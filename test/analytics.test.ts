@@ -790,19 +790,28 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
 
   // `tick` runs on the UI's timer (`FILES_POLL_MS`, 5 s): every open session's write waits `BUSY_MS` for the lock on its own, in the UI thread, so N sessions freeze it N x 200 ms
   // per poll for as long as the other connection holds the lock. One busy answer says the file is busy for the rest of that tick.
+  // What one blocked write waits is the platform's (macOS's system SQLite sleeps about twice a busy_timeout: 422 ms for 200), so the bound is relative: one tick of a single session
+  // against the lock is the measure of "once", and six sessions must not take much longer than that, where one wait per session would take six times as long.
   test("BUG-649/QA-analytics-02: one tick against a locked file waits for the lock once, not once per open session", () => {
-    const { path } = fresh();
-    const c = clock();
-    const a = new Analytics({ enabled: true, path, now: c.now });
-    for (let i = 0; i < 6; i++) a.begin(start({ name: `s${i}` }));
-    const unlock = hold(path);
-    c.t += FLUSH_MS;
-    const t0 = performance.now();
-    a.tick();
-    const waited = performance.now() - t0;
-    unlock();
-    a.close();
-    expect(waited).toBeLessThan(500);
+    const SESSIONS = 6;
+    const lockedTick = (sessions: number) => {
+      const { path } = fresh();
+      const c = clock();
+      const a = new Analytics({ enabled: true, path, now: c.now });
+      for (let i = 0; i < sessions; i++) a.begin(start({ name: `s${i}` }));
+      const unlock = hold(path);
+      c.t += FLUSH_MS;
+      const t0 = performance.now();
+      a.tick();
+      const waited = performance.now() - t0;
+      unlock();
+      a.close();
+      return waited;
+    };
+    const once = lockedTick(1);
+    const many = lockedTick(SESSIONS);
+    // 2.5 x one wait (+ a slack for a slow runner) is far under the 6 x of a wait per session.
+    expect(many).toBeLessThan(2.5 * once + 100 * (Number(process.env.GLUON_TEST_SLOW) || 1));
   });
 
   (POSIX ? test : test.skip)("BUG-650/QA-analytics-03: a state directory that is a symlink (a dotfiles setup) still records", () => {

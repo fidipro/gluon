@@ -905,6 +905,8 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     expect(existsSync(`${lockOf("abcdef")}.takeover`)).toBe(false);
   });
 
+  // 200 tries, each a sleep of 10 ms and two private-directory creations (the claim, the takeover file): 2 s on Linux, 9.4 s on a macOS CI runner (BUG-643).
+  const SLOW = Number(process.env.GLUON_TEST_SLOW) || (process.platform === "win32" ? 3 : 1);
   test("a garbled claim that can't be taken over names no process", () => {
     // A takeover file held by a live process keeps the garbled claim in place for the whole wait.
     mkdirSync(workspacesDir(), { recursive: true });
@@ -912,7 +914,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     writeFileSync(lockOf("abcdef"), "not json");
     writeFileSync(`${lockOf("abcdef")}.takeover`, `${JSON.stringify({ v: 1, pid: 333 })}\n`);
     expect(claimWorkspace("abcdef", { owner: { pid: 222 }, alive })).toEqual({ ok: false });
-  });
+  }, 10_000 * SLOW);
 
   test("deleting a saved workspace takes its claim along; a claim without a workspace is left to its owner", () => {
     saveWorkspace(workspace());
