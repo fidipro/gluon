@@ -1,0 +1,93 @@
+{
+ "_about": "Claude Code 2.1.289's own status-line input after each step of claude-code-2.1.289-live-haiku.jsonl: two prompts, /compact, a prompt. A real run on an API key (claude-haiku-4-5); the OTLP went to a local listener.",
+ "steps": [
+  {
+   "model": {
+    "id": "claude-haiku-4-5",
+    "display_name": "Haiku 4.5"
+   },
+   "cost": {
+    "total_cost_usd": 0.02782125
+   },
+   "context_window": {
+    "total_input_tokens": 22099,
+    "total_output_tokens": 40,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 10,
+     "output_tokens": 40,
+     "cache_creation_input_tokens": 22089,
+     "cache_read_input_tokens": 0
+    },
+    "used_percentage": 11,
+    "remaining_percentage": 89
+   }
+  },
+  {
+   "model": {
+    "id": "claude-haiku-4-5",
+    "display_name": "Haiku 4.5"
+   },
+   "cost": {
+    "total_cost_usd": 0.03123965
+   },
+   "context_window": {
+    "total_input_tokens": 22185,
+    "total_output_tokens": 31,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 10,
+     "output_tokens": 31,
+     "cache_creation_input_tokens": 86,
+     "cache_read_input_tokens": 22089
+    },
+    "used_percentage": 11,
+    "remaining_percentage": 89
+   }
+  },
+  {
+   "model": {
+    "id": "claude-haiku-4-5",
+    "display_name": "Haiku 4.5"
+   },
+   "cost": {
+    "total_cost_usd": 0.040140300000000004
+   },
+   "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 0,
+     "output_tokens": 0,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 0
+    },
+    "used_percentage": 0,
+    "remaining_percentage": 100
+   }
+  },
+  {
+   "model": {
+    "id": "claude-haiku-4-5",
+    "display_name": "Haiku 4.5"
+   },
+   "cost": {
+    "total_cost_usd": 0.045306650000000004
+   },
+   "context_window": {
+    "total_input_tokens": 21291,
+    "total_output_tokens": 41,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 10,
+     "output_tokens": 41,
+     "cache_creation_input_tokens": 2455,
+     "cache_read_input_tokens": 18826
+    },
+    "used_percentage": 11,
+    "remaining_percentage": 89
+   }
+  }
+ ]
+}

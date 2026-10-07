@@ -1,0 +1,67 @@
+{
+ "schema": 1,
+ "source": "grok binary default_models.json",
+ "grokVersion": "1.0.46",
+ "generatedAt": "2026-10-04",
+ "digest": "9d6924ec760a94f91902f60adb8bcf2cd9d3ab86891a1c83e8c01a092e56490a",
+ "models": {
+  "grok-4.5": {
+   "context": 500000,
+   "source": "binary",
+   "autoCompactPercent": 80
+  },
+  "grok-4.6": {
+   "context": 500000,
+   "source": "binary",
+   "autoCompactPercent": 80,
+   "cost": {
+    "input": 2,
+    "output": 6,
+    "cache_read": 0.5,
+    "tiers": [
+     {
+      "input": 4,
+      "output": 12,
+      "cache_read": 1,
+      "tier": {
+       "type": "context",
+       "size": 200000
+      }
+     }
+    ],
+    "context_over_200k": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 1
+    }
+   },
+   "costSource": "models.dev-seed"
+  },
+  "grok-4.7": {
+   "context": 256000,
+   "source": "observed",
+   "cost": {
+    "input": 2,
+    "output": 6,
+    "cache_read": 0.5,
+    "tiers": [
+     {
+      "input": 4,
+      "output": 12,
+      "cache_read": 1,
+      "tier": {
+       "type": "context",
+       "size": 200000
+      }
+     }
+    ],
+    "context_over_200k": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 1
+    }
+   },
+   "costSource": "models.dev-seed"
+  }
+ }
+}

@@ -1,0 +1,88 @@
+{
+ "_about": "Claude Code 2.1.289's own status-line input (what its footer shows), after each step of the scenario in claude-code-2.1.289.jsonl: a first turn, /compact, a subagent turn, a last turn. Captured offline against a local fake API.",
+ "steps": [
+  {
+   "model": {
+    "id": "claude-opus-4-6",
+    "display_name": "Opus 4.6"
+   },
+   "cost": {
+    "total_cost_usd": 0.355
+   },
+   "context_window": {
+    "total_input_tokens": 40000,
+    "total_output_tokens": 800,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 5000,
+     "output_tokens": 800,
+     "cache_creation_input_tokens": 20000,
+     "cache_read_input_tokens": 15000
+    },
+    "used_percentage": 20,
+    "remaining_percentage": 80
+   }
+  },
+  {
+   "model": {
+    "id": "claude-opus-4-6",
+    "display_name": "Opus 4.6"
+   },
+   "cost": {
+    "total_cost_usd": 0.3835
+   },
+   "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 200000,
+    "current_usage": null,
+    "used_percentage": null,
+    "remaining_percentage": null
+   }
+  },
+  {
+   "model": {
+    "id": "claude-opus-4-6",
+    "display_name": "Opus 4.6"
+   },
+   "cost": {
+    "total_cost_usd": 0.9959999999999999
+   },
+   "context_window": {
+    "total_input_tokens": 10000,
+    "total_output_tokens": 300,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 6000,
+     "output_tokens": 300,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 4000
+    },
+    "used_percentage": 5,
+    "remaining_percentage": 95
+   }
+  },
+  {
+   "model": {
+    "id": "claude-opus-4-6",
+    "display_name": "Opus 4.6"
+   },
+   "cost": {
+    "total_cost_usd": 1.1024999999999998
+   },
+   "context_window": {
+    "total_input_tokens": 12000,
+    "total_output_tokens": 400,
+    "context_window_size": 200000,
+    "current_usage": {
+     "input_tokens": 7000,
+     "output_tokens": 400,
+     "cache_creation_input_tokens": 1000,
+     "cache_read_input_tokens": 4000
+    },
+    "used_percentage": 6,
+    "remaining_percentage": 94
+   }
+  }
+ ]
+}

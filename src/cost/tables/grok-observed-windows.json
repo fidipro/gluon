@@ -1,0 +1,13 @@
+{
+ "schema": 1,
+ "source": "observed",
+ "note": "Hand-maintained by Gluon, not generated: the window Grok Build showed for a model its binary's default_models.json does not list yet. Add only with a live observation; remove once the binary lists the model (docs/contributing/maintenance.md).",
+ "models": {
+  "grok-4.7": {
+   "context": 256000,
+   "observedAt": "2026-10-04",
+   "grokVersion": "1.0.46",
+   "evidence": "Grok Build footer 13K / 256K and 17K / 256K on a subscription session; its footer counts K as 1000 (301K / 500K for 301,000 of 500,000 tokens), and its docs write windows as round decimals (256000)"
+  }
+ }
+}

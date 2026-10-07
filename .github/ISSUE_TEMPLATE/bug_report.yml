@@ -1,0 +1,43 @@
+name: Bug report
+description: Something doesn't work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problem?** Don't file it here — see [SECURITY.md](../blob/main/SECURITY.md).
+        Please remove keys and tokens from anything you paste (Gluon masks them in its own output).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `gluon doctor`
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Gluon version (`gluon --version`)
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Linux, WSL, macOS, Windows (PowerShell), Windows (cmd), Other]
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and shell (e.g. Windows Terminal + PowerShell 7, iTerm2 + zsh)

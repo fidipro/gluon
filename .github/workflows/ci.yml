@@ -1,0 +1,342 @@
+name: CI
+
+# Automatic: a pull request into main and a push to main run the tests of the changed areas (`bun run regression
+# --changed <base>`, always with the typecheck; a change to a core or unclassified file means the whole fast tier) on
+# Linux, macOS and Windows, plus the secret scan and the docs build. The base is origin/<base branch> for a pull
+# request and the previous head (github.event.before) for a push; a first push or a missing commit runs suite quick.
+# Neither runs the full suite, test:dist, the Docker suite or the cross-build: those run by hand before a release
+#   gh workflow run ci.yml --ref main -f suite=full
+# By hand (Actions → CI → Run workflow, or `gh workflow run ci.yml --ref <branch>`): the narrowest os, area or
+# filter, e.g. one OS and one bug's tests:
+#   gh workflow run ci.yml --ref <branch> -f os=macos -f filter=BUG-189 -f extras=false
+# Suites (-f suite=...): changed (the areas changed since origin/main), quick (typecheck + the fast tier,
+# `bun run regression`), full (the default by hand: every test, test:dist, and the extras), dist (test:dist only),
+# install-smoke (the published one-liner installers against the latest release; nothing is checked out or built).
+#
+# Never `pull_request_target`: a pull request's code runs with a read-only token and no secrets (test/release.test.ts).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "changed = the areas changed since origin/main; quick = typecheck + fast tier; full = everything; dist = test:dist; install-smoke = the released one-liner installers on each OS"
+        type: choice
+        options: [full, changed, quick, dist, install-smoke]
+        default: full
+      area:
+        description: "Only this area's tests (test/areas.ts: a name or a comma list), with the typecheck; for suite changed, quick or full (with changed it replaces the diff)"
+        type: string
+        default: ""
+      os:
+        description: Which OS runs the regression job (or the install-smoke one)
+        type: choice
+        options: [all, ubuntu, macos, windows, none]
+        default: all
+      filter:
+        description: "Only the tests matching this name (bun test -t), unit and e2e, after the typecheck; suite full only; skips test:dist and install.ps1"
+        type: string
+        default: ""
+      extras:
+        description: Suite full only - also run docker-test, build:all, the docs site build and gitleaks
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One run per pull request (a new push cancels the old run); a push to main or a manual run is never cancelled.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # What this event runs, in one place. Inputs are empty outside workflow_dispatch, so no job reads them directly.
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      suite: ${{ steps.plan.outputs.suite }}
+      os: ${{ steps.plan.outputs.os }}
+      heavy: ${{ steps.plan.outputs.heavy }}
+      light: ${{ steps.plan.outputs.light }}
+      base: ${{ steps.plan.outputs.base }}
+    env:
+      # An input reaches the shell as a variable, never spliced into the script.
+      EVENT: ${{ github.event_name }}
+      BASE_REF: ${{ github.base_ref }}
+      BEFORE: ${{ github.event.before }}
+      IN_SUITE: ${{ inputs.suite }}
+      IN_OS: ${{ inputs.os }}
+      IN_EXTRAS: ${{ inputs.extras }}
+    steps:
+      - id: plan
+        shell: bash
+        run: |
+          set -eu
+          # suite: changed on a pull request and on a push to main, the input by hand. base: what `changed` compares with.
+          # os: the runners of the regression (or install-smoke) job. heavy: docker + build-all. light: gitleaks + docs.
+          # Only a run by hand can be heavy (suite full with extras): a pull request or push never runs docker-test,
+          # build:all or regression:full (test/release.test.ts).
+          base=
+          case "$EVENT" in
+            pull_request) suite=changed; os=all; heavy=false; light=true; base="origin/$BASE_REF" ;;
+            push) suite=changed; os=all; heavy=false; light=true; base="$BEFORE" ;;
+            *)
+              suite="${IN_SUITE:-full}"; os="${IN_OS:-all}"; heavy=false; light=false
+              if [ "$suite" = changed ]; then base=origin/main; fi
+              if [ "$suite" = full ] && [ "${IN_EXTRAS:-true}" = true ]; then heavy=true; light=true; fi ;;
+          esac
+          # The base is checked before it reaches a command: a push needs a commit id that is not all zeros (a first push
+          # has none), a pull request a plain branch name. Anything else runs the fast tier whole.
+          if [ "$suite" = changed ]; then
+            ok=false
+            case "$EVENT" in
+              push) if printf '%s' "$base" | grep -Eq '^[0-9a-f]{40}$' && ! printf '%s' "$base" | grep -Eq '^0{40}$'; then ok=true; fi ;;
+              *) if printf '%s' "$base" | grep -Eq '^[A-Za-z0-9._][A-Za-z0-9._/-]*$'; then ok=true; fi ;;
+            esac
+            if [ "$ok" != true ]; then suite=quick; base=; fi
+          fi
+          case "$os" in
+            all) matrix='["ubuntu-24.04","macos-15","windows-2025"]' ;;
+            ubuntu) matrix='["ubuntu-24.04"]' ;;
+            macos) matrix='["macos-15"]' ;;
+            windows) matrix='["windows-2025"]' ;;
+            *) matrix='[]' ;;
+          esac
+          {
+            echo "suite=$suite"
+            echo "os=$matrix"
+            echo "heavy=$heavy"
+            echo "light=$light"
+            echo "base=$base"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  # Typecheck, unit tests, end-to-end scenarios (pty ones too: Bun's terminal spawn works on all
+  # three, through ConPTY on Windows) and the compiled binary, on each OS. macOS signs its binary
+  # ad hoc (scripts/build.ts); Windows runs the compiled TypeScript fake agents (test/fixtures/fake-agent.ts).
+  regression:
+    needs: plan
+    if: needs.plan.outputs.suite != 'install-smoke' && needs.plan.outputs.os != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60 # the full Windows suite under SLOW=4 outgrew 30 minutes
+    # A 2–4 vCPU runner is several times slower than a developer's machine: longer waits and test
+    # timeouts (the harness's SLOW), and fewer apps at once than `bun run regression`'s 6.
+    env:
+      GLUON_TEST_SLOW: ${{ matrix.os == 'windows-2025' && '4' || '2' }}
+      GLUON_E2E_CONCURRENCY: "3"
+      SUITE: ${{ needs.plan.outputs.suite }}
+      BASE: ${{ needs.plan.outputs.base }}
+      AREA: ${{ inputs.area }}
+      FILTER: ${{ inputs.filter }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `regression --changed` needs the merge-base with the base: its history, and origin/main
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      # The typecheck runs in every suite but dist: `regression` does its own first.
+      - name: tests
+        if: env.SUITE == 'changed' || env.SUITE == 'quick' || env.SUITE == 'full'
+        shell: bash
+        run: |
+          set -eu
+          # changed: the areas changed since $BASE, and always the typecheck (a change no test reads still gets it). A base
+          # that is not in the history (a force-pushed `before`) runs the whole fast tier; so does a core file (regression.ts).
+          if [ "$SUITE" = changed ] && [ -z "$AREA" ] && ! git rev-parse --verify --quiet "$BASE^{commit}" > /dev/null; then
+            echo "::warning::$BASE is not in the history: running the whole fast tier"
+            SUITE=quick
+          fi
+          if [ "$SUITE" = changed ] && [ -z "$AREA" ]; then
+            bun run regression --changed "$BASE"
+          elif [ "$SUITE" = changed ] || [ "$SUITE" = quick ]; then
+            bun run regression ${AREA:+--area "$AREA"}
+          elif [ -n "$FILTER" ]; then
+            bun run typecheck
+            bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' -t "$FILTER"
+            bun test --concurrent --max-concurrency=3 test/e2e -t "$FILTER"
+          elif [ -n "$AREA" ]; then
+            bun run regression:full --area "$AREA"
+          else
+            # Every step runs even when an earlier one fails (a failing unit test must not hide the e2e and dist results).
+            rc=0
+            bun run typecheck || rc=1
+            bun run test:unit || rc=1
+            bun run test:e2e --max-concurrency=3 || rc=1
+            bun run test:dist || rc=1
+            exit $rc
+          fi
+      - name: test:dist
+        if: env.SUITE == 'dist'
+        run: bun run test:dist
+      # install.ps1 against a local release dir and the https fixture (self-signed, localhost; the
+      # exe test:dist built natively): never -AddToPath, the user PATH only read.
+      - name: install.ps1 (Windows PowerShell 5.1)
+        if: runner.os == 'Windows' && (env.SUITE == 'dist' || (env.SUITE == 'full' && env.FILTER == '' && env.AREA == ''))
+        shell: powershell
+        run: .\test\install-ps1.ps1 -Exe dist\gluon-bun-windows-x64.exe -Fixture test\fixtures\https-release.ts
+
+  # The published one-liners (README, docs/getting-started/install.md) against the latest release, as a user runs
+  # them: no checkout, no Bun. Fails until a release is published.
+  install-smoke:
+    needs: plan
+    if: needs.plan.outputs.suite == 'install-smoke' && needs.plan.outputs.os != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      # This repository's latest release supplies the installer scripts. install.sh and install.ps1
+      # pin the upstream repo and its signing identity (src/repo.ts), so in a fork they still install the
+      # upstream release, and the version check below compares against the fork's latest: it only passes upstream.
+      RELEASES: https://github.com/${{ github.repository }}/releases/latest
+    steps:
+      # With cosign on PATH, install.sh also checks the release's signature.
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: runner.os != 'Windows'
+      - name: install.sh one-liner
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "$RELEASES/download/install.sh" | sh | tee "$RUNNER_TEMP/install.log"
+          grep -q 'signature ok' "$RUNNER_TEMP/install.log"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: gluon --version is the latest release
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest=$(curl -fsSL -o /dev/null -w '%{url_effective}' "$RELEASES")
+          latest="${latest##*/v}"
+          got=$(gluon --version)
+          echo "gluon $got, latest release $latest"
+          [ "$got" = "$latest" ]
+      - name: install.ps1 one-liner (PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          irm "$env:RELEASES/download/install.ps1" | iex
+          "$env:LOCALAPPDATA\Programs\gluon" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - name: gluon --version
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $v = gluon --version
+          if ($LASTEXITCODE -ne 0 -or $v -notmatch '^\d+\.\d+\.\d+') { throw "gluon --version printed '$v'" }
+          "gluon $v"
+      # Windows PowerShell 5.1 runs the same one-liner over the install the step above made.
+      - name: install.ps1 one-liner (Windows PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          irm "$env:RELEASES/download/install.ps1" | iex
+          $v = & "$env:LOCALAPPDATA\Programs\gluon\gluon.exe" --version
+          if ($LASTEXITCODE -ne 0 -or $v -notmatch '^\d+\.\d+\.\d+') { throw "gluon --version printed '$v'" }
+          "gluon $v"
+
+  # scripts/docker-test.sh: shellcheck, the regression in oven/bun debian + alpine, the npm tarball
+  # installed with `bun add -g`, and the release executables + install.sh (good, tampered, missing
+  # SHA256SUMS) in plain ubuntu / debian / alpine. Every container runs with --network none.
+  docker:
+    needs: plan
+    if: needs.plan.outputs.heavy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60 # two full regressions (Debian, Alpine) plus smoke outgrew 40 minutes
+    # Passed into the regression containers (see the regression job).
+    env:
+      GLUON_TEST_SLOW: "2"
+      GLUON_E2E_CONCURRENCY: "3"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - run: bun run docker-test
+
+  # Cross-builds every target (catches build-plugin drift). Each OS's own binary is tested above.
+  build-all:
+    needs: plan
+    if: needs.plan.outputs.heavy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - run: bun run build:all
+
+  # The docs site (site/, Starlight): builds it and keeps the result as an artifact. pages.yml deploys it.
+  docs:
+    needs: plan
+    if: needs.plan.outputs.light == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-docs-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
+      - run: bun install --frozen-lockfile
+        working-directory: site
+      - run: bun run docs:build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-site
+          path: site/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  secrets:
+    needs: plan
+    if: needs.plan.outputs.light == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: gitleaks (full history)
+        run: >
+          docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --no-banner --redact -c /repo/.gitleaks.toml

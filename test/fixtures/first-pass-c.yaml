@@ -1,0 +1,10 @@
+brain:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  order:
+    - { route: anthropic-api, model: claude-sonnet-5-5 }
+connections:
+  claude-code: { auth: api, provider: bedrock }
+auth: { claude-code: subscription }
+aws: { profile: work }
+bedrock: { region: us-west-2 }

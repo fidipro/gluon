@@ -1,0 +1,8 @@
+# Release-binary smoke test and install.sh in plain Ubuntu (no Bun). Run by scripts/docker-test.sh:
+# /release and /install.sh are mounted read-only at run time.
+FROM ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
+RUN useradd --create-home --uid 2000 tester
+COPY smoke.sh /usr/local/bin/gluon-smoke
+USER tester
+WORKDIR /home/tester
+CMD ["/usr/local/bin/gluon-smoke"]

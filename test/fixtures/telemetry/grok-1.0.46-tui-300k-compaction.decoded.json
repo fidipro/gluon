@@ -1,0 +1,525 @@
+{
+ "otlp-011-logs.bin": [
+  {
+   "eventName": "grok_code.auth",
+   "time": "1791123221980313090",
+   "observed": "1791123221980313090",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "0"
+    },
+    "auth_method": "api_key"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "client.version": "1.0.46",
+    "terminal.type": "tmux",
+    "app.entrypoint": "tui",
+    "service.name": "grok-cli",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1"
+   }
+  },
+  {
+   "eventName": "grok_code.session_start",
+   "time": "1791123222208661177",
+   "observed": "1791123222208661177",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "1"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike",
+    "permission_mode": "ask",
+    "mcp_server_count": {
+     "int": "0"
+    },
+    "plugin_count": {
+     "int": "0"
+    },
+    "skill_count": {
+     "int": "0"
+    },
+    "hook_count": {
+     "int": "14"
+    },
+    "memory_enabled": false,
+    "is_git_repo": false,
+    "client_identifier": "grok-pager"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "client.version": "1.0.46",
+    "terminal.type": "tmux",
+    "app.entrypoint": "tui",
+    "service.name": "grok-cli",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1"
+   }
+  },
+  {
+   "eventName": "grok_code.model_switched",
+   "time": "1791123222226205924",
+   "observed": "1791123222226205924",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "2"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "from_model": "spike",
+    "to_model": "spike",
+    "success": true
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "client.version": "1.0.46",
+    "terminal.type": "tmux",
+    "app.entrypoint": "tui",
+    "service.name": "grok-cli",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1"
+   }
+  }
+ ],
+ "otlp-013-logs.bin": [
+  {
+   "eventName": "grok_code.session_end",
+   "time": "1791123237466199240",
+   "observed": "1791123237466199240",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "3"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "duration_secs": {
+     "int": "15"
+    },
+    "turn_count": {
+     "int": "0"
+    },
+    "tool_call_count": {
+     "int": "0"
+    },
+    "compaction_count": {
+     "int": "0"
+    },
+    "model": "spike-1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "client.version": "1.0.46",
+    "terminal.type": "tmux",
+    "app.entrypoint": "tui",
+    "service.name": "grok-cli",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1"
+   }
+  }
+ ],
+ "otlp-014-logs.bin": [
+  {
+   "eventName": "grok_code.auth",
+   "time": "1791123238543146937",
+   "observed": "1791123238543146937",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "0"
+    },
+    "auth_method": "api_key"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.session_start",
+   "time": "1791123238717752083",
+   "observed": "1791123238717752083",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "1"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike",
+    "permission_mode": "ask",
+    "mcp_server_count": {
+     "int": "0"
+    },
+    "plugin_count": {
+     "int": "0"
+    },
+    "skill_count": {
+     "int": "0"
+    },
+    "hook_count": {
+     "int": "14"
+    },
+    "memory_enabled": false,
+    "is_git_repo": false,
+    "client_identifier": "grok-pager"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.model_switched",
+   "time": "1791123238735780856",
+   "observed": "1791123238735780856",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "2"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "from_model": "spike",
+    "to_model": "spike",
+    "success": true
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  }
+ ],
+ "otlp-017-logs.bin": [
+  {
+   "eventName": "grok_code.user_prompt",
+   "time": "1791123266119663965",
+   "observed": "1791123266119663965",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "3"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "prompt_length": {
+     "int": "39"
+    },
+    "model": "spike-1",
+    "screen_mode": "fullscreen"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.api_request",
+   "time": "1791123266190121462",
+   "observed": "1791123266190121462",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "4"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike-1",
+    "duration_ms": {
+     "int": "6"
+    },
+    "stop_reason": "stop",
+    "input_tokens": {
+     "int": "30000"
+    },
+    "output_tokens": {
+     "int": "100"
+    },
+    "reasoning_tokens": {
+     "int": "0"
+    },
+    "cache_read_tokens": {
+     "int": "0"
+    },
+    "cache_creation_tokens": {
+     "int": "0"
+    },
+    "cost_usd_micros": {
+     "int": "9"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.turn_completed",
+   "time": "1791123266256738991",
+   "observed": "1791123266256738991",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "5"
+    },
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "outcome": "completed",
+    "duration_ms": {
+     "int": "88"
+    },
+    "tool_call_count": {
+     "int": "0"
+    },
+    "model": "spike-1",
+    "session.id": "00000000-0000-0000-0000-000000000000"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.assistant_response",
+   "time": "1791123266256805915",
+   "observed": "1791123266256805915",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "6"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "response_length": {
+     "int": "2"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  }
+ ],
+ "otlp-002-logs.bin": [
+  {
+   "eventName": "grok_code.user_prompt",
+   "time": "1791123317788951560",
+   "observed": "1791123317788951560",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "7"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "1"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "prompt_length": {
+     "int": "45"
+    },
+    "model": "spike-1",
+    "screen_mode": "fullscreen"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.api_request",
+   "time": "1791123317866106416",
+   "observed": "1791123317866106416",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "8"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "1"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike-1",
+    "duration_ms": {
+     "int": "20"
+    },
+    "stop_reason": "stop",
+    "input_tokens": {
+     "int": "300000"
+    },
+    "output_tokens": {
+     "int": "1000"
+    },
+    "reasoning_tokens": {
+     "int": "400"
+    },
+    "cache_read_tokens": {
+     "int": "100000"
+    },
+    "cache_creation_tokens": {
+     "int": "0"
+    },
+    "cost_usd_micros": {
+     "int": "25000"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.turn_completed",
+   "time": "1791123317973074352",
+   "observed": "1791123317973074352",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "9"
+    },
+    "turn_number": {
+     "int": "1"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "outcome": "completed",
+    "duration_ms": {
+     "int": "129"
+    },
+    "tool_call_count": {
+     "int": "0"
+    },
+    "model": "spike-1",
+    "session.id": "00000000-0000-0000-0000-000000000000"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  },
+  {
+   "eventName": "grok_code.assistant_response",
+   "time": "1791123317973149239",
+   "observed": "1791123317973149239",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "10"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "1"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "response_length": {
+     "int": "2"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  }
+ ],
+ "otlp-003-logs.bin": [
+  {
+   "eventName": "grok_code.compaction",
+   "time": "1791123377165719362",
+   "observed": "1791123377165719362",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "11"
+    },
+    "duration_ms": {
+     "int": "71"
+    },
+    "tokens_before": {
+     "int": "301000"
+    },
+    "tokens_after": {
+     "int": "301000"
+    },
+    "model": "spike-1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "service.name": "grok-cli",
+    "app.entrypoint": "tui",
+    "service.version": "1.0.46 (2765805b9442)",
+    "grok_code.schema.version": "v1",
+    "terminal.type": "tmux",
+    "client.version": "1.0.46"
+   }
+  }
+ ]
+}

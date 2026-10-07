@@ -1,0 +1,98 @@
+---
+title: "Overview"
+description: "Gluon is a control platform for coding agents. It asks a few questions, writes a spec and starts the right agent, model and effort for the job."
+---
+
+import { Tabs, TabItem, Card, CardGrid } from '@astrojs/starlight/components';
+
+Gluon is a terminal app (the command is `gluon`) where you run coding agents side by side: Claude Code, Codex, Antigravity, Grok Build, OpenCode and Kimi Code, each on your own API key or your own subscription. Its home is the list of your sessions. Under it, the intake agent (an LLM with read-only access to your repository) asks a few questions about what you want to build, then proposes the agent as harness × model × effort with an agent-ready spec.
+
+Enter starts the session: the agent's own UI, unchanged, inside Gluon's frame. Start more, switch between them, go home with one key. Nothing has to be quit to switch.
+
+## Get started
+
+Pick your system, install Gluon, then run it in a repository. Gluon asks you to connect your agents the first time.
+
+<Tabs syncKey="os">
+  <TabItem label="Linux / macOS">
+    Works on Linux, macOS and WSL. It installs `~/.local/bin/gluon` (no sudo) after checking the download against the release's `SHA256SUMS`.
+
+    ```sh
+    curl -fsSL https://github.com/fidipro/gluon/releases/latest/download/install.sh | sh
+    ```
+
+    On Alpine and other musl systems, also run `apk add libstdc++ libgcc`.
+  </TabItem>
+  <TabItem label="Windows">
+    In PowerShell. It installs `%LOCALAPPDATA%\Programs\gluon\gluon.exe` after the same checksum check and changes your user PATH only if you ask.
+
+    ```powershell
+    irm https://github.com/fidipro/gluon/releases/latest/download/install.ps1 | iex
+    ```
+  </TabItem>
+  <TabItem label="Bun">
+    On Linux and macOS with Bun already installed, take the npm-style tarball from the release.
+
+    ```sh
+    bun add -g ./gluon-<version>.tgz
+    ```
+
+    It does not run on Windows.
+  </TabItem>
+  <TabItem label="From source">
+    Clone the repository and run it with Bun. The setup is in [Contributing](contributing/contributing.md).
+  </TabItem>
+</Tabs>
+
+Then start Gluon in any repository:
+
+```sh
+cd your-repo
+gluon
+```
+
+:::note
+The URLs above install the latest release. [Install Gluon](getting-started/install.md) has the release files, how to verify a download and how to install from a directory you built yourself.
+:::
+
+[Continue with the quickstart →](getting-started/quickstart.md)
+
+## What you can do
+
+<CardGrid>
+  <Card title="Describe the work, not the agent" icon="pencil">
+    Say what the session is for. The intake agent looks around your repository, asks only what it cannot tell from the code, and writes the spec the agent will get.
+  </Card>
+  <Card title="Let routing pick the agent" icon="random">
+    Your `routing.yaml` turns the session's kind and difficulty into an agent, a model and an effort, among the models your connections can really reach. See [Routing](guides/routing.md).
+  </Card>
+  <Card title="Run several agents at once" icon="laptop">
+    Each session is an agent's own binary in its own terminal, in Gluon's frame. Switch with one key while every session keeps running, and reopen them later with `gluon resume`. See [Sessions](guides/sessions.md).
+  </Card>
+  <Card title="Use your key or your plan" icon="approve-check">
+    Connect each agent with an API key (Anthropic, OpenAI, Gemini, xAI, Amazon Bedrock, OpenRouter) or your own subscription. See [Connections](guides/connections.md).
+  </Card>
+  <Card title="Explore or plan before it builds" icon="open-book">
+    Start a session in build, explore (read-only) or plan mode. See [Modes](guides/modes.md).
+  </Card>
+  <Card title="Keep sessions apart" icon="code-branch">
+    In a git repository each session works in its own worktree and branch, so sessions do not step on each other. See [Worktrees](guides/worktrees.md).
+  </Card>
+  <Card title="See what a session costs" icon="analytics">
+    Every row shows the agent's state, its cost and its context use, counted by Gluon's own tables. See [Cost and context](guides/cost-and-context.md).
+  </Card>
+  <Card title="Stay in control of your keys" icon="padlock">
+    Keys stay out of Gluon's environment, repository content goes nowhere but the intake agent's provider, and there is no telemetry. See [Security and privacy](guides/security-privacy.md).
+  </Card>
+</CardGrid>
+
+## Next steps
+
+- [Install Gluon](getting-started/install.md): the installers, release files and how to verify a download.
+- [Quickstart](getting-started/quickstart.md): your first session, from `gluon` to a running agent.
+- [Connect your agents](getting-started/connect-agents.md): install each agent and sign in or add a key.
+- [Supported agents](guides/harnesses/claude-code.md): one page per agent, with what it supports and its quirks.
+- [Command reference](reference/cli.md): every command and flag.
+- [Troubleshooting](guides/troubleshooting.md): fixes for the common problems.
+
+{/* Keeping this file fresh: update in the change that alters the install one-liners (install.sh, install.ps1; keep them equal to docs/getting-started/install.md), the supported agents (src/harnesses.ts) or a feature named in the cards. Release status lives only in docs/getting-started/install.md. */}

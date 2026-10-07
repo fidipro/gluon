@@ -1,0 +1,600 @@
+{
+ "otlp-001-logs.bin": [
+  {
+   "eventName": "grok_code.auth",
+   "time": "1791123491447797237",
+   "observed": "1791123491447797237",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "0"
+    },
+    "auth_method": "api_key"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.session_start",
+   "time": "1791123491514299041",
+   "observed": "1791123491514299041",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "1"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike",
+    "permission_mode": "always_approve",
+    "mcp_server_count": {
+     "int": "0"
+    },
+    "plugin_count": {
+     "int": "0"
+    },
+    "skill_count": {
+     "int": "0"
+    },
+    "hook_count": {
+     "int": "14"
+    },
+    "memory_enabled": false,
+    "is_git_repo": false,
+    "client_identifier": "grok-shell"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.model_switched",
+   "time": "1791123491522607215",
+   "observed": "1791123491522607215",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "2"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "from_model": "spike",
+    "to_model": "spike",
+    "success": true
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.user_prompt",
+   "time": "1791123491534077338",
+   "observed": "1791123491534077338",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "3"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "prompt_length": {
+     "int": "41"
+    },
+    "model": "spike-1",
+    "screen_mode": "headless"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.api_request",
+   "time": "1791123491602844679",
+   "observed": "1791123491602844679",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "4"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike-1",
+    "duration_ms": {
+     "int": "5"
+    },
+    "stop_reason": "toolcalls",
+    "input_tokens": {
+     "int": "50000"
+    },
+    "output_tokens": {
+     "int": "500"
+    },
+    "reasoning_tokens": {
+     "int": "50"
+    },
+    "cache_read_tokens": {
+     "int": "10000"
+    },
+    "cache_creation_tokens": {
+     "int": "0"
+    },
+    "cost_usd_micros": {
+     "int": "50"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.tool_decision",
+   "time": "1791123491613858466",
+   "observed": "1791123491613858466",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "5"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "tool_name": "task",
+    "decision": "allow",
+    "access_kind": "other",
+    "permission_mode": "always_approve",
+    "source": "config",
+    "tool_use_id": "call_1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.tool_result",
+   "time": "1791123491643677950",
+   "observed": "1791123491643677950",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "6"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "tool_name": "spawn_subagent",
+    "outcome": "success",
+    "success": true,
+    "hook_rewrote": false,
+    "duration_ms": {
+     "int": "10"
+    },
+    "model": "spike-1",
+    "tool_use_id": "call_1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.api_request",
+   "time": "1791123491650230687",
+   "observed": "1791123491650230687",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "7"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike-1",
+    "duration_ms": {
+     "int": "4"
+    },
+    "stop_reason": "stop",
+    "input_tokens": {
+     "int": "1000"
+    },
+    "output_tokens": {
+     "int": "10"
+    },
+    "reasoning_tokens": {
+     "int": "0"
+    },
+    "cache_read_tokens": {
+     "int": "0"
+    },
+    "cache_creation_tokens": {
+     "int": "0"
+    },
+    "cost_usd_micros": {
+     "int": "0"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.subagent",
+   "time": "1791123491678842953",
+   "observed": "1791123491678842953",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "8"
+    },
+    "phase": "launched",
+    "subagent_type": "explore"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.user_prompt",
+   "time": "1791123491733967299",
+   "observed": "1791123491733967299",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "9"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "prompt_length": {
+     "int": "14"
+    },
+    "model": "spike-1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.turn_completed",
+   "time": "1791123491736446122",
+   "observed": "1791123491736446122",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "10"
+    },
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "outcome": "completed",
+    "duration_ms": {
+     "int": "149"
+    },
+    "tool_call_count": {
+     "int": "1"
+    },
+    "model": "spike-1",
+    "session.id": "00000000-0000-0000-0000-000000000000"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.assistant_response",
+   "time": "1791123491736520366",
+   "observed": "1791123491736520366",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "11"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "response_length": {
+     "int": "2"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.api_request",
+   "time": "1791123491789360951",
+   "observed": "1791123491789360951",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "12"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "model": "spike-1",
+    "duration_ms": {
+     "int": "3"
+    },
+    "stop_reason": "stop",
+    "input_tokens": {
+     "int": "7000"
+    },
+    "output_tokens": {
+     "int": "70"
+    },
+    "reasoning_tokens": {
+     "int": "7"
+    },
+    "cache_read_tokens": {
+     "int": "2000"
+    },
+    "cache_creation_tokens": {
+     "int": "0"
+    },
+    "cost_usd_micros": {
+     "int": "0"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.turn_completed",
+   "time": "1791123491824693508",
+   "observed": "1791123491824693508",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "13"
+    },
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "outcome": "completed",
+    "duration_ms": {
+     "int": "50"
+    },
+    "tool_call_count": {
+     "int": "0"
+    },
+    "model": "spike-1",
+    "session.id": "00000000-0000-0000-0000-000000000000"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.assistant_response",
+   "time": "1791123491824734082",
+   "observed": "1791123491824734082",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "14"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "response_length": {
+     "int": "2"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.subagent",
+   "time": "1791123491842093308",
+   "observed": "1791123491842093308",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "15"
+    },
+    "phase": "completed",
+    "outcome": "completed",
+    "duration_ms": {
+     "int": "215"
+    }
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.session_end",
+   "time": "1791123491866582692",
+   "observed": "1791123491866582692",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "16"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "duration_secs": {
+     "int": "0"
+    },
+    "turn_count": {
+     "int": "1"
+    },
+    "tool_call_count": {
+     "int": "0"
+    },
+    "compaction_count": {
+     "int": "0"
+    },
+    "model": "spike-1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  },
+  {
+   "eventName": "grok_code.session_end",
+   "time": "1791123491909491499",
+   "observed": "1791123491909491499",
+   "severity": 9,
+   "attributes": {
+    "event.sequence": {
+     "int": "17"
+    },
+    "session.id": "00000000-0000-0000-0000-000000000000",
+    "turn_number": {
+     "int": "0"
+    },
+    "prompt.id": "00000000-0000-0000-0000-000000000000",
+    "duration_secs": {
+     "int": "0"
+    },
+    "turn_count": {
+     "int": "1"
+    },
+    "tool_call_count": {
+     "int": "1"
+    },
+    "compaction_count": {
+     "int": "0"
+    },
+    "model": "spike-1"
+   },
+   "scope": "ai.xai.grok_code",
+   "resource": {
+    "terminal.type": "vscode",
+    "grok_code.schema.version": "v1",
+    "service.version": "1.0.46 (2765805b9442)",
+    "client.version": "1.0.46",
+    "service.name": "grok-cli",
+    "app.entrypoint": "headless"
+   }
+  }
+ ]
+}

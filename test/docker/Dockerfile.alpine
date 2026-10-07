@@ -1,0 +1,9 @@
+# Release-binary (musl) smoke test and install.sh in plain Alpine (no Bun). Bun's musl builds need
+# libstdc++ and libgcc (install.sh says so). Run by scripts/docker-test.sh: /release and /install.sh
+# are mounted read-only at run time.
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+RUN apk add --no-cache libstdc++ libgcc && adduser -D -u 2000 tester
+COPY smoke.sh /usr/local/bin/gluon-smoke
+USER tester
+WORKDIR /home/tester
+CMD ["/usr/local/bin/gluon-smoke"]

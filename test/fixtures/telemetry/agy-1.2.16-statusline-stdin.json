@@ -1,0 +1,514 @@
+[
+ {
+  "at": 1791123193303,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": null
+   },
+   "exceeds_200k_tokens": null,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123193602,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": null
+   },
+   "exceeds_200k_tokens": null,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123209560,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": null
+   },
+   "exceeds_200k_tokens": null,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123209861,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": null
+   },
+   "exceeds_200k_tokens": null,
+   "product": "antigravity",
+   "agent_state": "working",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123210150,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13201,
+    "total_output_tokens": 200,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 200,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 2000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123258258,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13201,
+    "total_output_tokens": 200,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 200,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 2000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123258559,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13453,
+    "total_output_tokens": 300,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 2000,
+     "output_tokens": 100,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 6000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123284143,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13453,
+    "total_output_tokens": 300,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 2000,
+     "output_tokens": 100,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 6000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123284421,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13453,
+    "total_output_tokens": 300,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 2000,
+     "output_tokens": 100,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 6000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "working",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123284757,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13740,
+    "total_output_tokens": 460,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 80,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 1000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123311127,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13740,
+    "total_output_tokens": 460,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 80,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 1000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123311438,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13740,
+    "total_output_tokens": 460,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 80,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 1000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123333541,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13740,
+    "total_output_tokens": 460,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 80,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 1000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ },
+ {
+  "at": 1791123333841,
+  "statusline": {
+   "cwd": "<scrubbed>",
+   "session_id": "00000000-0000-0000-0000-000000000000",
+   "conversation_id": "00000000-0000-0000-0000-000000000000",
+   "transcript_path": "<scrubbed>",
+   "model": {
+    "id": "mock-model",
+    "display_name": "mock-model"
+   },
+   "workspace": {
+    "current_dir": "<scrubbed>",
+    "project_dir": "<scrubbed>"
+   },
+   "version": "1.2.16",
+   "context_window": {
+    "total_input_tokens": 13740,
+    "total_output_tokens": 460,
+    "context_window_size": 0,
+    "used_percentage": 0,
+    "remaining_percentage": 0,
+    "current_usage": {
+     "input_tokens": 3000,
+     "output_tokens": 80,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 1000
+    }
+   },
+   "exceeds_200k_tokens": false,
+   "product": "antigravity",
+   "agent_state": "idle",
+   "sandbox": {
+    "enabled": false
+   },
+   "terminal_width": 140
+  }
+ }
+]

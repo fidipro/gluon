@@ -1,0 +1,138 @@
+/* Gluon docs theme: neutral greys and one warm accent, in the manner of the Claude Code docs.
+   Starlight's scale: in dark mode gray-1 is lightest and gray-7 darkest; light mode inverts it. */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+:root {
+  --sl-font: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sl-content-width: 46rem;
+  --sl-sidebar-width: 17rem;
+  --sl-text-body: 1rem;
+  --sl-line-height: 1.7;
+  --gluon-radius: 0.75rem;
+
+  /* dark (default in Starlight's :root) */
+  --sl-color-white: #f4f4f4;
+  --sl-color-gray-1: #e4e4e4;
+  --sl-color-gray-2: #bdbdbd;
+  --sl-color-gray-3: #8f8f8f;
+  --sl-color-gray-4: #5f5f5f;
+  --sl-color-gray-5: #2f2f2f;
+  --sl-color-gray-6: #1f1f1f;
+  --sl-color-gray-7: #161616;
+  --sl-color-black: #0e0e0e;
+  --sl-color-accent-low: #3a2118;
+  --sl-color-accent: #d97757;
+  --sl-color-accent-high: #f2a98c;
+  --sl-color-text-invert: #0e0e0e;
+  --sl-color-hairline: var(--sl-color-gray-5);
+  --sl-color-hairline-light: var(--sl-color-gray-6);
+  --sl-color-hairline-shade: var(--sl-color-gray-6);
+}
+
+:root[data-theme="light"] {
+  /* accent darkened so white text on it and orange links on white both pass 4.5:1 */
+  --sl-color-white: #111111;
+  --sl-color-gray-1: #262626;
+  --sl-color-gray-2: #404040;
+  --sl-color-gray-3: #5c5c5c;
+  --sl-color-gray-4: #8c8c8c;
+  --sl-color-gray-5: #dcdcdc;
+  --sl-color-gray-6: #efefef;
+  --sl-color-gray-7: #f7f7f7;
+  --sl-color-black: #ffffff;
+  --sl-color-accent-low: #fbe9e1;
+  --sl-color-accent: #b9532f;
+  --sl-color-accent-high: #8f3d20;
+  --sl-color-text-invert: #ffffff;
+}
+
+/* Page background and header: flat, no tint. */
+:root { --sl-color-bg-nav: var(--sl-color-black); --sl-color-bg-sidebar: var(--sl-color-black); }
+.header { border-bottom: 1px solid var(--sl-color-hairline); }
+.site-title { font-weight: 650; font-size: 1.15rem; letter-spacing: -0.01em; }
+.sidebar-pane { border-inline-end: 1px solid var(--sl-color-hairline); }
+
+/* Sidebar: small uppercase-free group headings like Mintlify, subtle active pill. */
+.sidebar-content { gap: 1.25rem; }
+.sidebar-content details > summary .large { font-size: 0.8125rem; font-weight: 600; color: var(--sl-color-white); }
+.sidebar-content a { border-radius: 0.5rem; font-size: 0.875rem; padding-block: 0.3rem; }
+.sidebar-content a[aria-current="page"] {
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-accent-high);
+  font-weight: 550;
+}
+.sidebar-content a:not([aria-current="page"]):hover { background: var(--sl-color-gray-6); color: var(--sl-color-white); }
+
+/* Content */
+.sl-markdown-content :not(a, strong, em, del, span, input, code, br) + :not(a, strong, em, del, span, input, code, br, :where(.not-content *)) {
+  margin-top: 1.1rem;
+}
+.sl-markdown-content h2 { font-size: 1.5rem; letter-spacing: -0.015em; margin-top: 2.5rem; }
+.sl-markdown-content h3 { font-size: 1.2rem; margin-top: 1.9rem; }
+h1#_top { font-size: 2.125rem; letter-spacing: -0.02em; font-weight: 650; }
+.sl-markdown-content a:not(.not-content a) { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+.sl-markdown-content :not(pre) > code {
+  font-size: 0.85em;
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.4rem;
+  padding: 0.12em 0.4em;
+}
+.sl-markdown-content hr { border-color: var(--sl-color-hairline); }
+
+/* Code blocks (Expressive Code; its copy button is built in). */
+:root {
+  --ec-brdRad: var(--gluon-radius);
+  --ec-brdCol: var(--sl-color-gray-5);
+  --ec-codeFontFml: var(--sl-font-mono);
+  --ec-codeFontSize: 0.84rem;
+  --ec-codePadBlk: 0.9rem;
+  --ec-codePadInl: 1.1rem;
+}
+:root[data-theme="dark"], :root:not([data-theme="light"]) { --ec-codeBg: #121212; --ec-frm-edBg: #121212; --ec-frm-trmBg: #121212; --ec-frm-edTabBarBg: #1b1b1b; --ec-frm-trmTtbBg: #1b1b1b; }
+:root[data-theme="light"] { --ec-codeBg: #f7f7f7; --ec-frm-edBg: #f7f7f7; --ec-frm-trmBg: #f7f7f7; --ec-frm-edTabBarBg: #efefef; --ec-frm-trmTtbBg: #efefef; }
+
+/* Tables */
+.sl-markdown-content table { display: table; width: 100%; border: 1px solid var(--sl-color-gray-5); border-radius: var(--gluon-radius); border-collapse: separate; border-spacing: 0; overflow: hidden; font-size: 0.9rem; }
+.sl-markdown-content th { background: var(--sl-color-gray-6); font-weight: 600; }
+.sl-markdown-content :is(th, td) { border-bottom: 1px solid var(--sl-color-gray-5); padding: 0.55rem 0.8rem; }
+.sl-markdown-content tr:last-child td { border-bottom: 0; }
+.sl-markdown-content :is(th, td):not(:last-child) { border-inline-end: 1px solid var(--sl-color-gray-5); }
+
+/* Asides (note / tip / caution / danger): flat card with a thin border, as in Mintlify callouts. */
+.starlight-aside {
+  border: 1px solid color-mix(in srgb, var(--sl-color-asides-text-accent) 35%, transparent);
+  border-inline-start-width: 1px;
+  border-radius: var(--gluon-radius);
+  background: color-mix(in srgb, var(--sl-color-asides-text-accent) 8%, transparent);
+  padding: 0.9rem 1.1rem;
+}
+.starlight-aside--note { --sl-color-asides-text-accent: var(--sl-color-gray-2); }
+.starlight-aside__title { font-size: 0.85rem; font-weight: 600; }
+
+/* Cards and link cards (next-steps lists). */
+.sl-link-card, .card {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--gluon-radius);
+  background: transparent;
+  box-shadow: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sl-link-card:hover { border-color: var(--sl-color-accent); background: var(--sl-color-gray-7); }
+.sl-link-card .title { font-weight: 600; }
+.sl-link-card .title a { color: var(--sl-color-white); }
+.card .title { font-weight: 600; font-size: 1rem; }
+
+/* Right "On this page" table of contents */
+starlight-toc a { font-size: 0.8125rem; }
+starlight-toc a[aria-current="true"] { color: var(--sl-color-accent-high); }
+.right-sidebar-panel h2 { font-size: 0.8125rem; font-weight: 600; }
+
+/* Prev/next */
+.pagination-links a { border: 1px solid var(--sl-color-gray-5); border-radius: var(--gluon-radius); box-shadow: none; }
+.pagination-links a:hover { border-color: var(--sl-color-accent); }
+
+/* Search button */
+site-search button[data-open-modal] { border: 1px solid var(--sl-color-gray-5); border-radius: 0.6rem; background: var(--sl-color-gray-7); }

@@ -1,0 +1,3 @@
+# Bun reads this instead of a bunfig.toml in the current directory (package.json scripts pass
+# --config=scripts/empty-bunfig.toml): no preload or other setting from a repository runs (BUG-56).
+# /dev/null does that on POSIX (the shebangs) but not on Windows. Keep it without settings.

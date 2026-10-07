@@ -1,0 +1,258 @@
+# A release, run only by hand (Actions → Release → Run workflow) by the owner: never on push or tag.
+# Builds every executable on a runner of its own OS and CPU, the npm-style tarball, SHA256SUMS, a
+# CycloneDX SBOM and a keyless cosign signature of SHA256SUMS, uploads them as workflow
+# artifacts and creates a DRAFT release in this repository. Nothing is published: a draft is visible
+# only to people with write access, its tag is created only when someone publishes it, and there is
+# no npm publish step anywhere. Provenance attestations are not made.
+#
+# Why native runners: Bun's --bytecode output cross-compiled for another OS or CPU is not safe
+# (a Windows exe cross-built on Linux crashes at start; scripts/build.ts uses bytecode only for the
+# host), so each target is built where it runs, and every build job runs its own executables once.
+#
+# Permissions (BUG-121): every job reads only, except `sign` (id-token: write, only when signing,
+# no repository write) and `release` (contents: write, no third-party action, no checkout). The
+# SBOM action, which downloads syft at run time, runs in a read-only job.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.0.0 (must equal package.json's)"
+        required: true
+        type: string
+      sign:
+        description: >-
+          Sign SHA256SUMS with keyless cosign. This writes the repository name and workflow identity
+          to Sigstore's public transparency log (Rekor). Leave it on: install.sh and the install guide verify it.
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            name: linux-x64
+            targets: bun-linux-x64 bun-linux-x64-musl
+            pack: true
+          - runner: ubuntu-24.04-arm
+            name: linux-arm64
+            targets: bun-linux-arm64 bun-linux-arm64-musl
+          - runner: macos-15
+            name: darwin-arm64
+            targets: bun-darwin-arm64
+          - runner: macos-15-intel
+            name: darwin-x64
+            targets: bun-darwin-x64
+          - runner: windows-2025
+            name: windows-x64
+            targets: bun-windows-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ inputs.version }}
+      TARGETS: ${{ matrix.targets }}
+    steps:
+      # install.sh and docs/getting-started/install.md check the signature against release.yml on main.
+      - name: Only from main
+        run: '[ "$GITHUB_REF" = refs/heads/main ] || { echo "run the release from main, not $GITHUB_REF"; exit 1; }'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - name: Check the version
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "not a version: $VERSION"; exit 1; }
+          pkg=$(bun -e 'console.log(require("./package.json").version)')
+          [ "$pkg" = "$VERSION" ] || { echo "package.json is $pkg, not $VERSION"; exit 1; }
+      - run: bun install --frozen-lockfile
+      - name: Build
+        run: |
+          args=()
+          for t in $TARGETS; do args+=("--target=$t"); done
+          bun --no-env-file --config=scripts/empty-bunfig.toml scripts/build.ts "${args[@]}"
+      - name: Run each executable once
+        run: |
+          for t in $TARGETS; do
+            f="dist/gluon-$t"; [[ $t == bun-windows-* ]] && f="$f.exe"
+            if [[ $t == *-musl ]]; then
+              v=$(docker run --rm -v "$PWD/dist:/d:ro" alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc \
+                sh -c "apk add -q --no-cache libstdc++ libgcc >/dev/null && /d/${f#dist/} --version")
+            else
+              v=$("./$f" --version)
+            fi
+            [ "$v" = "$VERSION" ] || { echo "$f --version printed '$v'"; exit 1; }
+            echo "$f: $v"
+          done
+      - name: npm-style tarball
+        if: matrix.pack
+        run: bun --no-env-file --config=scripts/empty-bunfig.toml scripts/pack.ts
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-${{ matrix.name }}
+          path: |
+            dist/gluon-bun-*
+            dist/gluon-*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  # CycloneDX SBOM of the sources and lockfile: read-only.
+  sbom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: SBOM (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: gluon-${{ inputs.version }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: gluon-${{ inputs.version }}.cdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # The release's files in one place: the builds, the SBOM, the installers (so a one-liner can take
+  # them from the release, pinned: BUG-129) and SHA256SUMS over all of them. Read-only.
+  files:
+    needs: [build, sbom]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: build-*
+          path: release
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sbom
+          path: release
+      - name: Installers and SHA256SUMS
+        run: |
+          cp install.sh install.ps1 release/
+          cd release
+          ls -la
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+      # The draft's body: this version's CHANGELOG.md section (`[Unreleased]`, with a note, when there is none).
+      # Its own artifact, not a release file: it is not hashed or attached.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - name: Release notes
+        run: |
+          mkdir notes
+          bun --no-env-file --config=scripts/empty-bunfig.toml scripts/release-notes.ts "$VERSION" > notes/release-notes.md
+          cat notes/release-notes.md
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: notes-${{ inputs.version }}
+          path: notes/release-notes.md
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gluon-${{ inputs.version }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+  # Keyless cosign signature of SHA256SUMS (on by default; it writes to Sigstore's public log).
+  sign:
+    needs: files
+    if: inputs.sign
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: gluon-${{ inputs.version }}
+          path: release
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign SHA256SUMS (keyless)
+        working-directory: release
+        run: |
+          cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+          cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signature
+          path: release/SHA256SUMS.sigstore.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # The only job that can write to the repository: the draft release. GitHub's own actions and gh only.
+  release:
+    needs: [files, sign]
+    if: ${{ !cancelled() && needs.files.result == 'success' && (needs.sign.result == 'success' || needs.sign.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      SIGN: ${{ inputs.sign }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: gluon-${{ inputs.version }}
+          path: release
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: inputs.sign
+        with:
+          name: signature
+          path: release
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: notes-${{ inputs.version }}
+          path: notes
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          signed="not signed"; [ "$SIGN" = true ] && signed="signed with keyless cosign (SHA256SUMS.sigstore.json)"
+          {
+            cat notes/release-notes.md
+            printf '\n---\nDraft built by the Release workflow from %s. SHA256SUMS %s. Install and verify: see docs/getting-started/install.md.\n' "$GITHUB_SHA" "$signed"
+          } > notes/body.md
+          gh release create "v$VERSION" release/* \
+            --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" --title "Gluon $VERSION" \
+            --notes-file notes/body.md

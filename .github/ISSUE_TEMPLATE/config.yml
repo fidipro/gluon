@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/fidipro/gluon/security/advisories/new
+    about: Please report security problems privately, not as an issue.
+  - name: Questions and docs
+    url: https://github.com/fidipro/gluon/blob/main/SUPPORT.md
+    about: Where to ask questions, and what the documentation covers.

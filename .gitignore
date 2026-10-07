@@ -1,0 +1,13 @@
+node_modules/
+/reference/
+.env
+*.log
+qa/
+dist/
+*.tgz
+test/visual/out/
+site/node_modules/
+site/dist/
+site/.astro/
+.claude/
+gluon-intake.zip

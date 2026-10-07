@@ -1,0 +1,5 @@
+# uncommitted first pass
+brain: { provider: subscription, subscriptionNotice: 2026-09-20 }
+auth:
+  claude-code: subscription
+  opencode: api

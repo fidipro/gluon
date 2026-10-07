@@ -1,0 +1,56 @@
+{
+  "sessionId": "00000000-0000-7000-8000-000000000001",
+  "updatedAt": "2026-10-04T14:19:19.383258907+00:00",
+  "session": {
+    "inputTokens": 20000,
+    "outputTokens": 500,
+    "cachedReadTokens": 15000,
+    "cacheCreationTokens": 0,
+    "reasoningTokens": 200,
+    "totalTokens": 20500,
+    "modelCalls": 1,
+    "costUsdTicks": 123456789,
+    "turnCount": 1,
+    "primaryModelId": "spike-1",
+    "modelUsage": {
+      "spike-1": {
+        "inputTokens": 20000,
+        "outputTokens": 500,
+        "cachedReadTokens": 15000,
+        "cacheCreationTokens": 0,
+        "reasoningTokens": 200,
+        "totalTokens": 20500,
+        "modelCalls": 1,
+        "costUsdTicks": 123456789
+      }
+    }
+  },
+  "turns": [
+    {
+      "turnNumber": 1,
+      "endedAt": "2026-10-04T14:19:19.383258907+00:00",
+      "inputTokens": 20000,
+      "outputTokens": 500,
+      "cachedReadTokens": 15000,
+      "cacheCreationTokens": 0,
+      "reasoningTokens": 200,
+      "totalTokens": 20500,
+      "modelCalls": 1,
+      "costUsdTicks": 123456789,
+      "turnCount": 1,
+      "primaryModelId": "spike-1",
+      "modelUsage": {
+        "spike-1": {
+          "inputTokens": 20000,
+          "outputTokens": 500,
+          "cachedReadTokens": 15000,
+          "cacheCreationTokens": 0,
+          "reasoningTokens": 200,
+          "totalTokens": 20500,
+          "modelCalls": 1,
+          "costUsdTicks": 123456789
+        }
+      }
+    }
+  ]
+}

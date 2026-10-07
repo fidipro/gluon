@@ -1,0 +1,13 @@
+{"type":"session.inbox.enqueued","data":{"inboxID":"msg_REDACTED0010","sessionID":"ses_REDACTED0003","item":{"type":"user","payload":{"text":"Reply with just OK.","files":[],"agents":[]},"delivery":"steer"}}}
+{"type":"session.execution.started","data":{"sessionID":"ses_REDACTED0003"}}
+{"type":"session.inbox.delivered","data":{"sessionID":"ses_REDACTED0003","inboxID":"msg_REDACTED0010"}}
+{"type":"session.step.started","data":{"sessionID":"ses_REDACTED0003","agent":"build","model":{"id":"deepseek/deepseek-v4-flash","providerID":"openrouter","variant":"default"},"assistantMessageID":"msg_REDACTED0011","snapshot":"[dropped]","started":1791136209988}}
+{"type":"session.reasoning.started","data":{"sessionID":"ses_REDACTED0003","assistantMessageID":"msg_REDACTED0011","ordinal":0,"state":{"reasoningField":"reasoning_content"}}}
+{"type":"session.text.started","data":{"sessionID":"ses_REDACTED0003","assistantMessageID":"msg_REDACTED0011","ordinal":0}}
+{"type":"session.reasoning.ended","data":{"sessionID":"ses_REDACTED0003","assistantMessageID":"msg_REDACTED0011","ordinal":0,"text":"[dropped]","state":{"reasoningField":"reasoning_content","reasoningDetails":[{"type":"reasoning.text","text":"The user wants me to reply with just \"OK\".","format":"unknown","index":0}]}}}
+{"type":"session.text.ended","data":{"sessionID":"ses_REDACTED0003","assistantMessageID":"msg_REDACTED0011","ordinal":0,"text":"[dropped]"}}
+{"type":"session.step.streamed","data":{"sessionID":"ses_REDACTED0003","assistantMessageID":"msg_REDACTED0011"}}
+{"type":"session.step.ended","data":{"sessionID":"ses_REDACTED0003","assistantMessageID":"msg_REDACTED0011","finish":"stop","rawFinish":"stop","cost":0.00018477759999999997,"tokens":{"input":25,"output":3,"reasoning":11,"cache":{"read":7424,"write":0}},"snapshot":"[dropped]","files":"[dropped]"}}
+{"type":"session.usage.updated","data":{"sessionID":"ses_REDACTED0003","cost":0.000520783,"tokens":{"input":281,"output":20,"reasoning":27,"cache":{"read":14592,"write":1099}}}}
+{"type":"session.execution.succeeded","data":{"sessionID":"ses_REDACTED0003"}}
+{"type":"session.viewed","data":{"sessionID":"ses_REDACTED0003","idle":1791136212152}}

@@ -1,0 +1,29 @@
+diff --git a/index.js b/index.js
+index dd2a7cd83783dd1bc209832f99a3299fc7dc2174..6486d7025bfcf29b93220a701b7e409ce861cbe3 100644
+--- a/index.js
++++ b/index.js
+@@ -23,6 +23,15 @@ const spacingMarkRegex = /\p{Spacing_Mark}/v;
+ // RGI emoji sequences
+ const rgiEmojiRegex = /^\p{RGI_Emoji}$/v;
+ 
++// Gluon patch (QA-perf-01, BUG-615): `rgiEmojiRegex` costs ~49 us per cluster and Ink calls this for every box glyph of every frame.
++// Every RGI emoji (single code point or sequence) holds a code point with the Emoji property, and no RGI emoji is a lone ASCII character
++// (digits, # and * are only RGI inside a keycap sequence), so a cluster failing this pre-check cannot match: widths stay identical.
++const emojiPrecheckRegex = /\p{Emoji}/u;
++
++function canBeRgiEmoji(segment) {
++	return (segment.length > 1 || segment.charCodeAt(0) > 0x7F) && emojiPrecheckRegex.test(segment);
++}
++
+ // Detect minimally-qualified/unqualified emoji sequences (missing VS16 but still render as double-width)
+ const unqualifiedKeycapRegex = /^[\d#*]\u20E3$/;
+ const extendedPictographicRegex = /\p{Extended_Pictographic}/gu;
+@@ -180,7 +189,7 @@ export default function stringWidth(input, options = {}) {
+ 		}
+ 
+ 		// Emoji width logic
+-		if (rgiEmojiRegex.test(segment) || isDoubleWidthNonRgiEmojiSequence(segment)) {
++		if ((canBeRgiEmoji(segment) && rgiEmojiRegex.test(segment)) || isDoubleWidthNonRgiEmojiSequence(segment)) {
+ 			width += 2;
+ 			continue;
+ 		}

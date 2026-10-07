@@ -1,0 +1,12 @@
+# my gluon config (first pass)
+brain:
+  provider: bedrock   # the brain on Bedrock
+  model: us.anthropic.claude-sonnet-4-6
+aws:
+  profile: work       # my SSO profile
+  region: eu-west-1
+agents:
+  - harness: claude-code
+    label: Claude Code
+    models: [ { id: sonnet, label: Sonnet, note: x } ]
+    efforts: [low]

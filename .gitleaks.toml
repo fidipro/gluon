@@ -1,0 +1,34 @@
+# gitleaks config: the default rules, plus an allowlist of the fake keys the tests use to check
+# masking and key handling. Allowlisted by value (the obviously fake patterns), never by path, so a
+# real key pasted into a test file is still caught.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "fake keys in tests"
+regexes = [
+  '''0123456789''',
+  '''abcdef''',
+  '''ABCDEFGHIJ''',
+  '''sk-or-v1-notpa''',
+  '''plainKEYwithNo''',
+  '''xai-fromtheenv''',
+  '''sk-bad-key-''',
+  '''IQoJb3JpZ2luX2VjEJr//////////wEaCXVzLWVhc3QtMSJHMEUCIQD''',
+  '''QmVkcm9ja0FQSUtleS1''',
+  # Whole-value shapes, anchored: a real key can't match them (an OpenRouter key is sk-or-v1- plus 64
+  # hex digits; an xAI key is long and random). The last is a test title that has "keys" in it.
+  '''^sk-or-v1-[A-Za-z]{8}$''',
+  '''^sk-or-v1-[a-z]{12}[0-9]{5}$''',
+  '''^xai-saved[a-z]{7}[0-9]{6}$''',
+  '''^Shift\+PgUp/PgDn$''',
+  # The QA campaign's masking tests (2026-10): a PEM body that is only the generic openssh-key-v1
+  # header, a PKCS#8 body ending in a keyboard row, jwt.io's sample payload, a named fake env value.
+  '''b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW''',
+  '''QWERTYUIOPASDFGH''',
+  '''eyJzdWIiOiIxMjM0NTY3ODkwIn0''',
+  '''xai-from-the-environment''',
+  # BUG-583..589: fake passwords in URLs and `password=` values (the fake tokens carry `abcdef` or `0123456789`, allowlisted above).
+  '''s3cretPassw0rd''',
+  '''hunter2hunter2''',
+]

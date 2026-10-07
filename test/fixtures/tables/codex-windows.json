@@ -1,0 +1,65 @@
+{
+ "schema": 1,
+ "source": "codex debug models",
+ "codexVersion": "0.159.3",
+ "generatedAt": "2026-10-04",
+ "digest": "96dc9d6c22e79412f90eaadb2bed22e49b890d747c9975ddf8410aa72cc34bd6",
+ "note": "seed: the catalog bundled in the codex 0.159.3 binary (its bytes read, never run), the same text as `codex debug models --bundled`; the first CI run replaces it",
+ "models": {
+  "codex-auto-review": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-5.5": {
+   "context": 272000,
+   "max": 272000,
+   "percent": 95
+  },
+  "gpt-5.6-luna": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-5.6-sol": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-5.6-terra": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-6-astra": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-6-luna": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-6-sol": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-6.1-sol": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-daybreak-blue-latest": {
+   "context": 272000,
+   "max": 872000,
+   "percent": 95
+  },
+  "gpt-daybreak-red-latest": {
+   "context": 372000,
+   "max": 372000,
+   "percent": 95
+  }
+ }
+}

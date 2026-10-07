@@ -1,0 +1,20 @@
+---
+// The plugin's own PageTitle hides its buttons on the home page; this one shows the copy
+// button on every page. "Open with AI" is left out: it links the page's public URL to
+// external assistants, which this site doesn't use.
+import Default from "@astrojs/starlight/components/PageTitle.astro";
+import CopyMarkdown from "@wave-rf/starlight-llm-tools/components/CopyMarkdown.astro";
+
+const { id } = Astro.locals.starlightRoute;
+---
+
+{id && <div class="gluon-page-tools"><CopyMarkdown slug={id} /></div>}
+<Default />
+
+<style>
+  .gluon-page-tools {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+  }
+</style>

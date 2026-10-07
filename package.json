@@ -1,0 +1,86 @@
+{
+  "name": "gluon",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "A terminal front door for coding agents: describe a task, get agent \u00b7 model \u00b7 effort and a spec, hand off to Claude Code, Codex, Antigravity, Grok Build or OpenCode.",
+  "keywords": [
+    "cli",
+    "tui",
+    "coding-agents",
+    "claude-code",
+    "codex",
+    "opencode",
+    "llm"
+  ],
+  "homepage": "https://github.com/fidipro/gluon#readme",
+  "bugs": {
+    "url": "https://github.com/fidipro/gluon/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fidipro/gluon.git"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "@types/react": "^19.3.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.33.8",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.289",
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1142.0",
+    "@aws-sdk/credential-providers": "^3.1146.0",
+    "@xterm/addon-unicode11": "^0.9.0",
+    "@xterm/headless": "^6.0.0",
+    "chalk": "^6.0.1",
+    "ink": "^7.1.1",
+    "ink-text-input": "^6.0.0",
+    "openai": "^7.28.0",
+    "react": "^19.3.0",
+    "wrap-ansi": "^10.0.2",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "version": "1.0.0",
+  "bin": {
+    "gluon": "src/cli.tsx"
+  },
+  "scripts": {
+    "start": "bun --no-env-file --config=scripts/empty-bunfig.toml src/cli.tsx",
+    "demo": "bun --no-env-file --config=scripts/empty-bunfig.toml src/cli.tsx --demo",
+    "test": "bun test --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/perf/**'",
+    "test:unit": "bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/perf/**'",
+    "test:e2e": "bun test --concurrent --max-concurrency=6 test/e2e",
+    "test:perf": "GLUON_PERF=1 bun test --max-concurrency=1 ./test/perf",
+    "test:gluon": "GLUON_MONKEY_SEEDS=50 GLUON_MONKEY_STEPS=400 bun test --concurrent --max-concurrency=12 test/e2e/gluon-monkey.e2e.test.ts",
+    "test:visual": "bun test --concurrent --max-concurrency=8 ./test/visual",
+    "test:visual-must": "GLUON_VISUAL=must bun test --concurrent --max-concurrency=8 ./test/visual",
+    "test:gluon-full": "GLUON_FULL=1 bun test --concurrent --max-concurrency=6 test/e2e/gluon-matrix.e2e.test.ts",
+    "docs:dev": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/docs/astro.ts dev",
+    "docs:build": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/docs/astro.ts build",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc.tsbuildinfo -p .",
+    "docs:gen": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/docs/gen.ts",
+    "regression": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts",
+    "regression:full": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts --full",
+    "test:area": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts --area",
+    "test:health": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/test-health.ts",
+    "test:coverage": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/coverage.ts",
+    "test:live": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/live.ts",
+    "build": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/build.ts",
+    "build:all": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/build.ts --all",
+    "test:dist": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/build.ts --check",
+    "pack": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/pack.ts",
+    "docker-test": "sh scripts/docker-test.sh",
+    "test:windows": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/windows-test.ts"
+  },
+  "patchedDependencies": {
+    "string-width@8.3.0": "patches/string-width@8.3.0.patch"
+  }
+}

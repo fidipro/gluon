@@ -1,0 +1,69 @@
+{"t":1791134957055,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791134957057,"event":"status {\"state\":\"working\"}"}
+{"t":1791134959361,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791134959362,"event":"status {\"state\":\"done\"}"}
+{"t":1791134989450,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791134989451,"event":"status {\"state\":\"working\"}"}
+{"t":1791134993315,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791134993318,"event":"status {\"state\":\"working\",\"activity\":\"Bash: ls\"}"}
+{"t":1791134993528,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791134993530,"event":"status {\"state\":\"working\"}"}
+{"t":1791134995025,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791134995026,"event":"status {\"state\":\"done\"}"}
+{"t":1791135021627,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135021627,"event":"status {\"state\":\"working\"}"}
+{"t":1791135023713,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135023715,"event":"status {\"state\":\"working\",\"activity\":\"collaborationspawn_agent\"}"}
+{"t":1791135023797,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135023798,"event":"status {\"state\":\"working\"}"}
+{"t":1791135024768,"event":"status {\"state\":\"working\",\"activity\":\"Bash: cat calc.py\"}"}
+{"t":1791135024906,"event":"status {\"state\":\"working\"}"}
+{"t":1791135025272,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135025274,"event":"status {\"state\":\"working\",\"activity\":\"collaborationwait_agent\"}"}
+{"t":1791135025897,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135025897,"event":"status {\"state\":\"working\"}"}
+{"t":1791135027135,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135027135,"event":"status {\"state\":\"done\"}"}
+{"t":1791135083370,"hookpayload":{"name":"prompt","hook_event_name":"UserPromptSubmit","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","prompt"]}}
+{"t":1791135083372,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135083373,"event":"status {\"state\":\"working\"}"}
+{"t":1791135084705,"hookpayload":{"name":"tool","hook_event_name":"PreToolUse","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_use_id"]}}
+{"t":1791135084707,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135084710,"event":"status {\"state\":\"working\",\"activity\":\"collaborationspawn_agent\"}"}
+{"t":1791135084805,"hookpayload":{"name":"tool-done","hook_event_name":"PostToolUse","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_response","tool_use_id"]}}
+{"t":1791135084806,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135084807,"event":"status {\"state\":\"working\"}"}
+{"t":1791135085846,"hookpayload":{"name":"tool","hook_event_name":"PreToolUse","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_use_id"]}}
+{"t":1791135085848,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135085851,"event":"status {\"state\":\"working\",\"activity\":\"collaborationwait_agent\"}"}
+{"t":1791135086536,"hookpayload":{"name":"tool","hook_event_name":"PreToolUse","session_id":"00000000-0000-7000-8000-000000000086","agent_id":"00000000-0000-7000-8000-000000000095","agent_type":"default","keys":["session_id","turn_id","agent_id","agent_type","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_use_id"]}}
+{"t":1791135086540,"event":"status {\"state\":\"working\",\"activity\":\"Bash: cat main.py\"}"}
+{"t":1791135086674,"hookpayload":{"name":"tool-done","hook_event_name":"PostToolUse","session_id":"00000000-0000-7000-8000-000000000086","agent_id":"00000000-0000-7000-8000-000000000095","agent_type":"default","keys":["session_id","turn_id","agent_id","agent_type","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_response","tool_use_id"]}}
+{"t":1791135086676,"event":"status {\"state\":\"working\"}"}
+{"t":1791135087759,"hookpayload":{"name":"tool-done","hook_event_name":"PostToolUse","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_response","tool_use_id"]}}
+{"t":1791135087760,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135087761,"event":"status {\"state\":\"working\"}"}
+{"t":1791135088850,"hookpayload":{"name":"stop","hook_event_name":"Stop","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","stop_hook_active","last_assistant_message"]}}
+{"t":1791135088851,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135088852,"event":"status {\"state\":\"done\"}"}
+{"t":1791135126881,"hookpayload":{"name":"pre-compact","hook_event_name":"PreCompact","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","trigger"]}}
+{"t":1791135126882,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135126882,"event":"status {\"compacting\":true}"}
+{"t":1791135152472,"hookpayload":{"name":"prompt","hook_event_name":"UserPromptSubmit","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","prompt"]}}
+{"t":1791135152473,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135152473,"event":"status {\"state\":\"working\"}"}
+{"t":1791135153404,"hookpayload":{"name":"stop","hook_event_name":"Stop","session_id":"00000000-0000-7000-8000-000000000086","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","stop_hook_active","last_assistant_message"]}}
+{"t":1791135153405,"event":"session 00000000-0000-7000-8000-000000000086"}
+{"t":1791135153405,"event":"status {\"state\":\"done\"}"}
+{"t":1791135196155,"hookpayload":{"name":"prompt","hook_event_name":"UserPromptSubmit","session_id":"00000000-0000-7000-8000-000000000098","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","prompt"]}}
+{"t":1791135196157,"event":"session 00000000-0000-7000-8000-000000000098"}
+{"t":1791135196158,"event":"status {\"state\":\"working\"}"}
+{"t":1791135198385,"hookpayload":{"name":"tool","hook_event_name":"PreToolUse","session_id":"00000000-0000-7000-8000-000000000098","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_use_id"]}}
+{"t":1791135198387,"event":"session 00000000-0000-7000-8000-000000000098"}
+{"t":1791135198388,"event":"status {\"state\":\"working\",\"activity\":\"Bash: cat calc.py main.py\"}"}
+{"t":1791135198530,"hookpayload":{"name":"tool-done","hook_event_name":"PostToolUse","session_id":"00000000-0000-7000-8000-000000000098","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","tool_name","tool_input","tool_response","tool_use_id"]}}
+{"t":1791135198532,"event":"session 00000000-0000-7000-8000-000000000098"}
+{"t":1791135198533,"event":"status {\"state\":\"working\"}"}
+{"t":1791135199561,"hookpayload":{"name":"stop","hook_event_name":"Stop","session_id":"00000000-0000-7000-8000-000000000098","keys":["session_id","turn_id","transcript_path","cwd","hook_event_name","model","permission_mode","stop_hook_active","last_assistant_message"]}}
+{"t":1791135199562,"event":"session 00000000-0000-7000-8000-000000000098"}
+{"t":1791135199562,"event":"status {\"state\":\"done\"}"}

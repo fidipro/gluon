@@ -1,0 +1,6 @@
+# Gluon reads its own .env itself (src/secrets.ts), never into process.env: no automatic loading.
+env = false
+
+[test]
+root = "./test"
+preload = ["./test/preload.ts"]

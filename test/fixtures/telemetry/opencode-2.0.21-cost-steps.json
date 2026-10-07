@@ -1,0 +1,941 @@
+{
+ "_about": "OpenCode 2.0.21 real captures (fake OpenAI-compatible sink for the 'fake-sink-*' and config-tier runs; a real OpenRouter deepseek-v4-flash run for 'catalog:*'; the real models.dev catalog's openrouter x-ai/grok-4.6 tiers for t3). Each entry: the step/compaction tokens, OpenCode's reported cost, and the model's price rows exactly as `client.model.list` shows them (USD per million tokens, base row first, tier rows {tier:{type:'context',size}}). Formula (ported from OpenCode's Y0/c6): P = input+cache.read+cache.write; rows with tier.type==='context' and P > size are candidates, the largest size wins, else the base row; cost = (input*in + (output+reasoning)*out + cache.read*cr + cache.write*cw)/1e6 in that order.",
+ "entries": [
+  {
+   "source": "fake-sink-t1",
+   "kind": "step",
+   "sessionID": "ses_01",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 1000,
+    "output": 50,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0025,
+   "id": 1
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 10000,
+    "output": 1600,
+    "reasoning": 400,
+    "cache": {
+     "read": 20000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.05,
+   "id": 2
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 10000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 30000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.045,
+   "id": 3
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 10000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 30000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.045,
+   "id": 4
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 1000,
+    "output": 10,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0021,
+   "id": 5
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 1000,
+    "output": 10,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0021,
+   "id": 6
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_03",
+   "model": "fake/fake-small",
+   "price": [
+    {
+     "input": 1,
+     "output": 1,
+     "cache": {
+      "read": 0.1,
+      "write": 1
+     }
+    }
+   ],
+   "tokens": {
+    "input": 5000,
+    "output": 100,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0051,
+   "id": 7
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 40000,
+    "output": 500,
+    "reasoning": 0,
+    "cache": {
+     "read": 10000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.09,
+   "id": 8
+  },
+  {
+   "source": "fake-sink-t2",
+   "kind": "step",
+   "sessionID": "ses_02",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 40000,
+    "output": 500,
+    "reasoning": 0,
+    "cache": {
+     "read": 10000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.09,
+   "id": 9
+  },
+  {
+   "source": "fake-sink-t3",
+   "kind": "step",
+   "sessionID": "ses_04",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 20000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.05,
+   "id": 10
+  },
+  {
+   "source": "fake-sink-t3",
+   "kind": "compaction",
+   "sessionID": "ses_04",
+   "model": "fake/fake-small",
+   "price": [
+    {
+     "input": 1,
+     "output": 1,
+     "cache": {
+      "read": 0.1,
+      "write": 1
+     }
+    }
+   ],
+   "tokens": {
+    "input": 24000,
+    "output": 600,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0246,
+   "id": 11
+  },
+  {
+   "source": "fake-sink-t3",
+   "kind": "step",
+   "sessionID": "ses_04",
+   "model": "fake/fake-small",
+   "price": [
+    {
+     "input": 1,
+     "output": 1,
+     "cache": {
+      "read": 0.1,
+      "write": 1
+     }
+    }
+   ],
+   "tokens": {
+    "input": 15000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.016,
+   "id": 12
+  },
+  {
+   "source": "fake-sink-t3",
+   "kind": "step",
+   "sessionID": "ses_04",
+   "model": "fake/fake-small",
+   "price": [
+    {
+     "input": 1,
+     "output": 1,
+     "cache": {
+      "read": 0.1,
+      "write": 1
+     }
+    }
+   ],
+   "tokens": {
+    "input": 15000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.016,
+   "id": 13
+  },
+  {
+   "source": "fake-sink-t3",
+   "kind": "compaction",
+   "sessionID": "ses_04",
+   "model": "fake/fake-small",
+   "price": [
+    {
+     "input": 1,
+     "output": 1,
+     "cache": {
+      "read": 0.1,
+      "write": 1
+     }
+    }
+   ],
+   "tokens": {
+    "input": 18000,
+    "output": 600,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0186,
+   "id": 14
+  },
+  {
+   "source": "fake-sink-t4",
+   "kind": "step",
+   "sessionID": "ses_05",
+   "model": "fake/fake-free",
+   "price": [],
+   "tokens": {
+    "input": 8000,
+    "output": 500,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0,
+   "id": 15
+  },
+  {
+   "source": "fake-sink-t5",
+   "kind": "step",
+   "sessionID": "ses_06",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 10000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.03,
+   "id": 16
+  },
+  {
+   "source": "fake-sink-t5",
+   "kind": "step",
+   "sessionID": "ses_07",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 30000,
+    "output": 2000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.08,
+   "id": 17
+  },
+  {
+   "source": "fake-sink-t6",
+   "kind": "step",
+   "sessionID": "ses_08",
+   "model": "fake/fake-1",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 10000,
+    "output": 1000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.03,
+   "id": 18
+  },
+  {
+   "source": "fake-sink-t6",
+   "kind": "step",
+   "sessionID": "ses_08",
+   "model": "fake/fake-nolimit",
+   "price": [
+    {
+     "input": 1,
+     "output": 1,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    }
+   ],
+   "tokens": {
+    "input": 40000,
+    "output": 2000,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.042,
+   "id": 19
+  },
+  {
+   "source": "catalog:openrouter-deepseek-v4-flash-real-run",
+   "kind": "step",
+   "sessionID": "ses_09",
+   "model": "openrouter/deepseek/deepseek-v4-flash",
+   "price": [
+    {
+     "input": 0.0224,
+     "output": 1.28,
+     "cache": {
+      "read": 0.0224,
+      "write": 0
+     }
+    }
+   ],
+   "tokens": {
+    "input": 5191,
+    "output": 3,
+    "reasoning": 11,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0001341984,
+   "id": 20
+  },
+  {
+   "source": "catalog:openrouter-deepseek-v4-flash-real-run",
+   "kind": "step",
+   "sessionID": "ses_09",
+   "model": "openrouter/deepseek/deepseek-v4-flash",
+   "price": [
+    {
+     "input": 0.0224,
+     "output": 1.28,
+     "cache": {
+      "read": 0.0224,
+      "write": 0
+     }
+    }
+   ],
+   "tokens": {
+    "input": 95,
+    "output": 3,
+    "reasoning": 13,
+    "cache": {
+     "read": 5120,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.000137296,
+   "id": 21
+  },
+  {
+   "source": "t1-config-tiers-ignored",
+   "kind": "step",
+   "sessionID": "ses_10",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 15000,
+    "output": 500,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.035,
+   "id": 22
+  },
+  {
+   "source": "t1-config-tiers-ignored",
+   "kind": "step",
+   "sessionID": "ses_10",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 20000,
+    "output": 400,
+    "reasoning": 100,
+    "cache": {
+     "read": 5000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.0475,
+   "id": 23
+  },
+  {
+   "source": "t1-config-tiers-ignored",
+   "kind": "step",
+   "sessionID": "ses_10",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 20000,
+    "output": 300,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.043,
+   "id": 24
+  },
+  {
+   "source": "t1-config-tiers-ignored",
+   "kind": "step",
+   "sessionID": "ses_10",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    }
+   ],
+   "tokens": {
+    "input": 20001,
+    "output": 300,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.043002,
+   "id": 25
+  },
+  {
+   "source": "t2-config-context_over_200k",
+   "kind": "step",
+   "sessionID": "ses_11",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 15,
+     "cache": {
+      "read": 1,
+      "write": 6
+     }
+    }
+   ],
+   "tokens": {
+    "input": 200000,
+    "output": 400,
+    "reasoning": 100,
+    "cache": {
+     "read": 10000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.8175,
+   "id": 26
+  },
+  {
+   "source": "t2-config-context_over_200k",
+   "kind": "step",
+   "sessionID": "ses_11",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 15,
+     "cache": {
+      "read": 1,
+      "write": 6
+     }
+    }
+   ],
+   "tokens": {
+    "input": 200000,
+    "output": 300,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.403,
+   "id": 27
+  },
+  {
+   "source": "t2-config-context_over_200k",
+   "kind": "step",
+   "sessionID": "ses_11",
+   "model": "fake/fake-tier",
+   "price": [
+    {
+     "input": 2,
+     "output": 10,
+     "cache": {
+      "read": 0.5,
+      "write": 3
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 15,
+     "cache": {
+      "read": 1,
+      "write": 6
+     }
+    }
+   ],
+   "tokens": {
+    "input": 200001,
+    "output": 300,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.804504,
+   "id": 28
+  },
+  {
+   "source": "t3-catalog-tiers",
+   "kind": "step",
+   "sessionID": "ses_12",
+   "model": "openrouter/x-ai/grok-4.6",
+   "price": [
+    {
+     "input": 2,
+     "output": 6,
+     "cache": {
+      "read": 0.5,
+      "write": 0
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 12,
+     "cache": {
+      "read": 1,
+      "write": 0
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 12,
+     "cache": {
+      "read": 1,
+      "write": 0
+     }
+    }
+   ],
+   "tokens": {
+    "input": 200000,
+    "output": 400,
+    "reasoning": 100,
+    "cache": {
+     "read": 10000,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.816,
+   "id": 29
+  },
+  {
+   "source": "t3-catalog-tiers",
+   "kind": "step",
+   "sessionID": "ses_12",
+   "model": "openrouter/x-ai/grok-4.6",
+   "price": [
+    {
+     "input": 2,
+     "output": 6,
+     "cache": {
+      "read": 0.5,
+      "write": 0
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 12,
+     "cache": {
+      "read": 1,
+      "write": 0
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 12,
+     "cache": {
+      "read": 1,
+      "write": 0
+     }
+    }
+   ],
+   "tokens": {
+    "input": 200000,
+    "output": 300,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.4018,
+   "id": 30
+  },
+  {
+   "source": "t3-catalog-tiers",
+   "kind": "step",
+   "sessionID": "ses_12",
+   "model": "openrouter/x-ai/grok-4.6",
+   "price": [
+    {
+     "input": 2,
+     "output": 6,
+     "cache": {
+      "read": 0.5,
+      "write": 0
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 12,
+     "cache": {
+      "read": 1,
+      "write": 0
+     }
+    },
+    {
+     "tier": {
+      "type": "context",
+      "size": 200000
+     },
+     "input": 4,
+     "output": 12,
+     "cache": {
+      "read": 1,
+      "write": 0
+     }
+    }
+   ],
+   "tokens": {
+    "input": 200001,
+    "output": 300,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "reportedCost": 0.803604,
+   "id": 31
+  }
+ ]
+}
