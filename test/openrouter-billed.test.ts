@@ -1280,7 +1280,7 @@ describe("BUG-631/variants: reading the other brains' files never throws, whatev
     const dir = fresh();
     mkdirSync(dir, { recursive: true });
     const a = new BrainLog(dir, { pid: 4242, tailMs: 150_000, restrict: false });
-    a.record("k", Date.now() - 5_000, 0.5);
+    a.record("k", win[1].from - 6_000, 0.5); // inside the windows, which were fixed when the file loaded
     writeFileSync(join(dir, "4243.brain"), "{junk");
     const old = aDayAgo();
     for (const f of ["4242.brain", "4243.brain"]) utimesSync(join(dir, f), old, old);
