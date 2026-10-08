@@ -155,7 +155,7 @@ until you restart them.
 
   --check   only say whether a newer release exists
 
-Gluon also does this by itself at start (at most one check a day): the config key `updates` is
+Gluon also does this by itself at start (GitHub is asked once a day while it is up to date): the config key `updates` is
 auto (install), notify (only say) or off; GLUON_UPDATES=auto|notify|off wins over it.
 ```
 

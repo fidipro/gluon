@@ -4,7 +4,7 @@
  * not stop a SQLite step that is running (it keeps the core and the memory) and nothing in `bun:sqlite` can interrupt one.
  *
  * Inside the child: `PRAGMA hard_heap_limit` caps SQLite's own memory (a `randomblob(1e9)`, a `group_concat` over a recursive CTE
- * fail with "out of memory" instead of taking GB); the query is wrapped so a blob or a very long text never reaches JS whole
+ * fail with "out of memory" instead of taking GB; on macOS, whose SQLite ignores it, the watchdog caps the child's memory instead); the query is wrapped so a blob or a very long text never reaches JS whole
  * (`zeroblob(1e9)` takes no SQLite memory, but would be copied into a 1 GB array) and so at most `SQL_MAX_ROWS` + 1 rows are
  * produced; the rows are counted in bytes as they stream in. Light on purpose: the child loads only this file.
  */
@@ -109,7 +109,7 @@ function bounded(statement: string, columns: number): string {
   return `WITH gluon_q(${cols.join(", ")}) AS (\n${statement}\n) SELECT ${select.join(", ")} FROM gluon_q LIMIT ${SQL_MAX_ROWS + 1}`;
 }
 
-const MEMORY_HINT = `sql: the query needs more than ${SQL_HEAP_BYTES / 1024 / 1024} MB of memory; select less (a LIMIT, fewer or shorter values)`;
+export const MEMORY_HINT = `sql: the query needs more than ${SQL_HEAP_BYTES / 1024 / 1024} MB of memory; select less (a LIMIT, fewer or shorter values)`;
 const sqlMessage = (e: unknown): string => (/out of memory/i.test((e as Error).message) ? MEMORY_HINT : `sql: ${line((e as Error).message)}`);
 
 /** Runs a checked query on a read-only handle, within the limits above (the caller bounds its time). */
@@ -180,33 +180,49 @@ export const decodeAnswer = (text: string): ChildAnswer => JSON.parse(text, unwi
 export const SQL_CHILD_LIMIT_ENV = "GLUON_STATS_SQL_LIMIT_MS";
 /** How long after the parent's deadline the child ends itself. */
 export const SQL_CHILD_GRACE_MS = 3_000;
+/**
+ * The child's own memory cap in bytes above what it used at start, set by the parent where SQLite doesn't enforce `hard_heap_limit`:
+ * macOS, where `bun:sqlite` is Apple's build (it keeps no memory statistics, so the limit is never reached). Past it the watchdog writes
+ * `SQL_MEMORY_MARK` to stderr and ends the child (SIGKILL); the parent reads the mark as the out-of-memory refusal. Not a signal of its
+ * own: Bun on macOS names signals by Linux's numbers (a SIGUSR2 arrived as SIGSYS). A single allocation may overshoot the cap briefly.
+ */
+export const SQL_CHILD_MEMORY_ENV = "GLUON_STATS_SQL_MEMORY_BYTES";
+/** The line the watchdog writes before it ends a child past its memory cap. */
+export const SQL_MEMORY_MARK = "gluon-stats-sql: memory cap";
 
 /** The watchdog's code, run in a Worker made from a Blob (no file to bundle or to resolve from the cwd): a thread of its own, so it runs while the main one is inside a SQLite step. */
 const WATCHDOG = `
 self.onmessage = (e) => {
-  const { parent, pid, limit } = e.data;
+  const { parent, pid, limit, memory, mark } = e.data;
   const start = Date.now();
+  const base = process.memoryUsage.rss();
+  let tick = 0;
   setInterval(() => {
+    if (memory > 0 && process.memoryUsage.rss() - base > memory) {
+      require("node:fs").writeSync(2, mark + "\\n");
+      process.kill(pid, "SIGKILL");
+    }
+    if (++tick % 10) return;
     let orphan = false;
     try { process.kill(parent, 0); } catch (err) { orphan = err.code === "ESRCH"; }
     if (orphan || Date.now() - start > limit) process.kill(pid, "SIGKILL");
-  }, 250);
+  }, 25);
   postMessage("ready");
 };`;
 
 /**
  * Ends this process by SIGKILL when its parent is gone (a killed `gluon stats sql` must not leave a query running: the orphan of the
- * incident ran 16 hours) or when `limit` ms have passed, from a thread of its own. Resolves once the watchdog runs; never throws: the
- * parent's deadline is the first line, this is the second.
+ * incident ran 16 hours), when `limit` ms have passed, or once it uses `memory` bytes more than at start (0: no cap; it says
+ * `SQL_MEMORY_MARK` first), from a thread of its own. Resolves once the watchdog runs; never throws: the parent's deadline is the first line, this is the second.
  */
-async function watchdog(limit: number): Promise<void> {
+async function watchdog(limit: number, memory: number): Promise<void> {
   try {
     const url = URL.createObjectURL(new Blob([WATCHDOG], { type: "text/javascript" }));
     const w = new Worker(url);
     await new Promise<void>((ready) => {
       w.onmessage = () => ready();
       w.onerror = () => ready();
-      w.postMessage({ parent: process.ppid, pid: process.pid, limit });
+      w.postMessage({ parent: process.ppid, pid: process.pid, limit, memory, mark: SQL_MEMORY_MARK });
       setTimeout(ready, 2_000);
     });
   } catch {}
@@ -216,7 +232,7 @@ async function watchdog(limit: number): Promise<void> {
 export async function statsSqlChild(): Promise<number> {
   const path = process.env[SQL_CHILD_ENV]!;
   const query = await Bun.stdin.text();
-  await watchdog(Number(process.env[SQL_CHILD_LIMIT_ENV]) || 15_000);
+  await watchdog(Number(process.env[SQL_CHILD_LIMIT_ENV]) || 15_000, Number(process.env[SQL_CHILD_MEMORY_ENV]) || 0);
   let answer: ChildAnswer;
   try {
     const db = new Database(path, { readonly: true });

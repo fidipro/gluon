@@ -261,8 +261,8 @@ it. Unlike the cost ledger it holds a prompt and a path. Recording never breaks 
 
 ### Updates
 
-At start, in the background and never before the first screen, `src/update/` asks GitHub at most once a day which release
-is the latest. With `updates: auto` (the default) it downloads `SHA256SUMS`, checks its Sigstore signature against the
+At start, in the background and never before the first screen, `src/update/` asks GitHub which release is the latest:
+once a day while Gluon is up to date, and at each start while it knows of a newer one (confirmed before it acts). With `updates: auto` (the default) it downloads `SHA256SUMS`, checks its Sigstore signature against the
 Release workflow on `main` (the trusted root comes from Sigstore's TUF repository), downloads this platform's binary,
 checks its hash, makes sure it answers `--version`, and renames it over the running executable (on Windows the old one
 is moved aside first). The new version runs from the next start; `gluon update` does the same in the foreground.

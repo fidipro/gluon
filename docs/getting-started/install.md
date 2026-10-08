@@ -154,7 +154,7 @@ repository and workflow in Sigstore's public transparency log.
 
 ## Updating
 
-From 1.1.0 on, Gluon keeps itself up to date. At most once a day, when it starts, it checks for a newer release; by default it
+From 1.1.0 on, Gluon keeps itself up to date. When it starts it checks for a newer release (once a day while it is up to date); by default it
 downloads it in the background and puts it in place of the standalone binary, and the new version runs from your next start
 (Gluons already running keep theirs). It installs nothing unless the release's `SHA256SUMS` carries a valid signature by the
 Release workflow on `main` of this repository, checked by Gluon itself (no `cosign` needed), and the binary matches it.

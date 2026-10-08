@@ -18,7 +18,7 @@ import { safeLine } from "./events.ts";
 import { HARNESSES, type Harness } from "./harnesses.ts";
 import { selfArgv } from "./self.ts";
 import { costLabel } from "./sessions.ts";
-import { decodeAnswer, SQL_CHILD_ENV, SQL_CHILD_GRACE_MS, SQL_CHILD_LIMIT_ENV, SQL_DEADLINE_MS, SQL_MAX_ROWS, SQL_OUTPUT_BYTES, sqlProblem, StatsError, writeAll, type QueryResult } from "./stats-sql.ts";
+import { decodeAnswer, MEMORY_HINT, SQL_CHILD_ENV, SQL_CHILD_GRACE_MS, SQL_CHILD_LIMIT_ENV, SQL_CHILD_MEMORY_ENV, SQL_DEADLINE_MS, SQL_HEAP_BYTES, SQL_MEMORY_MARK, SQL_MAX_ROWS, SQL_OUTPUT_BYTES, sqlProblem, StatsError, writeAll, type QueryResult } from "./stats-sql.ts";
 
 export { runQuery, sqlProblem, StatsError } from "./stats-sql.ts";
 
@@ -404,6 +404,8 @@ export const runQueryInChild: SqlRunner = async (path, query) => {
   const deadline = testDeadline() ?? SQL_DEADLINE_MS;
   const env: Record<string, string> = { [SQL_CHILD_ENV]: resolve(path), [SQL_CHILD_LIMIT_ENV]: String(deadline + SQL_CHILD_GRACE_MS) };
   for (const k of CHILD_ENV_KEYS) if (process.env[k] !== undefined) env[k] = process.env[k]!;
+  // macOS's SQLite (Apple's build) ignores `hard_heap_limit`: the child's watchdog caps its memory there.
+  if (process.platform === "darwin") env[SQL_CHILD_MEMORY_ENV] = String(SQL_HEAP_BYTES);
   const child = Bun.spawn([...selfArgv(), "stats-sql"], { cwd: neutralCwd(), env, stdin: new TextEncoder().encode(query), stdout: "pipe", stderr: "pipe" });
   const stop = () => {
     if (process.platform === "win32") killTree(child);
@@ -423,6 +425,7 @@ export const runQueryInChild: SqlRunner = async (path, query) => {
   try {
     const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     if (late) throw new StatsError(`sql: stopped after ${seconds(deadline)}: the query was still running; simplify it or add a LIMIT`, 1);
+    if (err.includes(SQL_MEMORY_MARK)) throw new StatsError(MEMORY_HINT, 1);
     let answer: ReturnType<typeof decodeAnswer> | null = null;
     try {
       answer = out ? decodeAnswer(out) : null;

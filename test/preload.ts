@@ -24,6 +24,9 @@ for (const k of process.platform === "win32" ? ["TEMP", "TMP"] : ["TMPDIR"]) pro
 process.env.GLUON_CONFIG ??= join(root, "no-config.yaml");
 // Never the developer's own state (cost-audit ledger, the local price tables).
 process.env.XDG_STATE_HOME = join(root, "state");
+// Never the developer's terminal's colours: with FORCE_COLOR (some terminals and agent shells set it) a Bun child colours a number it
+// `console.log`s, and a test comparing that output exactly reads another text (`test/pricing-update.test.ts`).
+delete process.env.FORCE_COLOR;
 seedTables(join(process.env.XDG_STATE_HOME, "gluon", "tables"));
 // Run from inside a Gluon session, these would point tests at its event file and return command.
 for (const k of ["GLUON_EVENTS", "GLUON_SELF", "GLUON_HANDOFF"]) delete process.env[k];
