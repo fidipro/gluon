@@ -66,7 +66,7 @@ The default order:
 | # | Route | Model | Effort |
 |---|---|---|---|
 | 1 | `claude-plan` | `claude-sonnet-5-5` | default |
-| 2 | `chatgpt-plan` | `gpt-6-luna` | default |
+| 2 | `chatgpt-plan` | `gpt-6.1-sol` | default |
 | 3 | `anthropic-api` | `claude-sonnet-5-5` | default |
 | 4 | `openai-api` | `gpt-6-sol` | default |
 | 5 | `bedrock` | `global.anthropic.claude-sonnet-5-5` | default |

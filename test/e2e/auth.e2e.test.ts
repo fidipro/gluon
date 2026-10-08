@@ -212,14 +212,14 @@ describe("Codex", () => {
     await choose(app, 1);
     await app.waitFor("FAKE-CODEX LOGIN press enter>");
     await app.press(KEY.enter);
-    await app.waitFor("Intake agent · GPT-6 Luna on your ChatGPT plan (personal)", 30_000);
+    await app.waitFor("Intake agent · GPT-6.1 Sol on your ChatGPT plan (personal)", 30_000);
     expect(app.history()).toContain("Signed in to Codex · ChatGPT");
     expect(app.history()).not.toContain("Your plan, your terminal");
     expect(app.history()).toContain("✓ Codex · plan · luna sol astra");
     const c = yaml(cfg);
     expect(c.connections.codex).toEqual({ auth: "subscription" });
     expect(c.notices).toBeUndefined();
-    expect(c.brain.active).toEqual({ route: "chatgpt-plan", model: "gpt-6-luna" });
+    expect(c.brain.active).toEqual({ route: "chatgpt-plan", model: "gpt-6.1-sol" });
   });
 
   test("signed in with an API key is not the ChatGPT plan: it says so and offers `codex login`", async () => {
@@ -462,7 +462,7 @@ describe("the brain order", () => {
     const r = await cli(["brain"], { env: { GLUON_CONFIG: cfg, OPENAI_API_KEY: "sk-proj-x0123456789abcdef" } });
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("✓ 1. Sonnet 5.5 on your Claude plan (personal)   ← in use");
-    expect(r.stdout).toContain("· 2. GPT-6 Luna on your ChatGPT plan (personal) · not connected");
+    expect(r.stdout).toContain("· 2. GPT-6.1 Sol on your ChatGPT plan (personal) · not connected");
     expect(r.stdout).toContain("· 4. GPT-6 Sol · OpenAI API · not tried (step 1 is in use)");
     expect(yaml(cfg).brain.active).toEqual({ route: "claude-plan", model: "claude-sonnet-5-5" });
     // Each step's effort: what it sends, the medium default unless the step sets one.
@@ -581,7 +581,7 @@ describe("doctor", () => {
     expect(r.stdout).toContain("Grok Build (grok 1.0.44) · SuperGrok / X account (personal) · signed in: grok.com account");
     expect(r.stdout).toContain(`✗ OpenCode (opencode) · not installed · install: ${installHint("opencode")} (or \`gluon install opencode\`)`);
     expect(r.stdout).toContain("✓ 1. Sonnet 5.5 on your Claude plan (personal)   ← in use");
-    expect(r.stdout).toContain("· 2. GPT-6 Luna on your ChatGPT plan (personal) · not connected");
+    expect(r.stdout).toContain("· 2. GPT-6.1 Sol on your ChatGPT plan (personal) · not connected");
     expect(r.code).toBe(1);
   });
 });

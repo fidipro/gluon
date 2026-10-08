@@ -75,7 +75,7 @@ export interface Config {
 
 export const DEFAULT_ORDER: BrainStep[] = [
   { route: "claude-plan", model: "claude-sonnet-5-5" },
-  { route: "chatgpt-plan", model: "gpt-6-luna" },
+  { route: "chatgpt-plan", model: "gpt-6.1-sol" },
   { route: "anthropic-api", model: "claude-sonnet-5-5" },
   { route: "openai-api", model: "gpt-6-sol" },
   { route: "bedrock", model: "global.anthropic.claude-sonnet-5-5" },
