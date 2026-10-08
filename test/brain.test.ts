@@ -54,7 +54,7 @@ describe("labels", () => {
     const labels = defaults().brain.order.map(stepLabel);
     expect(labels).toEqual([
       "Sonnet 5.5 on your Claude plan (personal)",
-      "GPT-6 Luna on your ChatGPT plan (personal)",
+      "GPT-6.1 Sol on your ChatGPT plan (personal)",
       "Sonnet 5.5 · Anthropic API",
       "GPT-6 Sol · OpenAI API",
       "Sonnet 5.5 on Bedrock",

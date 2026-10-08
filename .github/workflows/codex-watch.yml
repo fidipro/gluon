@@ -1,0 +1,100 @@
+# Every codex release, checked for what the ChatGPT-plan intake agent hasn't classified (scripts/codex-drift.ts: a new
+# enabled feature, catalog field or thread-item type; src/agent/codex.ts). GitHub can't trigger on another repository's
+# releases, so an hourly run reads npm's latest @openai/codex and checks each version once (an actions-cache key per
+# version, saved when the check ran, marks it checked). On drift `report` opens an issue, or comments on the open one for that version.
+#   gh workflow run codex-watch.yml -f version=0.161.0      # one version by hand
+# The only scheduled workflow, and `report` the only job outside Release and Pages that writes (issues alone): it runs
+# no codex and no checkout; `check`, which runs the downloaded codex, can write nothing (test/release.test.ts).
+# Limits: GitHub may delay a scheduled run, and turns schedules off after 60 days without repository activity; two
+# releases inside an hour: only the later is checked.
+name: Codex watch
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The codex version to check (default: npm's latest)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      drift: ${{ steps.drift.outputs.drift }}
+      report: ${{ steps.drift.outputs.report }}
+    steps:
+      - id: version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VERSION" ]; then VERSION=$(curl -fsSL https://registry.npmjs.org/@openai/codex/latest | jq -r .version); fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then echo "not a codex version: $VERSION"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      # Restores nothing (lookup-only); on a miss its post step saves the key when the job succeeds: this version is checked.
+      - id: seen
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .codex-watch
+          key: codex-watch-${{ steps.version.outputs.version }}
+          lookup-only: true
+      - if: steps.seen.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: steps.seen.outputs.cache-hit != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - if: steps.seen.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
+      # 0: nothing new, 1: drift (report), 2: couldn't check (the job fails and the next run tries again).
+      - id: drift
+        if: steps.seen.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -uo pipefail
+          bun add -g "@openai/codex@$VERSION"
+          code=0
+          bun scripts/codex-drift.ts --binary "$(bun pm bin -g)/codex" > report.md || code=$?
+          cat report.md
+          echo "drift=$code" >> "$GITHUB_OUTPUT"
+          { echo "report<<GLUON_REPORT_END"; cat report.md; echo "GLUON_REPORT_END"; } >> "$GITHUB_OUTPUT"
+          mkdir -p .codex-watch && echo "$VERSION" > .codex-watch/version
+          [ "$code" -le 1 ]
+
+  report:
+    needs: check
+    if: needs.check.outputs.drift == '1'
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.check.outputs.version }}
+          REPORT: ${{ needs.check.outputs.report }}
+        run: |
+          set -euo pipefail
+          title="codex $VERSION: the intake agent needs a look"
+          body="$REPORT
+
+          Found by the Codex watch: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --state open --limit 100 --json number,title | jq -r --arg t "$title" 'map(select(.title == $t))[0].number // empty')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "$body"; else gh issue create --title "$title" --body "$body"; fi

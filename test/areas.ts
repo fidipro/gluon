@@ -50,7 +50,8 @@ export const AREAS: Record<string, Area> = {
   brain: {
     doc: "the intake agent: its routes (Bedrock, Anthropic, OpenAI, Codex), prompt, effort, choices, session loop",
     src: ["src/brain.ts", "src/agent/bedrock-converse.ts", "src/agent/choices.ts", "src/agent/clients.ts", "src/agent/codex.ts", "src/agent/effort.ts", "src/agent/openai.ts", "src/agent/prompt.ts", "src/agent/session.ts", "src/agent/subscription.ts"],
-    unit: ["test/brain.test.ts", "test/brain-clients.test.ts", "test/choices.test.ts", "test/codex.test.ts", "test/converse.test.ts", "test/effort.test.ts", "test/openai.test.ts", "test/route-schema.test.ts", "test/session.test.ts"],
+    files: ["scripts/codex-drift.ts"],
+    unit: ["test/brain.test.ts", "test/brain-clients.test.ts", "test/choices.test.ts", "test/codex.test.ts", "test/codex-drift.test.ts", "test/converse.test.ts", "test/effort.test.ts", "test/openai.test.ts", "test/route-schema.test.ts", "test/session.test.ts"],
     e2e: [],
   },
   "repo-tools-security": {

@@ -1,6 +1,7 @@
 agent_message_board                      under development  false
 analytics_plan_history                   experimental       false
-api_key_model_discovery                  under development  false
+api_key_cyber_access_programs            stable             false
+api_key_model_discovery                  stable             true
 apply_patch_freeform                     removed            false
 apply_patch_preserve_line_endings        under development  false
 apply_patch_streaming_events             under development  false
@@ -10,10 +11,12 @@ artifact                                 under development  false
 auth_elicitation                         stable             true
 background_paginated_rollout_migration   under development  false
 bedrock_setup_wizard                     under development  false
+browser_annotation_api                   stable             true
 browser_use                              stable             true
 browser_use_external                     stable             true
 browser_use_full_cdp_access              stable             true
 chronicle                                under development  false
+cli_daybreak                             under development  false
 code_mode                                under development  false
 code_mode_buffered_exec                  removed            false
 code_mode_host                           stable             true
@@ -48,10 +51,12 @@ external_migration                       removed            false
 fast_mode                                stable             true
 goals                                    stable             true
 guardian_approval                        stable             true
+guardian_conversation_history_tools      under development  false
 guardian_enhanced_node_repl_transcripts  under development  false
 guardian_ext                             removed            false
 guardian_node_repl_transcript_images     under development  false
 guardian_reuse_parent_compaction         stable             true
+guardian_root_handoff_context            under development  false
 guardianv2                               under development  false
 guardianv2.thread_context                removed            false
 hooks                                    stable             true
@@ -63,16 +68,19 @@ in_app_chat                              stable             true
 in_app_dictation                         stable             true
 in_app_local_automation                  stable             true
 in_app_updates                           stable             true
+in_app_voice                             stable             true
 instant_interrupt                        under development  false
 item_ids                                 removed            true
 js_repl                                  removed            false
 js_repl_tools_only                       removed            false
 local_thread_store_compression           under development  false
 local_thread_store_shared_compression    removed            false
+login_shell_package_path                 experimental       false
 mcp_2026_07_28                           under development  false
 mcp_oauth_refresh_coordination           under development  false
 memories                                 stable             false
 mentions_v2                              stable             true
+model_catalog_in_context                 under development  false
 multi_agent                              stable             true
 multi_agent_mode                         removed            false
 multi_agent_v2                           stable             false

@@ -270,19 +270,36 @@ describe("what triggers and what writes: every workflow", () => {
   const all = WORKFLOWS.map((w) => [w, parse(read(w)) as { on: Record<string, unknown>; permissions?: Record<string, string>; jobs: Record<string, Job> }] as const);
   const wf = (name: string) => all.find(([w]) => w.endsWith(`/${name}`))![1];
 
-  test("there are exactly the workflows these rules know: ci, pages, release", () => {
-    expect(WORKFLOWS.map((w) => w.replace(".github/workflows/", "")).sort()).toEqual(["ci.yml", "pages.yml", "release.yml"]);
+  test("there are exactly the workflows these rules know: ci, codex-watch, pages, release", () => {
+    expect(WORKFLOWS.map((w) => w.replace(".github/workflows/", "")).sort()).toEqual(["ci.yml", "codex-watch.yml", "pages.yml", "release.yml"]);
   });
 
-  test("no workflow is scheduled, chained or runs a pull request's code with the base repository's token", () => {
+  test("no workflow but the Codex watch is scheduled; none is chained or runs a pull request's code with the base repository's token", () => {
     for (const [w, y] of all) {
       const on = Object.keys(y.on);
-      expect([w, on.filter((k) => ["schedule", "pull_request_target", "workflow_run"].includes(k))]).toEqual([w, []]);
+      const banned = w.endsWith("/codex-watch.yml") ? ["pull_request_target", "workflow_run"] : ["schedule", "pull_request_target", "workflow_run"];
+      expect([w, on.filter((k) => banned.includes(k))]).toEqual([w, []]);
     }
     for (const w of WORKFLOWS) {
       const code = read(w).split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
-      expect([w, /pull_request_target|workflow_run|^\s*schedule:|^\s*cron:/m.test(code)]).toEqual([w, false]);
+      expect([w, /pull_request_target|workflow_run/.test(code)]).toEqual([w, false]);
+      if (!w.endsWith("/codex-watch.yml")) expect([w, /^\s*schedule:|^\s*cron:/m.test(code)]).toEqual([w, false]);
     }
+  });
+
+  test("codex-watch.yml runs hourly and by hand; nothing else", () => {
+    const { on } = wf("codex-watch.yml");
+    expect(Object.keys(on).sort()).toEqual(["schedule", "workflow_dispatch"]);
+    expect(on.schedule).toEqual([{ cron: "17 * * * *" }]);
+  });
+
+  test("the Codex watch: `check`, which runs the downloaded codex, writes nothing; `report` writes issues alone and runs no action, checkout or codex", () => {
+    const { jobs } = wf("codex-watch.yml");
+    expect(Object.keys(jobs).sort()).toEqual(["check", "report"]);
+    expect(jobs.check!.permissions).toBeUndefined();
+    expect(jobs.report!.permissions).toEqual({ issues: "write" });
+    expect(jobs.report!.steps.filter((s) => s.uses)).toEqual([]);
+    expect(JSON.stringify(jobs.report!.steps)).not.toMatch(/codex-drift|bun |npm |@openai\/codex/);
   });
 
   test("every workflow's top-level permissions are `contents: read`", () => {
@@ -311,11 +328,11 @@ describe("what triggers and what writes: every workflow", () => {
     expect(JSON.stringify(jobs.deploy)).toContain("github-pages");
   });
 
-  test("no workflow but Release and Pages' `deploy` has a job that writes anything", () => {
+  test("no workflow but Release, Pages' `deploy` and the Codex watch's `report` has a job that writes anything", () => {
     for (const [w, y] of all)
       for (const [name, job] of Object.entries(y.jobs)) {
         const writes = Object.entries(job.permissions ?? {}).filter(([, v]) => v === "write").map(([k]) => k);
-        if (w.endsWith("/release.yml") || (w.endsWith("/pages.yml") && name === "deploy")) continue;
+        if (w.endsWith("/release.yml") || (w.endsWith("/pages.yml") && name === "deploy") || (w.endsWith("/codex-watch.yml") && name === "report")) continue;
         expect([w, name, writes]).toEqual([w, name, []]);
       }
   });

@@ -70,7 +70,7 @@ end-to-end harness.
   hand before a release (`gh workflow run ci.yml --ref main -f suite=full`). A maintainer can start
   one off with `gh workflow run ci.yml --ref <branch>` (`workflow_dispatch`). A fork's pull request runs
   with read-only permissions and no secrets, and a first-time contributor's needs a maintainer's approval
-  before Actions run. macOS is tested only in CI.
+  before Actions run. macOS is tested only in CI. `codex-watch.yml` runs `scripts/codex-drift.ts` on each new codex release.
 
 ## Hard rules
 
