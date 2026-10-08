@@ -138,7 +138,7 @@ Select-String gluon-bun-windows-x64.exe .\SHA256SUMS
 ```
 
 Signature (`SHA256SUMS.sigstore.json`, on every release), with
-[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 2.4 or later:
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 2.4 or later (cosign 2 needs `--new-bundle-format` added to the command; cosign 3 needs nothing):
 
 <!-- example -->
 ```sh
