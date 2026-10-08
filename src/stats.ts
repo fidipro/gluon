@@ -18,7 +18,7 @@ import { safeLine } from "./events.ts";
 import { HARNESSES, type Harness } from "./harnesses.ts";
 import { selfArgv } from "./self.ts";
 import { costLabel } from "./sessions.ts";
-import { decodeAnswer, MEMORY_HINT, SQL_CHILD_ENV, SQL_CHILD_GRACE_MS, SQL_CHILD_LIMIT_ENV, SQL_CHILD_MEMORY_ENV, SQL_DEADLINE_MS, SQL_HEAP_BYTES, SQL_MEMORY_SIGNAL, SQL_MAX_ROWS, SQL_OUTPUT_BYTES, sqlProblem, StatsError, writeAll, type QueryResult } from "./stats-sql.ts";
+import { decodeAnswer, MEMORY_HINT, SQL_CHILD_ENV, SQL_CHILD_GRACE_MS, SQL_CHILD_LIMIT_ENV, SQL_CHILD_MEMORY_ENV, SQL_DEADLINE_MS, SQL_HEAP_BYTES, SQL_MEMORY_MARK, SQL_MAX_ROWS, SQL_OUTPUT_BYTES, sqlProblem, StatsError, writeAll, type QueryResult } from "./stats-sql.ts";
 
 export { runQuery, sqlProblem, StatsError } from "./stats-sql.ts";
 
@@ -425,7 +425,7 @@ export const runQueryInChild: SqlRunner = async (path, query) => {
   try {
     const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     if (late) throw new StatsError(`sql: stopped after ${seconds(deadline)}: the query was still running; simplify it or add a LIMIT`, 1);
-    if (child.signalCode === SQL_MEMORY_SIGNAL) throw new StatsError(MEMORY_HINT, 1);
+    if (err.includes(SQL_MEMORY_MARK)) throw new StatsError(MEMORY_HINT, 1);
     let answer: ReturnType<typeof decodeAnswer> | null = null;
     try {
       answer = out ? decodeAnswer(out) : null;

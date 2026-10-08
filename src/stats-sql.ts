@@ -182,22 +182,26 @@ export const SQL_CHILD_LIMIT_ENV = "GLUON_STATS_SQL_LIMIT_MS";
 export const SQL_CHILD_GRACE_MS = 3_000;
 /**
  * The child's own memory cap in bytes above what it used at start, set by the parent where SQLite doesn't enforce `hard_heap_limit`:
- * macOS, where `bun:sqlite` is Apple's build (it keeps no memory statistics, so the limit is never reached). Past it the watchdog ends
- * the child with `SQL_MEMORY_SIGNAL`, which the parent reads as the out-of-memory refusal. A single allocation may overshoot it briefly.
+ * macOS, where `bun:sqlite` is Apple's build (it keeps no memory statistics, so the limit is never reached). Past it the watchdog writes
+ * `SQL_MEMORY_MARK` to stderr and ends the child (SIGKILL); the parent reads the mark as the out-of-memory refusal. Not a signal of its
+ * own: Bun on macOS names signals by Linux's numbers (a SIGUSR2 arrived as SIGSYS). A single allocation may overshoot the cap briefly.
  */
 export const SQL_CHILD_MEMORY_ENV = "GLUON_STATS_SQL_MEMORY_BYTES";
-/** How the watchdog ends a child past its memory cap: a signal nothing else sends it (no handler: the default action ends it). */
-export const SQL_MEMORY_SIGNAL = "SIGUSR2";
+/** The line the watchdog writes before it ends a child past its memory cap. */
+export const SQL_MEMORY_MARK = "gluon-stats-sql: memory cap";
 
 /** The watchdog's code, run in a Worker made from a Blob (no file to bundle or to resolve from the cwd): a thread of its own, so it runs while the main one is inside a SQLite step. */
 const WATCHDOG = `
 self.onmessage = (e) => {
-  const { parent, pid, limit, memory, signal } = e.data;
+  const { parent, pid, limit, memory, mark } = e.data;
   const start = Date.now();
   const base = process.memoryUsage.rss();
   let tick = 0;
   setInterval(() => {
-    if (memory > 0 && process.memoryUsage.rss() - base > memory) process.kill(pid, signal);
+    if (memory > 0 && process.memoryUsage.rss() - base > memory) {
+      require("node:fs").writeSync(2, mark + "\\n");
+      process.kill(pid, "SIGKILL");
+    }
     if (++tick % 10) return;
     let orphan = false;
     try { process.kill(parent, 0); } catch (err) { orphan = err.code === "ESRCH"; }
@@ -208,8 +212,8 @@ self.onmessage = (e) => {
 
 /**
  * Ends this process by SIGKILL when its parent is gone (a killed `gluon stats sql` must not leave a query running: the orphan of the
- * incident ran 16 hours) or when `limit` ms have passed, and by `SQL_MEMORY_SIGNAL` once it uses `memory` bytes more than at start
- * (0: no cap), from a thread of its own. Resolves once the watchdog runs; never throws: the parent's deadline is the first line, this is the second.
+ * incident ran 16 hours), when `limit` ms have passed, or once it uses `memory` bytes more than at start (0: no cap; it says
+ * `SQL_MEMORY_MARK` first), from a thread of its own. Resolves once the watchdog runs; never throws: the parent's deadline is the first line, this is the second.
  */
 async function watchdog(limit: number, memory: number): Promise<void> {
   try {
@@ -218,7 +222,7 @@ async function watchdog(limit: number, memory: number): Promise<void> {
     await new Promise<void>((ready) => {
       w.onmessage = () => ready();
       w.onerror = () => ready();
-      w.postMessage({ parent: process.ppid, pid: process.pid, limit, memory, signal: SQL_MEMORY_SIGNAL });
+      w.postMessage({ parent: process.ppid, pid: process.pid, limit, memory, mark: SQL_MEMORY_MARK });
       setTimeout(ready, 2_000);
     });
   } catch {}
