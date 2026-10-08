@@ -282,18 +282,34 @@ describe("update: at start", () => {
     expect(r.requests).toEqual([]);
   });
 
-  test("notify says a newer release exists, and checks GitHub at most once a day", async () => {
+  test("notify says a newer release exists, confirming it with GitHub at each start; up to date, GitHub is asked once a day", async () => {
     const r = serve("1.1.0");
     const dir = scratch();
     expect(await start(r, "notify", { dir })).toEqual(["Gluon 1.1.0 is available (you have 1.0.0): run gluon update to install it."]);
     expect(r.requests).toEqual(["/releases/latest"]);
     expect(readState(dir).latest).toBe("1.1.0");
-    // A second start the same day: the notice again, from what the check found; no request.
+    // A second start the same day: the newer version it remembers is confirmed first.
     expect(await start(r, "notify", { dir })).toHaveLength(1);
-    expect(r.requests).toEqual(["/releases/latest"]);
-    // A day later: checked again.
+    expect(r.requests).toHaveLength(2);
+    // Up to date (GitHub's latest is this one): nothing said, and no further request that day.
+    r.latest = "1.0.0";
+    expect(await start(r, "notify", { dir })).toEqual([]);
+    expect(await start(r, "notify", { dir })).toEqual([]);
+    expect(r.requests).toHaveLength(3);
+    // A day later: asked again.
     await start(r, "notify", { dir, now: Date.now() + CHECK_EVERY_MS + 1000 });
-    expect(r.requests).toEqual(["/releases/latest", "/releases/latest"]);
+    expect(r.requests).toHaveLength(4);
+  });
+
+  test("a remembered version GitHub doesn't confirm (a stale or foreign state file) is never said or downloaded", async () => {
+    const r = serve("1.0.0");
+    const dir = scratch();
+    const exe = exeIn();
+    writeState({ checkedAt: new Date().toISOString(), latest: "99.0.0" }, dir);
+    expect(await start(r, "auto", { dir, exe })).toEqual([]);
+    expect(r.requests).toEqual(["/releases/latest"]);
+    expect(readState(dir).latest).toBe("1.0.0");
+    expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
   });
 
   test("nothing is said when this is the latest, or GitHub can't be reached", async () => {
@@ -310,7 +326,7 @@ describe("update: at start", () => {
     expect(readFileSync(exe, "utf8")).toBe("NEW BINARY");
   });
 
-  test("auto that fails says why, and doesn't try that version again before the next check", async () => {
+  test("auto that fails says why, and doesn't download that version again for a day", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     r.files["1.1.0"]![ASSET] = "TAMPERED";
     const exe = exeIn();
@@ -319,9 +335,14 @@ describe("update: at start", () => {
     expect(notice).toStartWith("Gluon 1.1.0 is available (you have 1.0.0), but installing it automatically failed: gluon-bun-linux-x64 doesn't match SHA256SUMS");
     expect(notice).toEndWith("Run gluon update to try again.");
     expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
-    const asked = r.requests.length;
+    const downloads = () => r.requests.filter((p) => p.endsWith(ASSET)).length;
+    expect(downloads()).toBe(2);
+    // The next start confirms the version, says the same, and downloads nothing.
     expect(await start(r, "auto", { dir, exe })).toEqual([notice!]);
-    expect(r.requests.length).toBe(asked);
+    expect(downloads()).toBe(2);
+    // A day later it tries again.
+    await start(r, "auto", { dir, exe, now: Date.now() + CHECK_EVERY_MS + 1000 });
+    expect(downloads()).toBe(4);
   });
 
   test("auto without an executable to replace (the npm package, source) says how to update instead", async () => {

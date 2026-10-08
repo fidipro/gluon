@@ -59,8 +59,8 @@ disclosure date with you. Only the latest release gets security fixes.
   at a harness launch (at most every 10 minutes) or with `gluon pricing update`; there is no switch to turn them off.
   Responses are size-capped, https to the same host (a redirect is an error), and validated before use. Gluon also runs
   your installed `claude`, `codex` and `grok` to read a version or model catalog, never to call a model.
-- **Gluon's own updates** (`updates: auto` by default; `notify` only says, `off` never checks; `GLUON_UPDATES` wins). At most
-  once a day at start, and with `gluon update`, plain unauthenticated `GET`s with nothing of yours in them go to
+- **Gluon's own updates** (`updates: auto` by default; `notify` only says, `off` never checks; `GLUON_UPDATES` wins). At start
+  (once a day while up to date, at each start while an update is pending) and with `gluon update`, plain unauthenticated `GET`s with nothing of yours in them go to
   `github.com` (the latest release's version, then its files, served from `objects.githubusercontent.com` or
   `release-assets.githubusercontent.com`) and to Sigstore's `tuf-repo-cdn.sigstore.dev` (its trusted root). `auto` replaces
   the standalone binary in place: it runs from your next start.

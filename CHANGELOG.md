@@ -6,6 +6,13 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Gluon's own updates: a newer version Gluon remembers from an earlier check is confirmed with GitHub before it is announced or
+  downloaded (a remembered version that GitHub no longer lists is never acted on); while Gluon is up to date it still asks once a
+  day. A version whose automatic install failed is not downloaded again for a day.
+- On macOS, `gluon stats sql` keeps its 256 MB memory cap: macOS's SQLite ignores the heap limit Gluon sets, so the query's process
+  now watches its own memory there and stops a query that passes it ("the query needs more than 256 MB of memory").
+
 ## [1.1.0] - 2026-10-08
 
 ### Added

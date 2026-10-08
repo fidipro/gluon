@@ -1,7 +1,7 @@
 /**
- * Gluon's own updates: at start, in the background (`backgroundUpdate`, never before the first screen, at most one check of
- * GitHub a day), and `gluon update` in the foreground. `updates: auto` (the default) installs a new release by itself, `notify`
- * only says it exists, `off` checks nothing; `GLUON_UPDATES` wins over the config. Only a standalone binary replaces itself; the
+ * Gluon's own updates: at start, in the background (`backgroundUpdate`, never before the first screen; GitHub is asked at most
+ * once a day while Gluon is up to date, and a newer version it remembers is confirmed before it acts), and `gluon update` in the
+ * foreground. `updates: auto` (the default) installs a new release by itself, `notify` only says it exists, `off` checks nothing; `GLUON_UPDATES` wins over the config. Only a standalone binary replaces itself; the
  * npm package and a source checkout are told how to update. Nothing is installed unless the release's signature and checksum
  * verify (`verify.ts`).
  *
@@ -89,8 +89,8 @@ export function manualUpdate(version: string): string {
 export interface UpdateState {
   checkedAt?: string;
   latest?: string;
-  /** The version an automatic update last failed to install, and why: it is not tried again before the next check. */
-  failed?: { version: string; error: string };
+  /** The version an automatic update last failed to install, when, and why: it is not tried again for `CHECK_EVERY_MS`. */
+  failed?: { version: string; error: string; at: string };
 }
 
 export const statePath = (dir = stateDir()): string => join(dir, "update.json");
@@ -207,7 +207,7 @@ export interface BackgroundOptions {
 
 const available = (latest: string, current: string) => `Gluon ${latest} is available (you have ${current})`;
 
-/** The start's update: a check at most once a day, then a notice or, with `auto`, the install. Never throws, never waits on anything. */
+/** The start's update: a check of GitHub (see the header), then a notice or, with `auto`, the install. Never throws, never waits on anything. */
 export async function backgroundUpdate(o: BackgroundOptions): Promise<void> {
   try {
     if (o.mode === "off" || (o.demo && seamPath(o.env ?? process.env) === undefined)) return;
@@ -218,23 +218,26 @@ export async function backgroundUpdate(o: BackgroundOptions): Promise<void> {
     const exe = updatableExe(src);
     if (exe) sweepLeftovers(exe, now);
     const state = readState(dir);
-    const due = !state.checkedAt || !(now - Date.parse(state.checkedAt) < CHECK_EVERY_MS);
     let latest = state.latest;
-    let failed = state.failed;
-    if (due) {
+    // GitHub is asked once a day while Gluon is up to date, and at every start while a newer version is remembered: what is remembered
+    // is confirmed before anything is said or downloaded (a remembered version may be gone, or not be GitHub's at all).
+    const fresh = state.checkedAt !== undefined && now - Date.parse(state.checkedAt) < CHECK_EVERY_MS;
+    if (!fresh || (latest !== undefined && newer(latest, o.current))) {
       try {
         latest = await latestVersion(src.releases);
-        failed = undefined;
       } catch {
         // Offline or GitHub unreachable: quiet; the next start tries again.
         return;
       }
-      writeState({ checkedAt: new Date(now).toISOString(), latest }, dir);
     }
+    // A version whose automatic install failed is not tried again for a day (a binary in a directory Gluon can't write to: no daily 150 MB).
+    const f = state.failed;
+    const failed = f && f.version === latest && now - Date.parse(f.at) < CHECK_EVERY_MS ? f : undefined;
+    writeState({ checkedAt: new Date(now).toISOString(), ...(latest ? { latest } : {}), ...(failed ? { failed } : {}) }, dir);
     if (!latest || !newer(latest, o.current)) return;
     if (o.mode === "notify") return o.notice(`${available(latest, o.current)}: run gluon update to install it.`);
     if (!exe) return o.notice(`${available(latest, o.current)}: ${manualUpdate(latest)}.`);
-    if (failed?.version === latest) return o.notice(`${available(latest, o.current)}, but installing it automatically failed: ${failed.error}. Run gluon update to try again.`);
+    if (failed) return o.notice(`${available(latest, o.current)}, but installing it automatically failed: ${failed.error}. Run gluon update to try again.`);
     const unlock = takeLock(dir);
     if (!unlock) return;
     try {
@@ -242,7 +245,7 @@ export async function backgroundUpdate(o: BackgroundOptions): Promise<void> {
       o.notice(`Gluon ${latest} is installed: it starts the next time you open Gluon (this one stays ${o.current}).`);
     } catch (e) {
       const error = e instanceof UpdateError ? e.message : String(e);
-      writeState({ ...readState(dir), failed: { version: latest, error } }, dir);
+      writeState({ ...readState(dir), failed: { version: latest, error, at: new Date(now).toISOString() } }, dir);
       o.notice(`${available(latest, o.current)}, but installing it automatically failed: ${error}. Run gluon update to try again.`);
     } finally {
       unlock();
@@ -260,7 +263,7 @@ until you restart them.
 
   --check   only say whether a newer release exists
 
-Gluon also does this by itself at start (at most one check a day): the config key \`updates\` is
+Gluon also does this by itself at start (GitHub is asked once a day while it is up to date): the config key \`updates\` is
 auto (install), notify (only say) or off; GLUON_UPDATES=auto|notify|off wins over it.`;
 
 export interface CommandOptions {

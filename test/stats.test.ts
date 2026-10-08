@@ -8,6 +8,7 @@ import { GLUON, SLOW, SYSTEM_ENV } from "./e2e/harness.ts";
 import { WIN } from "./e2e/fixtures.ts";
 import { uninstallTargets } from "../src/uninstall.ts";
 import { HEARTBEAT_MS, MIGRATIONS, runStatus, type SessionRow } from "../src/analytics.ts";
+import { SQL_CHILD_ENV, SQL_CHILD_MEMORY_ENV, SQL_MEMORY_SIGNAL } from "../src/stats-sql.ts";
 import { detailJson, durationLabel, findSession, formatTable, newestSessions, openStats, parseWhen, queryJson, runQuery, selectSessions, sqlProblem, StatsError, statsCommand, summarize, wipe } from "../src/stats.ts";
 
 // UTC+12/+13: a day boundary far from UTC, so a UTC-day bug shows. Pinned for this file's tests only: Bun loads every test file of
@@ -692,6 +693,24 @@ describe("gluon stats sql: limits", () => {
       expect(r.err).toContain("needs more than 256 MB of memory");
       // Peak of the command and its child: a bare run is about 125 MB; the values are 300 MB to 1 GB.
       if (r.maxRss !== undefined) expect([q, r.maxRss < 400_000_000]).toEqual([q, true]);
+    }
+  }, 30_000 * SLOW);
+
+  test.skipIf(WIN)("BUG-597/macos-memory: where SQLite ignores its heap limit (macOS), the child's watchdog ends it past its memory cap, with the signal the parent reads as out of memory", async () => {
+    // Forced here with a small cap: on Linux SQLite's own limit (256 MB) lets a 100 MB value through, the 30 MB cap doesn't.
+    const dir = mkdtempSync(join(tmpdir(), "gluon-sql-memory-"));
+    try {
+      const path = join(dir, "a.db");
+      new Database(path, { create: true }).close();
+      const child = Bun.spawn([...GLUON, "stats-sql"], { env: { ...SYSTEM_ENV, PATH: process.env.PATH ?? "", [SQL_CHILD_ENV]: path, [SQL_CHILD_MEMORY_ENV]: String(30_000_000) }, stdin: new TextEncoder().encode("SELECT zeroblob(100000000) AS z"), stdout: "pipe", stderr: "pipe" });
+      await child.exited;
+      expect(child.signalCode).toBe(SQL_MEMORY_SIGNAL);
+      // Without the cap the same query answers.
+      const free = Bun.spawn([...GLUON, "stats-sql"], { env: { ...SYSTEM_ENV, PATH: process.env.PATH ?? "", [SQL_CHILD_ENV]: path }, stdin: new TextEncoder().encode("SELECT zeroblob(100000000) AS z"), stdout: "pipe", stderr: "pipe" });
+      const [out] = await Promise.all([new Response(free.stdout).text(), free.exited]);
+      expect(out).toContain("<blob 100000000 bytes>");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   }, 30_000 * SLOW);
 
