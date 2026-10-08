@@ -40,7 +40,7 @@ irm https://github.com/fidipro/gluon/releases/latest/download/install.ps1 | iex
 <details>
 <summary>With Bun, or from source</summary>
 
-Download the npm-style tarball `gluon-<version>.tgz` from the release, then `bun add -g ./gluon-<version>.tgz` (Linux, macOS). To build from a checkout, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Download the npm-style tarball `gluon-<version>.tgz` from the release, then `bun add -g "$PWD/gluon-<version>.tgz"` (Linux, macOS). To build from a checkout, see [CONTRIBUTING.md](CONTRIBUTING.md).
 Checksums, cosign and every installer option: [install guide](https://fidipro.github.io/gluon/getting-started/install/).
 
 </details>

@@ -6,6 +6,9 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The documented tarball install is `bun add -g "$PWD/gluon-<version>.tgz"`: `bun add -g ./gluon-<version>.tgz` failed, because `bun add -g` resolves a relative path against Bun's global directory.
+
 ## [1.0.0] - 2026-10-08
 
 First public release.

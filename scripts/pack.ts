@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bun --no-env-file --config=/dev/null
 /**
  * `bun run pack`: the npm-style package, for a local install on Linux / macOS with Bun
- * (`bun add -g ./dist/gluon-<version>.tgz`). Never published: the generated package.json keeps
+ * (`bun add -g "$PWD/dist/gluon-<version>.tgz"`). Never published: the generated package.json keeps
  * `"private": true`, which `bun pm pack` accepts and `npm publish` / `bun publish` refuse.
  *
  *   dist/npm/gluon.js                  the CLI bundled for Bun (`--target=bun`, no runtime deps),

@@ -94,7 +94,7 @@ Check it against `SHA256SUMS` (below) before choosing "Run anyway".
 ## npm-style package (Linux / macOS, with Bun)
 
 ```sh
-bun add -g ./gluon-<version>.tgz   # downloaded from the release first
+bun add -g "$PWD/gluon-<version>.tgz"   # downloaded from the release first
 ```
 
 The package is one bundled file (`gluon.js`, no dependencies) plus its grep worker. Its bin runs
