@@ -368,6 +368,9 @@ async function main(): Promise<number> {
   // A failed stage ends the run, unless --keep-going: then every stage runs and the run fails at the end.
   let failed = false;
   const stop = () => ((failed = true), !keepGoing);
+  // Windows: the compiled fake agent is built once here, before the test processes start: each one's preload would build it,
+  // and `bun build --compile`s at once collide in Bun's own temp copy of itself (EBUSY on a fresh CI runner).
+  if (process.platform === "win32" && stages.some((x) => x !== "typecheck")) (await import("../test/e2e/fixtures.ts")).fakeExe();
   meter.stage("typecheck");
   if (stages.includes("typecheck") && !report([await timed("typecheck", () => run("typecheck", [bun, "run", "typecheck"]))]) && stop()) return 1;
   meter.stage("unit");
