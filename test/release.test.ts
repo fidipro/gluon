@@ -409,3 +409,38 @@ describe("ci.yml: one plan per event", () => {
   });
 });
 
+
+describe("BUG-707/tarball: the documented tarball install works from any directory", () => {
+  // `bun add -g` resolves a relative path (`./gluon-1.0.0.tgz`) against Bun's global dir, not the cwd, and fails
+  // with ENOENT. Every documented form must be absolute: `bun add -g "$PWD/gluon-<version>.tgz"`.
+  const RELATIVE = /bun add -g\s+["']?(\.{1,2}\/|gluon-[^\s"']*\.tgz)/;
+  const files = (): string[] => {
+    const out = ["README.md", "CONTRIBUTING.md"];
+    for (const dir of ["docs", "scripts"]) {
+      for (const f of new Bun.Glob("**/*").scanSync({ cwd: join(ROOT, dir), onlyFiles: true })) {
+        if (!f.includes("node_modules/")) out.push(`${dir}/${f}`);
+      }
+    }
+    return out;
+  };
+
+  test("the pattern catches a relative tarball path", () => {
+    for (const bad of ["bun add -g ./gluon-1.0.0.tgz", 'bun add -g "./dist/gluon-<version>.tgz"', "bun add -g ../gluon.tgz", "bun add -g gluon-1.0.0.tgz"]) {
+      expect(RELATIVE.test(bad), bad).toBe(true);
+    }
+    for (const good of ['bun add -g "$PWD/gluon-<version>.tgz"', "bun add -g /tmp/gluon-1.0.0.tgz", "bun add -g in oven/bun"]) {
+      expect(RELATIVE.test(good), good).toBe(false);
+    }
+  });
+
+  test("no doc or script installs a tarball by a relative path", () => {
+    const hits: string[] = [];
+    for (const f of files()) {
+      const text = readFileSync(join(ROOT, f), "utf8");
+      text.split("\n").forEach((line, i) => {
+        if (RELATIVE.test(line)) hits.push(`${f}:${i + 1}: ${line.trim()}`);
+      });
+    }
+    expect(hits, `use bun add -g "$PWD/gluon-<version>.tgz" (absolute):\n${hits.join("\n")}`).toEqual([]);
+  });
+});

@@ -93,7 +93,8 @@ npm_install() { # npm_install <flavor>
   docker run --rm --init --network none -e VERSION="$VERSION" -v "$WORK/pkg:/pkg:ro" "gluon-test-bun-$1" sh -euc '
     # A user install, as a developer would have it (the image points BUN_INSTALL_BIN at /usr/local/bin).
     export BUN_INSTALL_BIN="$HOME/.bun/bin" PATH="$HOME/.bun/bin:$PATH"
-    bun add -g "/pkg/gluon-$VERSION.tgz"
+    # As the docs say: from the tarball'"'"'s directory, by "$PWD/…" (a relative path resolves against Bun'"'"'s global dir, not the cwd).
+    cd /pkg && bun add -g "$PWD/gluon-$VERSION.tgz"
     bin="$(command -v gluon)"
     echo "installed: $bin -> $(readlink -f "$bin")"
     head -n 1 "$(readlink -f "$bin")"
