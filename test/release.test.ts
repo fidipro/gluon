@@ -322,7 +322,7 @@ describe("what triggers and what writes: every workflow", () => {
   test("ci.yml runs on pull requests and pushes to main, nightly, and by hand; nothing else", () => {
     const { on } = wf("ci.yml");
     expect(Object.keys(on).sort()).toEqual(["pull_request", "push", "schedule", "workflow_dispatch"]);
-    expect(on.pull_request).toEqual({ branches: ["main"] });
+    expect(on.pull_request).toEqual({ branches: ["main"], types: ["opened", "synchronize", "reopened", "labeled", "unlabeled"] });
     expect(on.push).toEqual({ branches: ["main"] });
     expect(on.schedule).toEqual([{ cron: "23 2 * * *" }]);
   });
@@ -412,10 +412,18 @@ describe("ci.yml: one plan per event", () => {
     expect(run).toContain('if [ "$suite" = changed ] && p=$(bun run regression --list --json --changed "$base" | tail -n 1 | jq -r .platforms) && [ "$p" = linux ]; then os=ubuntu; fi');
   });
 
+  test("a pull request's tests are guarded: red-check (skipped only by `red-exempt`) and test-guard (passes a weakening only with `tests-reviewed`)", () => {
+    expect((ci.jobs["red-check"] as Job).if).toBe("github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'red-exempt')");
+    expect(ci.jobs["red-check"]!.steps.map((s) => s.run ?? "").join("\n")).toContain('bun scripts/red-check.ts "origin/$BASE_REF"');
+    expect((ci.jobs["test-guard"] as Job).if).toBe("github.event_name == 'pull_request'");
+    expect(ci.jobs["test-guard"]!.env).toMatchObject({ TESTS_REVIEWED: "${{ contains(github.event.pull_request.labels.*.name, 'tests-reviewed') }}" });
+    expect(ci.jobs["test-guard"]!.steps.map((s) => s.run ?? "").join("\n")).toContain('bun scripts/test-guard.ts "origin/$BASE_REF"');
+  });
+
   test("`gate`, the one required check, runs whatever happened and passes only when every job it needs passed or was skipped", () => {
     const gate = ci.jobs.gate! as Job & { if?: string };
     expect(gate.if).toBe("always()");
-    expect([gate.needs].flat().sort()).toEqual(["dco", "plan", "regression", "secrets"]);
+    expect([gate.needs].flat().sort()).toEqual(["dco", "plan", "red-check", "regression", "secrets", "test-guard"]);
     expect(gate.steps.map((s) => s.run ?? "").join("\n")).toContain(`jq -e 'all(.[]; . == "success" or . == "skipped")'`);
   });
 

@@ -42,8 +42,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 
 - **Done means `bun run regression --changed` passes** (it runs the whole fast tier itself when a core file
   changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
-- **Every fixed bug gets a regression test** named `BUG-nn/<plan case>: …` (e2e in `test/e2e/`,
-  or a unit test in `test/` if it needs no terminal).
+- **Every fixed bug gets a regression test that fails before the fix**, named `BUG-nn/<plan case>: …`, at the
+  cheapest layer (unit unless it needs a terminal); never weaken a test to get green (rules: `test/AGENTS.md`).
 - **The regression suite is offline and free.** Never call a real brain, agent, API or installer.
 - **Paid runs only when the user asked for one; if a change needs one, ask first and wait** — this
   includes `gluon doctor`, `bun run start` and a real `--launch` (they call real models).

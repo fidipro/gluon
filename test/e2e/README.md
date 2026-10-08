@@ -160,6 +160,16 @@ for every vendor in `test/rules.test.ts`, the brain order, the offered-models fi
 config migration in `test/brain.test.ts`. Brain behaviour (D) needs the real model and isn't
 covered here; `bun run test:live` checks the real brains and connections on a budget.
 
+### Windows traps
+
+Found by `bun run test:windows`: `test.failing` has no `.skipIf` (use `(WIN ? test.skip : test.failing)`);
+`Bun.sleep(0)` is a 15 ms timer and an await that only an `AbortSignal.timeout` can end spins forever (keep a ref'd
+`setInterval`); ConPTY reports full-width rows as wrapped and keeps focus reports on (`gluon-invariants.ts`) and keeps
+the background-colour query (no OSC 11 reply comes); a `finally` that removes a state directory an app still holds gets
+EBUSY (`cleanDir`); no `mkdir`/`sh`/`ps` spawns, no `/dev/null` (`BUN_FLAGS`); deadlines a test's own steps must meet
+scale with `SLOW`; a runner's temp dir is 8.3 (`RUNNER~1`): `realpathSync` keeps it, git names it long, so
+`test/preload.ts` uses `.native` (about 30 git failures on `windows-latest` before it did).
+
 ## Gluon's coverage matrix
 
 `test/fixtures/gluon-matrix.ts` lists every Gluon state (home, a session of each fake, the setup

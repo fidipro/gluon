@@ -555,7 +555,7 @@ describe("BUG-507/launch: a launch starts the refreshes and never waits for them
     const started = performance.now();
     const returned = refreshOnLaunch({ harness: "claude-code", version: "2.9.9", openrouterKey: "openrouter/anthropic/claude-haiku-4.5", deps });
     expect(returned).toBeUndefined();
-    expect(performance.now() - started).toBeLessThan(50);
+    expect(performance.now() - started).toBeLessThan(50 * SLOW);
     expect(f.asked).toEqual([]);
     release();
     const settled = await refreshNetworkTables(deps);

@@ -1,7 +1,15 @@
 # test/ — instructions for coding agents
 
 Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), fakes
-(`fixtures/`), Docker suite (`docker/`).
+(`fixtures/`), Docker suite (`docker/`). How to write a test worth keeping, and why:
+`docs/contributing/testing.md`; CI checks the rules (`red-check`, `test-guard`, `test/test-style.test.ts`).
+
+- **A new bug's test fails before its fix** (`scripts/red-check.ts` runs it against the base's `src/`).
+- **Never weaken a test to get green**: no deleted test or `expect`, no new skip, `@full` or `@quarantine`
+  without a person's `tests-reviewed` label (`scripts/test-guard.ts`). Fix the code, or stop and say what fails.
+- **One layer per bug, the cheapest that catches it**: unit unless the bug lives in terminal I/O; never both.
+- **Assert meaning, not copy**: the state or region that matters; no snapshot outside `test/visual/`; fakes at the
+  process or network boundary, not `mock.module`. Search for the bug's id before adding a test.
 
 - **Never reach the real `claude` / `codex`** or any real installer: use the fakes and
   `fakeInstaller()`; real installers only in a throwaway container. Probes come from
@@ -10,7 +18,8 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
   `env: process.env`.
 - **Wait for states, don't sleep**: `press`, `type`, `waitFor`, `exitCode()` handle half-drawn
   frames and slow machines; a late OSC reply: `oscReplied()`. A sleep is only a window in which
-  something must *not* happen. CI uses `GLUON_TEST_SLOW` and concurrency 3. Install offers: wait `GUARD_MS` first.
+  something must *not* happen: mark it `// sleep-ok: <what>` (`test/test-style.test.ts` counts the rest). CI uses
+  `GLUON_TEST_SLOW`. Install offers: wait `GUARD_MS` first.
 - **No bare millisecond bound**: a deadline a test's own steps must meet is `ms * SLOW` (`test/fixtures/slow.ts`);
   a perception limit belongs in `test/perf/`. Bare bounds were the CI flakes on macOS and Windows.
 - **A flaky test is fixed, or quarantined while it's fixed**: `@quarantine BUG-nn until:YYYY-MM-DD` (≤ 30 days;
@@ -32,13 +41,8 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
   SID, never icacls' listing); timeouts × `SLOW`; `writeFileSync` when the next line reads the
   file. ConPTY holds a lone Esc (the harness sends win32-input-mode Esc) and drops OSC 11 replies
   (light theme is manual: `windows-manual-qa.md`).
-- **Windows traps** (found by `bun run test:windows`): `test.failing` has no `.skipIf` (use
-  `(WIN ? test.skip : test.failing)`); `Bun.sleep(0)` is a 15 ms timer and an await that only an
-  `AbortSignal.timeout` can end spins forever (keep a ref'd `setInterval`); ConPTY reports full-width
-  rows as wrapped and keeps focus reports on (`gluon-invariants.ts`); a `finally` that removes a state
-  directory an app still holds gets EBUSY (`cleanDir`); no `mkdir`/`sh`/`ps` spawns, no `/dev/null`
-  (`BUN_FLAGS`); deadlines a test's own steps must meet scale with `SLOW`; a runner's temp dir is 8.3 (`RUNNER~1`): `realpathSync`
-  keeps it, git names it long, so `test/preload.ts` uses `.native` (QA-win-04: ~30 `windows-latest` git failures).
+- **Windows traps** (`test.failing` without `.skipIf`, 15 ms timers, ConPTY, EBUSY, 8.3 temp paths): read
+  "Windows traps" in `e2e/README.md` before a Windows-only fix.
 - **The "real Windows" test in `windows.test.ts` proves Bun's shim quoting** — if it fails, Bun
   changed.
 - **Don't assume the host arch** (macOS runners are arm64): pass it (`nativeExe`'s `arch`).
