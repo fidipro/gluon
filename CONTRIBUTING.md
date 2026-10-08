@@ -100,6 +100,14 @@ breaks one won't be merged.
 - `AGENTS.md` files are the single source of instructions for coding agents, whichever you use; the
   policy for every Markdown file is at the end of the root `AGENTS.md`.
 
+## Sign off your commits (DCO)
+
+Every commit in a pull request from an outside contributor needs a `Signed-off-by: Your Name <you@example.com>`
+line, with the email you commit with. It certifies the [Developer Certificate of Origin](https://developercertificate.org):
+you wrote the change, or have the right to submit it under the project's license. `git commit -s` adds it. CI's `dco`
+check fails a pull request with an unsigned commit; to fix one, run `git rebase --signoff origin/main` and force-push your
+branch (`git push --force-with-lease`), or `git commit --amend -s` for the last commit. Merge commits are skipped.
+
 ## Security issues
 
 Don't open an issue: see [SECURITY.md](SECURITY.md).

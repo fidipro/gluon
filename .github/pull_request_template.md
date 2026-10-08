@@ -9,6 +9,7 @@
 - [ ] `AGENTS.md` / `README.md` updated if a command, file, workflow or behaviour changed
 - [ ] Behaviour changed? Updated the guide in `docs/` that describes it (guide footers list the files they describe); ran `bun run docs:gen` if CLI/config/models changed
 - [ ] Keeps the hard rules for subscriptions (see `CONTRIBUTING.md`)
+- [ ] Every commit is signed off (`git commit -s`, see `CONTRIBUTING.md`; checked for outside contributors)
 - [ ] No real keys, tokens or personal data in code, tests, logs or screenshots
 
 <!-- Keeping this file fresh:

@@ -197,6 +197,7 @@ export const AREAS: Record<string, Area> = {
       "scripts/pack.ts",
       "scripts/docker-test.sh",
       "scripts/release-notes.ts",
+      "scripts/dco.ts",
       "install.sh",
       "install.ps1",
       ".github/workflows/**",
@@ -204,7 +205,7 @@ export const AREAS: Record<string, Area> = {
       "test/docker/**",
       "test/install-ps1.ps1",
     ],
-    unit: ["test/dist.test.ts", "test/release.test.ts", "test/live-script.test.ts"],
+    unit: ["test/dist.test.ts", "test/release.test.ts", "test/dco.test.ts", "test/live-script.test.ts"],
     e2e: [],
   },
   windows: {
@@ -269,7 +270,7 @@ export const CORE: string[] = [
 ];
 
 /** Files no test reads: a change to one runs nothing. */
-export const IGNORED: string[] = ["qa/**", ".claude/**", ".gitignore", ".gitleaks.toml", ".env.example", "scripts/coverage.ts", "scripts/live.ts", "scripts/live-lib.ts", "scripts/live-harness.ts", "scripts/live-driver.ts", "scripts/drive.py"];
+export const IGNORED: string[] = ["qa/**", ".claude/**", ".gitignore", ".gitleaks.toml", ".github/CODEOWNERS", ".env.example", "scripts/coverage.ts", "scripts/live.ts", "scripts/live-lib.ts", "scripts/live-harness.ts", "scripts/live-driver.ts", "scripts/drive.py"];
 
 const globs = new Map<string, Bun.Glob>();
 const glob = (p: string) => globs.get(p) ?? (globs.set(p, new Bun.Glob(p)), globs.get(p)!);
