@@ -18,11 +18,23 @@ if (process.argv[2] === "debug" && process.argv[3] === "models") {
   process.exit(0);
 }
 
-// `features list [--disable f]…`: codex 0.158's list (the fixture), with the disables applied
-// (unified_exec stays on, as codex forces it), and FAKE_CODEX_FEATURES_EXTRA rows a newer codex might add.
+// codex 0.161's features (the fixture), less FAKE_CODEX_FEATURES_DROP's names (an older codex). Like
+// codex, `features list` and `app-server` refuse a `--disable` of a name the list doesn't have.
+const drop = new Set((process.env.FAKE_CODEX_FEATURES_DROP ?? "").split(",").filter(Boolean));
+const rows = FEATURES.trim()
+  .split(/\r?\n/)
+  .filter((row) => !drop.has(row.trim().split(/\s{2,}/)[0]!));
+const known = new Set(rows.map((row) => row.trim().split(/\s{2,}/)[0]!));
+const off = new Set(process.argv.flatMap((a, i) => (process.argv[i - 1] === "--disable" ? [a] : [])));
+const unknown = [...off].find((f) => !known.has(f));
+if (unknown) {
+  console.error(`Error: Unknown feature flag: ${unknown}`);
+  process.exit(1);
+}
+
+// `features list [--disable f]…`: the list with the disables applied (unified_exec stays on, as
+// codex forces it), and FAKE_CODEX_FEATURES_EXTRA rows a newer codex might add.
 if (process.argv[2] === "features" && process.argv[3] === "list") {
-  const off = new Set(process.argv.flatMap((a, i) => (process.argv[i - 1] === "--disable" ? [a] : [])));
-  const rows = FEATURES.trim().split(/\r?\n/);
   for (const row of rows) {
     const [name, stage, on] = row.trim().split(/\s{2,}/);
     console.log(`${name!.padEnd(40)} ${stage!.padEnd(18)} ${off.has(name!) && name !== "unified_exec" ? "false" : on}`);
@@ -38,6 +50,8 @@ type Step = {
   tool?: { name: string; input: Record<string, unknown> };
   /** A server request the client must answer (an approval). */
   approval?: string;
+  /** An item/started of any item (say, a tool of Codex's own that got through). */
+  item?: Record<string, unknown>;
   /** Waits for turn/interrupt. */
   hang?: boolean;
   fail?: { message: string; codexErrorInfo?: string };
@@ -84,6 +98,7 @@ async function playTurn(turnId: string, steps: Step[]) {
       notify("item/completed", { threadId: THREAD, turnId, completedAtMs: 0, item: { ...item, status: "completed", ...res } });
     }
     if (step.approval) await request(step.approval, { threadId: THREAD, turnId, itemId, command: "rm -rf /" });
+    if (step.item) notify("item/started", { threadId: THREAD, turnId, startedAtMs: 0, item: { id: itemId, ...step.item } });
     if (step.hang) {
       await new Promise<void>((resolve) => (onInterrupt = resolve));
       notify("turn/completed", { threadId: THREAD, turn: { id: turnId, items: [], status: "interrupted", error: null } });

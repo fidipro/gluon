@@ -5,7 +5,8 @@
  * a base URL, forwards no token, and sends its own system prompt unchanged as the thread's base
  * instructions. Codex's own tools are turned off: the brain sees Gluon's five tools only.
  *
- * What gives a Codex thread tools (checked against codex 0.159 by capturing the model request):
+ * What gives a Codex thread tools (checked against codex 0.159 by capturing the model request; feature
+ * names and item types against 0.161):
  * - features (`--disable` below);
  * - the model catalog: a model's `tool_mode: code_mode_only` wraps every tool in a JavaScript
  *   `exec` tool (with `wait`), `apply_patch_tool_type` adds `apply_patch`,
@@ -16,10 +17,11 @@
  *   `request_user_input` tool and the skills list, turned off in `thread/start`.
  *
  * This list is a denylist, so it fails closed at runtime: before the app-server starts, `codex
- * features list` (with the same `--disable`s) must show no enabled feature outside
- * CODEX_FEATURES_KEPT, and every catalog field set on a model must be one Gluon knows
+ * features list` (with the same `--disable`s, for the names this codex knows) must show no enabled
+ * feature outside CODEX_FEATURES_KEPT, and every catalog field set on a model must be one Gluon knows
  * (CATALOG_FIELDS). A newer codex with a new feature or catalog field is refused, with a readable
- * error, until Gluon has looked at it; the brain order then falls through.
+ * error, until Gluon has looked at it; the brain order then falls through. During a turn, an item
+ * of a type outside BRAIN_ITEMS (a tool of Codex's own that got through) stops the app-server.
  *
  * `dynamicTools` is an experimental app-server API: a Codex update may break it. The probe catches
  * that, and the brain order falls through to the next step. A ChatGPT account may also refuse
@@ -39,9 +41,10 @@ import type { LoopBrain, LoopHooks, ToolOutput } from "./session.ts";
 import { TOOLS } from "./tools.ts";
 
 /**
- * Codex features that bring tools or run commands of their own. All are known to codex 0.159
- * (an unknown one only draws a config warning). `code_mode_host` stays on: turning it off makes
- * code mode fail closed rather than go away. test/codex.test.ts checks this list against
+ * Codex features that bring tools or run commands of their own, or that Gluon hasn't looked into
+ * (off costs nothing). `codex` refuses a `--disable` of a name it doesn't know (exit 1), so only
+ * the names a codex lists are passed (`knownFeatures`). `code_mode_host` stays on: turning it off
+ * makes code mode fail closed rather than go away. test/codex.test.ts checks this list against
  * `codex features list` (test/fixtures/codex-features-list.txt).
  */
 export const CODEX_FEATURES_OFF = [
@@ -95,6 +98,15 @@ export const CODEX_FEATURES_OFF = [
   "token_budget",
   "memories",
   "chronicle",
+  // New in codex 0.161, not looked into: off.
+  "browser_annotation_api",
+  "in_app_voice",
+  "cli_daybreak",
+  "guardian_conversation_history_tools",
+  "guardian_root_handoff_context",
+  "login_shell_package_path",
+  "model_catalog_in_context",
+  "api_key_cyber_access_programs",
 ];
 
 /**
@@ -113,29 +125,42 @@ export const CODEX_FEATURES_KEPT: Record<string, string> = {
 };
 
 /** What the refusals say: the user's codex is newer than what Gluon has checked. */
-export const UNSUPPORTED = "this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.159)";
+export const UNSUPPORTED = "this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.161)";
 /** The tail of a refusal of a codex whose catalog Gluon can't read: `brainErrorHint` matches it with `UNSUPPORTED`. */
 export const TOO_NEW = "this codex may be too new for the intake agent";
 
-/**
- * The enabled features of `codex features list` that Gluon hasn't cleared (not in
- * CODEX_FEATURES_KEPT; features at the "removed" stage do nothing). Throws when the list can't be read.
- */
-export function uncheckedFeatures(list: string): string[] {
+/** `codex features list` as [name, stage, on] rows. Throws when the list can't be read. */
+function featureRows(list: string): string[][] {
   const rows = list
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
     .map((l) => l.split(/\s{2,}/));
   if (rows.length < 10 || rows.some((r) => r.length !== 3 || !/^(true|false)$/.test(r[2]!))) throw new Error(`${UNSUPPORTED}: its \`codex features list\` isn't in the shape Gluon reads`);
-  return rows.filter(([name, stage, on]) => on === "true" && stage !== "removed" && !(name! in CODEX_FEATURES_KEPT)).map(([name]) => name!);
+  return rows;
+}
+
+/** The names of CODEX_FEATURES_OFF that this `codex features list` knows: the only ones `--disable` may name. */
+export function knownFeatures(list: string): string[] {
+  const known = new Set(featureRows(list).map(([name]) => name));
+  return CODEX_FEATURES_OFF.filter((f) => known.has(f));
+}
+
+/**
+ * The enabled features of `codex features list` that Gluon hasn't cleared (not in
+ * CODEX_FEATURES_KEPT; features at the "removed" stage do nothing). Throws when the list can't be read.
+ */
+export function uncheckedFeatures(list: string): string[] {
+  return featureRows(list)
+    .filter(([name, stage, on]) => on === "true" && stage !== "removed" && !(name! in CODEX_FEATURES_KEPT))
+    .map(([name]) => name!);
 }
 
 /** Catalog fields that add tools of their own, and the values that add none. */
 const CATALOG_TOOLS_OFF = { tool_mode: "direct", apply_patch_tool_type: null, experimental_supported_tools: [], multi_agent_version: null };
 
 /**
- * The other catalog fields Gluon knows (codex 0.159), none of which gives the thread a tool:
+ * The other catalog fields Gluon knows (codex 0.161), none of which gives the thread a tool:
  * descriptions, reasoning and context settings, prompts, access programs. `shell_type` and
  * `web_search_tool_type` / `supports_search_tool` only shape tools that are off (shell_tool,
  * web_search, no environment).
@@ -173,10 +198,10 @@ export function catalogWithoutTools(json: string): string {
 }
 
 /**
- * Runs one `codex` command to its end (30 s at most): its output and exit code. A timeout stops
- * the tree and doesn't wait for the output to close (a child codex started may still hold it).
+ * Runs one `codex` command to its end (30 s at most): its output, errors and exit code. A timeout
+ * stops the tree and doesn't wait for the output to close (a child codex started may still hold it).
  */
-async function codexOutput(spawn: SpawnCodex, args: string[], timeoutMs = 30_000): Promise<{ out: string; code: number }> {
+async function codexOutput(spawn: SpawnCodex, args: string[], timeoutMs = 30_000): Promise<{ out: string; err: string; code: number }> {
   const child = spawn(["codex", ...args], codexEnv());
   child.stdin.end?.();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -186,12 +211,35 @@ async function codexOutput(spawn: SpawnCodex, args: string[], timeoutMs = 30_000
       resolve(null);
     }, timeoutMs);
   });
-  const r = await Promise.race([Promise.all([new Response(child.stdout).text(), child.exited]), timedOut]);
+  const err = child.stderr ? new Response(child.stderr).text() : Promise.resolve("");
+  const r = await Promise.race([Promise.all([new Response(child.stdout).text(), err, child.exited]), timedOut]);
   clearTimeout(timer);
-  return r ? { out: r[0], code: r[1] } : { out: "", code: -1 };
+  return r ? { out: r[0], err: r[1], code: r[2] } : { out: "", err: "", code: -1 };
 }
 
-const catalogFiles = new WeakMap<SpawnCodex, Promise<string>>();
+/** The last line codex wrote to stderr, without colours and masked; "" when there is none. */
+function lastLine(text: string): string {
+  const last = text
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .at(-1);
+  return last ? maskSecrets(last) : "";
+}
+
+/** A `codex features list` that ran: its output, or a refusal that says why it didn't. */
+async function featuresList(spawn: SpawnCodex, disable: string[]): Promise<string> {
+  const r = await codexOutput(spawn, ["features", "list", ...disable.flatMap((f) => ["--disable", f])]);
+  if (r.code === 0) return r.out;
+  const why = lastLine(r.err);
+  throw new Error(`${UNSUPPORTED}: \`codex features list\` failed (exit code ${r.code})${why ? `: ${why}` : ""}`);
+}
+
+/** What the app-server is started with: the tool-free catalog's path and the features to turn off. */
+type BrainSetup = { catalog: string; off: string[] };
+
+const catalogFiles = new WeakMap<SpawnCodex, Promise<BrainSetup>>();
 
 /** Each model's `supported_reasoning_levels` from the last catalog read; empty until one is. */
 let levels: Readonly<Record<string, string[]>> = {};
@@ -202,17 +250,17 @@ export function codexLevels(): Readonly<Record<string, string[]>> {
 }
 
 /**
- * Checks this codex (once per run): no enabled feature Gluon hasn't cleared. Then writes the
- * tool-free catalog to a private temp file and returns its path: from Codex's own refreshed
- * catalog, else the one bundled with the binary. Never a model call.
+ * Checks this codex (once per run): with every feature of CODEX_FEATURES_OFF it knows turned off,
+ * no enabled feature Gluon hasn't cleared. Then writes the tool-free catalog to a private temp file:
+ * from Codex's own refreshed catalog, else the one bundled with the binary. Returns its path and the
+ * features turned off. Never a model call.
  */
-function brainCatalog(spawn: SpawnCodex): Promise<string> {
+function brainCatalog(spawn: SpawnCodex): Promise<BrainSetup> {
   let file = catalogFiles.get(spawn);
   if (file) return file;
   file = (async () => {
-    const features = await codexOutput(spawn, ["features", "list", ...CODEX_FEATURES_OFF.flatMap((f) => ["--disable", f])]);
-    if (features.code !== 0) throw new Error(`${UNSUPPORTED}: \`codex features list\` failed (exit code ${features.code})`);
-    const unchecked = uncheckedFeatures(features.out);
+    const off = knownFeatures(await featuresList(spawn, []));
+    const unchecked = uncheckedFeatures(await featuresList(spawn, off));
     if (unchecked.length) throw new Error(`${UNSUPPORTED}: it has features on that Gluon hasn't checked (${unchecked.join(", ")}), which may give the intake agent tools of Codex's own. Update Gluon, or use another step of brain.order`);
     let json = "";
     for (const args of [["debug", "models"], ["debug", "models", "--bundled"]]) {
@@ -230,7 +278,7 @@ function brainCatalog(spawn: SpawnCodex): Promise<string> {
       throw e;
     }
     process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
-    return path;
+    return { catalog: path, off };
   })();
   catalogFiles.set(spawn, file);
   file.catch(() => catalogFiles.delete(spawn));
@@ -265,13 +313,16 @@ export function codexEnvWarnings(): string[] {
   return out;
 }
 
-/** The app-server command: Codex's own tools are off from the start (features, and the catalog at `catalog`). */
-export function appServerArgv(catalog: string, codex = "codex"): string[] {
-  return [codex, "app-server", ...CODEX_FEATURES_OFF.flatMap((f) => ["--disable", f]), "-c", `model_catalog_json=${JSON.stringify(catalog)}`];
+/**
+ * The app-server command: Codex's own tools are off from the start (the features `off`, the names
+ * of CODEX_FEATURES_OFF this codex knows, and the catalog at `catalog`).
+ */
+export function appServerArgv(catalog: string, off: string[] = CODEX_FEATURES_OFF, codex = "codex"): string[] {
+  return [codex, "app-server", ...off.flatMap((f) => ["--disable", f]), "-c", `model_catalog_json=${JSON.stringify(catalog)}`];
 }
 
 /** The thread: Gluon's prompt and tools only, read-only, never asking, nothing saved to disk. */
-export function threadStartParams(model: string, cwd: string, system: string, mcpServers: string[] = []) {
+export function threadStartParams(model: string, cwd: string, system: string, mcpServers: string[] = [], off: string[] = CODEX_FEATURES_OFF) {
   return {
     model,
     cwd,
@@ -283,7 +334,7 @@ export function threadStartParams(model: string, cwd: string, system: string, mc
     // No execution environment: no apply_patch, nothing that runs on the host.
     environments: [],
     config: {
-      ...Object.fromEntries(CODEX_FEATURES_OFF.map((f) => [`features.${f}`, false])),
+      ...Object.fromEntries(off.map((f) => [`features.${f}`, false])),
       web_search: "disabled",
       "agents.enabled": false,
       "tools.experimental_request_user_input.enabled": false,
@@ -441,10 +492,50 @@ async function mcpServerNames(server: AppServer, cwd: string): Promise<string[]>
 }
 
 /** Starts the thread and returns its id and the start response. */
-async function startThread(server: AppServer, model: string, cwd: string, system: string) {
+async function startThread(server: AppServer, model: string, cwd: string, system: string, off: string[]) {
   await handshake(server);
-  const res = await server.request("thread/start", threadStartParams(model, cwd, system, await mcpServerNames(server, cwd)));
+  const res = await server.request("thread/start", threadStartParams(model, cwd, system, await mcpServerNames(server, cwd), off));
   return { threadId: res.thread.id as string, res };
+}
+
+/**
+ * The thread items a brain's turn may hold (codex 0.161's `ThreadItem` types): the developer's
+ * message, the model's text, reasoning and plan text, Gluon's own tool calls, and Codex's context compaction.
+ */
+export const BRAIN_ITEMS = new Set(["userMessage", "agentMessage", "reasoning", "plan", "dynamicToolCall", "contextCompaction"]);
+
+/**
+ * The other item types of codex 0.161: a tool of Codex's own, or work Gluon never asks for. A type
+ * in neither set is new: `scripts/codex-drift.ts` reports it, and the brain refuses it like these.
+ */
+export const FOREIGN_ITEMS = new Set([
+  "commandExecution",
+  "fileChange",
+  "mcpToolCall",
+  "functionCallOutput",
+  "collabAgentToolCall",
+  "subAgentActivity",
+  "webSearch",
+  "imageView",
+  "imageGeneration",
+  "sleep",
+  "hookPrompt",
+  "enteredReviewMode",
+  "exitedReviewMode",
+]);
+
+const GLUON_TOOLS = new Set(TOOLS.map((t) => t.name));
+
+/**
+ * The refusal for an `item/started` or `item/completed` whose item the brain must never have: a
+ * type outside BRAIN_ITEMS, or a dynamic tool that isn't one of Gluon's. Null for anything else.
+ */
+export function foreignItem(method: string, p: any): string | null {
+  if (method !== "item/started" && method !== "item/completed") return null;
+  const item = p?.item;
+  const type = typeof item?.type === "string" ? item.type : "an item without a type";
+  const what = !BRAIN_ITEMS.has(type) ? type : type === "dynamicToolCall" && !GLUON_TOOLS.has(String(item.tool)) ? `the tool ${JSON.stringify(String(item.tool))}` : null;
+  return what && `${UNSUPPORTED}: Codex gave the intake agent a tool of its own (${what}), so Gluon stopped it. Update Gluon, or use another step of brain.order`;
 }
 
 /** Approval requests get a denial (the brain never runs commands or edits files); anything else an error. */
@@ -506,7 +597,21 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
     return block;
   };
 
+  /**
+   * Codex gave the brain a tool of its own: the app-server stops at once (with what it runs), the
+   * turn fails with why, and the next message starts a new one (the developer is told it forgot).
+   */
+  const stop = (reason: string) => {
+    const session = live;
+    live = null;
+    lost ||= !!session?.started;
+    session?.server?.close();
+    turn?.reject(new Error(reason));
+  };
+
   const onNotification = (method: string, p: any) => {
+    const foreign = foreignItem(method, p);
+    if (foreign) return stop(foreign);
     const t = turn;
     if (!t) return;
     if (p?.turnId && t.id && p.turnId !== t.id) return;
@@ -578,7 +683,8 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
   const start = (system: string) => {
     const session: NonNullable<typeof live> = { server: null, ready: Promise.resolve(""), started: false, effort: null };
     session.ready = (async () => {
-      const argv = appServerArgv(await brainCatalog(spawn));
+      const setup = await brainCatalog(spawn);
+      const argv = appServerArgv(setup.catalog, setup.off);
       if (live !== session) throw new Error("closed");
       session.effort = sentEffort({ route: "chatgpt-plan", model: opts.model, ...(opts.effort ? { effort: opts.effort } : {}) }, levels[opts.model]);
       opts.onEffort?.(session.effort);
@@ -592,7 +698,7 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
         }
         turn?.reject(e);
       };
-      const { threadId } = await startThread(server, opts.model, opts.cwd, system);
+      const { threadId } = await startThread(server, opts.model, opts.cwd, system, setup.off);
       session.started = true;
       return threadId;
     })();
@@ -709,7 +815,7 @@ function explain(message: string, model: string): string {
   return message;
 }
 
-/** `codex login status` output, read. Wording as of codex 0.159. */
+/** `codex login status` output, read. Wording as of codex 0.161. */
 export function parseLoginStatus(text: string): { loggedIn: boolean; method?: "chatgpt" | "api-key" } | null {
   if (/Logged in using ChatGPT/i.test(text)) return { loggedIn: true, method: "chatgpt" };
   if (/Logged in using an API key/i.test(text)) return { loggedIn: true, method: "api-key" };
@@ -748,9 +854,11 @@ export async function probeChatgptPlan(
   opts: { spawn?: SpawnCodex; timeoutMs?: number } = {},
 ): Promise<{ ok: true; warnings?: string[] } | { ok: false; error: string }> {
   let server: AppServer;
+  let setup: BrainSetup;
   try {
     const spawn = opts.spawn ?? defaultSpawn;
-    server = new AppServer(spawn(appServerArgv(await brainCatalog(spawn)), codexEnv()));
+    setup = await brainCatalog(spawn);
+    server = new AppServer(spawn(appServerArgv(setup.catalog, setup.off), codexEnv()));
   } catch (e) {
     return { ok: false, error: maskSecrets((e as Error).message) };
   }
@@ -764,7 +872,7 @@ export async function probeChatgptPlan(
         throw new Error(`Codex is signed in with ${account.type === "apiKey" ? "an API key" : account.type}, not a ChatGPT plan. Run \`codex login\` and sign in with ChatGPT.`);
       }
       const names = await mcpServerNames(server, cwd);
-      const res = await server.request("thread/start", threadStartParams(model, cwd, PROBE_SYSTEM, names));
+      const res = await server.request("thread/start", threadStartParams(model, cwd, PROBE_SYSTEM, names, setup.off));
       const threadId = res.thread.id as string;
       const warnings = (res.instructionSources ?? []).map((s: string) => `Codex adds instructions from ${s} to the brain's prompt.`);
       if (names.length) {
@@ -775,6 +883,11 @@ export async function probeChatgptPlan(
       const done = new Promise<void>((resolve, reject) => {
         let error: string | null = null;
         server.onNotification = (method, p) => {
+          const foreign = foreignItem(method, p);
+          if (foreign) {
+            server.close();
+            return reject(new Error(foreign));
+          }
           if (method === "error" && !p?.willRetry) error = turnError(p?.error, model);
           if (method !== "turn/completed") return;
           if (p?.turn?.status === "completed") resolve();

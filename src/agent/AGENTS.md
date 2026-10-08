@@ -55,10 +55,10 @@ The brain: conversation, LLM clients, read-only repo tools.
   (BUG-78). Sessions are ephemeral; a restart fires `restarted` (BUG-85).
 - **`codex app-server` and `dynamicTools` are experimental**; doctor probes, the brain order falls
   through.
-- **Codex tools come from features, the model catalog and the thread** (codex 0.159). The denylist
-  fails closed (BUG-79): only `CODEX_FEATURES_KEPT` may be enabled, only `CATALOG_FIELDS` set; a
-  new feature or field → decide and list it. `code_mode_host` stays on. After a codex update: the harness-update
-  runbook (in the maintainers' private notes).
+- **Codex tools come from features, the model catalog and the thread** (codex 0.161). The denylist
+  fails closed (BUG-79): only `CODEX_FEATURES_KEPT` may be enabled, only `CATALOG_FIELDS` set, only `BRAIN_ITEMS` in a turn
+  (BUG-709); a new one → decide and list it (`scripts/codex-drift.ts` finds it). `--disable` only names codex lists: it refuses
+  others (`knownFeatures`; BUG-708). `code_mode_host` stays on. After a codex update: the harness-update runbook (private notes).
 
 ## Keeping this file fresh
 

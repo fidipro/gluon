@@ -10,6 +10,8 @@ All notable changes to Gluon are listed here. The format follows
 - Pull requests from outside contributors need every commit signed off (`git commit -s`, the Developer Certificate of Origin); CI checks it. See `CONTRIBUTING.md`.
 
 ### Fixed
+- The intake agent on the ChatGPT plan works with a codex that doesn't know every feature Gluon turns off: `codex features list` failed with exit code 1 (seen on Windows). Gluon now turns off only the features the installed codex lists, and a failure shows codex's own reason. Codex 0.161 is supported.
+- On the ChatGPT plan, a tool of Codex's own that reaches the intake agent's turn (a command, a file change, a web search, a type Gluon doesn't know) stops `codex app-server` at once, and the turn fails saying so.
 - The documented tarball install is `bun add -g "$PWD/gluon-<version>.tgz"`: `bun add -g ./gluon-<version>.tgz` failed, because `bun add -g` resolves a relative path against Bun's global directory.
 
 ## [1.0.0] - 2026-10-08
