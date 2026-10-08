@@ -176,6 +176,9 @@ describe("update: installing a release", () => {
     const exe = exeIn();
     await installRelease("1.1.0", sourceOf(r), exe, { versionOf: says("1.1.0"), dir: scratch() });
     expect(readFileSync(exe, "utf8")).toBe("NEW BINARY");
+    // Windows moves the old one aside (it may still be running); the next start sweeps it.
+    expect(readdirSync(join(exe, "..")).sort()).toEqual(process.platform === "win32" ? ["gluon", "gluon.old"] : ["gluon"]);
+    sweepLeftovers(exe);
     expect(readdirSync(join(exe, ".."))).toEqual(["gluon"]);
   });
 
