@@ -10,6 +10,9 @@ import { loadSecrets, knownSecretValues, maskSecrets, maskValue, outsideProfile,
 import { canSymlink, isPrivate } from "./e2e/fixtures.ts";
 
 const POSIX = process.platform !== "win32";
+// The linear-time bounds scale with a slow CI machine (GLUON_TEST_SLOW): a quadratic pattern on these runs of
+// millions of characters takes minutes, so a loose bound still catches it.
+const SLOW = Number(process.env.GLUON_TEST_SLOW) || 1;
 const TMP = mkdtempSync(join(tmpdir(), "gluon-secrets-"));
 const saved = { ...process.env };
 const env = () => join(TMP, ".env");
@@ -41,7 +44,7 @@ describe("parseEnv", () => {
     writeFileSync(env(), `A=x${" ".repeat(400_000)}y\n${" ".repeat(400_000)}B=1\nC${" ".repeat(400_000)}\nD=z${" ".repeat(400_000)}\n`);
     const t0 = performance.now();
     expect(parseEnv(env())).toEqual([["A", `x${" ".repeat(400_000)}y`], ["B", "1"], ["D", "z"]]);
-    expect(performance.now() - t0).toBeLessThan(1000);
+    expect(performance.now() - t0).toBeLessThan(1000 * SLOW);
   });
   test("BUG-587/quoted: a quoted value keeps the spaces inside the quotes, loses those around them; tabs and CRLF count as trailing too", () => {
     writeFileSync(env(), 'A="  inner  spaces "  \r\nB=\'x y\'\t\r\nC=plain \t \nD="kept" # not a comment handler\nE=   \n');
@@ -329,7 +332,7 @@ describe("masking edges", () => {
       for (const text of ["https://" + ":".repeat(2_000_000), "https://user:" + "x".repeat(2_000_000), "https://a:b".repeat(300_000), "https://u:" + "a@".repeat(1_000_000), "https://u:".repeat(300_000), "a.".repeat(1_000_000) + "://" + "u:".repeat(500_000)]) {
         const t0 = performance.now();
         maskSecrets(text);
-        expect(performance.now() - t0).toBeLessThan(1500);
+        expect(performance.now() - t0).toBeLessThan(1500 * SLOW);
       }
     });
   });
@@ -375,7 +378,7 @@ describe("masking edges", () => {
       for (const text of cases) {
         const t0 = performance.now();
         maskSecrets(text);
-        expect(performance.now() - t0).toBeLessThan(1500);
+        expect(performance.now() - t0).toBeLessThan(1500 * SLOW);
       }
     });
   });
@@ -412,7 +415,7 @@ describe("masking edges", () => {
       for (const text of ["password=".repeat(500_000), "token" + " ".repeat(2_000_000) + "=", 'secret="' + "a ".repeat(1_000_000), 'passwd="'.repeat(300_000), "token=" + "a".repeat(2_000_000), "api_key=a.".repeat(300_000), "Authorization: Basic " + "A".repeat(2_000_000), "Authorization: Basic ".repeat(100_000), 'token"='.repeat(500_000)]) {
         const t0 = performance.now();
         maskSecrets(text);
-        expect(performance.now() - t0).toBeLessThan(1500);
+        expect(performance.now() - t0).toBeLessThan(1500 * SLOW);
       }
     });
   });
@@ -423,7 +426,7 @@ describe("masking edges", () => {
     for (const text of cases) {
       const t0 = performance.now();
       maskSecrets(text);
-      expect(performance.now() - t0).toBeLessThan(1500);
+      expect(performance.now() - t0).toBeLessThan(1500 * SLOW);
     }
   });
 });
