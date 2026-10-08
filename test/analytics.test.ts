@@ -1,4 +1,5 @@
 /** Local analytics (`src/analytics.ts`): one row per launched session in a private SQLite file; recording never breaks anything. */
+import { SLOW } from "./fixtures/slow.ts";
 import { Database } from "bun:sqlite";
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -770,7 +771,7 @@ describe("QA analytics: what the spec keeps", () => {
     const keys = ["sk-ant-api03-abcdefghijklmnop", "sk-or-v1-0123456789abcdef0123456789abcdef", "AIzaSyA-abcdefghijklmnopqrstuvwxyz012345", "AKIAABCDEFGHIJKLMNOP", "ghp_abcdefghijklmnopqrstuvwxyz0123456789", "Bearer abcdefghijklmnopqrstuvwxyz", "hf_abcdefghijklmnopqrstuvwxyzABCDEFGH", "https://u:pw-abcdef-0123456789@h", "password=hunter2-abcdef-0123456789"];
     const t0 = performance.now();
     a.begin(start({ spec: `${keys.join(" ")} ${"the quick brown fox ".repeat(250_000)}` }));
-    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(performance.now() - t0).toBeLessThan(2000 * SLOW);
     a.close();
     const spec = rows(path)[0]!.spec;
     for (const k of keys) expect(spec).not.toContain(k.slice(-12));

@@ -73,6 +73,7 @@ exits 1 only for something definitely broken. Run it before a release.
 | a change in `src/pty/`, `src/gluon.ts`, `src/ui/` or `src/sessions.ts` | `GLUON_PERF_QUICK=1 bun run test:perf` |
 | a price source or table builder changes | refresh `test/fixtures/tables/` |
 | a test slower than the fast tier's threshold | put `@full` in its title |
+| a test CI reports as flaky (failed, then passed on retry) | fix it, or quarantine it while you do: `@quarantine <bug> until:<date>` in its title, at most 30 days |
 | a Bun upgrade | `bun run test:windows` and `bun run test:dist` |
 | a change in `.github/workflows/` | one targeted run of that workflow, not a full one |
 

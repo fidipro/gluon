@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./areas.ts";
-import { ageDays, ago, baselineGaps, compareVersions, fixtureStatus, groupCandidates, ledgerSummary, parseVersion, render, scanCandidates, slowTests } from "../scripts/test-health.ts";
+import { ageDays, ago, baselineGaps, compareVersions, fixtureStatus, groupCandidates, ledgerSummary, parseVersion, render, scanCandidates, scanQuarantines, slowTests } from "../scripts/test-health.ts";
 import { FULL_OVER_S, type TimesFile } from "../scripts/test-times.ts";
 
 const scan = (text: string, path = "test/x.test.ts") => scanCandidates([{ path, text }]);
@@ -99,6 +99,28 @@ describe("bug candidates", () => {
     const raw = files.filter((f) => !["test/e2e/gluon-monkey.ts", "test/test-health.test.ts"].includes(f.path) && /\(\s*["'`](BUG-CANDIDATE|MODEL-GAP)\/[A-Za-z0-9]/.test(code(f.text))).map((f) => f.path);
     expect([...new Set(candidates.map((c) => c.file))].sort()).toEqual(raw.sort());
     expect(candidates.every((c) => c.title.startsWith(`${c.marker}/${c.id}:`))).toBe(true);
+  });
+});
+
+describe("quarantined tests", () => {
+  const now = new Date("2026-10-09T12:00:00Z");
+  const q = (title: string) => scanQuarantines([{ path: "test/x.test.ts", text: `test("${title}", () => {});` }], now);
+
+  test("a quarantine names its bug and its end; a well-formed one inside its 30 days is listed, nothing broken", () => {
+    expect(q("BUG-7/a: flaky @quarantine BUG-7 until:2026-10-20")).toEqual({ quarantined: [{ file: "test/x.test.ts", line: 1, title: "BUG-7/a: flaky @quarantine BUG-7 until:2026-10-20", bug: "BUG-7", until: "2026-10-20" }], problems: [] });
+    expect(q("a test with no tag").quarantined).toEqual([]);
+  });
+
+  test("past its date, with no date or bug, or longer than 30 days: broken, with what to do", () => {
+    expect(q("t @quarantine BUG-7 until:2026-10-08").problems).toEqual(["test/x.test.ts:1: BUG-7's quarantine ended 2026-10-08: fix the test (and drop the tag) or delete it"]);
+    expect(q("t @quarantine BUG-7").problems[0]).toContain('"@quarantine BUG-nn until:YYYY-MM-DD"');
+    expect(q("t @quarantine until:2026-10-20").problems[0]).toContain('"@quarantine BUG-nn until:YYYY-MM-DD"');
+    expect(q("t @quarantine BUG-7 until:2026-12-31").problems).toEqual(["test/x.test.ts:1: BUG-7's quarantine runs to 2026-12-31, more than 30 days"]);
+  });
+
+  test("no quarantine in this repository is broken", () => {
+    const files = [...new Bun.Glob("test/**/*.{ts,tsx}").scanSync({ cwd: ROOT })].filter((f) => !f.includes("node_modules")).map((path) => ({ path: path.replaceAll("\\", "/"), text: readFileSync(join(ROOT, path), "utf8") }));
+    expect(scanQuarantines(files, new Date()).problems).toEqual([]);
   });
 });
 

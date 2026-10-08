@@ -32,7 +32,8 @@ test("when a scoped body ends, gluon and the agent it started are gone, whatever
     expect(pids.length).toBeGreaterThan(1);
     expect(pids.every(alive)).toBe(true);
   })();
-  await Bun.sleep(300 * SLOW);
+  // Ended when the scope ends: wait for that, not a fixed time.
+  for (const end = performance.now() + 5_000 * SLOW; pids.some(alive) && performance.now() < end; ) await Bun.sleep(25);
   expect(pids.filter(alive)).toEqual([]);
 });
 

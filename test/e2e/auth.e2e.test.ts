@@ -423,7 +423,7 @@ describe("the menus", () => {
     const cfg = freshConfig("late-osc");
     const app = run([], { GLUON_CONFIG: cfg }, { osc11: { delayMs: 600, splitMs: 60 } });
     await app.waitFor("Connect your coding agents");
-    await Bun.sleep(900);
+    await app.oscReplied();
     expect(app.screen()).toContain("space or 1-6 to check");
     expect(await app.exitCode(100)).toBeNull();
     await app.press(KEY.enter);
@@ -895,7 +895,7 @@ describe("menus: late OSC replies (QA pass 2)", () => {
     await app.waitFor("Which provider?");
     await choose(app, 1);
     await app.waitFor("Paste your Anthropic API key");
-    await Bun.sleep(1500);
+    await app.oscReplied();
     await app.paste("sk-ant-api03-lightlightlight");
     await app.press(KEY.enter);
     await app.waitFor("Intake agent ·", 20_000);
@@ -906,7 +906,7 @@ describe("menus: late OSC replies (QA pass 2)", () => {
     for (const splitMs of [undefined, 30]) {
       const app = new App({ cwd: repo.tiny(), cols: 80, rows: 24, osc11: { delayMs: 300, splitMs, light: true } });
       await app.waitFor(HOME_VIEW);
-      await Bun.sleep(900);
+      await app.oscReplied();
       await app.type("x");
       expect(app.lines().at(-2)).toMatch(/^ {3}› x$/);
     }
@@ -916,7 +916,7 @@ describe("menus: late OSC replies (QA pass 2)", () => {
     for (const light of [false, true]) {
       const app = run(["connect", "claude-code"], { GLUON_CONFIG: freshConfig(`bug63-${light}`) }, { osc11: { delayMs: 300, splitMs: 250, light } });
       await app.waitFor("How should Claude Code sign in?");
-      await Bun.sleep(1200);
+      await app.oscReplied();
       expect(app.screen()).toContain("enter to select · esc to cancel");
       expect(app.screen()).not.toMatch(/rgb:|11;|\\/);
       await app.press(KEY.esc);

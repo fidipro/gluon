@@ -1,4 +1,5 @@
 /** The Claude Code and Codex adapters (issue #13): what each adds per setting and version, and their hooks. */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -87,7 +88,7 @@ describe("the waiting compaction question (askBeforeCompact)", () => {
     const t = Date.now();
     rmSync(c.eventsDir, { recursive: true, force: true });
     expect(await run).toBe(false);
-    expect(Date.now() - t).toBeLessThan(1000);
+    expect(Date.now() - t).toBeLessThan(1000 * SLOW);
   });
 
   test("never asks with the piece off or an events directory that can't be written", async () => {

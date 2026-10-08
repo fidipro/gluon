@@ -690,7 +690,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     const yes = performance.now();
     await app.press(KEY.enter);
     await app.waitFor((s) => HOME_VIEW.test(s) && !/fix-add-bug +codex/.test(s));
-    expect(performance.now() - yes).toBeLessThan(5000);
+    expect(performance.now() - yes).toBeLessThan(5000 * SLOW);
   });
 
   test("F34: a pasted /clear never asks; on_clear: stay never asks @full", async () => {

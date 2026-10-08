@@ -2,7 +2,7 @@
 /**
  * `bun run regression` (the fast tier) and `bun run regression:full` (`--full`): typecheck, then
  * the unit tests in shards (separate processes: `--parallel` can't run Ink's Yoga twice), then the
- * e2e scenarios. The fast tier leaves out the tests whose title carries `@full` and keeps its
+ * e2e scenarios. The fast tier leaves out the tests whose title carries `@full` or `@quarantine` and keeps its
  * memory low (3 unit shards, `GLUON_E2E_CONCURRENCY` apps at once); the full tier runs everything
  * with 4 shards. `GLUON_UNIT_SHARDS` overrides the shards.
  *
@@ -14,20 +14,24 @@
  * After a run: the slowest files, the non-`@full` tests over 3 s (candidates for `@full`), and the
  * peak memory of the whole process tree (Linux). Test times are kept in `qa/logs/test-times.json`
  * and balance the next run's shards.
+ *
+ * `--retry-failed` (CI): a stage that fails runs its failed tests once more. Passing then, they are flaky, not
+ * failures: named in a warning and in `qa/logs/flaky.json`, and the run goes on. Tests never retry themselves.
  */
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
 import { AREAS, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
-const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--list]
-  (none)           the fast tier: typecheck + unit + e2e without the tests titled @full
-  --full           also the @full tests (bun run regression:full)
+const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--list]
+  (none)           the fast tier: typecheck + unit + e2e without the tests titled @full or @quarantine
+  --full           also the @full and @quarantine tests (bun run regression:full)
   --area a,b       only those areas' unit and e2e tests (bun run test:area a,b); areas: ${Object.keys(AREAS).join(", ")}
   --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too
   --stages a,b     only those stages (typecheck, unit, e2e), to time or meter one of them
+  --retry-failed   run a stage's failed tests once more; passing then, they are flaky (qa/logs/flaky.json), not failures
   --list           print what would run, then stop
 env: GLUON_UNIT_SHARDS (unit processes), GLUON_E2E_CONCURRENCY (apps at once), GLUON_TEST_CASES (a file: every test run, as JSON)`;
 
@@ -38,13 +42,14 @@ if (argv.includes("--help") || argv.includes("-h")) {
 }
 const full = argv.includes("--full");
 const list = argv.includes("--list");
+const retryFailed = argv.includes("--retry-failed");
 let areaArg: string | undefined;
 let changedArg: string | true | undefined;
 let stagesArg: string | undefined;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]!;
   const next = argv[i + 1];
-  if (a === "--full" || a === "--list" || a === "--") continue;
+  if (a === "--full" || a === "--list" || a === "--retry-failed" || a === "--") continue;
   else if (a === "--area") areaArg = next && !next.startsWith("--") ? (i++, next) : "";
   else if (a.startsWith("--area=")) areaArg = a.slice(7);
   else if (a === "--changed") changedArg = next && !next.startsWith("--") ? (i++, next) : true;
@@ -70,7 +75,7 @@ if (!stages.length || stages.some((x) => !STAGES.includes(x))) {
 const wanted = Math.floor(Number(process.env.GLUON_UNIT_SHARDS));
 const shards = wanted >= 1 ? wanted : full ? 4 : 3;
 const bun = process.execPath;
-const filter = full ? [] : ["-t", "^(?!.*@full)"];
+const filter = full ? [] : ["-t", "^(?!.*@(?:full|quarantine))"];
 const tier = full ? "full" : "fast";
 
 const apps = defaultApps();
@@ -238,28 +243,28 @@ function startMeter(): { stage(name: string): void; stop(): Peak | string } {
 }
 
 // ── JUnit → durations ───────────────────────────────────────────────────────
-type Case = { file: string; name: string; s: number; kind: "unit" | "e2e" };
+type Case = { file: string; name: string; leaf: string; s: number; kind: "unit" | "e2e"; failed: boolean };
 const ENTITY: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 const unxml = (s: string) => s.replace(/&(?:(lt|gt|amp|quot|apos)|#(\d+)|#x([0-9a-f]+));/gi, (_, n, d, h) => (n ? ENTITY[n.toLowerCase()]! : String.fromCodePoint(d ? Number(d) : parseInt(h, 16))));
-function readCases(): Case[] {
+function readCases(reports = junits): Case[] {
   const cases: Case[] = [];
-  for (const j of junits) {
+  for (const j of reports) {
     let xml = "";
     try {
       xml = readFileSync(j.file, "utf8");
     } catch {
       continue; // a run that never wrote its report (killed)
     }
-    for (const m of xml.matchAll(/<testcase\b([^>]*?)\/?>/g)) {
+    for (const m of xml.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
       const a: Record<string, string> = {};
       for (const kv of m[1]!.matchAll(/([\w:-]+)="([^"]*)"/g)) a[kv[1]!] = unxml(kv[2]!); // (Bun escapes a classname twice: unxml'd again below)
-      if (a.file) cases.push({ file: a.file.replaceAll("\\", "/"), name: [a.classname && unxml(a.classname), a.name].filter(Boolean).join(" "), s: Number(a.time) || 0, kind: j.kind });
+      if (a.file) cases.push({ file: a.file.replaceAll("\\", "/"), name: [a.classname && unxml(a.classname), a.name].filter(Boolean).join(" "), leaf: a.name ?? "", s: Number(a.time) || 0, kind: j.kind, failed: (m[2] ?? "").includes("<failure") });
     }
   }
   return cases;
 }
 
-const dur = (s: number) => (s >= 90 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${s.toFixed(1)}s`);
+const dur = (s: number) => (s >= 90 ? `${Math.floor(Math.round(s) / 60)}m${String(Math.round(s) % 60).padStart(2, "0")}s` : `${s.toFixed(1)}s`);
 const gb = (b: number) => `${(b / 2 ** 30).toFixed(2)} GB`;
 
 function summarize(cases: Case[], wallS: number, mem: Peak | string) {
@@ -312,15 +317,49 @@ async function timed<T>(name: string, f: () => Promise<T>): Promise<T> {
   }
 }
 
+const flaky: { kind: Case["kind"]; file: string; name: string }[] = [];
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * A test stage's verdict. With --retry-failed, a failed stage runs the tests its reports mark failed once more, by
+ * title; passing then, they are flaky. A failure no title names (a file that doesn't load, a crashed shard) is final.
+ */
+async function verdict(kind: Case["kind"], from: number, rs: Result[], concurrent: string[] = []): Promise<boolean> {
+  if (report(rs)) return true;
+  if (!retryFailed) return false;
+  const failed = readCases(junits.slice(from)).filter((c) => c.failed);
+  // Bun prints each failure twice (where it ran, and in the summary): count the distinct ones.
+  const failLines = new Set(rs.flatMap((r) => r.out.match(/^\(fail\) .*?(?= \[[\d.]+m?s\]$|$)/gm) ?? [])).size;
+  if (!failed.length || failed.some((c) => !c.leaf) || failLines > failed.length) {
+    console.log(`── ${kind}: not retried (a failure outside a named test)`);
+    return false;
+  }
+  console.log(`── ${kind}: running ${failed.length} failed test(s) once more (--retry-failed)`);
+  const pattern = `(?:^| )(?:${[...new Set(failed.map((c) => escape(c.leaf)))].join("|")})$`;
+  const files = [...new Set(failed.map((c) => `./${c.file}`))];
+  if (!report([await run(`${kind} retry`, [bun, "test", ...concurrent, "-t", pattern, ...files])])) return false;
+  for (const c of failed) {
+    flaky.push({ kind, file: c.file, name: c.name });
+    console.log(process.env.GITHUB_ACTIONS ? `::warning title=Flaky test::${c.file} :: ${c.name}` : `FLAKY (failed, then passed): ${c.file} :: ${c.name}`);
+  }
+  return true;
+}
+
 async function main(): Promise<number> {
   meter.stage("typecheck");
   if (stages.includes("typecheck") && !report([await timed("typecheck", () => run("typecheck", [bun, "run", "typecheck"]))])) return 1;
   meter.stage("unit");
-  if (stages.includes("unit") && groups.length && !report(await timed("unit", () => Promise.all(groups.map((files, i) => run(`unit ${i + 1}/${groups.length}`, [bun, "test", ...filter, ...files], "unit")))))) return 1;
+  if (stages.includes("unit") && groups.length) {
+    const from = junits.length;
+    const rs = await timed("unit", () => Promise.all(groups.map((files, i) => run(`unit ${i + 1}/${groups.length}`, [bun, "test", ...filter, ...files], "unit"))));
+    if (!(await verdict("unit", from, rs))) return 1;
+  }
   meter.stage("e2e");
   if (stages.includes("e2e") && (!e2eFiles || e2eFiles.length)) {
     const target = e2eFiles ?? ["test/e2e"];
-    if (!report([await timed("e2e", () => run("e2e", [bun, "test", "--concurrent", `--max-concurrency=${apps}`, ...filter, ...target], "e2e"))])) return 1;
+    const concurrent = ["--concurrent", `--max-concurrency=${apps}`];
+    const from = junits.length;
+    const rs = [await timed("e2e", () => run("e2e", [bun, "test", ...concurrent, ...filter, ...target], "e2e"))];
+    if (!(await verdict("e2e", from, rs, concurrent))) return 1;
   }
   if (!groups.length && !e2eFiles?.length) console.log("nothing to run after the typecheck: no test file selected");
   return 0;
@@ -329,6 +368,11 @@ const code = await main();
 const cases = readCases();
 summarize(cases, (performance.now() - started) / 1000, meter.stop());
 saveTimes(times, tier, cases);
+if (retryFailed) {
+  // Every --retry-failed run writes it, empty too: CI uploads it, and a flake is seen in the run that had it.
+  mkdirSync(join(ROOT, "qa", "logs"), { recursive: true });
+  writeFileSync(join(ROOT, "qa", "logs", "flaky.json"), JSON.stringify({ at: new Date().toISOString(), tier, flaky }, null, 1) + "\n");
+}
 // GLUON_TEST_CASES=<file>: every test of the run (file, title, seconds) as JSON, for counting a tier per area.
 if (process.env.GLUON_TEST_CASES) await Bun.write(process.env.GLUON_TEST_CASES, JSON.stringify(cases));
 for (const h of sel?.hooks ?? []) console.log(`by hand (${h.area}/${h.name}): ${h.cmd}`);

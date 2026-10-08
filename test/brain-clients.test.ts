@@ -5,6 +5,7 @@
  * shapes, the status-to-error mapping and the stream's edge cases are the ones a provider would cause.
  * The plan brain runs on a fake `query`; the OpenAI and Converse clients on their injected clients.
  */
+import { SLOW } from "./fixtures/slow.ts";
 import type Anthropic from "@anthropic-ai/sdk";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -212,7 +213,7 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     const p = brain(url)(ask({ signal: ac.signal }), () => {}).then(() => "resolved", () => "rejected");
     setTimeout(() => ac.abort(), 150);
     expect(await p).toBe("rejected");
-    expect(Date.now() - started).toBeLessThan(2000);
+    expect(Date.now() - started).toBeLessThan(2000 * SLOW);
     release();
   });
 

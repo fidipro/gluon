@@ -266,6 +266,7 @@ export const CORE: string[] = [
   "scripts/regression.ts",
   "test/areas.ts",
   "test/preload.ts",
+  "test/fixtures/slow.ts",
   "test/e2e/harness.ts",
   "test/e2e/fixtures.ts",
   "test/e2e/actions.ts",

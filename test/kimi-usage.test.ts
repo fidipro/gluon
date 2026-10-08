@@ -505,7 +505,7 @@ describe("QA cost: a corrupt export", () => {
         check(copy);
       }
     }
-    expect(performance.now() - t0).toBeLessThan(3000);
+    expect(performance.now() - t0).toBeLessThan(3000 * SLOW);
     expect([...outcomes].sort()).toEqual(["error", "ok"]);
   });
 

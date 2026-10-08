@@ -1,4 +1,5 @@
 /** Returning to Gluon (issue #13): the UI launch's channel, how events end the agent, the stale sweep. */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -79,7 +80,7 @@ eval "$ACT"
   test("`back` ends it within a poll or two: SIGTERM", async () => {
     const r = await run(`printf back > "$GLUON_EVENTS/1.event"; sleep 10`);
     expect(r.end).toEqual({ code: 143, reason: "back" });
-    expect(r.ms).toBeLessThan(1500);
+    expect(r.ms).toBeLessThan(1500 * SLOW);
     expect(r.left).toEqual([]);
   });
 

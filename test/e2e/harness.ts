@@ -13,6 +13,7 @@ import { trackModes, type ModeTracker, type ModesState } from "../../src/pty/mod
 import type { Cell } from "../../src/pty/types.ts";
 import { recordRow, type ScreenState } from "../fixtures/screens.ts";
 import { RUN_ENV } from "../fixtures/run-sweep.ts";
+import { SLOW } from "../fixtures/slow.ts";
 import { seedTables } from "../fixtures/seed-tables.ts";
 import { KEYS } from "./actions.ts";
 import { fakeAgents, probes, WIN, type FakeAgent } from "./fixtures.ts";
@@ -28,12 +29,7 @@ export const BUN_FLAGS = readFileSync(CLI, "utf8").split(/\r?\n/)[0]!.replace(/^
 /** How gluon is run: Bun on the source, or the compiled binary GLUON_TEST_BINARY names (`bun run test:dist`). */
 export const GLUON = process.env.GLUON_TEST_BINARY ? [resolve(process.env.GLUON_TEST_BINARY)] : [process.execPath, ...BUN_FLAGS, CLI];
 
-/**
- * How much longer waits (and test timeouts) are: 3 on Windows, where a compiled exe (the fakes) takes
- * ~0.5 s to start, more under load; 1 elsewhere. GLUON_TEST_SLOW overrides it (CI sets it: a
- * loaded 2–4 vCPU runner is several times slower than a developer's machine).
- */
-export const SLOW = Number(process.env.GLUON_TEST_SLOW) || (WIN ? 3 : 1);
+export { SLOW };
 
 /**
  * The screen counts as drawn once no output has arrived for this long. A frame is one write but can
@@ -148,6 +144,7 @@ export class App {
   /** When the last output arrived (performance.now()). */
   private lastData = performance.now();
   private eof = Promise.withResolvers<void>();
+  private osc = Promise.withResolvers<void>();
   private trigger: { text: string; keys: string; from: number; done: () => void } | null = null;
   /** The exit code, once the process has exited and its output has reached the screen. */
   readonly exited: Promise<number>;
@@ -205,12 +202,17 @@ export class App {
             else if (typeof osc === "object") {
               const reply = osc.light ? light : dark;
               // `splitMs`: the ESC arrives alone, the rest that much later (some terminals split the reply).
-              if (osc.splitMs === undefined) setTimeout(() => this.write(reply), osc.delayMs);
+              const last = (text: string) => {
+                this.write(text);
+                this.osc.resolve();
+              };
+              if (osc.splitMs === undefined) setTimeout(() => last(reply), osc.delayMs);
               else {
                 setTimeout(() => this.write(reply.slice(0, 1)), osc.delayMs);
-                setTimeout(() => this.write(reply.slice(1)), osc.delayMs + osc.splitMs);
+                setTimeout(() => last(reply.slice(1)), osc.delayMs + osc.splitMs);
               }
             }
+            if (typeof osc !== "object") this.osc.resolve();
           }
           if (opts.kitty && !this.probed && this.raw.includes("\x1b[?u\x1b[c")) {
             this.probed = true;
@@ -246,6 +248,12 @@ export class App {
     // Bounded well below exitCode()'s budget (2000 ms × SLOW): a pty that never reports its end
     // must not turn an exit into a null.
     await Promise.race([this.eof.promise, Bun.sleep(1000 * SLOW)]);
+    await this.quiet();
+  }
+
+  /** Waits until the background-colour reply (late with `osc11: { delayMs }`) is written whole and the app has drawn its answer. */
+  async oscReplied() {
+    await this.osc.promise;
     await this.quiet();
   }
 

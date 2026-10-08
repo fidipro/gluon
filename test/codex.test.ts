@@ -3,6 +3,7 @@
  * the same as on any other brain, the thread gets Gluon's prompt and tools only, approvals are
  * denied, interrupts reach Codex, and nothing touches Codex's credentials or the network.
  */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -397,7 +398,7 @@ describe("review of PR #1", () => {
     try {
       const started = Date.now();
       const s = await codexLoginStatus({ timeoutMs: 300 });
-      expect(Date.now() - started).toBeLessThan(3000);
+      expect(Date.now() - started).toBeLessThan(3000 * SLOW);
       expect(s).toEqual({ installed: true, loggedIn: false, transient: true, error: "`codex login status` timed out" });
       delete process.env.FAKE_CODEX_LOGIN_HANG;
       expect(await codexLoginStatus()).toEqual({ installed: true, loggedIn: true, method: "chatgpt" });
@@ -415,7 +416,7 @@ describe("review of PR #1", () => {
     await s.submit("hello");
     expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
     await until(() => f.spawned.filter((x) => x.argv[1] === "app-server").length === 1 && f.received().length > 0);
-    await Bun.sleep(300); // the fake exits after the turn
+    await Bun.sleep(300 * SLOW); // the fake exits 50 ms after the turn
     await s.submit("again");
     expect(f.spawned.filter((x) => x.argv[1] === "app-server")).toHaveLength(2);
     const notices = state().items.filter((i) => i.kind === "notice");

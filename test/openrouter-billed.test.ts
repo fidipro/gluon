@@ -19,7 +19,7 @@ import { CostTracker } from "../src/cost/tracker.ts";
 import { wantedKeys } from "../scripts/pricing/modelsdev.ts";
 import { billedSource, BilledMeter, BrainLog, keyTag, readUsage, Registry, settled, STALE_MS, TIMINGS, type BilledResult, type Source, type Timings } from "../src/openrouter-billed.ts";
 import { costLabel } from "../src/sessions.ts";
-import { BUN_FLAGS } from "./e2e/harness.ts";
+import { BUN_FLAGS, SLOW } from "./e2e/harness.ts";
 
 const TMP = mkdtempSync(join(tmpdir(), "gluon-or-billed-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));
@@ -600,7 +600,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     const m = await BilledMeter.begin({ key: KEY, source: source({ landMs: 60_000, giveUpMs: 120_000 }), registry: new Registry(fresh()), fetch: fakeKey([7]).fetch, onSettled: (r) => settled(r, { tracker, ledger, harness: "codex", note: (x) => notes.push(x) }) });
     const t0 = Date.now();
     expect(await m.finish({ usd: 0 })).toEqual({ status: "clean", usd: 0 });
-    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(Date.now() - t0).toBeLessThan(2000 * SLOW);
     expect(tracker.figure()).toEqual({ usd: 0, approx: false, own: true, billed: true });
     expect(notes[0]).toContain("OpenRouter billed $0.00✓");
   });

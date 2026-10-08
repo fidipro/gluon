@@ -155,14 +155,14 @@ describe("the JS search can't hang or leak (phase 1 review)", () => {
     const started = Date.now();
     setTimeout(() => ac.abort(new Error("stopped")), 100);
     await expect(grepFallback(d, ".", "(a+)+$", 100, ac.signal)).rejects.toThrow("stopped");
-    expect(Date.now() - started).toBeLessThan(1000);
+    expect(Date.now() - started).toBeLessThan(1000 * SLOW);
   });
   test("BUG-90/H9: …and by the time budget without one, as a search failure", async () => {
     const started = Date.now();
     const r = await grepFallback(catastrophic(), ".", "(a+)+$", 100, undefined, 300);
     expect(r).toMatchObject({ code: 2, total: 0 });
     expect(r.stderr).toContain("timed out");
-    expect(Date.now() - started).toBeLessThan(1500);
+    expect(Date.now() - started).toBeLessThan(1500 * SLOW);
   });
   test("BUG-91/H10: files over 2 MB are not searched (a huge sparse file costs nothing)", async () => {
     const d = dir({ "small.txt": "needle\n" });
@@ -845,7 +845,7 @@ describe("BUG-138: a git config include that never ends doesn't hang the repo to
     // Startup (blocking, before anything is drawn) waits at most 2 s per query.
     const s = performance.now();
     expect(repoContext(d).isRepo).toBe(false);
-    expect(performance.now() - s).toBeLessThan(3_000);
+    expect(performance.now() - s).toBeLessThan(3_000 * SLOW);
     expect(performance.now() - t).toBeLessThan(4 * GIT_QUERY_MS);
   }, 60_000);
 });

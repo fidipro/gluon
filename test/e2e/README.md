@@ -11,8 +11,9 @@ bun test test/e2e/stages  # one scenario file
 bun test -t "BUG-01"      # scenarios for one bug
 ```
 
-A test titled with `@full` (`test("F32: … @full", …)`) is left out of `regression`: `-t '^(?!.*@full)'`
-in its script, no code. The fast tier keeps the tests under ~3 s (e2e measured with the apps at once), and `BUG-149`, `BUG-160` and the claude monkey; cc's matrix line and the perf smoke are tagged: each ran alone in its file, three of the four apps idle for 13 to 21 s;
+A test titled with `@full` (`test("F32: … @full", …)`) is left out of `regression`: `-t '^(?!.*@(?:full|quarantine))'`
+in its script, no code. So is a flaky one, quarantined: `@quarantine BUG-nn until:YYYY-MM-DD` in its title, at most 30 days,
+then fixed or deleted (`bun run test:health` breaks past the date; `regression:full` still runs it). The fast tier keeps the tests under ~3 s (e2e measured with the apps at once), and `BUG-149`, `BUG-160` and the claude monkey; cc's matrix line and the perf smoke are tagged: each ran alone in its file, three of the four apps idle for 13 to 21 s;
 anything slower is tagged, a `BUG-nn` one too: its fix is then checked by `regression:full` (run it for a big change)
 and CI. `regression:full`, CI and `docker-test` run them.
 `scripts/regression.ts` runs both tiers: typecheck, the unit tests in shards (3 in the fast tier, 4 in
@@ -22,7 +23,9 @@ times the last run measured (`qa/logs/test-times.json`, from Bun's JUnit report;
 Bun runs the e2e files one after the other and the tests of a file concurrently, so a file with fewer tests than apps leaves apps idle (why a lone 20 s test costs 20 s of the run). `--stages typecheck,unit,e2e` runs only some stages and `GLUON_TEST_CASES=<file>` writes every test run (file, title, seconds) as JSON, to count a tier per area.
 It ends by printing each stage's wall time, the ten slowest files, the tests over 3 s that lack `@full` (candidates for it), and the
 peak memory of its whole process tree (Linux, by stage). `--area a,b`, `--changed [ref]` and `--list` narrow it to
-the areas of `test/areas.ts`; a new test file must be listed there (`test/areas.test.ts`).
+the areas of `test/areas.ts`; a new test file must be listed there (`test/areas.test.ts`). `--retry-failed` (CI) runs a
+stage's failed tests once more: passing then, they are flaky, not failures (a warning, and `qa/logs/flaky.json`, which CI
+uploads). Tests never retry themselves.
 
 It runs offline and costs nothing: the demo intake agent, fake agent binaries that print what they were
 given, and throwaway repos made in a temp dir. The real binaries and your credentials are never
@@ -131,8 +134,10 @@ every step takes several times longer. The harness never returns a half-drawn sc
   run ends, or gets SIGINT, SIGTERM or SIGHUP, whatever still carries it is killed; a run killed outright (SIGKILL) is swept by the next
   run's start. Only a process with a marker of this run, or of a run whose process is gone, is ever killed (`test/fixtures/run-sweep.ts`).
   The sweep needs `/proc`: on macOS and Windows only the tracked trees end (a gluon that dies before its agent leaves the agent there).
-- Waits and test timeouts scale with `SLOW`: 3 on Windows, 1 elsewhere, `GLUON_TEST_SLOW`
-  overrides it. CI sets it (2; 4 on Windows) and runs the e2e files with
+- Waits, test timeouts and every deadline a test's own steps must meet scale with `SLOW`
+  (`test/fixtures/slow.ts`): 3 on Windows, 1 elsewhere, `GLUON_TEST_SLOW` overrides it. Every file's default
+  timeout is 5 s × `SLOW` (unit; 30 s at least on Windows) or 20 s × `SLOW` (e2e, visual, perf), set by
+  `test/preload.ts` on each file's first line. CI sets it (2; 4 on Windows) and runs the e2e files with
   `bun run test:e2e --max-concurrency=3` (`scripts/docker-test.sh` reads
   `GLUON_E2E_CONCURRENCY`, else `scripts/e2e-concurrency.ts`).
 

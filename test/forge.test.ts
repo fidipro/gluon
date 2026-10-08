@@ -1,4 +1,5 @@
 /** The brain's read-only `forge` tool (issue #41): fake gh / glab on PATH, no network. */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -214,7 +215,7 @@ test.skipIf(!posix)("BUG-654/QA-brain-11: Esc while forge runs ends the tool cal
   const p = runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" }, ac.signal).catch(() => "rejected");
   setTimeout(() => ac.abort(), 100);
   await p;
-  expect(Date.now() - started).toBeLessThan(1500);
+  expect(Date.now() - started).toBeLessThan(1500 * SLOW);
 });
 
 /** A `gh` that starts `sleep` in the background and records its pid; it waits for it, or (`exit`) ends at once while the child keeps the pipes. */
@@ -267,7 +268,7 @@ describe("BUG-654/variants: forge abort", () => {
     const started = Date.now();
     setTimeout(() => ac.abort(), 100);
     expect(await p).toBeInstanceOf(Error);
-    expect(Date.now() - started).toBeLessThan(3000);
+    expect(Date.now() - started).toBeLessThan(3000 * SLOW);
     try {
       expect(await gone(pid)).toBe(true);
     } finally {
@@ -356,6 +357,6 @@ describe("QA: forge", () => {
     const p = runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" }, ac.signal);
     setTimeout(() => ac.abort(), 100);
     await expect(p).rejects.toThrow();
-    expect(Date.now() - started).toBeLessThan(3000);
+    expect(Date.now() - started).toBeLessThan(3000 * SLOW);
   });
 });
