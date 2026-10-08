@@ -9,7 +9,7 @@
  * `GLUON_TEST_UPDATE` names a loopback server (compiled out of release builds, like `GLUON_TEST_PRICING`).
  */
 import { closeSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { TrustedRoot } from "@sigstore/protobuf-specs";
 import { UPDATE_MODES, type UpdateMode } from "../config.ts";
 import { stateDir } from "../cost/ledger-file.ts";
@@ -173,7 +173,15 @@ export async function installRelease(version: string, src: UpdateSource, exe: st
   const staged = stagedPath(exe);
   try {
     log(`Downloading ${name}…`);
-    const got = await downloadTo(src.releases, version, name, staged);
+    let got: string;
+    try {
+      got = await downloadTo(src.releases, version, name, staged);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      // A binary in a directory that isn't the user's (a system-wide install): Gluon never asks for more rights.
+      if (code === "EACCES" || code === "EPERM" || code === "EROFS") throw new UpdateError(`can't write in ${dirname(exe)} (${code}): install the new version with ${process.platform === "win32" ? "install.ps1" : "install.sh"} instead (see the install guide)`);
+      throw e;
+    }
     if (got !== want) throw new UpdateError(`${name} doesn't match SHA256SUMS (got ${got}, expected ${want})`);
     log("Checksum verified.");
     await replaceExecutable({ exe, staged, version, ...(deps.versionOf ? { versionOf: deps.versionOf } : {}) });

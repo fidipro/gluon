@@ -5,7 +5,7 @@
  * server stands in for GitHub (`test/fixtures/fake-release.ts`).
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TrustedRoot } from "@sigstore/protobuf-specs";
@@ -205,6 +205,19 @@ describe("update: installing a release", () => {
     delete r.files["1.0.0"]!["SHA256SUMS.sigstore.json"];
     await expect(installRelease("1.0.0", sourceOf(r, { unsigned: false }), exe, { root: async () => TRUSTED_ROOT, versionOf: says("1.0.0"), dir: scratch() })).rejects.toThrow("HTTP 404");
     expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("an executable in a directory Gluon can't write to: nothing changes, and the error says to use the installer", async () => {
+    const r = serve("1.1.0", "NEW BINARY");
+    const dir = scratch();
+    const exe = exeIn(dir);
+    chmodSync(dir, 0o555);
+    try {
+      await expect(installRelease("1.1.0", sourceOf(r), exe, { versionOf: says("1.1.0"), dir: scratch() })).rejects.toThrow(`can't write in ${dir} (EACCES): install the new version with install.sh instead`);
+      expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
+    } finally {
+      chmodSync(dir, 0o755);
+    }
   });
 
   test("a new executable that doesn't answer --version with its version is not put in place", async () => {
