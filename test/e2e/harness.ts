@@ -254,9 +254,14 @@ export class App {
     await this.quiet();
   }
 
-  /** Waits until the background-colour reply (late with `osc11: { delayMs }`) is written whole and the app has drawn its answer. */
+  /**
+   * Waits until the background-colour reply (late with `osc11: { delayMs }`) is written whole and the app has drawn its answer.
+   * Bounded by the reply's own schedule: where the query never reaches the terminal (Windows' ConPTY keeps it), there is no reply to wait for.
+   */
   async oscReplied() {
-    await this.osc.promise;
+    const osc = this.opts.osc11;
+    const late = typeof osc === "object" ? osc.delayMs + (osc.splitMs ?? 0) : 0;
+    await Promise.race([this.osc.promise, Bun.sleep(late + 2_000 * SLOW)]);
     await this.quiet();
   }
 
