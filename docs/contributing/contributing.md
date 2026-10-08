@@ -21,4 +21,4 @@ To report a vulnerability, do it privately: see [SECURITY.md](../../SECURITY.md)
 - [Maintenance](maintenance.md): what to do when a harness or a provider changes under Gluon.
 - [Platforms](../concepts/platforms.md): what is tested where.
 
-<!-- Keeping this file fresh: update when CONTRIBUTING.md, CODE_OF_CONDUCT.md, SUPPORT.md or the license status changes (the license lines of README.md and CONTRIBUTING.md; docs/contributing/internal.md, "Going public"). -->
+<!-- Keeping this file fresh: update when CONTRIBUTING.md, CODE_OF_CONDUCT.md, SUPPORT.md or the license status changes (the license lines of README.md and CONTRIBUTING.md), or when a page under Next steps moves (docs/contributing/maintenance.md, docs/concepts/platforms.md). -->

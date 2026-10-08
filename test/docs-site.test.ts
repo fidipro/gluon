@@ -59,22 +59,22 @@ test("BUG-540/docs:dev and docs:build pass Astro an absolute --root (a relative 
   }
 });
 
-test("BUG-542/published:false pages are not in the sidebar, and every other page is", () => {
+test("BUG-542/published:false pages (if any) are not in the sidebar, and every other page is", () => {
   const unpub = PAGES.filter(unpublished);
-  expect(unpub).toContain("contributing/internal.md");
   const reached = new Set([...slugsNamed, ...dirsNamed.flatMap((d) => slugsIn(docsItems(d)))]);
   expect(unpub.filter((p) => reached.has(slugOf(p)))).toEqual([]);
 });
 
-test("BUG-544/internal maintainer notes stay off the published pages", () => {
+test("BUG-544/maintainer notes stay off the published pages, and in no page of this repository", () => {
   const FORBIDDEN = [/live-spend/, /CLAUDE_CODE_OAUTH_TOKEN/, /owner only/i, /WSL dev machine/, /\$\d[\d.,]*[^\n]{0,40}\bpaid\b/i, /\bpaid[^\n]{0,40}\$\d/i, /gluon-coverage|gluon-followups/];
   const rootPages = ["CHANGELOG.md", "SECURITY.md"].map((f) => [f, readFileSync(join(ROOT, f), "utf8")] as const);
   const published = [...PUBLISHED.map((p) => [`docs/${p}`, textOf(p)] as const), ...rootPages];
   expect(published.length).toBeGreaterThan(20);
   const hits = published.flatMap(([file, text]) => FORBIDDEN.filter((re) => re.test(text)).map((re) => `${file}: ${re}`));
   expect(hits).toEqual([]);
-  // the notes moved to the unpublished page, which is where they are meant to be
-  expect(textOf("contributing/internal.md")).toMatch(/CLAUDE_CODE_OAUTH_TOKEN/);
+  // the maintainers' notes are kept privately: no page here is kept off the site, none holds them
+  expect(PAGES.filter(unpublished)).toEqual([]);
+  expect(PAGES.filter((p) => /(^|\/)internal\.md$/.test(p))).toEqual([]);
 });
 
 test("BUG-545/every getting-started page, guide and harness page ends with a Next steps section", () => {

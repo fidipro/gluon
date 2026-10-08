@@ -216,7 +216,7 @@ export interface GrokModelsTable {
 /**
  * The one hand-maintained table (`tables/grok-observed-windows.json`): the window Grok showed for a model its
  * binary's catalog doesn't list yet, with the evidence. Added only with a live observation, removed once the binary lists the model
- * (the builder says so: `grokTable`); `docs/contributing/internal.md` has the steps. Never stored locally: it is not built.
+ * (the builder says so: `grokTable`); the harness-update runbook (in the maintainers' private notes) has the steps. Never stored locally: it is not built.
  */
 export interface GrokObservedWindowsTable {
   schema: 1;

@@ -9,7 +9,7 @@ launch call real models (a few cents): pick the cheapest model.
 
 Run steps 1 to 14 in **Windows Terminal** (PowerShell profile), then repeat 1 to 4 and 9 in the
 **legacy console** (`conhost.exe` → `powershell`) and in a **cmd** profile. Record the date and the result in
-`docs/contributing/internal.md` ("Test status log"), not here.
+the maintainers' private notes, not here.
 
 1. **Theme.** Dark and light terminal themes: Gluon paints its own dark ground over both; the setup
    menus use the light colours on a light terminal. (ConPTY in the test harness drops OSC 11
@@ -61,4 +61,4 @@ Run steps 1 to 14 in **Windows Terminal** (PowerShell profile), then repeat 1 to
 
 Add or adjust a step in the change that alters input handling, the theme, Gluon's frame, a shim
 launch, key storage or the analytics files on Windows. Keep it a 10 to 15 minute walk: fold a new step
-into the one it belongs with. Record walking it only in `docs/contributing/internal.md`, not here.
+into the one it belongs with. Record walking it only in the maintainers' private notes, not here.

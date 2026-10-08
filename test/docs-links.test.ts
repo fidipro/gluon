@@ -62,10 +62,10 @@ test("BUG-542/a page with `published: false` is left out of the site, any other 
 });
 
 test("BUG-543/a link to an unpublished page goes to GitHub, not to a route the site doesn't have", () => {
-  const unpublished = (p: string) => slash(p).endsWith("/internal.md");
+  const unpublished = (p: string) => slash(p).endsWith("/private-note.md");
   const to = (href: string) => resolveLink(href, join(root, "docs/contributing/maintenance.md"), { ...opts, unpublished });
-  expect(to("internal.md")).toBe("https://github.com/o/r/blob/main/docs/contributing/internal.md");
-  expect(to("internal.md#going-public")).toBe("https://github.com/o/r/blob/main/docs/contributing/internal.md#going-public");
+  expect(to("private-note.md")).toBe("https://github.com/o/r/blob/main/docs/contributing/private-note.md");
+  expect(to("private-note.md#going-public")).toBe("https://github.com/o/r/blob/main/docs/contributing/private-note.md#going-public");
   expect(to("contributing.md")).toBe("/contributing/contributing/");
 });
 

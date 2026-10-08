@@ -118,4 +118,4 @@ is in [Kimi Code](../guides/harnesses/kimi-code.md).
 - [Architecture](architecture.md): how the sessions, the frame and the agents fit together.
 - [Troubleshooting](../guides/troubleshooting.md): fixes for the problems each platform runs into.
 
-<!-- Keeping this file fresh: update when a platform is added or dropped, when CI's coverage changes (.github/workflows/ci.yml), or when a platform's behaviour changes how Gluon is built, installed or run there. Which suites have run where, with dates, is a maintainer log in docs/contributing/internal.md, not here. Check package.json (the scripts named above) and test/windows-manual-qa.md. -->
+<!-- Keeping this file fresh: update when a platform is added or dropped, when CI's coverage changes (.github/workflows/ci.yml), or when a platform's behaviour changes how Gluon is built, installed or run there. Which suites have run where, with dates, is a maintainers' log kept outside this repository, not here. Check package.json (the scripts named above) and test/windows-manual-qa.md. -->

@@ -247,7 +247,7 @@ describe("the draft release's body is the changelog section", () => {
 });
 
 describe("the repository's slug: every place that spells it", () => {
-  // The one list of places to change when the project moves (docs/contributing/internal.md, "Going public").
+  // The one list of places to change when the project moves (the maintainers' private notes, "Going public").
   test("src/repo.ts, the installers, package.json and the issue-template config agree", () => {
     expect(REPO_URL).toBe(`https://github.com/${REPO_SLUG}`);
     expect(read("install.sh")).toMatch(new RegExp(`^REPO="${REPO_SLUG}"$`, "m"));

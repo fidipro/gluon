@@ -108,6 +108,6 @@ Don't open an issue: see [SECURITY.md](SECURITY.md).
 
 Update in the change that alters a command (`package.json` scripts), what CI runs (`.github/workflows/ci.yml`),
 the test policy or the hard rules (`test/rules.test.ts`). Keep this to what an outside contributor needs: no
-bug or issue numbers, no paid-run budgets, no machine-specific timings. Maintainer-only procedures go in
-`docs/contributing/internal.md`, rules for agents in `AGENTS.md`; link rather than repeat. The scripts and files
+bug or issue numbers, no paid-run budgets, no machine-specific timings. Maintainer-only procedures are not kept in this repository;
+rules for agents are in `AGENTS.md`; link rather than repeat. The scripts and files
 named here and the line budget are checked by `test/contributor-docs.test.ts`.

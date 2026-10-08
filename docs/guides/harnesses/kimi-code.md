@@ -58,4 +58,4 @@ Kimi Code's OpenRouter route is checked live. The Moonshot key route is only tes
 - [Platforms](../../concepts/platforms.md#kimi-code): where Kimi Code is supported.
 - [Connections](../connections.md): compare the plan and the API keys.
 
-<!-- Keeping this file fresh: update in the change that alters Kimi Code's entry in src/harnesses.ts (connections, modes, typed brief, install notes), its usage reading (src/kimi-usage.ts, src/cost/kimi.ts) or its status check (src/status.ts). After a kimi update follow docs/contributing/internal.md. -->
+<!-- Keeping this file fresh: update in the change that alters Kimi Code's entry in src/harnesses.ts (connections, modes, typed brief, install notes), its usage reading (src/kimi-usage.ts, src/cost/kimi.ts) or its status check (src/status.ts). After a kimi update follow docs/contributing/maintenance.md. -->

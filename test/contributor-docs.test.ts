@@ -1,19 +1,18 @@
 /**
  * The pages an outsider reads (`CONTRIBUTING.md`, `docs/contributing/maintenance.md`, `SECURITY.md`) say only what
  * an outside contributor can act on. Bug and issue numbers, paid-run budgets, dev-machine specs and dated status
- * go in `docs/contributing/internal.md` (unpublished). Line budgets force a cut or a move before a page bloats.
+ * go in the maintainers' private notes, never in this repository. Line budgets force a cut or a move before a page bloats.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
 const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
 const SCRIPTS = Object.keys(JSON.parse(read("package.json")).scripts);
 
-/** Page → line budget. Over it: cut, or move maintainer-only detail to internal.md (and keep internal.md under its own). */
+/** Page → line budget. Over it: cut, or move maintainer-only detail to the private repo. */
 const PAGES = { "CONTRIBUTING.md": 115, "docs/contributing/maintenance.md": 100, "SECURITY.md": 85 } as const;
-const INTERNAL = { "docs/contributing/internal.md": 180 } as const;
 
 /** What an outsider can't see or use. */
 const INTERNAL_MARKERS: [string, RegExp][] = [
@@ -32,7 +31,7 @@ const isRepoPath = (s: string) => /^(?:src|docs|scripts|test|site|\.github)\/[\w
 describe.each(Object.entries(PAGES))("%s", (file, budget) => {
   const md = read(file);
 
-  test.each(INTERNAL_MARKERS)("has no %s (maintainer detail goes in docs/contributing/internal.md)", (_what, re) => {
+  test.each(INTERNAL_MARKERS)("has no %s (maintainer detail goes in the maintainers' private notes)", (_what, re) => {
     expect(strip(md).split("\n").filter((l) => re.test(l))).toEqual([]);
   });
 
@@ -51,13 +50,6 @@ describe.each(Object.entries(PAGES))("%s", (file, budget) => {
   });
 });
 
-describe.each(Object.entries(INTERNAL))("%s", (file, budget) => {
-  const md = read(file);
-  test("every `bun run` script it names is in package.json", () => {
-    const runs = [...strip(md).matchAll(/bun run ([\w:-]+)/g)].map((m) => m[1]!);
-    expect(runs.filter((r) => !SCRIPTS.includes(r))).toEqual([]);
-  });
-  test(`stays within ${budget} lines (cut what is done or moot)`, () => {
-    expect(md.split("\n").length).toBeLessThanOrEqual(budget);
-  });
+test("the maintainers' notes are not in this repository (they are kept privately)", () => {
+  expect(readdirSync(join(ROOT, "docs/contributing")).filter((f) => /^internal/i.test(f))).toEqual([]);
 });

@@ -35,7 +35,7 @@ sessions and the frame" in `docs/concepts/architecture.md`.
 - **`shutdown` (`src/gluon.ts`) ends on every path with the terminal back**: a second signal while it waits for the agents
   calls `compositor.abort()` before `process.exit` (BUG-666); never exit around it.
 - **Change a reader only against a captured screen** (`test/fixtures/screens.ts`); never guess a
-  harness's layout. Re-capturing: `docs/contributing/internal.md`.
+  harness's layout. Re-capturing: the harness-update runbook (in the maintainers' private notes).
 - **A reader finds the composer by its own rows, not the cursor's row**: Grok moves its cursor
   while it draws (`src/pty/readers/grok.ts`; BUG-411); a screen it can't find the box on is `null`.
 - **Windows sends win32-input-mode**: characters with no virtual key are VT bytes to read again,
