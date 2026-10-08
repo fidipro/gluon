@@ -37,8 +37,8 @@ describe("test-guard: weakening a test needs a person's review", () => {
   });
 
   test("a test switched off or out is found once per marker and file; a line edited that keeps its @full is not; a sample in an assertion is not", () => {
-    const d = diff("test/a.test.ts", ['+test.skip("x", () => {});', '-test("y", () => {});', '+test("y @full", () => {});', '-test("z @full: old", () => {});', '+test("z @full: new", () => {});', '+  expect(q("t @quarantine BUG-7")).toBe(1);']);
-    expect(weakened(d, new Map(), new Map()).map((f) => f.text.split(" (")[0])).toEqual([".skip ×1", "@full ×1"]);
+    const d = diff("test/a.test.ts", ['+test.skip("x", () => {});', '+test.skipIf(WIN)("w", () => {});', '-test("y", () => {});', '+test("y @full", () => {});', '-test("z @full: old", () => {});', '+test("z @full: new", () => {});', '+  expect(q("t @quarantine BUG-7")).toBe(1);']);
+    expect(weakened(d, new Map(), new Map()).map((f) => f.text.split(" (")[0])).toEqual([".skip ×1", ".skipIf ×1", "@full ×1"]);
   });
 
   test("a test gone is found; one renamed or split while its bug is still tested in that file is not", () => {

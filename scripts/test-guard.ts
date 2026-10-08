@@ -12,7 +12,9 @@ const ROOT = resolve(import.meta.dir, "..");
 const TEST = /^test\/.*\.(ts|tsx)$/;
 const TITLE = /\b(?:test|it|describe)(?:\.\w+)*(?:\([^)]*\))?\(\s*(["'`])((?:(?!\1)[^\\]|\\.)*)\1/g;
 /** What switches a test off or out of the blocking run. */
-const OFF = [".skip", ".todo", "skipIf(", "test.failing", "@full", "@quarantine"];
+const OFF: [string, RegExp][] = [[".skip", /\.skip\(/g], [".todo", /\.todo\(/g], [".skipIf", /\.skipIf\(/g], ["test.failing", /\btest\.failing\b/g], ["@full", /@full\b/g], ["@quarantine", /@quarantine\b/g]];
+/** The tests of these checks: their samples weaken tests on purpose. */
+const SAMPLES = ["test/test-guards.test.ts", "test/test-style.test.ts", "test/test-health.test.ts"];
 
 export type Finding = { kind: "test gone" | "assertion removed" | "switched off or out"; file: string; text: string };
 
@@ -34,8 +36,8 @@ export function weakened(diff: string, before: Map<string, string>, after: Map<s
   const count = (file: string, body: string, d: number) => {
     // A comment, or a sample inside an assertion (a test of these rules), switches nothing off.
     if (/^\s*(\/\/|\*)/.test(body) || /\bexpect\(/.test(body)) return;
-    for (const m of OFF) {
-      const k = body.split(m).length - 1;
+    for (const [m, re] of OFF) {
+      const k = body.match(re)?.length ?? 0;
       if (!k) continue;
       const e = off.get(`${file}\0${m}`) ?? { n: 0, example: "" };
       e.n += d * k;
@@ -50,7 +52,7 @@ export function weakened(diff: string, before: Map<string, string>, after: Map<s
       if (f[1]) file = f[1];
       continue;
     }
-    if (!TEST.test(file)) continue;
+    if (!TEST.test(file) || SAMPLES.includes(file)) continue;
     const body = line.slice(1).trim();
     if (line.startsWith("-")) {
       if (/\bexpect\(/.test(body)) removed.push({ file, line: body });
