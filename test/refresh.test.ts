@@ -3,6 +3,7 @@
  * launch starts, the seam, and the ledger's `tables` entry. Offline: the fetch and the spawn are injected, or a local server stands in for the sources
  * (`test/fixtures/pricing-sources.ts`); nothing real is reached.
  */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -994,7 +995,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
       const t0 = performance.now();
       const got = await defaultFetch(`http://127.0.0.1:${server.port}/api.json`, { timeoutMs: 300, maxBytes: 1_000_000 });
       expect(got).toBeNull();
-      expect(performance.now() - t0).toBeLessThan(3000);
+      expect(performance.now() - t0).toBeLessThan(3000 * SLOW);
     } finally {
       server.stop(true);
     }

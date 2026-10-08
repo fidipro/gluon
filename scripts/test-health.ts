@@ -3,11 +3,14 @@
  * `bun run test:health`: what in the test suite has gone stale, each line with the action to take. Cheap and
  * offline: it runs no test, calls no model and needs no login (a harness is asked `--version` only, in an empty
  * temp directory with a timeout). Exit 1 only for something definitely broken (the area manifest, a malformed or
- * repeated bug-candidate title, an unreadable baseline); stale is advice. `--brief` leaves out the candidate list.
+ * repeated bug-candidate title, an unreadable baseline, a quarantine past its date or without one, a fast-tier test over
+ * 3 × the `@full` threshold); stale is advice.
+ * `--brief` leaves out the candidate list.
  *
  * Checks: the area manifest; the visual goldens against the UI changes since; the screen fixtures against the
  * installed harness versions; the perf baseline against the perf-relevant changes since; the test times (and the
- * tests over the fast-tier threshold that lack `@full`); the open `BUG-CANDIDATE` / `MODEL-GAP` tests; the live ledger.
+ * tests over the fast-tier threshold that lack `@full`); the quarantined (`@quarantine`) tests; the open `BUG-CANDIDATE` /
+ * `MODEL-GAP` tests; the live ledger.
  * The pure parts are exported for `test/test-health.test.ts`.
  */
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -117,6 +120,44 @@ export function groupCandidates(cs: Candidate[]): { id: string; marker: string; 
     .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
     .map(([, v]) => ({ id: v[0]!.id, marker: v[0]!.marker, tests: v.length, files: [...new Set(v.map((c) => c.file))] }));
 }
+
+export type Quarantined = { file: string; line: number; title: string; bug: string; until: string };
+const QUARANTINE = /@quarantine\b/;
+/** A quarantine lasts at most this long: past it, the test is fixed or deleted, not quarantined again. */
+export const QUARANTINE_MAX_DAYS = 30;
+/**
+ * Every test title tagged `@quarantine` (a flaky test, out of the blocking runs until fixed: `scripts/regression.ts`),
+ * and what is wrong with each: a quarantine names its bug and its end, `@quarantine BUG-nn until:YYYY-MM-DD`, at
+ * most QUARANTINE_MAX_DAYS ahead; past that date it is a problem.
+ */
+export function scanQuarantines(files: { path: string; text: string }[], now: Date): { quarantined: Quarantined[]; problems: string[] } {
+  const quarantined: Quarantined[] = [];
+  const problems: string[] = [];
+  const today = now.toISOString().slice(0, 10);
+  for (const f of files) {
+    if (NOT_TESTS.includes(f.path)) continue;
+    for (const m of f.text.matchAll(STRING_ARG)) {
+      const title = m[2]!;
+      if (!QUARANTINE.test(title)) continue;
+      const line = f.text.slice(0, m.index!).split("\n").length;
+      if (/^(\/\/|\*|\/\*)/.test(f.text.split("\n")[line - 1]!.trim())) continue;
+      const where = `${f.path}:${line}`;
+      const q = /@quarantine (BUG-\d+) until:(\d{4}-\d{2}-\d{2})\b/.exec(title);
+      if (!q || Number.isNaN(Date.parse(q[2]!))) {
+        problems.push(`${where}: a quarantine needs its bug and its end: "@quarantine BUG-nn until:YYYY-MM-DD"`);
+        continue;
+      }
+      const [, bug, until] = q as unknown as [string, string, string];
+      if (until < today) problems.push(`${where}: ${bug}'s quarantine ended ${until}: fix the test (and drop the tag) or delete it`);
+      else if ((Date.parse(until) - Date.parse(today)) / DAY_MS > QUARANTINE_MAX_DAYS) problems.push(`${where}: ${bug}'s quarantine runs to ${until}, more than ${QUARANTINE_MAX_DAYS} days`);
+      quarantined.push({ file: f.path, line, title, bug, until });
+    }
+  }
+  return { quarantined, problems };
+}
+
+/** A fast-tier test this many times over `FULL_OVER_S` is broken, not just slow. */
+export const BROKEN_OVER = 3;
 
 /** The tests of a times file over `over` seconds whose title lacks `@full` (the slowest reading of either tier). */
 export function slowTests(times: TimesFile, over: number): { file: string; name: string; s: number }[] {
@@ -281,18 +322,32 @@ function times(): Section {
   const lines: Line[] = [];
   lines.push(d !== null && d > 14 ? { level: "stale", text: `measured ${ago(d)}`, action: "bun run regression refreshes it" } : { level: "ok", text: `measured ${ago(d)}` });
   const slow = slowTests(t, FULL_OVER_S);
+  // Far over the threshold is broken, not advice: it holds every fast run back (a wait that runs to its deadline, a loop of variants in one test).
+  for (const s of slow.filter((x) => x.s > FULL_OVER_S * BROKEN_OVER)) {
+    lines.push({ level: "BROKEN", text: `${s.s.toFixed(1)} s, over ${FULL_OVER_S * BROKEN_OVER} s, in the fast tier: ${s.file} :: ${s.name.length > 100 ? `${s.name.slice(0, 99)}…` : s.name}`, action: "make it faster (wait for a state, not a deadline; one test per variant, so they run at once), else add @full" });
+  }
   if (slow.length) {
-    lines.push({ level: "stale", text: `${slow.length} test${slow.length === 1 ? "" : "s"} over ${FULL_OVER_S} s without @full (the fast tier's threshold):`, action: "add @full to the title" });
+    lines.push({ level: "stale", text: `${slow.length} test${slow.length === 1 ? "" : "s"} over ${FULL_OVER_S} s without @full (the fast tier's threshold):`, action: "make it faster, else add @full to the title" });
     for (const s of slow.slice(0, 10)) lines.push({ level: "info", text: `  ${s.s.toFixed(1)} s  ${s.file} :: ${s.name.length > 100 ? `${s.name.slice(0, 99)}…` : s.name}` });
     if (slow.length > 10) lines.push({ level: "info", text: `  … and ${slow.length - 10} more` });
   } else lines.push({ level: "ok", text: `no test over ${FULL_OVER_S} s lacks @full` });
   return { title, lines };
 }
 
+const testFiles = () => [...new Bun.Glob("test/**/*.{ts,tsx}").scanSync({ cwd: ROOT })].filter((f) => !f.includes("node_modules")).sort().map((path) => ({ path, text: readFileSync(join(ROOT, path), "utf8") }));
+
+function quarantine(): Section {
+  const title = "Quarantined tests (@quarantine: out of the blocking runs, in regression:full)";
+  const { quarantined, problems } = scanQuarantines(testFiles(), now);
+  const lines: Line[] = problems.map((text) => ({ level: "BROKEN" as Level, text }));
+  lines.push({ level: quarantined.length ? "info" : "ok", text: `${quarantined.length} quarantined`, action: quarantined.length ? "fix each by its date, then drop the tag" : undefined });
+  for (const q of quarantined) lines.push({ level: "info", text: `  ${q.bug} until ${q.until}  ${q.file}:${q.line}` });
+  return { title, lines };
+}
+
 function candidates(brief: boolean): Section {
   const title = "Open bug candidates (BUG-CANDIDATE / MODEL-GAP tests)";
-  const files = [...new Bun.Glob("test/**/*.{ts,tsx}").scanSync({ cwd: ROOT })].filter((f) => !f.includes("node_modules")).sort().map((path) => ({ path, text: readFileSync(join(ROOT, path), "utf8") }));
-  const { candidates: cs, problems } = scanCandidates(files);
+  const { candidates: cs, problems } = scanCandidates(testFiles());
   const groups = groupCandidates(cs);
   const lines: Line[] = problems.map((text) => ({ level: "BROKEN" as Level, text }));
   lines.push({ level: groups.length ? "info" : "ok", text: `${groups.length} open id${groups.length === 1 ? "" : "s"} on ${cs.length} test${cs.length === 1 ? "" : "s"}`, action: groups.length ? "when a bug is fixed: drop `.failing` and rename the test to BUG-nn/<case>; bun test -t \"<id>\" runs one" : undefined });
@@ -333,7 +388,7 @@ if (import.meta.main) {
     console.log("usage: bun run test:health [--brief]\n  what in the test suite is stale, with the action for each; runs no test, offline; exit 1 only when something is broken\n  --brief: count the open bug candidates without listing them");
     process.exit(0);
   }
-  const sections = [manifest(), goldens(), await screens(), perf(), times(), candidates(brief), ledger()];
+  const sections = [manifest(), goldens(), await screens(), perf(), times(), quarantine(), candidates(brief), ledger()];
   const r = render(sections);
   console.log(`gluon test health, ${now.toISOString().slice(0, 10)}: runs no test, calls no model${r.text}`);
   console.log(`\n${r.broken ? `${r.broken} BROKEN` : "nothing broken"}, ${r.stale} stale`);

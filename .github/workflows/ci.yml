@@ -1,11 +1,14 @@
 name: CI
 
-# Automatic: a pull request into main and a push to main run the tests of the changed areas (`bun run regression
-# --changed <base>`, always with the typecheck; a change to a core or unclassified file means the whole fast tier) on
-# Linux, macOS and Windows, plus the secret scan and the docs build. The base is origin/<base branch> for a pull
-# request and the previous head (github.event.before) for a push; a first push or a missing commit runs suite quick.
-# Neither runs the full suite, test:dist, the Docker suite or the cross-build: those run by hand before a release
+# Automatic: a pull request into main runs the tests of the changed areas (`bun run regression --changed <base>`,
+# always with the typecheck; a change to a core or unclassified file means the whole fast tier) on Linux, and on macOS
+# and Windows too unless every changed area says `platforms: "linux"` (test/areas.ts); plus the secret scan and the
+# docs build. A push to main (a merged pull request, already tested on every OS it needed) runs the same on Linux.
+# The base is origin/<base branch> for a pull request and the previous head (github.event.before) for a push; a first
+# push or a missing commit runs suite quick. Every night the full suite runs on every OS, with test:dist, the Docker
+# suite and the cross-build; a failure opens (or adds to) one issue. By hand before a release:
 #   gh workflow run ci.yml --ref main -f suite=full
+# The one required check is `gate`: every job the run needed passed or was skipped.
 # By hand (Actions → CI → Run workflow, or `gh workflow run ci.yml --ref <branch>`): the narrowest os, area or
 # filter, e.g. one OS and one bug's tests:
 #   gh workflow run ci.yml --ref <branch> -f os=macos -f filter=BUG-189 -f extras=false
@@ -21,6 +24,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # The nightly full run (every OS, test:dist, Docker, the cross-build).
+  schedule:
+    - cron: "23 2 * * *"
   workflow_dispatch:
     inputs:
       suite:
@@ -74,18 +80,29 @@ jobs:
       IN_OS: ${{ inputs.os }}
       IN_EXTRAS: ${{ inputs.extras }}
     steps:
+      # A pull request's OSes come from its changed files (`regression --list --json`): its history and Bun, nothing installed.
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
       - id: plan
         shell: bash
         run: |
           set -eu
-          # suite: changed on a pull request and on a push to main, the input by hand. base: what `changed` compares with.
-          # os: the runners of the regression (or install-smoke) job. heavy: docker + build-all. light: gitleaks + docs.
-          # Only a run by hand can be heavy (suite full with extras): a pull request or push never runs docker-test,
-          # build:all or regression:full (test/release.test.ts).
+          # suite: changed on a pull request and on a push to main, full at night, the input by hand. base: what `changed`
+          # compares with. os: the runners of the regression (or install-smoke) job; `auto`: what the change needs.
+          # heavy: docker + build-all. light: gitleaks + docs. Only the nightly run and a run by hand can be heavy (suite
+          # full with extras): a pull request or push never runs docker-test, build:all or regression:full (test/release.test.ts).
           base=
           case "$EVENT" in
-            pull_request) suite=changed; os=all; heavy=false; light=true; base="origin/$BASE_REF" ;;
-            push) suite=changed; os=all; heavy=false; light=true; base="$BEFORE" ;;
+            pull_request) suite=changed; os=auto; heavy=false; light=true; base="origin/$BASE_REF" ;;
+            push) suite=changed; os=ubuntu; heavy=false; light=true; base="$BEFORE" ;;
+            schedule) suite=full; os=all; heavy=true; light=true ;;
             *)
               suite="${IN_SUITE:-full}"; os="${IN_OS:-all}"; heavy=false; light=false
               if [ "$suite" = changed ]; then base=origin/main; fi
@@ -100,6 +117,11 @@ jobs:
               *) if printf '%s' "$base" | grep -Eq '^[A-Za-z0-9._][A-Za-z0-9._/-]*$'; then ok=true; fi ;;
             esac
             if [ "$ok" != true ]; then suite=quick; base=; fi
+          fi
+          # Linux alone when every changed area says so (test/areas.ts `platforms`); anything else, or a failed listing: every OS.
+          if [ "$os" = auto ]; then
+            os=all
+            if [ "$suite" = changed ] && p=$(bun run regression --list --json --changed "$base" | tail -n 1 | jq -r .platforms) && [ "$p" = linux ]; then os=ubuntu; fi
           fi
           case "$os" in
             all) matrix='["ubuntu-24.04","macos-15","windows-2025"]' ;;
@@ -129,11 +151,12 @@ jobs:
         os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60 # the full Windows suite under SLOW=4 outgrew 30 minutes
-    # A 2–4 vCPU runner is several times slower than a developer's machine: longer waits and test
-    # timeouts (the harness's SLOW), and fewer apps at once than `bun run regression`'s 6.
+    # A 3–4 vCPU runner is several times slower than a developer's machine: longer waits and test
+    # timeouts (the harness's SLOW). 4 apps at once: the fast tier's e2e in two processes of two (they overlap the
+    # files), the full suite's in one (its big files want every app; scripts/regression.ts).
     env:
       GLUON_TEST_SLOW: ${{ matrix.os == 'windows-2025' && '4' || '2' }}
-      GLUON_E2E_CONCURRENCY: "3"
+      GLUON_E2E_CONCURRENCY: "4"
       SUITE: ${{ needs.plan.outputs.suite }}
       BASE: ${{ needs.plan.outputs.base }}
       AREA: ${{ inputs.area }}
@@ -151,6 +174,15 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
+      # The last run's test times (they balance the shards) and the typecheck's incremental state: a pull request
+      # restores main's (the nightly run's on macOS and Windows); each run saves its own.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            qa/logs/test-times.json
+            node_modules/.cache/tsc.tsbuildinfo
+          key: test-state-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: test-state-${{ matrix.os }}-
       # The typecheck runs in every suite but dist: `regression` does its own first.
       - name: tests
         if: env.SUITE == 'changed' || env.SUITE == 'quick' || env.SUITE == 'full'
@@ -164,24 +196,30 @@ jobs:
             SUITE=quick
           fi
           if [ "$SUITE" = changed ] && [ -z "$AREA" ]; then
-            bun run regression --changed "$BASE"
+            bun run regression --changed "$BASE" --retry-failed
           elif [ "$SUITE" = changed ] || [ "$SUITE" = quick ]; then
-            bun run regression ${AREA:+--area "$AREA"}
+            bun run regression --retry-failed ${AREA:+--area "$AREA"}
           elif [ -n "$FILTER" ]; then
             bun run typecheck
             bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' -t "$FILTER"
             bun test --concurrent --max-concurrency=3 test/e2e -t "$FILTER"
           elif [ -n "$AREA" ]; then
-            bun run regression:full --area "$AREA"
+            bun run regression:full --retry-failed --area "$AREA"
           else
-            # Every step runs even when an earlier one fails (a failing unit test must not hide the e2e and dist results).
+            # Every stage runs even when an earlier one fails (a failing unit test must not hide the e2e and dist results).
             rc=0
-            bun run typecheck || rc=1
-            bun run test:unit || rc=1
-            bun run test:e2e --max-concurrency=3 || rc=1
+            bun run regression:full --retry-failed --keep-going || rc=1
             bun run test:dist || rc=1
             exit $rc
           fi
+      # --retry-failed's report: the tests that failed, then passed (written empty when none). A flaky test is fixed
+      # or quarantined (test/AGENTS.md); its warning is on the run's summary too.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && hashFiles('qa/logs/flaky.json') != ''
+        with:
+          name: flaky-${{ matrix.os }}
+          path: qa/logs/flaky.json
+          retention-days: 30
       - name: test:dist
         if: env.SUITE == 'dist'
         run: bun run test:dist
@@ -258,15 +296,21 @@ jobs:
   # scripts/docker-test.sh: shellcheck, the regression in oven/bun debian + alpine, the npm tarball
   # installed with `bun add -g`, and the release executables + install.sh (good, tampered, missing
   # SHA256SUMS) in plain ubuntu / debian / alpine. Every container runs with --network none.
+  # Three runners at once: the Debian regression, the Alpine one, and the rest.
   docker:
     needs: plan
     if: needs.plan.outputs.heavy == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        stages: ["regression-debian", "regression-alpine", "lint npm smoke https"]
     runs-on: ubuntu-24.04
-    timeout-minutes: 60 # two full regressions (Debian, Alpine) plus smoke outgrew 40 minutes
+    timeout-minutes: 40
     # Passed into the regression containers (see the regression job).
     env:
       GLUON_TEST_SLOW: "2"
-      GLUON_E2E_CONCURRENCY: "3"
+      GLUON_E2E_CONCURRENCY: "4"
+      STAGES: ${{ matrix.stages }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -279,7 +323,10 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
-      - run: bun run docker-test
+      # STAGES is a list: split on purpose.
+      - run: |
+          # shellcheck disable=SC2086
+          bun run docker-test $STAGES
 
   # Cross-builds every target (catches build-plugin drift). Each OS's own binary is tested above.
   build-all:
@@ -369,3 +416,38 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun scripts/dco.ts "origin/$BASE_REF" HEAD
+
+  # The one required check (the main ruleset): every job this run needed passed or was skipped. An OS a change doesn't
+  # need is a skipped matrix, never a required check left pending.
+  gate:
+    needs: [plan, regression, secrets, dco]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - shell: bash
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          echo "$RESULTS" | jq -e 'all(.[]; . == "success" or . == "skipped")' > /dev/null
+
+  # The nightly run's failures reach a person: one open issue, a comment per failed night. No checkout, no action.
+  nightly-report:
+    needs: [plan, regression, docker, build-all]
+    if: always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          title="Nightly CI failed"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --state open --limit 100 --json number,title | jq -r --arg t "$title" 'map(select(.title == $t))[0].number // empty')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "Failed again: $run"; else gh issue create --title "$title" --body "The nightly full run failed: $run (fix it, or quarantine a flaky test: test/AGENTS.md)"; fi

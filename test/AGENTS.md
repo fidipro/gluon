@@ -9,8 +9,12 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
 - **`Bun.which` and `Bun.spawn` without `env` see the startup PATH**: spawn `git`/`rg` with
   `env: process.env`.
 - **Wait for states, don't sleep**: `press`, `type`, `waitFor`, `exitCode()` handle half-drawn
-  frames and slow machines. CI uses `GLUON_TEST_SLOW` and concurrency 3. Install offers: wait
-  `GUARD_MS` first.
+  frames and slow machines; a late OSC reply: `oscReplied()`. A sleep is only a window in which
+  something must *not* happen. CI uses `GLUON_TEST_SLOW` and concurrency 3. Install offers: wait `GUARD_MS` first.
+- **No bare millisecond bound**: a deadline a test's own steps must meet is `ms * SLOW` (`test/fixtures/slow.ts`);
+  a perception limit belongs in `test/perf/`. Bare bounds were the CI flakes on macOS and Windows.
+- **A flaky test is fixed, or quarantined while it's fixed**: `@quarantine BUG-nn until:YYYY-MM-DD` (≤ 30 days;
+  `test:health` breaks past it). Never a retry inside a test: CI's `--retry-failed` reports flakes (its `flaky.json`).
 - **Replays of captured runs price from `test/fixtures/telemetry/prices-at-capture.json`, never the
   seeded tables** (a refresh changes them; `frozenTracker` in `test/fixtures/frozen-prices.ts`;
   BUG-413).

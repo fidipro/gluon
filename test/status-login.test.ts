@@ -3,6 +3,7 @@
  * becomes, with fake binaries on PATH (shell scripts, so POSIX only: the Windows fakes are compiled and
  * covered by the e2e suite). Never a real `claude` / `agy` / `grok`. Security QA pass.
  */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -73,7 +74,7 @@ describe.skipIf(!POSIX)("run", () => {
     const t = performance.now();
     const r = await run([join(dir, "hang")], 300);
     expect(r.code).toBeNull();
-    expect(performance.now() - t).toBeLessThan(3000);
+    expect(performance.now() - t).toBeLessThan(3000 * SLOW);
   });
   test("a binary killed by a signal is null too; a plain non-zero exit keeps its code and both streams", async () => {
     const dir = fakes({ boom: "echo out; echo err >&2; exit 7", sig: "kill -9 $$" });

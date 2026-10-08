@@ -5,6 +5,7 @@
  * harness itself displayed for the same session. Where each figure comes from, per harness:
  * "Status, cost and context" in `docs/concepts/architecture.md`.
  */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, describe, expect, mock, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -264,8 +265,8 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
         client: { event: { subscribe: async () => ({ stream: (async function* () { yield* stream; })() }) }, model: { list: async () => ({ data: list }) } },
       };
       const stop = plugin.setup(context);
-      // Figures are written at most once a second.
-      await Bun.sleep(1400);
+      // Figures are written at most once a second (a slow runner's second tick comes later).
+      await Bun.sleep(1400 * SLOW);
       stop();
       const merged: StatusInfo = {};
       const steps: NonNullable<StatusInfo["steps"]> = [];

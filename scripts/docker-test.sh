@@ -5,9 +5,10 @@
 #   scripts/docker-test.sh [stage ...]      default: all stages, in this order
 #
 #   lint         shellcheck on install.sh and the test scripts
-#   regression   typecheck, unit and e2e (every test) in oven/bun debian (glibc) and alpine (musl); the e2e part
+#   regression   `bun run regression:full --retry-failed` (every test) in oven/bun debian (glibc) and alpine (musl); the e2e part
 #                runs GLUON_E2E_CONCURRENCY apps at once (default: scripts/e2e-concurrency.ts, by cores and free RAM, as locally) and passes
-#                GLUON_TEST_SLOW on (CI sets both: its runners are slower)
+#                GLUON_TEST_SLOW on (CI sets both: its runners are slower). regression-debian / regression-alpine: one of
+#                the two (CI runs them on two runners at once)
 #   npm          `bun run pack`'s tarball, `bun add -g` in both oven/bun images, then --version,
 #                `bun publish` refused (private), and test/dist.test.ts (doctor, hostile cwd, the
 #                grep worker) against the installed `gluon`
@@ -85,8 +86,9 @@ build_pack() {
 }
 
 regression() { # regression <flavor>
-  docker run --rm --init --network none -e GLUON_TEST_SLOW="${GLUON_TEST_SLOW:-}" "gluon-test-bun-$1" \
-    sh -c 'bun run typecheck && bun run test:unit && bun run test:e2e --max-concurrency="$1"' sh "${GLUON_E2E_CONCURRENCY:-$($BUN scripts/e2e-concurrency.ts)}"
+  docker run --rm --init --network none -e GLUON_TEST_SLOW="${GLUON_TEST_SLOW:-}" \
+    -e GLUON_E2E_CONCURRENCY="${GLUON_E2E_CONCURRENCY:-$($BUN scripts/e2e-concurrency.ts)}" "gluon-test-bun-$1" \
+    bun run regression:full --retry-failed
 }
 
 npm_install() { # npm_install <flavor>
@@ -130,14 +132,11 @@ lint() {
 }
 
 want lint && step "lint: shellcheck" lint
-if want regression || want npm || want https; then
-  step "image: oven/bun debian" bun_image debian "$BUN_DEBIAN"
-  step "image: oven/bun alpine" bun_image alpine "$BUN_ALPINE"
-fi
-if want regression; then
-  step "regression: oven/bun debian" regression debian
-  step "regression: oven/bun alpine" regression alpine
-fi
+want regression && stages="$stages regression-debian regression-alpine"
+if want regression-debian || want npm || want https; then step "image: oven/bun debian" bun_image debian "$BUN_DEBIAN"; fi
+if want regression-alpine || want npm; then step "image: oven/bun alpine" bun_image alpine "$BUN_ALPINE"; fi
+want regression-debian && step "regression: oven/bun debian" regression debian
+want regression-alpine && step "regression: oven/bun alpine" regression alpine
 if want npm; then
   step "pack: npm tarball" build_pack
   step "npm: bun add -g in oven/bun debian" npm_install debian

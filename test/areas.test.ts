@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
+import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
 
 const names = Object.keys(AREAS);
 
@@ -96,5 +96,28 @@ describe("--changed: files to areas", () => {
   test("test-ownership agrees with the lists", () => {
     expect(testOwner("test/e2e/resume.e2e.test.ts")).toBe("resume-workspaces");
     expect(selectAreas(["perf"]).hooks.map((h) => h.cmd)).toEqual(["bun run test:perf"]);
+  });
+});
+
+describe("--changed: the OSes a pull request needs (CI's plan job)", () => {
+  test("Linux alone when every touched area says so; a docs-only change too; a test file counts as its area", () => {
+    expect(platformsOf(selectChanged(["docs/concepts/architecture.md"]))).toBe("linux");
+    expect(platformsOf(selectChanged(["src/routing.ts", "docs/concepts/architecture.md"]))).toBe("linux");
+    expect(platformsOf(selectChanged(["test/route.test.ts"]))).toBe("linux");
+    expect(platformsOf(selectChanged([]))).toBe("linux");
+  });
+
+  test("every OS for an area that runs processes, paths or a terminal, for one of several areas, and for the whole tier", () => {
+    expect(platformsOf(selectChanged(["src/pty/session.ts"]))).toBe("all");
+    expect(platformsOf(selectChanged(["src/routing.ts", "src/pty/session.ts"]))).toBe("all");
+    // The brain starts `codex app-server`: a process, so every OS.
+    expect(platformsOf(selectChanged(["src/agent/codex.ts"]))).toBe("all");
+    expect(platformsOf(selectChanged(["test/e2e/auth.e2e.test.ts"]))).toBe("all");
+    expect(platformsOf(selectChanged(["bun.lock"]))).toBe("all");
+    expect(platformsOf(selectChanged(["somewhere/unknown.txt"]))).toBe("all");
+  });
+
+  test("only areas with no process, path or terminal of their own are Linux-only", () => {
+    expect(Object.keys(AREAS).filter((a) => AREAS[a]!.platforms === "linux").sort()).toEqual(["docs", "routing"]);
   });
 });

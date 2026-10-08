@@ -1,3 +1,4 @@
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -449,7 +450,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     expect(steps.map((r) => r.n)).toEqual(Array.from({ length: 60 }, (_, i) => i + 1));
     expect(steps.map((r) => r.input)).toEqual(Array.from({ length: 60 }, (_, i) => 100 + i));
     expect(statuses.filter((s) => s.steps).map((s) => s.steps!.length)).toEqual([12, 12, 12, 12, 12]);
-    expect(stoppedAfterMs).toBeLessThan(500);
+    expect(stoppedAfterMs).toBeLessThan(500 * SLOW);
   });
 
   test("BUG-344/flushsteps-batch-fits: the biggest batch the plugin builds (12 records with a 128-character model, 13-digit counts and a long cost, a context and a side flag) is a status file Gluon reads (under MAX_STATUS_BYTES), not one it drops whole", () => {

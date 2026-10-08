@@ -1,4 +1,5 @@
 /** Gluon's compositor (`src/pty/compositor.ts`): the key table, mouse shifting, and the views on fake streams. */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
@@ -334,7 +335,6 @@ function fakeSession(): ViewSession & { inputs: Key[]; mice: string[]; screen: T
 }
 
 const tick = (ms = 40) => Bun.sleep(ms);
-const SLOW = Number(process.env.GLUON_TEST_SLOW) || (process.platform === "win32" ? 3 : 1);
 /**
  * Waits until `ok()` holds (a ceiling that scales with the machine), then asserts it. For what the compositor paints after the home view's model
  * has parsed a frame and its output is quiet (`SELECTION_QUIET_MS`): a fixed `tick` is too short where timers tick every 15 ms and the loop is busy.

@@ -1,4 +1,5 @@
 /** Gluon's AgentSession (`src/pty/session.ts`) on a fake PTY: what reaches the agent, the question, events, status. */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -76,7 +77,6 @@ const keys = (text: string) => {
   return [...d.feed(text), ...d.flush()];
 };
 const settle = (ms = 30) => Bun.sleep(ms);
-const SLOW = Number(process.env.GLUON_TEST_SLOW) || (process.platform === "win32" ? 3 : 1);
 async function until(ok: () => boolean, ms = 3000 * SLOW) {
   const end = Date.now() + ms;
   while (!ok() && Date.now() < end) await Bun.sleep(10);

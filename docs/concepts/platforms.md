@@ -7,12 +7,13 @@ What Gluon builds for, what CI runs, how to test on your own machine, and what d
 
 ## Support matrix
 
-CI (`.github/workflows/ci.yml`) runs the tests of the changed areas (`bun run regression --changed`) on Ubuntu 24.04, macOS 15
-and Windows 2025 for every pull request and push to main; the full suite, `docker-test`, `build:all` and
-`test:dist` run by hand before a release (`gh workflow run ci.yml --ref main -f suite=full`). `CONTRIBUTING.md` ("When to
+CI (`.github/workflows/ci.yml`) runs the tests of the changed areas (`bun run regression --changed`) for every pull request on
+Ubuntu 24.04, and on macOS 15 and Windows 2025 unless every changed area is Linux-only (`platforms` in `test/areas.ts`); a push
+to main runs them on Ubuntu. The full suite, `docker-test`, `build:all` and `test:dist` run every night and by hand before a
+release (`gh workflow run ci.yml --ref main -f suite=full`). `CONTRIBUTING.md` ("When to
 run what") says what to run locally.
 
-| Platform | Build | What CI runs (the full suite and Docker, by hand) |
+| Platform | Build | What CI runs (the full suite and Docker: nightly, and by hand) |
 |---|---|---|
 | Linux x64, glibc | `gluon-bun-linux-x64` | `ubuntu-24.04`: typecheck, unit, end-to-end, the compiled binary; `docker-test`; `build:all` |
 | Linux x64, musl (Alpine) | `gluon-bun-linux-x64-musl` | `docker-test` |

@@ -4,6 +4,7 @@
  * mutation is applied to src/ (checked by hand) and passes on the real code. `BUG-CANDIDATE/…` are
  * `test.failing`: behaviour that looks wrong today, written as the behaviour wanted.
  */
+import { SLOW } from "./fixtures/slow.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -762,7 +763,7 @@ describe("F: the only fetch", () => {
       expect(await defaultFetch(url("/404"), { timeoutMs: 2000, maxBytes: 100 })).toBeNull();
       const t0 = Date.now();
       expect(await defaultFetch(url("/slow"), { timeoutMs: 150, maxBytes: 100 })).toBeNull();
-      expect(Date.now() - t0).toBeLessThan(3000);
+      expect(Date.now() - t0).toBeLessThan(3000 * SLOW);
     } finally {
       main.stop(true);
       other.stop(true);

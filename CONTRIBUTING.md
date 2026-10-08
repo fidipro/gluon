@@ -52,9 +52,9 @@ probes. Never make a test call a real model, agent or API.
 | Situation | Run |
 |---|---|
 | Editing one area | `bun run test:area <area>` (areas: `test/areas.ts`; several: `a,b`) |
-| Before a commit | `bun run regression --changed` (the areas of what you changed since `origin/main`) |
-| Done | `bun run regression`: typecheck + unit + end-to-end, without tests titled `@full` (~3 min) |
-| A big change | `bun run regression:full`: everything (~14 min) |
+| Done | `bun run regression --changed`: the areas of what you changed since `origin/main` (the whole fast tier when a core file changed) |
+| A change across areas | `bun run regression`: typecheck + unit + end-to-end, without tests titled `@full` (~2.5 min) |
+| A big change | `bun run regression:full`: everything (~12 min) |
 | `src/pty/`, the frame, `src/gluon.ts` | `bun run test:area pty,gluon-frame`, then `bun run test:gluon` |
 | Platform-specific code | `bun run test:dist` (builds and tests the executable); `bun run test:windows` (from WSL, on the machine's Windows); `bun run docker-test` (Linux in Docker) |
 
@@ -64,13 +64,13 @@ end-to-end harness.
 
 - **A fixed bug gets a regression test** in `test/` (a unit test if it needs no terminal, otherwise an
   end-to-end scenario in the `test/e2e/` file for its area). A maintainer gives it its bug number.
-- **CI** (`.github/workflows/ci.yml`) runs on every pull request and every push to main the tests of the
-  changed areas (`bun run regression --changed`, with the typecheck) on Ubuntu 24.04, macOS 15 and Windows 2025,
-  a secret scan (gitleaks) and the docs build. The full suite, `docker-test`, `build:all` and `test:dist` run by
-  hand before a release (`gh workflow run ci.yml --ref main -f suite=full`). A maintainer can start
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request the changed areas' tests (`bun run regression --changed`)
+  on Ubuntu 24.04, plus macOS 15 and Windows 2025 unless every area is Linux-only (`platforms`, `test/areas.ts`), gitleaks
+  and the docs build; a push to main, on Ubuntu; `gate` is the required check. The full suite, `docker-test`, `build:all`
+  and `test:dist` run nightly (a failure opens an issue) and before a release (`gh workflow run ci.yml --ref main -f suite=full`). A maintainer can start
   one off with `gh workflow run ci.yml --ref <branch>` (`workflow_dispatch`). A fork's pull request runs
   with read-only permissions and no secrets, and a first-time contributor's needs a maintainer's approval
-  before Actions run. macOS is tested only in CI. `codex-watch.yml` runs `scripts/codex-drift.ts` on each new codex release.
+  before Actions run. A test that fails and then passes on CI's one retry is flaky: a warning, not a failure. macOS is tested only in CI. `codex-watch.yml` runs `scripts/codex-drift.ts` on each new codex release.
 
 ## Hard rules
 
