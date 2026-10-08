@@ -1,9 +1,8 @@
-**Gluon** is a control platform for coding agents: run Claude Code, Codex, Antigravity, Grok Build, OpenCode and Kimi Code side by side in one terminal frame, on your own API keys or subscriptions.
+**Gluon** is a control platform for coding agents. It lets you:
 
-Gluon enables two things:
-
-1. **Choosing the most cost-effective agent for each session, within one harness or across several.** An agent is a harness × model × effort. Gluon works out a spec with you, then routes with configurable rules.
-2. **Managing your agents' sessions**, with cost and context observability and analytics.
+1. **Choose the most cost-effective combination** of harness × model × effort for each session. Gluon works out a spec with you, then routes with configurable rules.
+2. **Manage your agents' sessions**, with cost and context observability and analytics.
+3. **Run Claude Code, Codex, Antigravity, Grok Build, OpenCode and Kimi Code** side by side in one terminal frame, on your own API keys or subscriptions.
 
 <p align="center"><a href="https://fidipro.github.io/gluon/concepts/manifesto/">Read our manifesto</a></p>
 
