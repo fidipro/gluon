@@ -465,13 +465,14 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     expect(await gone(pid)).toBe(true);
   });
 
-  test.skipIf(WIN)("BUG-149: SIGTERM or SIGHUP ends the agents and restores the terminal", async () => {
-    // ECHO is 0x8 everywhere; ICANON 0x2 on Linux, 0x100 on macOS.
-    const ICANON = process.platform === "darwin" ? 0x100 : 0x2;
-    for (const [sig, code] of [
-      ["SIGTERM", 143],
-      ["SIGHUP", 129],
-    ] as const) {
+  // One test per signal: they run at once.
+  for (const [sig, code] of [
+    ["SIGTERM", 143],
+    ["SIGHUP", 129],
+  ] as const) {
+    test.skipIf(WIN)(`BUG-149: ${sig} ends the agents and restores the terminal`, async () => {
+      // ECHO is 0x8 everywhere; ICANON 0x2 on Linux, 0x100 on macOS.
+      const ICANON = process.platform === "darwin" ? 0x100 : 0x2;
       const pidFile = join(tmpdir(), `gluon-pid-bug149-${sig}-${process.pid}`);
       const log = killLog(`bug149-${sig}`);
       const app = await tui({ FAKE_PID_FILE: pidFile, FAKE_KILL_LOG: log });
@@ -496,8 +497,8 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
       expect(readFileSync(log, "utf8")).toBe("KILLED\n");
       expect(await gone(agent)).toBe(true);
       expect(mine()).toEqual([]);
-    }
-  });
+    });
+  }
 });
 
 describe("the question at the agent's /clear and /compact (issue #13 v2)", () => {

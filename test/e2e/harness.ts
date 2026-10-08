@@ -145,6 +145,8 @@ export class App {
   private lastData = performance.now();
   private eof = Promise.withResolvers<void>();
   private osc = Promise.withResolvers<void>();
+  /** Set once gluon has exited and its last output is on the screen: a wait for more is over. */
+  private ended: { code: number } | null = null;
   private trigger: { text: string; keys: string; from: number; done: () => void } | null = null;
   /** The exit code, once the process has exited and its output has reached the screen. */
   readonly exited: Promise<number>;
@@ -230,6 +232,7 @@ export class App {
     });
     this.exited = this.proc.exited.then(async (code) => {
       await this.drain();
+      this.ended = { code };
       return code;
     });
   }
@@ -489,9 +492,14 @@ export class App {
         : (s: string) => (typeof pattern === "string" ? s.includes(pattern) : pattern.test(s));
     const end = Date.now() + timeoutMs * SLOW;
     while (Date.now() < end) {
+      // Read before the check: an exit seen here had its last output drawn, so a screen that still doesn't match never will.
+      const ended = this.ended;
       await Bun.sleep(50);
       await this.pending;
-      if (!ok(this.screen())) continue;
+      if (!ok(this.screen())) {
+        if (ended) throw new Error(`gluon exited (code ${ended.code}) while waiting for ${pattern}; screen:\n${this.screen()}`);
+        continue;
+      }
       // Matched: let the frame (and anything printed right after) finish, then check it still holds.
       await this.quiet();
       if (ok(this.screen())) return;

@@ -12,6 +12,8 @@
  *   coverage table marks them `e2e`, not 0 %.
  * - `unmeasured`: `src` files that run where the coverage report can't see (a subprocess, a Worker): glob → why.
  * - `optional`: the area's globs may match nothing yet (a directory another change is adding).
+ * - `platforms`: `"linux"` when a change to this area alone needs CI on Linux only (pure logic, no process, path or
+ *   terminal that differs by OS); left out, a pull request runs macOS and Windows too. The nightly full run covers every OS.
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -28,6 +30,7 @@ export type Area = {
   unmeasured?: Record<string, string>;
   e2eOnly?: string[];
   optional?: boolean;
+  platforms?: "linux";
 };
 
 export const AREAS: Record<string, Area> = {
@@ -63,6 +66,7 @@ export const AREAS: Record<string, Area> = {
   },
   routing: {
     doc: "routing.yaml, the catalog, the models the brain may offer, the intake seam",
+    platforms: "linux",
     src: ["src/routing.ts", "src/routing-config.ts", "src/routing.yaml", "src/models.ts", "src/intake.ts"],
     files: ["test/fixtures/route-catalog.ts", "test/fixtures/first-pass-*.yaml"],
     unit: ["test/route.test.ts", "test/routing-upgrade.test.ts", "test/intake.test.ts"],
@@ -225,6 +229,7 @@ export const AREAS: Record<string, Area> = {
   },
   docs: {
     doc: "Markdown, the generated reference, the docs site, README, AGENTS.md files; the area manifest's own test",
+    platforms: "linux",
     src: ["src/**/AGENTS.md"],
     files: ["**/*.md", "**/*.mdx", "docs/**", "site/**", "scripts/docs/**", "scripts/test-health.ts", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"],
     unit: ["test/areas.test.ts", "test/test-health.test.ts", "test/markdown.test.ts", "test/contributor-docs.test.ts", "test/docs-gen.test.ts", "test/docs-links.test.ts", "test/docs-no-copies.test.ts", "test/docs-site.test.ts", "test/readme.test.ts"],
@@ -359,6 +364,17 @@ export function selectAreas(areas: string[], extra: { unit?: string[]; e2e?: str
     hooks: uniq([...ok, ...(extra.hookAreas ?? [])]).flatMap((a) => Object.entries(AREAS[a]!.hooks ?? {}).map(([name, h]) => ({ area: a, name, cmd: h.cmd }))),
     why: [],
   };
+}
+
+/**
+ * The OSes a selection needs on a pull request: Linux alone when every area it touches says `platforms: "linux"`
+ * (a changed test file counts as its area); every OS for the whole tier (a core or unknown file).
+ */
+export function platformsOf(sel: Selection): "all" | "linux" {
+  if (sel.kind === "none") return "linux";
+  if (sel.kind === "fast") return "all";
+  const owners = new Set([...sel.areas, ...[...sel.unit, ...sel.e2e].map(testOwner).filter((a): a is string => !!a), ...sel.hooks.map((h) => h.area)]);
+  return [...owners].every((a) => AREAS[a]?.platforms === "linux") ? "linux" : "all";
 }
 
 /**

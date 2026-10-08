@@ -12,7 +12,7 @@ Editing any `AGENTS.md`: follow "Keeping AGENTS.md files fresh" at the end of th
 ## Commands
 
 ```bash
-bun run regression    # fast tier: typecheck + unit + e2e minus `@full` tests (~3 min); `regression:full` is all (~14 min)
+bun run regression    # fast tier: typecheck + unit + e2e minus `@full` tests (~2.5 min); `regression:full` is all (~12 min)
 bun run test:area <a,b>  # one area's tests (test/areas.ts; `regression --changed|--list`); `test:coverage`: unit coverage
 bun run test:health   # what in the tests is stale + the action (offline, seconds; docs/contributing/maintenance.md)
 bun run test:unit     # unit tests, one process (`regression` shards them)
@@ -40,7 +40,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 
 ## Workflow
 
-- **Done means `bun run regression` passes** (`regression:full` for a big change; `@full`: `test/AGENTS.md`).
+- **Done means `bun run regression --changed` passes** (it runs the whole fast tier itself when a core file
+  changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
 - **Every fixed bug gets a regression test** named `BUG-nn/<plan case>: …` (e2e in `test/e2e/`,
   or a unit test in `test/` if it needs no terminal).
 - **The regression suite is offline and free.** Never call a real brain, agent, API or installer.
@@ -52,9 +53,10 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
   open a PR unless asked.
 - **Publishing to npm, publishing a release and changing release signing are the owner's decision
   alone.**
-- **CI** runs the tests of the changed areas on Ubuntu, macOS and Windows for every pull request and push to main
-  (`regression --changed`; what it runs: `CONTRIBUTING.md`); the full suite, Docker and builds run by hand before a
-  release (`gh workflow run ci.yml --ref main -f suite=full`). `gh workflow run ci.yml --ref <branch>` runs one off (`-f os=… -f filter=… -f extras=false`);
+- **CI** runs the tests of the changed areas for every pull request (`regression --changed`; macOS and Windows unless
+  every area says `platforms: "linux"` in `test/areas.ts`) and on Linux for a push to main; `gate` is the one required
+  check. The full suite, Docker and builds run nightly (a failure opens an issue) and by hand before a release
+  (`gh workflow run ci.yml --ref main -f suite=full`). `gh workflow run ci.yml --ref <branch>` runs one off (`-f os=… -f filter=… -f extras=false`);
   Windows locally first (`bun run test:windows`).
 - **Keep `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md`, `docs/` true** when
   behaviour changes.

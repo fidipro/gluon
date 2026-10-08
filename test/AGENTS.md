@@ -14,7 +14,7 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
 - **No bare millisecond bound**: a deadline a test's own steps must meet is `ms * SLOW` (`test/fixtures/slow.ts`);
   a perception limit belongs in `test/perf/`. Bare bounds were the CI flakes on macOS and Windows.
 - **A flaky test is fixed, or quarantined while it's fixed**: `@quarantine BUG-nn until:YYYY-MM-DD` (≤ 30 days;
-  `test:health` breaks past it). Never a retry inside a test: CI's `--retry-failed` reports flakes (`qa/logs/flaky.json`).
+  `test:health` breaks past it). Never a retry inside a test: CI's `--retry-failed` reports flakes (its `flaky.json`).
 - **Replays of captured runs price from `test/fixtures/telemetry/prices-at-capture.json`, never the
   seeded tables** (a refresh changes them; `frozenTracker` in `test/fixtures/frozen-prices.ts`;
   BUG-413).

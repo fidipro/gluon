@@ -166,8 +166,9 @@ test("BUG-612/resume-modes: an OpenCode session saved in explore resumes with th
   }
 });
 
-test("BUG-612/resume-modes: a Codex or OpenCode session saved before Gluon recorded its mode is not resumed (nothing starts), the chat names `gluon sessions --delete <id>`, and the record stays", async () => {
-  for (const fake of ["codex", "opencode"]) {
+// One test per harness: they run at once (a loop in one test waited out both no-start windows in turn).
+for (const fake of ["codex", "opencode"]) {
+  test(`BUG-612/resume-modes: a ${fake === "codex" ? "Codex" : "OpenCode"} session saved before Gluon recorded its mode is not resumed (nothing starts), the chat names \`gluon sessions --delete <id>\`, and the record stays`, async () => {
     const s = sandbox(`resume-unmoded-${fake}`);
     seed(s, repo.tiny(), sessionOf(fake));
     const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: [fake as "codex"], env: s.env });
@@ -180,8 +181,8 @@ test("BUG-612/resume-modes: a Codex or OpenCode session saved before Gluon recor
     const kept = parseWorkspace(readFileSync(join(s.ws, "abcdef.json"), "utf8"))!;
     expect(kept.sessions.map((c) => c.key)).toEqual(["k1"]);
     app.kill();
-  }
-});
+  });
+}
 
 test("BUG-612/resume-modes: with no mode on record, Claude Code (whose own session keeps it) still resumes, and a Codex one beside it is the only refusal", async () => {
   const s = sandbox("resume-unmoded-mixed");
@@ -189,9 +190,9 @@ test("BUG-612/resume-modes: with no mode on record, Claude Code (whose own sessi
   const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ["claude", "codex"], env: s.env });
   await app.waitFor((x) => x.replace(/\s+/g, " ").includes("gluon sessions --delete abcdef"), 20_000);
   const end = performance.now() + 20_000 * SLOW;
-  while (!app.agentLog().includes("FAKE-claude") && performance.now() < end) await Bun.sleep(50);
+  while (!app.agentLog().includes("FAKE-CLAUDE") && performance.now() < end) await Bun.sleep(50);
   expect(app.agentLog()).toContain(`--resume=${UUID}`);
-  expect(app.agentLog()).not.toContain("FAKE-codex");
+  expect(app.agentLog()).not.toContain("FAKE-CODEX");
   app.kill();
 });
 

@@ -3,8 +3,8 @@
 Run it after every change, before committing:
 
 ```bash
-bun run regression        # the fast tier: typecheck + unit + e2e without the tests titled `@full` (~3 min)
-bun run regression:full   # everything: typecheck + all unit + all e2e (~14 min)
+bun run regression        # the fast tier: typecheck + unit + e2e without the tests titled `@full` (~2.5 min)
+bun run regression:full   # everything: typecheck + all unit + all e2e (~12 min)
 bun run test:area home-ui # one area's unit + e2e tests (areas: test/areas.ts); `bun run regression --changed` picks them from your diff
 bun run test:unit         # just the unit tests (~1.5 min)
 bun test test/e2e/stages  # one scenario file
@@ -20,7 +20,7 @@ and CI. `regression:full`, CI and `docker-test` run them.
 the full one, `GLUON_UNIT_SHARDS`; separate processes, `bun test --parallel` can't run Ink's Yoga twice), then
 the e2e scenarios (`GLUON_E2E_CONCURRENCY` apps, default `min(4, cores/3, free GB/0.25)`, `scripts/e2e-concurrency.ts`, which `scripts/docker-test.sh` and `scripts/windows-test.ts` use too). The unit files are grouped by the
 times the last run measured (`qa/logs/test-times.json`, from Bun's JUnit report; `SECONDS` in `scripts/test-times.ts` when there are none).
-Bun runs the e2e files one after the other and the tests of a file concurrently, so a file with fewer tests than apps leaves apps idle (why a lone 20 s test costs 20 s of the run). `--stages typecheck,unit,e2e` runs only some stages and `GLUON_TEST_CASES=<file>` writes every test run (file, title, seconds) as JSON, to count a tier per area.
+Bun runs a process's e2e files one after the other and the tests of a file concurrently, so a file with fewer tests than apps leaves apps idle (why a lone 20 s test costs 20 s of the run): the fast tier splits the e2e files into processes too (by measured time, `GLUON_E2E_SHARDS`, default half the apps; the full tier keeps one), the apps shared between them, and a test of several variants is one test per variant, so they run at once. `--stages typecheck,unit,e2e` runs only some stages and `GLUON_TEST_CASES=<file>` writes every test run (file, title, seconds) as JSON, to count a tier per area.
 It ends by printing each stage's wall time, the ten slowest files, the tests over 3 s that lack `@full` (candidates for it), and the
 peak memory of its whole process tree (Linux, by stage). `--area a,b`, `--changed [ref]` and `--list` narrow it to
 the areas of `test/areas.ts`; a new test file must be listed there (`test/areas.test.ts`). `--retry-failed` (CI) runs a
@@ -137,9 +137,8 @@ every step takes several times longer. The harness never returns a half-drawn sc
 - Waits, test timeouts and every deadline a test's own steps must meet scale with `SLOW`
   (`test/fixtures/slow.ts`): 3 on Windows, 1 elsewhere, `GLUON_TEST_SLOW` overrides it. Every file's default
   timeout is 5 s × `SLOW` (unit; 30 s at least on Windows) or 20 s × `SLOW` (e2e, visual, perf), set by
-  `test/preload.ts` on each file's first line. CI sets it (2; 4 on Windows) and runs the e2e files with
-  `bun run test:e2e --max-concurrency=3` (`scripts/docker-test.sh` reads
-  `GLUON_E2E_CONCURRENCY`, else `scripts/e2e-concurrency.ts`).
+  `test/preload.ts` on each file's first line. CI sets it (2; 4 on Windows) and 4 apps at once
+  (`GLUON_E2E_CONCURRENCY=4`; `scripts/docker-test.sh` reads it too, else `scripts/e2e-concurrency.ts`).
 
 So assert after `press` / `type` / `waitFor`, never after a bare `write()` or `Bun.sleep()`: wait
 for what the key should produce (`waitFor`) when it's a batch or a timing case. To check a change

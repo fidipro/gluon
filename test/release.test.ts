@@ -279,16 +279,24 @@ describe("what triggers and what writes: every workflow", () => {
     expect(WORKFLOWS.map((w) => w.replace(".github/workflows/", "")).sort()).toEqual(["ci.yml", "codex-watch.yml", "pages.yml", "release.yml"]);
   });
 
-  test("no workflow but the Codex watch is scheduled; none is chained or runs a pull request's code with the base repository's token", () => {
+  test("only the Codex watch and CI's nightly run are scheduled; none is chained or runs a pull request's code with the base repository's token", () => {
+    const scheduled = (w: string) => w.endsWith("/codex-watch.yml") || w.endsWith("/ci.yml");
     for (const [w, y] of all) {
       const on = Object.keys(y.on);
-      const banned = w.endsWith("/codex-watch.yml") ? ["pull_request_target", "workflow_run"] : ["schedule", "pull_request_target", "workflow_run"];
+      const banned = scheduled(w) ? ["pull_request_target", "workflow_run"] : ["schedule", "pull_request_target", "workflow_run"];
       expect([w, on.filter((k) => banned.includes(k))]).toEqual([w, []]);
     }
     for (const w of WORKFLOWS) {
       const code = read(w).split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
       expect([w, /pull_request_target|workflow_run/.test(code)]).toEqual([w, false]);
-      if (!w.endsWith("/codex-watch.yml")) expect([w, /^\s*schedule:|^\s*cron:/m.test(code)]).toEqual([w, false]);
+      if (!scheduled(w)) expect([w, /^\s*schedule:|^\s*cron:/m.test(code)]).toEqual([w, false]);
+    }
+  });
+
+  test("no workflow runs the live checks: they spend money, and only a person starts them (`regression --live`, `test:live`)", () => {
+    for (const w of WORKFLOWS) {
+      const code = read(w).split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+      expect([w, /--live\b|test:live|scripts\/live/.test(code)]).toEqual([w, false]);
     }
   });
 
@@ -311,11 +319,21 @@ describe("what triggers and what writes: every workflow", () => {
     for (const [w, y] of all) expect([w, y.permissions]).toEqual([w, { contents: "read" }]);
   });
 
-  test("ci.yml runs on pull requests and pushes to main, and by hand; nothing else", () => {
+  test("ci.yml runs on pull requests and pushes to main, nightly, and by hand; nothing else", () => {
     const { on } = wf("ci.yml");
-    expect(Object.keys(on).sort()).toEqual(["pull_request", "push", "workflow_dispatch"]);
+    expect(Object.keys(on).sort()).toEqual(["pull_request", "push", "schedule", "workflow_dispatch"]);
     expect(on.pull_request).toEqual({ branches: ["main"] });
     expect(on.push).toEqual({ branches: ["main"] });
+    expect(on.schedule).toEqual([{ cron: "23 2 * * *" }]);
+  });
+
+  test("CI's `nightly-report` writes issues alone, only for a failed nightly run, and runs no action, checkout or test", () => {
+    const { jobs } = wf("ci.yml");
+    const r = jobs["nightly-report"]!;
+    expect(r.permissions).toEqual({ issues: "write" });
+    expect((r as { if?: string }).if).toBe("always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure')");
+    expect(r.steps.filter((s) => s.uses)).toEqual([]);
+    expect(JSON.stringify(r.steps)).not.toMatch(/bun |npm |checkout/);
   });
 
   test("pages.yml runs on pushes to main and by hand; nothing else", () => {
@@ -333,11 +351,11 @@ describe("what triggers and what writes: every workflow", () => {
     expect(JSON.stringify(jobs.deploy)).toContain("github-pages");
   });
 
-  test("no workflow but Release, Pages' `deploy` and the Codex watch's `report` has a job that writes anything", () => {
+  test("no workflow but Release, Pages' `deploy`, the Codex watch's `report` and CI's `nightly-report` has a job that writes anything", () => {
     for (const [w, y] of all)
       for (const [name, job] of Object.entries(y.jobs)) {
         const writes = Object.entries(job.permissions ?? {}).filter(([, v]) => v === "write").map(([k]) => k);
-        if (w.endsWith("/release.yml") || (w.endsWith("/pages.yml") && name === "deploy") || (w.endsWith("/codex-watch.yml") && name === "report")) continue;
+        if (w.endsWith("/release.yml") || (w.endsWith("/pages.yml") && name === "deploy") || (w.endsWith("/codex-watch.yml") && name === "report") || (w.endsWith("/ci.yml") && name === "nightly-report")) continue;
         expect([w, name, writes]).toEqual([w, name, []]);
       }
   });
@@ -367,7 +385,7 @@ describe("ci.yml: one plan per event", () => {
   const ci = parse(read(".github/workflows/ci.yml")) as { jobs: Record<string, Job & { strategy?: unknown; env?: Record<string, string>; "runs-on"?: string }> };
 
   test("a `plan` job decides the suite, the OSes and the extras; the others read it", () => {
-    for (const [name, job] of Object.entries(ci.jobs)) if (name !== "plan") expect([name, job.needs]).toEqual([name, "plan"]);
+    for (const [name, job] of Object.entries(ci.jobs)) if (name !== "plan") expect([name, [job.needs].flat().includes("plan")]).toEqual([name, true]);
     const run = ci.jobs.plan!.steps.map((s) => s.run ?? "").join("\n");
     expect(JSON.stringify(ci.jobs.regression)).not.toContain("inputs.suite");
   });
@@ -380,14 +398,25 @@ describe("ci.yml: one plan per event", () => {
     return Object.fromEntries([...m![1]!.matchAll(/\b(\w+)=("[^"]*"|\S+?)(?:;|$)/g)].map((x) => [x[1]!, x[2]!.replaceAll('"', "")]));
   };
 
-  test("a pull request and a push test the changed areas on every OS, with no extras; no docker-test, build:all or regression:full", () => {
-    expect(arm("pull_request")).toEqual({ suite: "changed", os: "all", heavy: "false", light: "true", base: "origin/$BASE_REF" });
-    expect(arm("push")).toEqual({ suite: "changed", os: "all", heavy: "false", light: "true", base: "$BEFORE" });
+  test("a pull request tests the changed areas on the OSes they need, a push on Linux, with no extras; only the nightly run (and a run by hand) is heavy", () => {
+    expect(arm("pull_request")).toEqual({ suite: "changed", os: "auto", heavy: "false", light: "true", base: "origin/$BASE_REF" });
+    expect(arm("push")).toEqual({ suite: "changed", os: "ubuntu", heavy: "false", light: "true", base: "$BEFORE" });
+    expect(arm("schedule")).toEqual({ suite: "full", os: "all", heavy: "true", light: "true" });
     // Only `heavy` starts docker-test and build:all, and only the full suite runs regression:full or test:dist.
     for (const j of ["docker", "build-all"]) expect([j, ci.jobs[j]!["if"]]).toEqual([j, "needs.plan.outputs.heavy == 'true'"]);
     const run = ci.jobs.plan!.steps.map((s) => s.run ?? "").join("\n");
     expect(run).toMatch(/if \[ "\$suite" = full \] && \[ "\$\{IN_EXTRAS:-true\}" = true \]; then heavy=true/);
-    expect(run.match(/heavy=true/g)).toHaveLength(1);
+    expect(run.match(/heavy=true/g)).toHaveLength(2);
+    // `auto`: Linux alone only when the listing says so; anything else is every OS.
+    expect(run).toMatch(/if \[ "\$os" = auto \]; then\n\s*os=all\n/);
+    expect(run).toContain('if [ "$suite" = changed ] && p=$(bun run regression --list --json --changed "$base" | tail -n 1 | jq -r .platforms) && [ "$p" = linux ]; then os=ubuntu; fi');
+  });
+
+  test("`gate`, the one required check, runs whatever happened and passes only when every job it needs passed or was skipped", () => {
+    const gate = ci.jobs.gate! as Job & { if?: string };
+    expect(gate.if).toBe("always()");
+    expect([gate.needs].flat().sort()).toEqual(["dco", "plan", "regression", "secrets"]);
+    expect(gate.steps.map((s) => s.run ?? "").join("\n")).toContain(`jq -e 'all(.[]; . == "success" or . == "skipped")'`);
   });
 
   test("the base reaches the shell as a variable, is validated, and falls back to the fast tier; the typecheck always runs", () => {

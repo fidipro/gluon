@@ -87,18 +87,18 @@ describe("terminal", () => {
   // Not on Windows: ConPTY answers DA1 itself and drops a reply written as input.
   test.skipIf(WIN)("BUG-160/A: the startup probe: a terminal that speaks the kitty keyboard protocol has its `CSI ? u` answered for every agent", async () => {
     const cfg = freshConfig("kitty-probe", "handoff:\n  on_clear: ask\n");
-    const plain = await start({ cwd: repo.tiny(), cols: 100, env: { GLUON_CONFIG: cfg, FAKE_TUI: "1" } });
-    await toLaunch(plain, "TUI ready");
-    await plain.type("!kq");
-    await plain.press(KEY.enter);
-    await plain.waitFor("DA1");
-    expect(plain.screen()).not.toContain("KITTYQ");
-    const kitty = await start({ cwd: repo.tiny(), cols: 100, kitty: true, env: { GLUON_CONFIG: cfg, FAKE_TUI: "1" } });
-    await toLaunch(kitty, "TUI ready");
-    await kitty.type("!kq");
-    await kitty.press(KEY.enter);
-    await kitty.waitFor("DA1");
-    expect(kitty.screen()).toContain("KITTYQ ?0");
+    // A plain terminal and a kitty one, at once: what the agent's own probe gets back in each.
+    const probe = async (kitty: boolean) => {
+      const app = await start({ cwd: repo.tiny(), cols: 100, kitty, env: { GLUON_CONFIG: cfg, FAKE_TUI: "1" } });
+      await toLaunch(app, "TUI ready");
+      await app.type("!kq");
+      await app.press(KEY.enter);
+      await app.waitFor("DA1");
+      return app.screen();
+    };
+    const [plain, kitty] = await Promise.all([probe(false), probe(true)]);
+    expect(plain).not.toContain("KITTYQ");
+    expect(kitty).toContain("KITTYQ ?0");
   });
 });
 

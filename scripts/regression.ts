@@ -2,14 +2,16 @@
 /**
  * `bun run regression` (the fast tier) and `bun run regression:full` (`--full`): typecheck, then
  * the unit tests in shards (separate processes: `--parallel` can't run Ink's Yoga twice), then the
- * e2e scenarios. The fast tier leaves out the tests whose title carries `@full` or `@quarantine` and keeps its
+ * e2e scenarios, also in shards (Bun runs a process's files one after the other: two processes overlap
+ * them; `GLUON_E2E_SHARDS`), with the apps shared between them. The fast tier leaves out the tests whose title carries `@full` or `@quarantine` and keeps its
  * memory low (3 unit shards, `GLUON_E2E_CONCURRENCY` apps at once); the full tier runs everything
  * with 4 shards. `GLUON_UNIT_SHARDS` overrides the shards.
  *
  * Narrower runs (areas: `test/areas.ts`; same `@full` rule, `--full` lifts it): `--area a,b` (also
  * `bun run test:area a,b`), `--changed [ref]` (the files changed since the merge-base with `ref`,
  * default origin/main, plus uncommitted ones; a core or unknown file means the fast tier), and
- * `--list` (print what would run and stop).
+ * `--list` (print what would run and stop; `--json`: as JSON, with the OSes the change needs, for CI).
+ * `--keep-going` runs every stage even after one fails (CI's full suite: a unit failure doesn't hide the e2e results).
  *
  * After a run: the slowest files, the non-`@full` tests over 3 s (candidates for `@full`), and the
  * peak memory of the whole process tree (Linux). Test times are kept in `qa/logs/test-times.json`
@@ -21,19 +23,21 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
-import { AREAS, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
+import { AREAS, e2eTestFiles, platformsOf, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
-const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--list]
+const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--list [--json]]
   (none)           the fast tier: typecheck + unit + e2e without the tests titled @full or @quarantine
   --full           also the @full and @quarantine tests (bun run regression:full)
   --area a,b       only those areas' unit and e2e tests (bun run test:area a,b); areas: ${Object.keys(AREAS).join(", ")}
   --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too
   --stages a,b     only those stages (typecheck, unit, e2e), to time or meter one of them
   --retry-failed   run a stage's failed tests once more; passing then, they are flaky (qa/logs/flaky.json), not failures
-  --list           print what would run, then stop
-env: GLUON_UNIT_SHARDS (unit processes), GLUON_E2E_CONCURRENCY (apps at once), GLUON_TEST_CASES (a file: every test run, as JSON)`;
+  --keep-going     run every stage even after one fails
+  --list           print what would run, then stop (--json: as JSON, with the OSes the change needs)
+env: GLUON_UNIT_SHARDS (unit processes), GLUON_E2E_SHARDS (e2e processes; fast tier: half the apps, full: 1), GLUON_E2E_CONCURRENCY (apps at once, all e2e processes together),
+  GLUON_TEST_CASES (a file: every test run, as JSON)`;
 
 const argv = process.argv.slice(2);
 if (argv.includes("--help") || argv.includes("-h")) {
@@ -43,13 +47,15 @@ if (argv.includes("--help") || argv.includes("-h")) {
 const full = argv.includes("--full");
 const list = argv.includes("--list");
 const retryFailed = argv.includes("--retry-failed");
+const keepGoing = argv.includes("--keep-going");
+const json = argv.includes("--json");
 let areaArg: string | undefined;
 let changedArg: string | true | undefined;
 let stagesArg: string | undefined;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]!;
   const next = argv[i + 1];
-  if (a === "--full" || a === "--list" || a === "--retry-failed" || a === "--") continue;
+  if (["--full", "--list", "--json", "--retry-failed", "--keep-going", "--"].includes(a)) continue;
   else if (a === "--area") areaArg = next && !next.startsWith("--") ? (i++, next) : "";
   else if (a.startsWith("--area=")) areaArg = a.slice(7);
   else if (a === "--changed") changedArg = next && !next.startsWith("--") ? (i++, next) : true;
@@ -105,6 +111,8 @@ function changedFiles(ref: string | undefined): { files: string[]; base: string 
 
 // What to run. `sel === undefined` is the whole tier.
 let sel: (Selection & { kind: "areas" }) | undefined;
+/** What the change selected (`--changed`), for the OSes it needs; undefined: the whole tier, every OS. */
+let picked: Selection | undefined;
 let title = full ? "full tier" : "fast tier";
 let notes: string[] = [];
 if (areaArg !== undefined) {
@@ -122,6 +130,7 @@ if (areaArg !== undefined) {
     title = `${tier} tier (--changed: ${c.error}, so everything)`;
   } else {
     const s = selectChanged(c.files);
+    picked = s;
     notes = s.why;
     if (s.kind === "areas") {
       sel = s;
@@ -136,7 +145,7 @@ if (areaArg !== undefined) {
 }
 
 const unitAll = sel ? sel.unit : unitTestFiles();
-const e2eFiles = sel?.e2e.map((f) => `./${f}`);
+const e2eAll = sel ? sel.e2e : e2eTestFiles();
 
 type Result = { label: string; code: number; out: string };
 const tmp = mkdtempSync(join(tmpdir(), "gluon-regression-"));
@@ -182,6 +191,12 @@ function report(rs: Result[]) {
 
 const times = readTimes();
 const groups = unitShards(times, tier, unitAll, shards);
+// e2e: the apps split between the processes (memory stays where `apps` puts it); one process when there are too few apps to
+// share. The full tier keeps one: its big frame files (dozens of tests each) want every app inside the file (measured: 9m34s in
+// one process of 4 apps, 10m12s in two of 2; the fast tier, 1m50s against 81 s).
+const e2eWanted = Math.floor(Number(process.env.GLUON_E2E_SHARDS));
+const e2eGroups = unitShards(times, tier, e2eAll, e2eWanted >= 1 ? e2eWanted : full ? 1 : Math.max(1, Math.floor(apps / 2)));
+const perProcess = Math.max(1, Math.floor(apps / Math.max(1, e2eGroups.length)));
 
 // ── memory meter (Linux: /proc; the whole process tree, every ~250 ms) ───────
 type Peak = { rss: number; pss: number; procs: number; stages: Record<string, number> };
@@ -288,6 +303,12 @@ function summarize(cases: Case[], wallS: number, mem: Peak | string) {
 }
 
 // ── the run ─────────────────────────────────────────────────────────────────
+if (list && json) {
+  // For CI's plan job: what runs, and the OSes it needs (`platforms` in test/areas.ts; a whole tier needs every OS).
+  console.log(JSON.stringify({ title, platforms: picked ? platformsOf(picked) : "all", unit: unitAll, e2e: e2eAll, why: notes }));
+  rmSync(tmp, { recursive: true, force: true });
+  process.exit(0);
+}
 if (list) {
   console.log(`regression: ${title}`);
   for (const n of notes) console.log(`  ${n}`);
@@ -295,15 +316,14 @@ if (list) {
   const left = full ? "" : ", @full tests left out";
   console.log(`unit: ${unitAll.length} file(s) in ${groups.length} process(es)${left}`);
   if (sel || unitAll.length <= 12) for (const f of unitAll) console.log(`  ${f}`);
-  if (!sel) console.log(`e2e: every file in test/e2e, ${apps} apps at once${left}`);
-  else console.log(`e2e: ${e2eFiles!.length} file(s), ${apps} apps at once${left}`);
+  console.log(`e2e: ${sel ? `${e2eAll.length} file(s)` : "every file in test/e2e"} in ${e2eGroups.length} process(es), ${perProcess} apps at once in each${left}`);
   for (const f of sel?.e2e ?? []) console.log(`  ${f}`);
   for (const h of sel?.hooks ?? []) console.log(`by hand (${h.area}/${h.name}): ${h.cmd}`);
   rmSync(tmp, { recursive: true, force: true });
   process.exit(0);
 }
 
-console.log(`regression: ${title}; ${groups.length || "no"} unit process(es), e2e ${apps} apps at once`);
+console.log(`regression: ${title}; ${groups.length || "no"} unit process(es), ${e2eGroups.length || "no"} e2e process(es) of ${perProcess} apps at once`);
 const started = performance.now();
 const meter = startMeter();
 const walls: [string, number][] = [];
@@ -345,24 +365,26 @@ async function verdict(kind: Case["kind"], from: number, rs: Result[], concurren
 }
 
 async function main(): Promise<number> {
+  // A failed stage ends the run, unless --keep-going: then every stage runs and the run fails at the end.
+  let failed = false;
+  const stop = () => ((failed = true), !keepGoing);
   meter.stage("typecheck");
-  if (stages.includes("typecheck") && !report([await timed("typecheck", () => run("typecheck", [bun, "run", "typecheck"]))])) return 1;
+  if (stages.includes("typecheck") && !report([await timed("typecheck", () => run("typecheck", [bun, "run", "typecheck"]))]) && stop()) return 1;
   meter.stage("unit");
   if (stages.includes("unit") && groups.length) {
     const from = junits.length;
     const rs = await timed("unit", () => Promise.all(groups.map((files, i) => run(`unit ${i + 1}/${groups.length}`, [bun, "test", ...filter, ...files], "unit"))));
-    if (!(await verdict("unit", from, rs))) return 1;
+    if (!(await verdict("unit", from, rs)) && stop()) return 1;
   }
   meter.stage("e2e");
-  if (stages.includes("e2e") && (!e2eFiles || e2eFiles.length)) {
-    const target = e2eFiles ?? ["test/e2e"];
-    const concurrent = ["--concurrent", `--max-concurrency=${apps}`];
+  if (stages.includes("e2e") && e2eGroups.length) {
+    const concurrent = ["--concurrent", `--max-concurrency=${perProcess}`];
     const from = junits.length;
-    const rs = [await timed("e2e", () => run("e2e", [bun, "test", ...concurrent, ...filter, ...target], "e2e"))];
-    if (!(await verdict("e2e", from, rs, concurrent))) return 1;
+    const rs = await timed("e2e", () => Promise.all(e2eGroups.map((files, i) => run(`e2e ${i + 1}/${e2eGroups.length}`, [bun, "test", ...concurrent, ...filter, ...files], "e2e"))));
+    if (!(await verdict("e2e", from, rs, concurrent)) && stop()) return 1;
   }
-  if (!groups.length && !e2eFiles?.length) console.log("nothing to run after the typecheck: no test file selected");
-  return 0;
+  if (!groups.length && !e2eGroups.length) console.log("nothing to run after the typecheck: no test file selected");
+  return failed ? 1 : 0;
 }
 const code = await main();
 const cases = readCases();

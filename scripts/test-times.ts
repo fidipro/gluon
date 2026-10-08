@@ -60,7 +60,7 @@ function weight(times: TimesFile, tier: string, f: string): number {
 }
 
 /**
- * The unit files in up to `shards` groups of about the same time: measured seconds first (the last
+ * Test files (unit, or e2e) in up to `shards` groups of about the same time: measured seconds first (the last
  * run of this tier, else the other tier's), then `SECONDS`, then size; each file into the lightest
  * group. A small set gets fewer groups (a process costs ~1 s). Never an empty group: `bun test` with
  * no file would run all of test/, e2e and visual included.

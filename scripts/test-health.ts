@@ -3,7 +3,8 @@
  * `bun run test:health`: what in the test suite has gone stale, each line with the action to take. Cheap and
  * offline: it runs no test, calls no model and needs no login (a harness is asked `--version` only, in an empty
  * temp directory with a timeout). Exit 1 only for something definitely broken (the area manifest, a malformed or
- * repeated bug-candidate title, an unreadable baseline, a quarantine past its date or without one); stale is advice.
+ * repeated bug-candidate title, an unreadable baseline, a quarantine past its date or without one, a fast-tier test over
+ * 3 × the `@full` threshold); stale is advice.
  * `--brief` leaves out the candidate list.
  *
  * Checks: the area manifest; the visual goldens against the UI changes since; the screen fixtures against the
@@ -154,6 +155,9 @@ export function scanQuarantines(files: { path: string; text: string }[], now: Da
   }
   return { quarantined, problems };
 }
+
+/** A fast-tier test this many times over `FULL_OVER_S` is broken, not just slow. */
+export const BROKEN_OVER = 3;
 
 /** The tests of a times file over `over` seconds whose title lacks `@full` (the slowest reading of either tier). */
 export function slowTests(times: TimesFile, over: number): { file: string; name: string; s: number }[] {
@@ -318,8 +322,12 @@ function times(): Section {
   const lines: Line[] = [];
   lines.push(d !== null && d > 14 ? { level: "stale", text: `measured ${ago(d)}`, action: "bun run regression refreshes it" } : { level: "ok", text: `measured ${ago(d)}` });
   const slow = slowTests(t, FULL_OVER_S);
+  // Far over the threshold is broken, not advice: it holds every fast run back (a wait that runs to its deadline, a loop of variants in one test).
+  for (const s of slow.filter((x) => x.s > FULL_OVER_S * BROKEN_OVER)) {
+    lines.push({ level: "BROKEN", text: `${s.s.toFixed(1)} s, over ${FULL_OVER_S * BROKEN_OVER} s, in the fast tier: ${s.file} :: ${s.name.length > 100 ? `${s.name.slice(0, 99)}…` : s.name}`, action: "make it faster (wait for a state, not a deadline; one test per variant, so they run at once), else add @full" });
+  }
   if (slow.length) {
-    lines.push({ level: "stale", text: `${slow.length} test${slow.length === 1 ? "" : "s"} over ${FULL_OVER_S} s without @full (the fast tier's threshold):`, action: "add @full to the title" });
+    lines.push({ level: "stale", text: `${slow.length} test${slow.length === 1 ? "" : "s"} over ${FULL_OVER_S} s without @full (the fast tier's threshold):`, action: "make it faster, else add @full to the title" });
     for (const s of slow.slice(0, 10)) lines.push({ level: "info", text: `  ${s.s.toFixed(1)} s  ${s.file} :: ${s.name.length > 100 ? `${s.name.slice(0, 99)}…` : s.name}` });
     if (slow.length > 10) lines.push({ level: "info", text: `  … and ${slow.length - 10} more` });
   } else lines.push({ level: "ok", text: `no test over ${FULL_OVER_S} s lacks @full` });
