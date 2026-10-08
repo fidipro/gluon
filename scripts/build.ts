@@ -21,19 +21,15 @@ import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { assetName, hostTarget as hostTargetOrNull, TARGETS, type Target } from "../src/update/target.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
 
-export const TARGETS = ["bun-linux-x64", "bun-linux-arm64", "bun-linux-x64-musl", "bun-linux-arm64-musl", "bun-darwin-x64", "bun-darwin-arm64", "bun-windows-x64"] as const;
-type Target = (typeof TARGETS)[number];
-
 /** The host's target (musl when Bun itself was built for musl). */
 function hostTarget(): Target {
-  const os = process.platform === "win32" ? "windows" : process.platform;
-  const musl = os === "linux" && !(process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined)?.header?.glibcVersionRuntime;
-  const t = `bun-${os}-${process.arch}${musl ? "-musl" : ""}`;
-  if (!(TARGETS as readonly string[]).includes(t)) throw new Error(`no build target for this host (${t})`);
-  return t as Target;
+  const t = hostTargetOrNull();
+  if (!t) throw new Error(`no build target for this host (${process.platform}-${process.arch})`);
+  return t;
 }
 
 /**
@@ -61,7 +57,7 @@ export const STRING_WIDTH_PATCHED = /\^\\p\{RGI_Emoji\}\$\/v,[\w$]+=\/\\p\{Emoji
 
 /** Builds one target; returns the executable's path. */
 export async function build(target: Target, flavor: "release" | "test" = "release"): Promise<string> {
-  const outfile = join(ROOT, "dist", flavor === "test" ? "test" : "", `gluon-${target}${target.startsWith("bun-windows") ? ".exe" : ""}`);
+  const outfile = join(ROOT, "dist", flavor === "test" ? "test" : "", assetName(target));
   rmSync(outfile, { force: true });
   const r = await Bun.build({
     entrypoints: [join(ROOT, "src/cli.tsx"), join(ROOT, "src/agent/grep-worker.ts")],

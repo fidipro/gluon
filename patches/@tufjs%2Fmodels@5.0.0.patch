@@ -1,0 +1,17 @@
+diff --git a/dist/utils/verify.js b/dist/utils/verify.js
+index 8232b6f6a97ab1713303f5e3696f4de253b8e22b..f506d03533f2f2f28c7f05d42d8c1f0a32806b5c 100644
+--- a/dist/utils/verify.js
++++ b/dist/utils/verify.js
+@@ -8,6 +8,11 @@ const canonical_json_1 = require("@tufjs/canonical-json");
+ const crypto_1 = __importDefault(require("crypto"));
+ const verifySignature = (metaDataSignedData, key, signature) => {
+     const canonicalData = Buffer.from((0, canonical_json_1.canonicalize)(metaDataSignedData));
+-    return crypto_1.default.verify(undefined, canonicalData, key, Buffer.from(signature, 'hex'));
++    // Gluon's patch: Bun has no default digest for an EC or RSA key (Node's is SHA-256), and takes `{ key: <public KeyObject> }`
++    // for a private key: the KeyObject itself is passed when nothing else (an RSA padding) comes with it.
++    const { key: keyObject, ...options } = key;
++    const type = keyObject.asymmetricKeyType;
++    const algorithm = type === 'ed25519' || type === 'ed448' ? undefined : 'sha256';
++    return crypto_1.default.verify(algorithm, canonicalData, Object.keys(options).length ? key : keyObject, Buffer.from(signature, 'hex'));
+ };
+ exports.verifySignature = verifySignature;

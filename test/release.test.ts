@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { REPO_SLUG, REPO_URL } from "../src/repo.ts";
 import { releaseNotes } from "../scripts/release-notes.ts";
+import pkg from "../package.json" with { type: "json" };
 
 const ROOT = join(import.meta.dir, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -237,6 +238,10 @@ describe("the draft release's body is the changelog section", () => {
     const targets = [...releaseNotes(read("CHANGELOG.md"), "1.0.0").matchAll(/\]\(<?([^)\s>]*)/g)].map((m) => m[1]!);
     expect(targets.length).toBeGreaterThan(0);
     for (const t of targets) expect(t).toMatch(/^(https?:|mailto:|#)/);
+  });
+
+  test("the real CHANGELOG has a section for package.json's version: a release's draft body is never the fallback note", () => {
+    expect(releaseNotes(read("CHANGELOG.md"), pkg.version)).not.toStartWith("No CHANGELOG.md section");
   });
 
   test("the real CHANGELOG has a 1.0.0 section: the draft's body is that section, not the fallback note", () => {

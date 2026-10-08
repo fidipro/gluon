@@ -78,10 +78,14 @@ An agent's installer runs only when you pick "Run it" on the exact command shown
 
 Gluon's own installers check the download against the release's `SHA256SUMS` and install nothing that does not match. See [Install Gluon](../getting-started/install.md#verifying-by-hand).
 
+## Updates
+
+Gluon updates itself: at most once a day at start it asks `github.com` for the latest release, and by default (`updates: auto`) installs a newer one in place of the standalone binary, for your next start. The requests are plain and unauthenticated, with nothing of yours in them: to `github.com` and the hosts it serves release files from, and to Sigstore's `tuf-repo-cdn.sigstore.dev` for its trusted root. Nothing is installed unless the release's `SHA256SUMS` carries a valid Sigstore signature by this repository's release workflow on `main`, and the downloaded binary matches it. `updates: notify` only tells you a release exists, `updates: off` never checks, and an environment variable can override the config ([Environment variables](../reference/env.md)). See [Updating](../getting-started/install.md#updating).
+
 ## Next steps
 
 - [Connections](connections.md): subscriptions, keys and what a launched agent's environment gets.
 - [Architecture](../concepts/architecture.md): how the protections against an untrusted repository work.
 - [SECURITY.md](../../SECURITY.md): the policy and how to report a vulnerability.
 
-<!-- Keeping this file fresh: update in the change that alters a security guarantee: what the intake agent sends or may read (src/agent/), how keys are stored or passed (src/secrets.ts, src/config.ts, src/launchers.ts), what is written into an agent (src/pty/), what the analytics database stores (src/analytics.ts), or how a hostile repository is handled (src/detect.ts, src/agent/git.ts). Keep it equal to SECURITY.md. -->
+<!-- Keeping this file fresh: update in the change that alters a security guarantee: what the intake agent sends or may read (src/agent/), how keys are stored or passed (src/secrets.ts, src/config.ts, src/launchers.ts), what is written into an agent (src/pty/), what the analytics database stores (src/analytics.ts), what the updater fetches and installs (src/update/), or how a hostile repository is handled (src/detect.ts, src/agent/git.ts). Keep it equal to SECURITY.md. -->

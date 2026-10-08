@@ -6,7 +6,15 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-08
+
 ### Added
+- Gluon updates itself. At start, at most once a day, it checks for a newer release and by default installs it in the
+  background for your next start; `gluon update` does it now and `gluon update --check` only says whether there is one.
+  Nothing is installed unless the release's `SHA256SUMS` carries a valid Sigstore signature by the Release workflow on
+  `main` (checked by Gluon itself, no `cosign` needed) and the binary matches it. The config key `updates` (`auto`,
+  `notify`, `off`) and the variable `GLUON_UPDATES` choose what happens. This contacts `github.com` and Sigstore's
+  `tuf-repo-cdn.sigstore.dev`. 1.0.0 has no updater: run the installer once more to get it ([Updating](docs/getting-started/install.md#updating)).
 - Pull requests from outside contributors need every commit signed off (`git commit -s`, the Developer Certificate of Origin); CI checks it. See `CONTRIBUTING.md`.
 
 ### Changed

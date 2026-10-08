@@ -21,6 +21,7 @@ import { HANDOFF_GLOBAL_KEYS, HANDOFF_KEYS, HANDOFF_YAML, ON_CLEAR, ON_COMPACT, 
 import { DEFAULT_MODELS, HARNESS_INFO, HARNESSES, installMethods, PROVIDER_IDS, PROVIDERS, type Conn, type Harness, type InstallPlatform, type ModelEntry } from "../../src/harnesses.ts";
 import { DEFAULT_ROUTING_YAML } from "../../src/routing-config.ts";
 import { STATS_HELP } from "../../src/stats.ts";
+import { UPDATE_HELP } from "../../src/update/update.ts";
 import { CLI_OPTIONS, HINT_COMMANDS, usageText } from "../../src/usage.ts";
 
 const ROOT = join(import.meta.dir, "../..");
@@ -91,6 +92,7 @@ const COMMAND_DOC: Record<string, string> = {
   uninstall: "Remove Gluon's config, saved keys and files (and the binary, on a standalone install).",
   "cost-report": "What Gluon's own cost figures were audited against (no model calls).",
   pricing: "`pricing update` rebuilds the price tables from your installed agents and Claude's public model catalog.",
+  update: "Install the latest Gluon release in place of this one, once its signature and checksum verify; `--check` only says whether there is one.",
   stats: "What Gluon recorded about your launched sessions (a local file): time and cost per agent, model, day or repository, the newest sessions, one session in full, a read-only SQL query.",
 };
 
@@ -131,8 +133,12 @@ ${fence("text", pricing)}
 ## gluon stats
 
 ${fence("text", STATS_HELP)}
+
+## gluon update
+
+${fence("text", UPDATE_HELP)}
 `;
-  return page("Command line", "Every gluon command and flag, from the program's own usage text.", ["src/usage.ts", "src/cost/pricing-update.ts", "src/stats.ts"], body);
+  return page("Command line", "Every gluon command and flag, from the program's own usage text.", ["src/usage.ts", "src/cost/pricing-update.ts", "src/stats.ts", "src/update/update.ts"], body);
 }
 
 // ---------------------------------------------------------------- config.md
@@ -147,6 +153,7 @@ const TOP_KEYS: Record<string, string> = {
   handoff: "What happens around an agent's session in Gluon's frame: its end, `/clear`, `/compact`, the home key and the mouse.",
   cost: "Gluon's own cost figures.",
   analytics: "`on` (default) records one row per launched session in `<state dir>/analytics.db`, queried with `gluon stats`; `off` stops recording.",
+  updates: "`auto` (default) installs a new Gluon release by itself at start, after checking its signature and checksum (it runs from the next start); `notify` only says one exists; `off` never checks. At most one check a day. `GLUON_UPDATES` wins over it.",
 };
 /** Keys of `defaults()` that are derived or catalog facts, not config.yaml keys. */
 const DERIVED_KEYS = new Set(["models", "agents"]);
@@ -305,6 +312,12 @@ ${table(["Variable", "Meaning"], [
     [code("XDG_CONFIG_HOME"), "Moves the config directory: `$XDG_CONFIG_HOME/gluon/config.yaml`; a relative path is ignored, as the XDG spec says. On Windows the default is `%APPDATA%`."],
   ])}
 
+## Updates
+
+${table(["Variable", "Meaning"], [
+    [code("GLUON_UPDATES"), "`auto`, `notify` or `off`: wins over the config key `updates` (for CI and managed machines). Anything else is ignored."],
+  ])}
+
 ## Amazon Bedrock
 
 Used when \`bedrock.profile\` or \`bedrock.region\` is unset in [config.yaml](config.md):
@@ -322,7 +335,7 @@ Read from the header comments of \`install.sh\` (Linux, macOS) and \`install.ps1
 
 ${table(["Variable", "install.sh", "install.ps1"], installer)}
 `;
-  return page("Environment variables", "The environment variables Gluon and its installers read.", ["src/harnesses.ts", "src/config.ts", "install.sh", "install.ps1"], body);
+  return page("Environment variables", "The environment variables Gluon and its installers read.", ["src/harnesses.ts", "src/config.ts", "src/update/update.ts", "install.sh", "install.ps1"], body);
 }
 
 // ---------------------------------------------------------------- models.md

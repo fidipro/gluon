@@ -52,6 +52,7 @@ export async function pack(): Promise<string> {
   if (text.includes("GLUON_TEST_MAINTAINER_MODELS")) throw new Error(`${bin} keeps the maintainer models seam`);
   if (text.includes("GLUON_TEST_OPENROUTER")) throw new Error(`${bin} keeps the OpenRouter usage seam`);
   if (text.includes("GLUON_TEST_PRICING")) throw new Error(`${bin} keeps the price tables seam`);
+  if (text.includes("GLUON_TEST_UPDATE")) throw new Error(`${bin} keeps the update seam`);
   // The worker is found next to the bundle (tools.ts, GLUON_BUILD "npm"); a cwd-relative string would load the user's repo's copy.
   if (!text.includes('new URL("./agent/grep-worker.js", import.meta.url)')) throw new Error(`${bin} doesn't load the grep worker next to itself`);
   if (!(await Bun.file(join(OUT, "agent", "grep-worker.js")).exists())) throw new Error("the grep worker wasn't built");

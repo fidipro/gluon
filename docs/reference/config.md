@@ -28,6 +28,7 @@ Gluon writes it for you (`gluon setup`, `gluon connect`); everything below can a
 | `handoff` | What happens around an agent's session in Gluon's frame: its end, `/clear`, `/compact`, the home key and the mouse. |
 | `cost` | Gluon's own cost figures. |
 | `analytics` | `on` (default) records one row per launched session in `<state dir>/analytics.db`, queried with `gluon stats`; `off` stops recording. |
+| `updates` | `auto` (default) installs a new Gluon release by itself at start, after checking its signature and checksum (it runs from the next start); `notify` only says one exists; `off` never checks. At most one check a day. `GLUON_UPDATES` wins over it. |
 
 A `models:` key from earlier versions is ignored: the model catalog is built in (see [Models](models.md)).
 
