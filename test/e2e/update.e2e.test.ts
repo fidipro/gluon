@@ -25,6 +25,9 @@ function sandbox(opts: { exe?: boolean } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "gluon-update-e2e-"));
   const files = { [ASSET]: NEW_BIN };
   const server = fakeRelease(LATEST, { [LATEST]: { ...files, SHA256SUMS: sumsOf(files) } });
+  // The answer waits until the app is up: a notice that lands first replaces the intro the harness waits for.
+  let release!: () => void;
+  server.gate = new Promise<void>((r) => (release = r));
   const exe = join(dir, "gluon");
   if (opts.exe) {
     writeFileSync(exe, "#!/bin/sh\necho 1.0.0\n");
@@ -32,13 +35,14 @@ function sandbox(opts: { exe?: boolean } = {}) {
   }
   const seam = server.seam({ unsigned: true, ...(opts.exe ? { exe } : {}) });
   const env = { XDG_STATE_HOME: join(dir, "state"), GLUON_TEST_UPDATE: seam };
-  return { dir, server, exe, env, done: () => (server.stop(), rmSync(dir, { recursive: true, force: true })) };
+  return { dir, server, exe, env, release, done: () => (release(), server.stop(), rmSync(dir, { recursive: true, force: true })) };
 }
 
 test("update/e2e: notify says at start that a newer Gluon exists, without waiting for it", async () => {
   const s = sandbox();
   try {
     const app = await gluon(110, 30, { ...s.env, GLUON_UPDATES: "notify" });
+    s.release();
     await app.waitFor((t) => t.replace(/\s+/g, " ").includes(`Gluon ${LATEST} is available`), 20_000 * SLOW);
     expect(app.screen().replace(/\s+/g, " ")).toContain("run gluon update to install it.");
     expect(s.server.requests).toEqual(["/releases/latest"]);
@@ -63,6 +67,7 @@ test.skipIf(WIN)("update/e2e: auto installs the new release in the background an
   const s = sandbox({ exe: true });
   try {
     const app = await gluon(110, 30, s.env);
+    s.release();
     await app.waitFor((t) => t.replace(/\s+/g, " ").includes(`Gluon ${LATEST} is installed: it starts the next time you open Gluon`), 20_000 * SLOW);
     expect(readFileSync(s.exe, "utf8")).toBe(NEW_BIN);
   } finally {
@@ -73,6 +78,7 @@ test.skipIf(WIN)("update/e2e: auto installs the new release in the background an
 test.skipIf(WIN)("update/e2e: gluon update --check, then gluon update replaces the executable", async () => {
   const s = sandbox({ exe: true });
   try {
+    s.release();
     const check = await cli(["update", "--check"], { env: s.env });
     expect([check.code, check.stderr]).toEqual([0, ""]);
     expect(check.stdout).toContain(`Gluon ${LATEST} is available`);

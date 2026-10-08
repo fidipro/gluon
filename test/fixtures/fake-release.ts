@@ -7,7 +7,8 @@
  *   GET /releases/download/v<ver>/<file>      302 → /cdn/v<ver>/<file>
  *   GET /cdn/v<ver>/<file>                    the file of that version, or 404
  *
- * `requests` lists every path asked for; `redirectTo` sends downloads elsewhere instead (a hop the updater must refuse).
+ * `requests` lists every path asked for; `redirectTo` sends downloads elsewhere instead (a hop the updater must refuse); `gate`
+ * holds every answer until it resolves.
  */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,6 +20,8 @@ export interface FakeRelease {
   latest: string;
   files: Record<string, Record<string, Uint8Array | string>>;
   redirectTo?: string;
+  /** While set, every request waits for it (a test holds the answer until its app is up). */
+  gate?: Promise<void>;
   /** A seam file (`GLUON_TEST_UPDATE`) naming this server, with the given options. */
   seam(options?: Record<string, unknown>): string;
   stop(): void;
@@ -50,9 +53,10 @@ export function fakeRelease(latest: string, files: Record<string, Record<string,
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch(req) {
+    async fetch(req) {
       const path = new URL(req.url).pathname;
       requests.push(path);
+      await state.gate;
       if (path === "/releases/latest") return new Response(null, { status: 302, headers: { location: `/releases/tag/v${state.latest}` } });
       const dl = /^\/releases\/download\/v([^/]+)\/(.+)$/.exec(path);
       if (dl) return new Response(null, { status: 302, headers: { location: state.redirectTo ? `${state.redirectTo}/cdn/v${dl[1]}/${dl[2]}` : `/cdn/v${dl[1]}/${dl[2]}` } });
