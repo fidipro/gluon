@@ -81,6 +81,7 @@ describe("the old name", () => {
     "docs/index.mdx", // install one-liners
     "docs/getting-started/install.md", // install one-liners, `gh release download -R`, the cosign identity
     "docs/reference/env.md", // generated from the installers' own text
+    "docs/reference/cli.md", // generated from `gluon update --help`, which names the releases it installs
     "test/rules.test.ts", // this list
   ]);
 
@@ -188,6 +189,13 @@ describe("rule 1: never touch any harness's credentials", () => {
     const text = SRC.find(([f]) => f === "src/agent/subscription.ts")![1];
     expect(text).not.toMatch(/^import (?!type )[^\n]*"@anthropic-ai\/(sdk|bedrock-sdk)"/m);
     expect(text).not.toMatch(/\bfetch\(|https?:\/\//);
+  });
+
+  test("only the updater (src/update/) reads GitHub's releases or Sigstore's TUF repository", () => {
+    for (const [file, text] of SRC) {
+      if (file.startsWith("src/update/")) continue;
+      expect([file, text]).not.toEqual([file, expect.stringMatching(/releases\/(latest|download)|githubusercontent\.com|tuf-repo-cdn|@sigstore\//)]);
+    }
   });
 
   test("no impersonation of any harness in any prompt Gluon sends", () => {

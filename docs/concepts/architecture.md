@@ -259,6 +259,14 @@ Gluon keeps a history of what it launched: one row per session in a private SQLi
 it. Unlike the cost ledger it holds a prompt and a path. Recording never breaks a launch. See
 [analytics](../guides/analytics.md).
 
+### Updates
+
+At start, in the background and never before the first screen, `src/update/` asks GitHub at most once a day which release
+is the latest. With `updates: auto` (the default) it downloads `SHA256SUMS`, checks its Sigstore signature against the
+Release workflow on `main` (the trusted root comes from Sigstore's TUF repository), downloads this platform's binary,
+checks its hash, makes sure it answers `--version`, and renames it over the running executable (on Windows the old one
+is moved aside first). The new version runs from the next start; `gluon update` does the same in the foreground.
+
 ### Without a pseudo-terminal
 
 When Bun has no pseudo-terminal, the home view is the same, but a launch hands your terminal to the

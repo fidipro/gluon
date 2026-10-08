@@ -13,6 +13,7 @@ import pkg from "../package.json" with { type: "json" };
 import { MIGRATIONS } from "../src/analytics.ts";
 import { STRING_WIDTH_PATCHED } from "../scripts/build.ts";
 import { config, fakeAgents, repo } from "./e2e/fixtures.ts";
+import { fakeRelease } from "./fixtures/fake-release.ts";
 import { App, cli, HOME, HOME_VIEW, KEY, SLOW, start, stopAll, SYSTEM_ENV, SYSTEM_PATH, toLaunch, toQuestion } from "./e2e/harness.ts";
 
 const BIN = process.env.GLUON_TEST_BINARY;
@@ -222,6 +223,29 @@ describe.skipIf(!BIN)("compiled binary", () => {
         }
       }
     });
+  });
+});
+
+describe.skipIf(!BIN)("compiled binary: gluon update", () => {
+  test("update: the bundled (patched) Sigstore libraries verify the real v1.0.0 signature inside the binary, then refuse a binary SHA256SUMS doesn't list", async () => {
+    // The npm bundle, like the release binary, has no test seam: it would ask the real GitHub, so it is left out.
+    if (!readFileSync(BIN!).includes("GLUON_TEST_UPDATE")) return;
+    const dir = mkdtempSync(join(tmpdir(), "gluon-dist-update-"));
+    const fix = join(import.meta.dir, "fixtures", "update");
+    const release = fakeRelease("99.0.0", { "99.0.0": { SHA256SUMS: readFileSync(join(fix, "SHA256SUMS")), "SHA256SUMS.sigstore.json": readFileSync(join(fix, "SHA256SUMS.sigstore.json")), "gluon-bun-linux-x64": "NOT THE REAL BINARY" } });
+    try {
+      const exe = join(dir, "gluon");
+      writeFileSync(exe, "old");
+      const seam = release.seam({ trustedRoot: join(fix, "trusted_root.json"), target: "bun-linux-x64", exe });
+      const r = await cli(["update"], { env: { GLUON_TEST_UPDATE: seam, XDG_STATE_HOME: join(dir, "state") } });
+      expect(r.stdout).toContain("Signature verified: SHA256SUMS was signed by");
+      expect(r.stderr).toContain("gluon-bun-linux-x64 doesn't match SHA256SUMS");
+      expect(r.code).toBe(1);
+      expect(readFileSync(exe, "utf8")).toBe("old");
+    } finally {
+      release.stop();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

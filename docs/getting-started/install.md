@@ -152,6 +152,27 @@ A good signature means `SHA256SUMS` was produced by the Release workflow on `mai
 `fidipro/gluon`; the checksum check then ties each file to it. Keyless signing records the
 repository and workflow in Sigstore's public transparency log.
 
+## Updating
+
+From 1.1.0 on, Gluon keeps itself up to date. At most once a day, when it starts, it checks for a newer release; by default it
+downloads it in the background and puts it in place of the standalone binary, and the new version runs from your next start
+(Gluons already running keep theirs). It installs nothing unless the release's `SHA256SUMS` carries a valid signature by the
+Release workflow on `main` of this repository, checked by Gluon itself (no `cosign` needed), and the binary matches it.
+
+<!-- example -->
+```sh
+gluon update            # install the latest release now
+gluon update --check    # only say whether there is one
+```
+
+The config key `updates` chooses what happens at start: `auto` (the default), `notify` (only say a release exists) or `off`
+(never check); an environment variable overrides it, for CI and managed machines. See [config.yaml](../reference/config.md)
+and [Environment variables](../reference/env.md).
+
+Where Gluon can't replace itself it says how to update instead: the npm-style package (install the new tarball with
+`bun add -g`), a source checkout (`git pull`), or a binary in a directory you can't write to (run the installer again).
+Gluon 1.0.0 has no updater: run the installer once more to get it.
+
 ## Uninstall
 
 <!-- example -->
@@ -180,4 +201,4 @@ tables and the analytics database; `$env:LOCALAPPDATA\gluon` on Windows) and Glu
 - [Connect your agents](connect-agents.md): install the coding agents and connect each one with a key or a plan.
 - [Platforms](../concepts/platforms.md): what is tested where, and the notes for each platform.
 
-<!-- Keeping this file fresh: update in the change that alters install.sh, install.ps1, the release files (scripts/build.ts, .github/workflows/release.yml) or verification. Release status lives only on this page. -->
+<!-- Keeping this file fresh: update in the change that alters install.sh, install.ps1, the release files (scripts/build.ts, .github/workflows/release.yml), the updater (src/update/) or verification. Release status lives only on this page. -->

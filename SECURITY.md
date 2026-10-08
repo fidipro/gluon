@@ -23,7 +23,7 @@ disclosure date with you. Only the latest release gets security fixes.
 | Keystrokes and agent screens | Agents run in a pseudo-terminal of Gluon's own, so it sees what you type and what they draw. Both stay in memory and are never logged, written to disk or sent anywhere. The screen alone never triggers anything. Gluon writes into an agent only your own keys, the terminal's answers to the agent's own queries, your mouse reports, and, for a launch mode with no flag (Codex's plan mode) or an agent that takes no prompt on its command line (Kimi Code), one line Gluon made for the launch. A drag over Gluon's own home view copies the covered text to your terminal's clipboard (OSC 52). |
 | Saved sessions | `gluon resume` keeps one private file per workspace in `workspaces/` next to the config: repository path, the id and start time of the Gluon that has it open (with a small private `<id>.lock` claim file while a resumed Gluon runs), and per session its name, agent, model, mode, spec (keys masked), worktree and the agent's session id. Never the intake chat, a key, an environment or a screen. The file is read back as untrusted text and every field is validated. `gluon uninstall` removes it. |
 | Your machine | An agent installer runs only when you pick "Run it" on the exact command shown, pressed on its own; there is no `--yes`, and Gluon never uses sudo. |
-| Releases | Every release carries `SHA256SUMS`; `install.sh` and `install.ps1` install nothing that doesn't match, download over https only and carry no token. `SHA256SUMS` is signed with keyless cosign by the Release workflow on `main` of this repository, and `install.sh` checks that signature when `cosign` is installed ([how to verify](docs/getting-started/install.md#verifying-by-hand)). |
+| Releases | Every release carries `SHA256SUMS`; `install.sh` and `install.ps1` install nothing that doesn't match, download over https only and carry no token. `SHA256SUMS` is signed with keyless cosign by the Release workflow on `main` of this repository, and `install.sh` checks that signature when `cosign` is installed ([how to verify](docs/getting-started/install.md#verifying-by-hand)). Gluon's own updater always checks it, with the Sigstore libraries built in, and installs nothing unless both the signature and the checksum verify. |
 
 `test/rules.test.ts` and the tests named in the code check most of these.
 
@@ -59,6 +59,11 @@ disclosure date with you. Only the latest release gets security fixes.
   at a harness launch (at most every 10 minutes) or with `gluon pricing update`; there is no switch to turn them off.
   Responses are size-capped, https to the same host (a redirect is an error), and validated before use. Gluon also runs
   your installed `claude`, `codex` and `grok` to read a version or model catalog, never to call a model.
+- **Gluon's own updates** (`updates: auto` by default; `notify` only says, `off` never checks; `GLUON_UPDATES` wins). At most
+  once a day at start, and with `gluon update`, plain unauthenticated `GET`s with nothing of yours in them go to
+  `github.com` (the latest release's version, then its files, served from `objects.githubusercontent.com` or
+  `release-assets.githubusercontent.com`) and to Sigstore's `tuf-repo-cdn.sigstore.dev` (its trusted root). `auto` replaces
+  the standalone binary in place: it runs from your next start.
 - **What Gluon reads of other tools' settings**, and nothing else of them: two cache-TTL keys (`promptCacheTtl`,
   `subagentPromptCacheTtl`) from Claude Code's settings files, which are treated as untrusted
   (`src/cost/harness-config.ts`); and the `region` of your AWS profile when no region is set (`awsConfigRegion`,
@@ -68,7 +73,7 @@ disclosure date with you. Only the latest release gets security fixes.
 <!-- Keeping this file fresh:
 Update in the change that alters a guarantee it states (keys, subscriptions, the untrusted repository, what Gluon
 sees and writes into an agent, the events channel, the telemetry listener, saved sessions, the cost ledger, the
-analytics database, the price tables, the settings Gluon reads, releases). Keep it equal to
+analytics database, the price tables, Gluon's own updates, the settings Gluon reads, releases). Keep it equal to
 docs/guides/security-privacy.md. Keep it to guarantees and disclosures an outside reader can use: no bug or issue
 numbers; mechanism detail belongs in code comments and tests (test/contributor-docs.test.ts checks the markers,
 the names and the line budget). test/rules.test.ts enforces most guarantees.

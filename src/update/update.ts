@@ -186,6 +186,8 @@ export async function installRelease(version: string, src: UpdateSource, exe: st
 
 export interface BackgroundOptions {
   mode: UpdateMode;
+  /** The demo makes no network call by design: none, unless a test build names its server (`GLUON_TEST_UPDATE`, as `refreshAllowed`). */
+  demo?: boolean;
   current: string;
   /** Says something in the chat. */
   notice: (text: string) => void;
@@ -200,7 +202,7 @@ const available = (latest: string, current: string) => `Gluon ${latest} is avail
 /** The start's update: a check at most once a day, then a notice or, with `auto`, the install. Never throws, never waits on anything. */
 export async function backgroundUpdate(o: BackgroundOptions): Promise<void> {
   try {
-    if (o.mode === "off") return;
+    if (o.mode === "off" || (o.demo && seamPath(o.env ?? process.env) === undefined)) return;
     const src = updateSource(o.env);
     if (!src) return;
     const now = (o.now ?? Date.now)();

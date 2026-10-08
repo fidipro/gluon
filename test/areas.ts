@@ -209,6 +209,13 @@ export const AREAS: Record<string, Area> = {
     unit: ["test/dist.test.ts", "test/release.test.ts", "test/dco.test.ts", "test/live-script.test.ts"],
     e2e: [],
   },
+  update: {
+    doc: "Gluon's own updates: the daily check, gluon update, the release's signature and checksum, replacing the executable",
+    src: ["src/update/**"],
+    files: ["test/fixtures/fake-release.ts", "test/fixtures/update/**", "patches/@sigstore*", "patches/@tufjs*"],
+    unit: ["test/update.test.ts"],
+    e2e: ["test/e2e/update.e2e.test.ts"],
+  },
   windows: {
     doc: "Windows paths, shims, ConPTY, key storage and the WSL-driven Windows run",
     src: [],
