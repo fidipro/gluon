@@ -140,9 +140,12 @@ test("issue 52: Gluon only reads the repository: git through gitQuery, nothing c
 
 // QA campaign (B6): the plan must be one the agent can carry out (its first step is `git worktree add -b <branch> <path> HEAD`).
 describe("QA-resume: a plan the agent can't carry out", () => {
-  /** What the brief's first step does with `plan`: its exit code and message. */
+  /**
+   * What the brief's first step does with `plan`: its exit code and message. With an identity, as `git()` has: without one, git
+   * looks up the host's name for the new branch's reflog, which waits out a DNS timeout (15 s) in a container with no network (Alpine).
+   */
   const carryOut = (d: string, plan: WorktreePlan) => {
-    const r = Bun.spawnSync(["git", "worktree", "add", "-b", plan.branch, plan.path, "HEAD"], { cwd: d, stdout: "pipe", stderr: "pipe", env: process.env });
+    const r = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", "worktree", "add", "-b", plan.branch, plan.path, "HEAD"], { cwd: d, stdout: "pipe", stderr: "pipe", env: process.env });
     return { code: r.exitCode, err: r.stderr.toString().trim() };
   };
 
