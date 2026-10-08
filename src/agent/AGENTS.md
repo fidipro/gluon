@@ -57,8 +57,8 @@ The brain: conversation, LLM clients, read-only repo tools.
   through.
 - **Codex tools come from features, the model catalog and the thread** (codex 0.159). The denylist
   fails closed (BUG-79): only `CODEX_FEATURES_KEPT` may be enabled, only `CATALOG_FIELDS` set; a
-  new feature or field → decide and list it. `code_mode_host` stays on. After a codex update:
-  `docs/contributing/internal.md`.
+  new feature or field → decide and list it. `code_mode_host` stays on. After a codex update: the harness-update
+  runbook (in the maintainers' private notes).
 
 ## Keeping this file fresh
 

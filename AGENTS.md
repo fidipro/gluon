@@ -46,8 +46,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 - **The regression suite is offline and free.** Never call a real brain, agent, API or installer.
 - **Paid runs only when the user asked for one; if a change needs one, ask first and wait** — this
   includes `gluon doctor`, `bun run start` and a real `--launch` (they call real models).
-  `test:live` enforces its own budgets and ledger (gitignored; `docs/contributing/internal.md`); log any
-  manual paid call there.
+  `test:live` enforces its own budgets and ledger (gitignored; budgets: the maintainers' private
+  notes); log any manual paid call there.
 - **Git**: unless told otherwise, work on a new branch; commit and push as you go; don't merge or
   open a PR unless asked.
 - **Publishing to npm, publishing a release and changing release signing are the owner's decision
@@ -97,7 +97,7 @@ Read the area's file first: open it before you change anything there.
 | `src/pty/**` (the agent's pseudo-terminal, readers, question bar) | `src/pty/AGENTS.md` |
 | `test/**` | `test/AGENTS.md`; e2e harness: `test/e2e/README.md` |
 | `scripts/`, `install.sh`, `install.ps1`, `.github/workflows/` | `scripts/AGENTS.md` |
-| after any harness update (screens, hooks, flags) | `docs/contributing/internal.md` ("Harness update runbook") |
+| after any harness update (screens, hooks, flags) | the "Harness update runbook" in the maintainers' private notes (not in this repository) |
 
 ## Markdown files
 
@@ -121,15 +121,15 @@ test (an executable spec), a constant, or a command's output (`--help`, `doctor`
   ids or flags (`test/docs-no-copies.test.ts`).
 - **The docs site** is `site/` (`bun run docs:dev`, `bun run docs:build`; not in regression): a page
   goes in a `docs/` folder its sidebar names (`test/docs-site.test.ts`). Maintainer-only notes
-  (paid runs, going public, dev-machine status) go in a page with `published: false`
-  (`docs/contributing/internal.md`), never in a published one.
+  (paid runs, going public, dev-machine status) go in the maintainers' private
+  notes, never in this repository; a page with `published: false` stays off the site (`site/published.mjs`).
 - **Status in one place**: what CI covers in `docs/concepts/platforms.md`, the dated log of what has run
-  where in `docs/contributing/internal.md`, release status in `docs/getting-started/install.md`,
+  where in the maintainers' private notes, release status in `docs/getting-started/install.md`,
   history in `CHANGELOG.md`.
 - **Every `.md` ends with "Keeping this file fresh"**: which changes make it stale, what to check.
   In pages users read, put it in an HTML comment. `test/markdown.test.ts` checks this and links.
 - **Public pages** (`CONTRIBUTING.md`, `docs/contributing/maintenance.md`, `SECURITY.md`): only what an outsider can act
-  on; bug ids, budgets, machine specs and dated status go in `docs/contributing/internal.md` (`test/contributor-docs.test.ts`).
+  on; bug ids, budgets, machine specs and dated status go in the maintainers' private notes, never here (`test/contributor-docs.test.ts`).
 - **Same change**: a change that makes a line wrong updates it in the same commit. **Delete** a
   file, or a section, when what it describes is gone.
 
@@ -151,4 +151,4 @@ On top of the above, for every `AGENTS.md`. Every line costs every agent context
 - **Neutral to the agent**: write for any coding agent; no tool-specific files or wording.
 
 A new `AGENTS.md` only for a directory with ~5+ non-obvious rules that apply nowhere else; copy the
-template in `docs/contributing/internal.md` ("Starting a new AGENTS.md") and add its row to "Before you edit".
+template in the maintainers' private notes ("Starting a new AGENTS.md") and add its row to "Before you edit".

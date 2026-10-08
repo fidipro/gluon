@@ -411,7 +411,7 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
     // its Bash still asks). A resume applies no mode anyway. Explore has no way in: checked live on 2.1.1 against a local sink, the interactive TUI
     // ignores `--agent` and `--agent-file` (it binds the default agent whatever they say: the request still carried all 26 tools, Write, Edit and Bash
     // among them), and the other things that shape the tool list (`[tools] disabled`, deny rules, an agents directory) are Kimi's own files, which Gluon
-    // never edits or moves. Recheck after a Kimi release (docs/contributing/internal.md).
+    // never edits or moves. Recheck after a Kimi release (the harness-update runbook in the maintainers' private notes).
     modes: {
       explore: { unavailable: "its interactive mode ignores an agent file, so no flag can take its writing and shell tools away; use plan mode, or build" },
       plan: { argv: ["--plan"] },
