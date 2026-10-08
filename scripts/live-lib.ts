@@ -26,6 +26,22 @@ export const DEFAULT_LEDGER = "qa/logs/live-spend.json";
 export const REGRESSION_RUN_CAP = 3;
 /** `--tier=harness`: one harness's check, all buckets together (USD). */
 export const HARNESS_RUN_CAP = 1;
+/**
+ * `--tier=journey` (`bun run regression --live`): the user's whole way through, on the real brain. Hard caps, in USD: one journey's
+ * brain part (at most `JOURNEY_BRAIN.turns` turns), its agent part (the cheapest model, one prompt), one harness's journey, every
+ * harness's, and all journeys in a calendar month (the ledger's runs).
+ */
+export const JOURNEY_BRAIN = { input: 36_000, output: 3_000, turns: 3 } as const;
+export const JOURNEY_BRAIN_CAP = 0.05;
+export const JOURNEY_AGENT_CAP = 0.2;
+export const JOURNEY_HARNESS_CAP = 0.25;
+export const JOURNEY_RUN_CAP = 1;
+export const JOURNEY_MONTH_CAP = 5;
+/** What every journey has been charged in `now`'s calendar month (UTC), from the ledger's runs. */
+export function journeyMonthSpend(runs: { at: string; calls: { what: string; usd: number }[] }[], now: Date): number {
+  const month = now.toISOString().slice(0, 7);
+  return runs.filter((r) => r.at.startsWith(month)).flatMap((r) => r.calls).filter((c) => c.what.startsWith("journey ")).reduce((a, c) => a + c.usd, 0);
+}
 
 /**
  * `bedrock=30,other=10,openrouter=0.5` → caps. A key left out keeps its default (`openrouter` has none:
@@ -224,7 +240,7 @@ export class Spend {
 
 // ——— flags and tiers ———
 
-export type Tier = "regression" | "harness";
+export type Tier = "regression" | "harness" | "journey";
 export type Only = "nested-instructions" | "git-tools";
 export interface Args {
   only?: Only;
@@ -261,7 +277,7 @@ export function parseArgs(argv: string[]): Args {
       }
       case "--tier": {
         const v = value();
-        if (v !== "regression" && v !== "harness") throw new Error(`unknown tier: ${v} (known: regression, harness)`);
+        if (v !== "regression" && v !== "harness" && v !== "journey") throw new Error(`unknown tier: ${v} (known: regression, harness, journey)`);
         a.tier = v;
         break;
       }
@@ -276,20 +292,21 @@ export function parseArgs(argv: string[]): Args {
   }
   if (a.only && a.tier) throw new Error("--only and --tier are two ways to pick a run: use one");
   if (a.tier === "harness" && !a.harness) throw new Error("--tier=harness needs --harness=<id> (claude-code, codex, antigravity, opencode, kimi-code)");
-  if (a.harness && a.tier !== "harness" && a.tier !== "regression") throw new Error("--harness goes with --tier=harness (or --tier=regression, to run one harness's section only)");
+  if (a.harness && !a.tier) throw new Error("--harness goes with --tier=harness, --tier=journey (or --tier=regression, to run one harness's section only)");
   if ((a.conn || a.model) && !a.tier) throw new Error("--conn and --model go with --tier=harness or --tier=regression");
   return a;
 }
 
 /** A run's whole-run cap in dollars: a targeted check's own, the tier's, or none (the buckets' caps alone). */
-export function runCapOf(a: Pick<Args, "only" | "tier">): number {
+export function runCapOf(a: Pick<Args, "only" | "tier" | "harness">): number {
   if (a.tier === "regression") return REGRESSION_RUN_CAP;
   if (a.tier === "harness") return HARNESS_RUN_CAP;
+  if (a.tier === "journey") return a.harness ? JOURNEY_HARNESS_CAP : JOURNEY_RUN_CAP;
   return a.only === "git-tools" ? 1 : a.only ? 0.5 : Infinity;
 }
 
 /** What a run does, in order. `probes`: every brain step (and, outside a tier, every harness check and connection too). */
-export type Section = "harnesses" | "connections" | "probes" | "brain-chat" | "git-tools" | "nested-instructions" | "real-harness" | "brain-order";
+export type Section = "harnesses" | "connections" | "probes" | "brain-chat" | "git-tools" | "nested-instructions" | "real-harness" | "brain-order" | "journey";
 
 /**
  * The sections a run is made of. The plain run is the long check (harness status, every connection probed, the brain order with
@@ -298,6 +315,7 @@ export type Section = "harnesses" | "connections" | "probes" | "brain-chat" | "g
 export function sectionsOf(a: Pick<Args, "only" | "tier" | "harness">): Section[] {
   if (a.tier === "regression") return a.harness ? ["real-harness"] : ["probes", "brain-chat", "git-tools", "nested-instructions", "real-harness"];
   if (a.tier === "harness") return ["real-harness"];
+  if (a.tier === "journey") return ["journey"];
   if (a.only === "nested-instructions") return ["nested-instructions"];
   if (a.only === "git-tools") return ["git-tools"];
   return ["harnesses", "connections", "brain-order"];

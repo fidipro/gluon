@@ -11,6 +11,9 @@
  * `bun run test:area a,b`), `--changed [ref]` (the files changed since the merge-base with `ref`,
  * default origin/main, plus uncommitted ones; a core or unknown file means the fast tier), and
  * `--list` (print what would run and stop; `--json`: as JSON, with the OSes the change needs, for CI).
+ * `--live` adds the live stage after e2e (paid: an agent passes it only when the user asked in chat; never in CI): the journeys the
+ * change needs (`live` in test/areas.ts; `bun scripts/live.ts --tier=journey`, capped in code). Without it, a line says which
+ * journeys a run with `--live` would add, and their cap. A cap that stops a journey is a skip, not a failure; a journey never retries.
  * `--keep-going` runs every stage even after one fails (CI's full suite: a unit failure doesn't hide the e2e results).
  *
  * After a run: the slowest files, the non-`@full` tests over 3 s (candidates for `@full`), and the
@@ -23,17 +26,19 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
-import { AREAS, e2eTestFiles, platformsOf, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
+import { AREAS, e2eTestFiles, liveJourneys, platformsOf, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
+import { JOURNEY_HARNESS_CAP, JOURNEY_RUN_CAP } from "./live-lib.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
-const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--list [--json]]
+const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--live] [--list [--json]]
   (none)           the fast tier: typecheck + unit + e2e without the tests titled @full or @quarantine
   --full           also the @full and @quarantine tests (bun run regression:full)
   --area a,b       only those areas' unit and e2e tests (bun run test:area a,b); areas: ${Object.keys(AREAS).join(", ")}
   --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too
   --stages a,b     only those stages (typecheck, unit, e2e), to time or meter one of them
   --retry-failed   run a stage's failed tests once more; passing then, they are flaky (qa/logs/flaky.json), not failures
+  --live           also the live journeys the change needs (paid, capped; only when the user asked)
   --keep-going     run every stage even after one fails
   --list           print what would run, then stop (--json: as JSON, with the OSes the change needs)
 env: GLUON_UNIT_SHARDS (unit processes), GLUON_E2E_SHARDS (e2e processes; fast tier: half the apps, full: 1), GLUON_E2E_CONCURRENCY (apps at once, all e2e processes together),
@@ -49,13 +54,14 @@ const list = argv.includes("--list");
 const retryFailed = argv.includes("--retry-failed");
 const keepGoing = argv.includes("--keep-going");
 const json = argv.includes("--json");
+const live = argv.includes("--live");
 let areaArg: string | undefined;
 let changedArg: string | true | undefined;
 let stagesArg: string | undefined;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]!;
   const next = argv[i + 1];
-  if (["--full", "--list", "--json", "--retry-failed", "--keep-going", "--"].includes(a)) continue;
+  if (["--full", "--list", "--json", "--retry-failed", "--keep-going", "--live", "--"].includes(a)) continue;
   else if (a === "--area") areaArg = next && !next.startsWith("--") ? (i++, next) : "";
   else if (a.startsWith("--area=")) areaArg = a.slice(7);
   else if (a === "--changed") changedArg = next && !next.startsWith("--") ? (i++, next) : true;
@@ -113,6 +119,8 @@ function changedFiles(ref: string | undefined): { files: string[]; base: string 
 let sel: (Selection & { kind: "areas" }) | undefined;
 /** What the change selected (`--changed`), for the OSes it needs; undefined: the whole tier, every OS. */
 let picked: Selection | undefined;
+/** The files `--changed` found (they name the harness a journey is for). */
+let changedList: string[] = [];
 let title = full ? "full tier" : "fast tier";
 let notes: string[] = [];
 if (areaArg !== undefined) {
@@ -131,6 +139,7 @@ if (areaArg !== undefined) {
   } else {
     const s = selectChanged(c.files);
     picked = s;
+    changedList = c.files;
     notes = s.why;
     if (s.kind === "areas") {
       sel = s;
@@ -145,6 +154,11 @@ if (areaArg !== undefined) {
 }
 
 const unitAll = sel ? sel.unit : unitTestFiles();
+/** The live journeys this run needs: by the change (`--changed`, `--area`), the cheapest for a whole tier, every harness for the full one. */
+const journeys = liveJourneys(picked ?? sel, changedList, full && !sel);
+const everyJourney = full && !sel;
+const liveCap = everyJourney ? JOURNEY_RUN_CAP : journeys.length * JOURNEY_HARNESS_CAP;
+const liveLine = () => (journeys.length ? `${journeys.map((h) => `journey ${h}`).join(", ")} (≤ $${liveCap.toFixed(2)})` : "none");
 const e2eAll = sel ? sel.e2e : e2eTestFiles();
 
 type Result = { label: string; code: number; out: string };
@@ -305,7 +319,7 @@ function summarize(cases: Case[], wallS: number, mem: Peak | string) {
 // ── the run ─────────────────────────────────────────────────────────────────
 if (list && json) {
   // For CI's plan job: what runs, and the OSes it needs (`platforms` in test/areas.ts; a whole tier needs every OS).
-  console.log(JSON.stringify({ title, platforms: picked ? platformsOf(picked) : "all", unit: unitAll, e2e: e2eAll, why: notes }));
+  console.log(JSON.stringify({ title, platforms: picked ? platformsOf(picked) : "all", unit: unitAll, e2e: e2eAll, live: journeys, why: notes }));
   rmSync(tmp, { recursive: true, force: true });
   process.exit(0);
 }
@@ -319,6 +333,7 @@ if (list) {
   console.log(`e2e: ${sel ? `${e2eAll.length} file(s)` : "every file in test/e2e"} in ${e2eGroups.length} process(es), ${perProcess} apps at once in each${left}`);
   for (const f of sel?.e2e ?? []) console.log(`  ${f}`);
   for (const h of sel?.hooks ?? []) console.log(`by hand (${h.area}/${h.name}): ${h.cmd}`);
+  console.log(`live (--live, paid): ${liveLine()}`);
   rmSync(tmp, { recursive: true, force: true });
   process.exit(0);
 }
@@ -387,6 +402,20 @@ async function main(): Promise<number> {
     if (!(await verdict("e2e", from, rs, concurrent)) && stop()) return 1;
   }
   if (!groups.length && !e2eGroups.length) console.log("nothing to run after the typecheck: no test file selected");
+  meter.stage("live");
+  if (journeys.length && !live) console.log(`── live: skipped (paid: only when the user asks) · would run: ${liveLine()} · run: bun run regression${argv.length ? ` ${argv.join(" ")}` : ""} --live`);
+  else if (journeys.length && failed) console.log("── live: not run (an earlier stage failed: nothing paid for a broken change)");
+  else if (journeys.length) {
+    // Each journey alone, never retried (a retry costs money); exit 2 is a cap that stopped it: a skip, not a failure.
+    const runs = everyJourney ? [[]] : journeys.map((h) => [`--harness=${h}`]);
+    const rs = await timed("live", async () => {
+      const out: Result[] = [];
+      for (const extra of runs) out.push(await run(`live ${extra[0]?.slice(10) ?? "every harness"}`, [bun, "scripts/live.ts", "--tier=journey", ...extra]));
+      return out;
+    });
+    for (const r of rs) console.log(`── ${r.label}: ${r.code === 0 ? "ok" : r.code === 2 ? "SKIPPED (a cap)" : "FAILED"}\n${r.out.trimEnd()}`);
+    if (rs.some((r) => r.code !== 0 && r.code !== 2)) failed = true;
+  }
   return failed ? 1 : 0;
 }
 const code = await main();

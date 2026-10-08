@@ -25,7 +25,7 @@ bun test -t "BUG-01"  # tests for one bug
 bun run typecheck
 bun run demo          # UI with the scripted demo brain (no API calls)
 bun run start         # the real thing (first working step of brain.order)
-bun run test:live     # real, budgeted checks; never in regression; --dry-run, --tier=regression|harness: CONTRIBUTING.md
+bun run test:live     # real, budgeted checks; --dry-run, --tier=regression|harness|journey: CONTRIBUTING.md
 bun run build         # standalone binary for this host → dist/gluon-<target>[.exe]
 bun run build:all     # every target (linux x64/arm64 glibc+musl, darwin x64/arm64, windows-x64)
 bun run test:dist     # build release + test binaries, run test/dist.test.ts on them and the npm bundle
@@ -46,7 +46,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
   cheapest layer (unit unless it needs a terminal); never weaken a test to get green (rules: `test/AGENTS.md`).
 - **The regression suite is offline and free.** Never call a real brain, agent, API or installer.
 - **Paid runs only when the user asked for one; if a change needs one, ask first and wait** — this
-  includes `gluon doctor`, `bun run start` and a real `--launch` (they call real models).
+  includes `gluon doctor`, `bun run start`, a real `--launch` and `regression --live` (the live journeys: pass `--live`
+  only when the user asked for it in this conversation; without it, regression says which journeys and what cap).
   `test:live` enforces its own budgets and ledger (gitignored; budgets: the maintainers' private
   notes); log any manual paid call there.
 - **Git**: unless told otherwise, work on a new branch; commit and push as you go; don't merge or

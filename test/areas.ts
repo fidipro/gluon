@@ -12,6 +12,9 @@
  *   coverage table marks them `e2e`, not 0 %.
  * - `unmeasured`: `src` files that run where the coverage report can't see (a subprocess, a Worker): glob → why.
  * - `optional`: the area's globs may match nothing yet (a directory another change is adding).
+ * - `live`: what a change here needs from the live checks (`bun run regression --live`, paid, only when the user asks): `"brain"`,
+ *   one journey (the real brain to an agent's reply) on the cheapest harness; `"harness"`, the journey of each harness the change
+ *   names (else the cheapest one). Left out: nothing live.
  * - `platforms`: `"linux"` when a change to this area alone needs CI on Linux only (pure logic, no process, path or
  *   terminal that differs by OS); left out, a pull request runs macOS and Windows too. The nightly full run covers every OS.
  */
@@ -31,11 +34,13 @@ export type Area = {
   e2eOnly?: string[];
   optional?: boolean;
   platforms?: "linux";
+  live?: "brain" | "harness";
 };
 
 export const AREAS: Record<string, Area> = {
   cli: {
     doc: "the command line, config file, startup, hidden subcommands, doctor, uninstall",
+    live: "brain",
     src: ["src/cli.tsx", "src/main.tsx", "src/usage.ts", "src/startup.ts", "src/self.ts", "src/internal.ts", "src/uninstall.ts", "src/doctor.ts", "src/config.ts", "src/xdg.ts"],
     files: ["test/fixtures/hook-graph/**"],
     unit: ["test/usage.test.ts", "test/hook-import-graph.test.ts", "test/doctor.test.ts"],
@@ -45,6 +50,7 @@ export const AREAS: Record<string, Area> = {
   },
   "onboarding-auth": {
     doc: "connecting the agents: sign-in checks, keys, installs, status of each harness",
+    live: "harness",
     src: ["src/auth.ts", "src/status.ts", "src/verify.ts", "src/install.ts", "src/detect.ts", "src/secrets.ts", "src/harnesses.ts", "src/ui/signin.tsx"],
     unit: ["test/install.test.ts", "test/detect.test.ts", "test/secrets.test.ts", "test/status-login.test.ts"],
     e2e: ["test/e2e/auth.e2e.test.ts", "test/e2e/install.e2e.test.ts"],
@@ -52,6 +58,7 @@ export const AREAS: Record<string, Area> = {
   },
   brain: {
     doc: "the intake agent: its routes (Bedrock, Anthropic, OpenAI, Codex), prompt, effort, choices, session loop",
+    live: "brain",
     src: ["src/brain.ts", "src/agent/bedrock-converse.ts", "src/agent/choices.ts", "src/agent/clients.ts", "src/agent/codex.ts", "src/agent/effort.ts", "src/agent/openai.ts", "src/agent/prompt.ts", "src/agent/session.ts", "src/agent/subscription.ts"],
     files: ["scripts/codex-drift.ts"],
     unit: ["test/brain.test.ts", "test/brain-clients.test.ts", "test/choices.test.ts", "test/codex.test.ts", "test/codex-drift.test.ts", "test/converse.test.ts", "test/effort.test.ts", "test/openai.test.ts", "test/route-schema.test.ts", "test/session.test.ts"],
@@ -66,6 +73,7 @@ export const AREAS: Record<string, Area> = {
   },
   routing: {
     doc: "routing.yaml, the catalog, the models the brain may offer, the intake seam",
+    live: "brain",
     platforms: "linux",
     src: ["src/routing.ts", "src/routing-config.ts", "src/routing.yaml", "src/models.ts", "src/intake.ts"],
     files: ["test/fixtures/route-catalog.ts", "test/fixtures/first-pass-*.yaml"],
@@ -74,6 +82,7 @@ export const AREAS: Record<string, Area> = {
   },
   adapters: {
     doc: "each harness's launch (argv, env, hooks, modes, resume, handoff settings) and its events back to Gluon",
+    live: "harness",
     src: ["src/adapters/**", "src/launchers.ts", "src/handoff.ts", "src/events.ts"],
     unit: [
       "test/adapters-claude-codex.test.ts",
@@ -94,6 +103,7 @@ export const AREAS: Record<string, Area> = {
   },
   pty: {
     doc: "the agent's pseudo-terminal: screen model, readers, keys, modes, paint, selection, intercept",
+    live: "harness",
     src: ["src/pty/**", "!src/pty/chrome.ts", "!src/pty/compositor.ts", "!src/pty/AGENTS.md"],
     files: ["test/fixtures/screens/**", "test/fixtures/screens.ts"],
     unit: [
@@ -112,6 +122,7 @@ export const AREAS: Record<string, Area> = {
   },
   "gluon-frame": {
     doc: "Gluon's frame: the app, the compositor and chrome, sessions, tabs, the coverage matrix and the monkey",
+    live: "harness",
     src: ["src/gluon.ts", "src/files-poll.ts", "src/sessions.ts", "src/pty/chrome.ts", "src/pty/compositor.ts"],
     files: ["test/e2e/gluon-*.ts", "test/fixtures/gluon.ts", "test/fixtures/gluon-matrix.ts"],
     unit: [
@@ -364,6 +375,26 @@ export function selectAreas(areas: string[], extra: { unit?: string[]; e2e?: str
     hooks: uniq([...ok, ...(extra.hookAreas ?? [])]).flatMap((a) => Object.entries(AREAS[a]!.hooks ?? {}).map(([name, h]) => ({ area: a, name, cmd: h.cmd }))),
     why: [],
   };
+}
+
+/** The journey a change needs when nothing names a harness: the cheapest one. */
+export const LIVE_DEFAULT_HARNESS = "claude-code";
+const LIVE_HARNESSES = ["claude-code", "codex", "opencode", "antigravity", "kimi-code", "grok-build"];
+
+/**
+ * The live journeys a selection needs (`bun run regression --live`): none when no touched area has `live`; for `"harness"` areas, the
+ * harnesses the changed files name (`src/adapters/codex.ts`, a `claude` in its name), else the cheapest; for `"brain"`, the cheapest.
+ * The whole tier (a core or unknown file): the cheapest journey. `all`: every harness (the full tier).
+ */
+export function liveJourneys(sel: Selection | undefined, changed: string[], all = false): string[] {
+  if (all) return [...LIVE_HARNESSES];
+  if (!sel || sel.kind === "fast") return [LIVE_DEFAULT_HARNESS];
+  if (sel.kind === "none") return [];
+  const owners = new Set([...sel.areas, ...[...sel.unit, ...sel.e2e].map(testOwner).filter((a): a is string => !!a)]);
+  const kinds = new Set([...owners].map((a) => AREAS[a]?.live).filter(Boolean));
+  if (!kinds.size) return [];
+  const named = kinds.has("harness") ? LIVE_HARNESSES.filter((h) => changed.some((f) => f.includes(h) || f.includes(h.split("-")[0]!))) : [];
+  return named.length ? named : [LIVE_DEFAULT_HARNESS];
 }
 
 /**

@@ -71,7 +71,8 @@ const orSpend = (key: string) => {
   return ({ end, usd }: { end: number; usd: number | undefined }) => recordBrainReply(tag, end, usd);
 };
 
-const KEY: Partial<Record<Route, string>> = { "anthropic-api": "ANTHROPIC_API_KEY", "openai-api": "OPENAI_API_KEY", openrouter: "OPENROUTER_API_KEY" };
+/** The key an API brain route reads (from Gluon's secret store). */
+export const KEY: Partial<Record<Route, string>> = { "anthropic-api": "ANTHROPIC_API_KEY", "openai-api": "OPENAI_API_KEY", openrouter: "OPENROUTER_API_KEY" };
 
 /** Whether Bedrock is set up: an AWS profile or region in the config, or a harness connected through Bedrock. */
 export function bedrockConnected(config: Config): boolean {
