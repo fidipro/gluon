@@ -65,6 +65,14 @@ sha256() {
   fi
 }
 
+# cosign_verify [extra cosign flags]: 0 when the signature on $tmp/SHA256SUMS is this repository's
+# Release workflow's; prints cosign's output.
+cosign_verify() {
+  cosign verify-blob "$@" --bundle "$tmp/SHA256SUMS.sigstore.json" \
+    --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" \
+    "$tmp/SHA256SUMS" 2>&1
+}
+
 # glibc or musl. ldd names its libc; /lib/ld-musl-* alone isn't enough (Debian's musl package
 # puts one on a glibc system: BUG-117), so it decides only when ldd says nothing.
 detect_libc() {
@@ -158,11 +166,17 @@ main() {
 
   if command -v cosign >/dev/null 2>&1; then
     if fetch SHA256SUMS.sigstore.json "$tmp/SHA256SUMS.sigstore.json" 2>/dev/null; then
-      if cosign verify-blob --bundle "$tmp/SHA256SUMS.sigstore.json" \
-        --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" \
-        "$tmp/SHA256SUMS" >/dev/null 2>&1; then
+      # Releases are signed by cosign 3, which writes the new bundle format. cosign 3 reads it as is;
+      # cosign 2.4 and later need --new-bundle-format; older ones can't read it.
+      if cosign_verify >/dev/null; then
+        say "  signature ok  (cosign, $CERT_IDENTITY)"
+      elif cosign_out="$(cosign_verify --new-bundle-format)"; then
         say "  signature ok  (cosign, $CERT_IDENTITY)"
       else
+        case "$cosign_out" in
+          *"unknown flag"*new-bundle-format*)
+            die "this cosign is older than 2.4 and can't read this release's signature bundle; upgrade cosign (or remove it from PATH to rely on the SHA-256 check alone); nothing installed" ;;
+        esac
         die "the signature on SHA256SUMS does not verify; nothing installed"
       fi
     else
