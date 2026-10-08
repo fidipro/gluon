@@ -982,8 +982,8 @@ describe.concurrent("QA live: Esc during a turn", () => {
       b.pty.print(screen);
       await settle(30);
       now += 60_000;
-      await settle(100);
-      expect(b.s.state.state).toBe("awaiting");
+      // Wait for the row to change rather than for 100 ms: the screen model parses the print on its own time (slow on Windows), and a tick before that reads the old screen.
+      await until(() => b.s.state.state === "awaiting");
       b.s.dispose();
     });
 
