@@ -697,16 +697,17 @@ describe("gluon stats sql: limits", () => {
   }, 30_000 * SLOW);
 
   test.skipIf(WIN)("BUG-597/macos-memory: where SQLite ignores its heap limit (macOS), the child's watchdog ends it past its memory cap, with the mark the parent reads as out of memory", async () => {
-    // Forced here with a small cap: on Linux SQLite's own limit (256 MB) lets a 100 MB value through, the 30 MB cap doesn't.
+    // Forced here with a small cap: on Linux SQLite's own limit (256 MB) lets a 100 MB value through, the 30 MB cap doesn't. Random bytes:
+    // building them takes long enough for the watchdog to see (macOS's SQLite returns a zeroblob before its first look).
     const dir = mkdtempSync(join(tmpdir(), "gluon-sql-memory-"));
     try {
       const path = join(dir, "a.db");
       new Database(path, { create: true }).close();
-      const child = Bun.spawn([...GLUON, "stats-sql"], { env: { ...SYSTEM_ENV, PATH: process.env.PATH ?? "", [SQL_CHILD_ENV]: path, [SQL_CHILD_MEMORY_ENV]: String(30_000_000) }, stdin: new TextEncoder().encode("SELECT zeroblob(100000000) AS z"), stdout: "pipe", stderr: "pipe" });
+      const child = Bun.spawn([...GLUON, "stats-sql"], { env: { ...SYSTEM_ENV, PATH: process.env.PATH ?? "", [SQL_CHILD_ENV]: path, [SQL_CHILD_MEMORY_ENV]: String(30_000_000) }, stdin: new TextEncoder().encode("SELECT randomblob(100000000) AS z"), stdout: "pipe", stderr: "pipe" });
       const [err] = await Promise.all([new Response(child.stderr).text(), child.exited]);
       expect([child.signalCode, err.trim()]).toEqual(["SIGKILL", SQL_MEMORY_MARK]);
       // Without the cap the same query answers.
-      const free = Bun.spawn([...GLUON, "stats-sql"], { env: { ...SYSTEM_ENV, PATH: process.env.PATH ?? "", [SQL_CHILD_ENV]: path }, stdin: new TextEncoder().encode("SELECT zeroblob(100000000) AS z"), stdout: "pipe", stderr: "pipe" });
+      const free = Bun.spawn([...GLUON, "stats-sql"], { env: { ...SYSTEM_ENV, PATH: process.env.PATH ?? "", [SQL_CHILD_ENV]: path }, stdin: new TextEncoder().encode("SELECT randomblob(100000000) AS z"), stdout: "pipe", stderr: "pipe" });
       const [out] = await Promise.all([new Response(free.stdout).text(), free.exited]);
       expect(out).toContain("<blob 100000000 bytes>");
     } finally {
