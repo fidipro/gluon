@@ -73,7 +73,7 @@ describe.each(AGENTS.map((p) => [rel(p), p]))("%s", (_name, file) => {
 });
 
 /**
- * The docs site's sidebar (`site/astro.config.mjs`, `site/sidebar.mjs`) lists a folder of `docs/`
+ * The docs site's sidebar (`site/astro.config.mjs`, `site/groups.mjs`, `site/sidebar.mjs`) lists a folder of `docs/`
  * by name instead of each page, so a page is linked when the config quotes its slug or one of
  * its folders: `docs/guides/harnesses/x.md` by "guides", "guides/harnesses" or "guides/harnesses/x".
  */
@@ -82,7 +82,7 @@ export const linkedBySidebar = (docsFile: string, config: string): boolean => {
   const names = new Set([...config.matchAll(/"([\w\-/]+)"/g)].map((m) => m[1]!));
   return parts.some((_, i) => names.has(parts.slice(0, i + 1).join("/")));
 };
-const SIDEBAR_CONFIG = existsSync(join(ROOT, "site/astro.config.mjs")) ? readFileSync(join(ROOT, "site/astro.config.mjs"), "utf8") : "";
+const SIDEBAR_CONFIG = ["site/astro.config.mjs", "site/groups.mjs"].map((f) => (existsSync(join(ROOT, f)) ? readFileSync(join(ROOT, f), "utf8") : "")).join("\n");
 
 test("a docs page is linked by the sidebar when its slug or a folder of it is named", () => {
   const config = 'docsGroup("Guides", "guides"), { slug: "index" }, docsItems("getting-started")';
