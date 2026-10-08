@@ -344,13 +344,16 @@ jobs:
           git /repo --no-banner --redact -c /repo/.gitleaks.toml
 
   # Developer Certificate of Origin (CONTRIBUTING.md): every commit of a pull request from outside needs a matching
-  # Signed-off-by trailer (scripts/dco.ts). Skipped for the owner, members and collaborators, and for Dependabot.
+  # Signed-off-by trailer (scripts/dco.ts). Skipped for the owner, members and collaborators, for Dependabot, and for a
+  # branch of this repository (only people with write access push one; a private org member's author_association
+  # reaches a workflow as CONTRIBUTOR, so the association alone would check the owner).
   dco:
     needs: plan
     if: >-
       github.event_name == 'pull_request'
       && !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
       && github.event.pull_request.user.login != 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
