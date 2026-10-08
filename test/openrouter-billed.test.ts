@@ -956,15 +956,17 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     const key2 = nextKey();
     const or2 = fakeOpenRouter(20);
     const brain2 = new BrainSpend();
-    const m2 = await BilledMeter.begin({ key: key2, source: brainTimings({ landMs: 10, giveUpMs: 120 }), registry: new Registry(fresh()), fetch: or2.fetch, brain: brain2 });
+    // A reply ends just before every reading the meter makes after the baseline: it is in the delta or may be (`pending`), never a settled one. (A timer
+    // recording one every 5 ms left gaps wider than `tailMs` where Windows' 15 ms timers and a busy loop stalled: a reading then saw no reply near it and settled clean.)
+    let reads = 0;
+    const chatty = ((input: Request | string | URL, init?: RequestInit) => {
+      if (String(input instanceof Request ? input.url : input).endsWith("/key") && ++reads > 1) brain2.record(keyTag(key2), Date.now() - 10, 0.01);
+      return or2.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const m2 = await BilledMeter.begin({ key: key2, source: brainTimings({ landMs: 10, giveUpMs: 120 }), registry: new Registry(fresh()), fetch: chatty, brain: brain2 });
     or2.bill(0.3);
     m2.observe(0.25, true, 1);
-    const chat = setInterval(() => brain2.record(keyTag(key2), Date.now(), 0.01), 5);
-    try {
-      expect(await m2.finish()).toEqual({ status: "brain" });
-    } finally {
-      clearInterval(chat);
-    }
+    expect(await m2.finish()).toEqual({ status: "brain" });
   });
 
   test("BUG-631/variants: usage that moved only by the brain's reply is not the session's landing: the meter waits for the session's own", async () => {
