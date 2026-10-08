@@ -90,6 +90,13 @@ if (Bun.argv[2] === "pricing") {
   process.exit(await pricingUpdate());
 }
 
+// `gluon update [--check]`: installs the latest verified release in place of this binary (`src/update/update.ts`). Needs no config:
+// a broken one mustn't stop an update that may fix it.
+if (Bun.argv[2] === "update") {
+  const { updateCommand } = await import("./update/update.ts");
+  process.exit(await updateCommand(Bun.argv.slice(3), { current: pkg.version }));
+}
+
 // `gluon stats`: queries the local analytics database (`src/stats.ts`, its own options: the global `delete` is a string). Needs no config.
 if (Bun.argv[2] === "stats") {
   const { statsCommand } = await import("./stats.ts");

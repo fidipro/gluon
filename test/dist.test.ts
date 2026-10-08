@@ -230,7 +230,7 @@ describe.skipIf(!RELEASE)("release binary", () => {
     expect(STRING_WIDTH_PATCHED.test(Buffer.from(await Bun.file(RELEASE!).arrayBuffer()).toString("latin1"))).toBe(true);
   });
 
-  test.each(["GLUON_TEST_PROBES", "GLUON_TEST_PTY_FAIL", "GLUON_TEST_COMPACT_TIMEOUT_MS", "GLUON_TEST_NO_PTY", "GLUON_TEST_DEMO_PACE", "GLUON_TEST_MAINTAINER_MODELS", "GLUON_TEST_OPENROUTER", "GLUON_TEST_PRICING", "GLUON_TEST_SQL_DEADLINE_MS"])("the %s seam is compiled out", async (seam) => {
+  test.each(["GLUON_TEST_PROBES", "GLUON_TEST_PTY_FAIL", "GLUON_TEST_COMPACT_TIMEOUT_MS", "GLUON_TEST_NO_PTY", "GLUON_TEST_DEMO_PACE", "GLUON_TEST_MAINTAINER_MODELS", "GLUON_TEST_OPENROUTER", "GLUON_TEST_PRICING", "GLUON_TEST_SQL_DEADLINE_MS", "GLUON_TEST_UPDATE"])("the %s seam is compiled out", async (seam) => {
     const bytes = new Uint8Array(await Bun.file(RELEASE!).arrayBuffer());
     expect(Buffer.from(bytes).includes(seam)).toBe(false);
     expect(Buffer.from(await Bun.file(BIN ?? RELEASE!).arrayBuffer()).includes(seam)).toBe(!!BIN);

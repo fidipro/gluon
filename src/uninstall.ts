@@ -3,7 +3,7 @@
  * itself. Only Gluon's own files: the config file (never a directory GLUON_CONFIG merely
  * points into), the saved keys next to it (only its own lines of a `.env` that holds more: BUG-156),
  * the saved sessions next to it (`workspaces/`), its files in the agents' directories
- * (`removePermanentFiles`), its cost audit ledger, the price tables `gluon pricing update` kept, and its temporary directories.
+ * (`removePermanentFiles`), its cost audit ledger, the price tables `gluon pricing update` kept, what the updater keeps, and its temporary directories.
  */
 import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,12 +13,13 @@ import { listPermanentFiles, removePermanentFiles } from "./adapters/permanent.t
 import { analyticsPath } from "./analytics.ts";
 import { configPath } from "./config.ts";
 import { routingPath } from "./routing-config.ts";
-import { ledgerDir, registryDir, removeLedger } from "./cost/ledger-file.ts";
+import { ledgerDir, registryDir, removeLedger, stateDir } from "./cost/ledger-file.ts";
 import { tablesDir } from "./cost/tables-store.ts";
 import { BUILD, COMPILED } from "./detect.ts";
 import { EVENTS_PREFIX } from "./events.ts";
 import { grokKeyAuthPath } from "./launchers.ts";
 import { secretsPath, withoutSavedKeys } from "./secrets.ts";
+import { sweepLeftovers } from "./update/apply.ts";
 import { runningGluons, workspacesDir } from "./workspaces.ts";
 
 /** Temporary directories Gluon makes (launch specs, events, adapter files, neutral working dirs). */
@@ -149,7 +150,9 @@ export function uninstallTargets(tmp = tmpdir()): string[] {
     ...[dirname(grokKeyAuthPath()), ...keySaveLeftovers(dir), ledgerDir(), registryDir()].filter(isDir),
     // Only where Gluon has files in it, or it is empty: a directory of the user's own is no target, and is not reported as removed (BUG-623).
     ...(isDir(workspacesDir()) && (workspaceFiles().length > 0 || isEmptyDir(workspacesDir())) ? [workspacesDir()] : []),
-    ...[tablesDir()].filter(isDir),
+    ...[tablesDir(), join(stateDir(), "tuf")].filter(isDir),
+    // What the updater keeps (`src/update/update.ts`): its last check and its lock.
+    ...[join(stateDir(), "update.json"), join(stateDir(), "update.lock")].filter(isFile),
     ...[analyticsPath(), `${analyticsPath()}-wal`, `${analyticsPath()}-shm`].filter(isFile),
     ...staleTempDirs(tmp),
   ];
@@ -237,6 +240,8 @@ export function uninstall(o: UninstallOptions): number {
   }
   for (const p of removed) log(strip && p === env ? `Removed Gluon's keys from ${p}` : `Removed ${p}`);
   for (const f of failed) console.error(`gluon: couldn't remove ${f}`);
+  // An update's leftovers next to the binary (Windows: the old copy it moved aside).
+  if (COMPILED && BUILD === "release") sweepLeftovers(process.execPath);
   if (binary) {
     // Last: this process keeps running from memory.
     remove(binary);

@@ -364,6 +364,13 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
   // The demo makes no network call by design: no refresh in it, at start or at a launch (`refreshAllowed`).
   if (refreshAllowed(demo)) void refreshNetworkTables({ ledger: (e) => tablesLedger.add(e) });
 
+  // Gluon's own updates (`src/update/update.ts`): at most one check of GitHub a day, in the background, never before the first screen; `updates: auto`
+  // installs a verified release for the next start. The demo makes no network call. Loaded only here: the Sigstore libraries cost nothing at start.
+  if (!demo)
+    void import("./update/update.ts")
+      .then((u) => u.backgroundUpdate({ mode: u.updateMode(config.updates), current: ctx.version, notice: (m) => host.session.notice(maskSecrets(m), "info") }))
+      .catch(() => {});
+
   // The first chat: the brain's reachability and environment notes, as the old flow says them.
   if (!demo && brain.step) {
     const s = brain.step;

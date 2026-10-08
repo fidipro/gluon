@@ -21,7 +21,7 @@ export const CLI_OPTIONS = {
 export const SUBCOMMANDS = ["doctor", "setup", "brain", "connect", "install", "uninstall", "resume", "sessions", "routing"];
 
 /** Commands `src/main.tsx` handles before the config loads: not in `SUBCOMMANDS` (that one's matching words take the config-needing paths). */
-export const EARLY_COMMANDS = ["cost-report", "pricing", "stats"];
+export const EARLY_COMMANDS = ["cost-report", "pricing", "stats", "update"];
 
 /** The words a mistyped single-word session is compared with ("did you mean"): every command. */
 export const HINT_COMMANDS = [...SUBCOMMANDS, ...EARLY_COMMANDS];
@@ -64,6 +64,9 @@ export function usageText(config: Config, version: string = pkg.version): string
   gluon stats <id>                        one session in full: its spec, routing and cost (an id prefix, 4+ characters)
   gluon stats sql "<query>"               a read-only SELECT against the table sessions (10 s, 10000 rows at most)
   gluon stats --delete [--yes]            delete every recorded session (asks first)
+  gluon update [--check]                  install the latest Gluon release (signature and checksum verified first;
+                                          --check: only say whether there is one). Gluon also updates itself at
+                                          start: config key updates (auto, notify, off) or GLUON_UPDATES
   gluon uninstall [--yes]                 remove Gluon's config, saved keys and files
                                              (and the binary, on a standalone install)
   gluon --version

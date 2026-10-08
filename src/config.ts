@@ -71,7 +71,12 @@ export interface Config {
   cost: { audit: boolean; antigravityStatusline: boolean };
   /** One row per launched session in a local SQLite file (`src/analytics.ts`, `gluon stats`); `false` records nothing. On by default. */
   analytics: boolean;
+  /** Gluon's own updates (`src/update/update.ts`): `auto` installs a new release by itself, `notify` only says it exists, `off` checks nothing. */
+  updates: UpdateMode;
 }
+
+export const UPDATE_MODES = ["auto", "notify", "off"] as const;
+export type UpdateMode = (typeof UPDATE_MODES)[number];
 
 export const DEFAULT_ORDER: BrainStep[] = [
   { route: "claude-plan", model: "claude-sonnet-5-5" },
@@ -97,7 +102,7 @@ export function agentsFrom(models: Record<Harness, ModelEntry[]>): AgentOption[]
 
 export function defaults(): Config {
   const models = catalog();
-  return { connections: {}, bedrock: {}, models, verified: {}, checked: {}, unreached: {}, brain: { order: structuredClone(DEFAULT_ORDER), active: null }, agents: agentsFrom(models), handoff: handoffDefaults(), cost: { audit: true, antigravityStatusline: false }, analytics: true };
+  return { connections: {}, bedrock: {}, models, verified: {}, checked: {}, unreached: {}, brain: { order: structuredClone(DEFAULT_ORDER), active: null }, agents: agentsFrom(models), handoff: handoffDefaults(), cost: { audit: true, antigravityStatusline: false }, analytics: true, updates: "auto" };
 }
 
 /** GLUON_CONFIG (main.tsx makes it absolute at startup), else `gluon/config.yaml` under XDG_CONFIG_HOME (an absolute one only), else %APPDATA% on Windows, else ~/.config. */
@@ -399,6 +404,12 @@ export function loadConfig(): Config {
     if (file.analytics !== undefined && file.analytics !== null) {
       if (file.analytics !== true && file.analytics !== false && file.analytics !== "on" && file.analytics !== "off") throw new ConfigError("analytics must be on or off");
       config.analytics = file.analytics === true || file.analytics === "on";
+    }
+    if (file.updates !== undefined && file.updates !== null) {
+      // YAML 1.1 readers turn a bare `off` into false: taken as `off` (and true as `auto`).
+      const u = file.updates === false ? "off" : file.updates === true ? "auto" : file.updates;
+      if (!(UPDATE_MODES as readonly unknown[]).includes(u)) throw new ConfigError(`updates must be one of ${UPDATE_MODES.join(", ")}`);
+      config.updates = u as UpdateMode;
     }
     // Antigravity's cost and context need one key in its own settings (the owner's exception, `agy-settings.ts`): off until you turn it on.
     if (cost.antigravity_statusline !== undefined && cost.antigravity_statusline !== null) {
