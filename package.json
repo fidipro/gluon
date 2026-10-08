@@ -76,6 +76,7 @@
     "test:area": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts --area",
     "test:health": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/test-health.ts",
     "test:coverage": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/coverage.ts",
+    "test:value": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/test-value.ts",
     "test:live": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/live.ts",
     "build": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/build.ts",
     "build:all": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/build.ts --all",
