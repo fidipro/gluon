@@ -334,6 +334,16 @@ function fakeSession(): ViewSession & { inputs: Key[]; mice: string[]; screen: T
 }
 
 const tick = (ms = 40) => Bun.sleep(ms);
+const SLOW = Number(process.env.GLUON_TEST_SLOW) || (process.platform === "win32" ? 3 : 1);
+/**
+ * Waits until `ok()` holds (a ceiling that scales with the machine), then asserts it. For what the compositor paints after the home view's model
+ * has parsed a frame and its output is quiet (`SELECTION_QUIET_MS`): a fixed `tick` is too short where timers tick every 15 ms and the loop is busy.
+ */
+async function until(ok: () => boolean, ms = 5000 * SLOW) {
+  const end = Date.now() + ms;
+  while (!ok() && Date.now() < end) await Bun.sleep(5);
+  expect(ok()).toBe(true);
+}
 
 describe("the compositor on fake streams", () => {
   let c: Compositor | undefined;
@@ -415,16 +425,15 @@ describe("the compositor on fake streams", () => {
     c.dispatch(keys("\x1b[<0;7;1M"));
     expect(home.mice).toEqual([]);
     c.dispatch(keys("\x1b[<32;7;2M\x1b[<32;5;3M"));
-    expect(out.raw.slice(mark)).toContain("\x1b[0;7mw"); // "world" on the first row, reversed
+    await until(() => out.raw.slice(mark).includes("\x1b[0;7mw")); // "world" on the first row, reversed
     c.dispatch(keys("\x1b[<0;5;3m"));
     expect(home.mice).toEqual([]);
-    expect(out.raw.slice(mark)).toContain(`\x1b]52;c;${Buffer.from("world\nsecond line\nthird").toString("base64")}\x07`);
+    await until(() => out.raw.slice(mark).includes(`\x1b]52;c;${Buffer.from("world\nsecond line\nthird").toString("base64")}\x07`));
     expect(out.raw.slice(mark)).toContain(" Copied 23 characters");
-    // Gluon's own redraw of a frame with the same text paints the highlight again.
+    // Gluon's own redraw of a frame with the same text paints the highlight again (once the home view's output is quiet and its model has parsed it).
     mark = out.raw.length;
     home.write(frame);
-    await tick();
-    expect(out.raw.slice(mark)).toContain("\x1b[0;7mw");
+    await until(() => out.raw.slice(mark).includes("\x1b[0;7mw"));
     // A frame whose text under it changed: the selection is gone, and not painted again.
     mark = out.raw.length;
     home.write("\x1b[1;7Hxorld");
