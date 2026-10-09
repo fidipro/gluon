@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
+import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, liveJourneys, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
 
 const names = Object.keys(AREAS);
 
@@ -119,5 +119,20 @@ describe("--changed: the OSes a pull request needs (CI's plan job)", () => {
 
   test("only areas with no process, path or terminal of their own are Linux-only", () => {
     expect(Object.keys(AREAS).filter((a) => AREAS[a]!.platforms === "linux").sort()).toEqual(["docs", "routing"]);
+  });
+});
+
+describe("--live: the journeys a change needs", () => {
+  const j = (fs: string[]) => liveJourneys(selectChanged(fs), fs);
+  test("none for an area with nothing live (docs, cost); the cheapest for the brain, routing or a whole tier", () => {
+    expect(j(["docs/concepts/architecture.md"])).toEqual([]);
+    expect(j(["src/cost/ledger.ts"])).toEqual([]);
+    expect(j(["src/brain.ts"])).toEqual(["claude-code"]);
+    expect(j(["bun.lock"])).toEqual(["claude-code"]);
+  });
+  test("a harness's own files: that harness's journey; a harness area that names none: the cheapest; the full tier: every harness", () => {
+    expect(j(["src/adapters/codex.ts"])).toEqual(["codex"]);
+    expect(j(["src/pty/session.ts"])).toEqual(["claude-code"]);
+    expect(liveJourneys(undefined, [], true)).toHaveLength(6);
   });
 });

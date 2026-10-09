@@ -26,7 +26,7 @@ import { homedir, tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { stringify } from "yaml";
 import { bedrockConnected } from "../src/brain.ts";
-import { defaults, loadConfig, type Config } from "../src/config.ts";
+import { defaults, loadConfig, type BrainStep, type Config } from "../src/config.ts";
 import { HARNESS_INFO, HARNESSES, type Harness } from "../src/harnesses.ts";
 import { loadSecrets, maskSecrets, parseEnv, secret, useSecrets } from "../src/secrets.ts";
 import { HARNESS_WORD } from "../src/sessions.ts";
@@ -39,6 +39,13 @@ import {
 
 /** The one prompt of a checked launch: the spec the harness is asked to answer. */
 const TASK = (agent: string) => `Reply with just OK. Do not read, run or change anything. (${agent})`;
+/** A journey's task for the real brain: small, clear, and one an agent can answer in a line without touching the repo. */
+export const JOURNEY_TASK = (agent: string) => `Explain in one short sentence what add() in src/math.ts does. Don't change, run or create anything. Use ${agent}.`;
+/** A journey's answer to each question the brain asks (typed: it answers an open question as its own answer, or the chat). */
+export const JOURNEY_ANSWER = "Your call, keep it minimal: one short sentence, nothing changed.";
+/** On screen: the brain is waiting for the user (an open question, or the composer asking for a reply), or it proposes the agents. */
+export const brainAsks = (l: string[]) => l.some((x) => x.includes("type your own answer") || x.includes("reply to the intake agent"));
+export const brainProposes = (l: string[]) => l.some((x) => x.includes("keep talking"));
 
 /** One option of the agent choice: its number, whether it's highlighted, harness label, model, effort. */
 interface Option {
@@ -183,6 +190,14 @@ export interface HarnessRunOptions {
   maxPrompts?: number;
   /** false: skip the standard checks after the frame shows the agent; `scenario` runs at once. */
   standard?: boolean;
+  /**
+   * A journey (`--tier=journey`): Gluon on the real brain at this step (its key, when it needs one, from the dev key file), not the
+   * demo: the task goes to the brain, each question it asks gets `JOURNEY_ANSWER` (at most `turns` turns), and the agent's reply
+   * is any reply, not "OK" (the brain writes the spec).
+   */
+  brain?: { step: BrainStep; key?: string; turns: number };
+  /** When the whole check must be over (epoch ms): every wait stops there, and the check fails (a journey's wall clock). */
+  deadline?: number;
   /** Called with the scratch world before Gluon starts (an agent's own scratch state: a recent model, a setting). */
   prepare?(w: { scratch: string; home: string; repo: string; cfgDir: string; bin: string }): void;
   /** Called with the running session after the standard checks (or at once, `standard: false`). */
@@ -229,11 +244,12 @@ function makeRepo(dir: string): string {
 }
 
 /** Gluon's throwaway config for one check: the harness on one API-key connection, asking before /clear ends a session. */
-export function checkConfig(h: Harness, conn: string, aws: { region: string | null; profile?: string }): string {
+export function checkConfig(h: Harness, conn: string, aws: { region: string | null; profile?: string }, brain?: BrainStep): string {
   const connection = h === "opencode" ? { auth: "api", providers: [conn] } : { auth: "api", provider: conn };
   return stringify({
     handoff: { on_clear: "ask" },
     connections: { [h]: connection },
+    ...(brain ? { brain: { order: [brain] } } : {}),
     ...(conn === "bedrock" && (aws.region || aws.profile) ? { bedrock: { ...(aws.region ? { region: aws.region } : {}), ...(aws.profile ? { profile: aws.profile } : {}) } } : {}),
   });
 }
@@ -289,12 +305,13 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     return { asserts, charged: 0, refused: false };
   }
   const conn = plan.pick.conn;
-  const what = `real-harness ${h} (${conn})`;
+  const what = `${o.brain ? "journey" : "real-harness"} ${h} (${conn})`;
   if (!o.spend.allowUsd(plan.bucket, what, plan.model.id, plan.worst)) {
     add("launch", "SKIP", `refused, over a cap: ${o.spend.run.refused.at(-1)}`);
     return { asserts, charged: 0, refused: true };
   }
   const turnMs = o.turnMs ?? 180_000;
+  const startedAt = Date.now();
   const aws = awsSetupFromHost();
   // ——— the scratch world ———
   const scratch = mkdtempSync(join(tmpdir(), `gluonlive-${h}-`));
@@ -317,9 +334,10 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   const repo = makeRepo(scratch);
   const cfgDir = join(scratch, "cfg");
   mkdirSync(cfgDir, { mode: 0o700 });
-  const yaml = checkConfig(h, conn, aws);
+  const yaml = checkConfig(h, conn, aws, o.brain?.step);
   writeFileSync(join(cfgDir, "config.yaml"), yaml, { mode: 0o600 });
-  if (plan.pick.key) writeFileSync(join(cfgDir, ".env"), `${plan.pick.key}=${secret(plan.pick.key)}\n`, { mode: 0o600 });
+  const envKeys = [...new Set([plan.pick.key, o.brain?.key].filter((k): k is string => !!k))];
+  if (envKeys.length) writeFileSync(join(cfgDir, ".env"), envKeys.map((k) => `${k}=${secret(k)}\n`).join(""), { mode: 0o600 });
   writeFileSync(join(cfgDir, "probes.json"), "{}");
   o.prepare?.({ scratch, home, repo, cfgDir, bin });
   // The demo brain never fetches price tables (`refreshAllowed`), so the figures would show `—`: build them here, in the scratch HOME,
@@ -335,7 +353,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     cols: 100,
     rows: 30,
     cwd: repo,
-    argv: [process.execPath, ...BUN_FLAGS, CLI, "--demo"],
+    argv: [process.execPath, ...BUN_FLAGS, CLI, ...(o.brain ? [] : ["--demo"])],
     env: scrubEnv({ PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER, LOGNAME: process.env.LOGNAME, SHELL: process.env.SHELL, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), GLUON_TEST_PROBES: join(cfgDir, "probes.json"), ...o.env }),
     yaml,
     fakes: [],
@@ -369,8 +387,9 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   d.watch(300);
   const lines = async () => (await d.screen()).lines;
   const until = async (pred: (l: string[]) => boolean, ms: number, every = 200) => {
-    for (const end = Date.now() + ms; ; ) {
+    for (const end = Math.min(Date.now() + ms, o.deadline ?? Infinity); ; ) {
       if (pred(await lines())) return true;
+      if (o.deadline && Date.now() >= o.deadline) throw new Error(`out of time: the check's ${Math.round((o.deadline - startedAt) / 60_000)} min ran out`);
       if (Date.now() >= end) return false;
       await d.wait(every);
     }
@@ -439,13 +458,37 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   let scenarioSpend = 0;
   let chargedOverride: number | null = null;
   try {
-    // ——— the demo's question and proposal, then the harness's own option on its cheapest model ———
-    await d.type(o.task ?? TASK(BINARY[h]));
-    await d.keys(["enter"]);
-    if (!(await until((l) => l.join(" ").replace(/\s+/g, " ").includes("Should the fix include"), 30_000))) throw new Error("the demo's question didn't show");
-    await d.wait(1500);
-    await d.keys(["down", "enter"]); // "Just the fix"
-    if (!(await until((l) => l.some((x) => x.includes("keep talking")), 30_000))) throw new Error("the agent choice didn't show");
+    if (o.brain) {
+      // ——— a journey: the real brain asks (each question gets the same answer, at most `turns` turns), then proposes ———
+      await d.type(o.task ?? JOURNEY_TASK(label));
+      await d.keys(["enter"]);
+      let turns = 1;
+      let asked = 0;
+      for (;;) {
+        // The brain's own reply comes first: wait for the screen to say whose turn it is.
+        if (!(await until((l) => brainProposes(l) || brainAsks(l), 120_000))) throw new Error(`the brain neither asked nor proposed within 120 s (turn ${turns})`);
+        await d.wait(1200);
+        const l = await lines();
+        if (brainProposes(l)) break;
+        if (turns >= o.brain.turns) throw new Error(`the brain asked again after ${turns} turns: stopped at the journey's cap, nothing launched`);
+        asked++;
+        say(`  the brain asks (turn ${turns}): answered`);
+        await d.type(JOURNEY_ANSWER);
+        await d.keys(["enter"]);
+        turns++;
+        // The question closes, the brain thinks: let the asking state go before reading it again.
+        await until((x) => !brainAsks(x), 15_000);
+      }
+      add("the brain asks, then proposes the agents", "PASS", `${turns} turn(s), ${asked} question(s) answered`);
+    } else {
+      // ——— the demo's question and proposal, then the harness's own option on its cheapest model ———
+      await d.type(o.task ?? TASK(BINARY[h]));
+      await d.keys(["enter"]);
+      if (!(await until((l) => l.join(" ").replace(/\s+/g, " ").includes("Should the fix include"), 30_000))) throw new Error("the demo's question didn't show");
+      await d.wait(1500);
+      await d.keys(["down", "enter"]); // "Just the fix"
+      if (!(await until((l) => l.some((x) => x.includes("keep talking")), 30_000))) throw new Error("the agent choice didn't show");
+    }
     await d.wait(1200);
     const mine = () => lines().then((l) => options(l).find((x) => x.label.toLowerCase() === label) ?? null);
     if (!(await mine())) {
@@ -523,7 +566,8 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
         const l = await lines();
         if (isSession(l) && !awaiting(l)) working = true;
         if (await answerDialog(l)) continue;
-        replied = saysOK(l);
+        // A journey's reply is whatever the brain's spec asked for: the agent is done once it has worked and awaits.
+        replied = o.brain ? working && awaiting(l) : saysOK(l);
         idleSince = awaiting(l) ? idleSince || Date.now() : 0;
         // Done once it awaits with its reply on screen; awaiting for 15 s with no reply is an answer too (no OK).
         if (working && awaiting(l) && (replied || Date.now() - idleSince > 15_000)) break;
@@ -532,7 +576,8 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
       const now = await lines();
       const done = awaiting(now);
       add("status goes working → awaiting", working && done ? "PASS" : "FAIL", `${working ? "saw working" : "never saw working"}; ${done ? "awaiting your input" : `not awaiting after ${turnMs / 1000} s: ${infoRow(now).slice(0, 100)}`}`);
-      add('the agent answered "OK"', replied ? "PASS" : "FAIL", replied ? "a line that is just OK is on screen" : "no OK line on screen");
+      // A journey's spec is the brain's: any reply counts (the turn went working → awaiting, above); the demo's says "Reply with just OK".
+      if (!o.brain) add('the agent answered "OK"', replied ? "PASS" : "FAIL", replied ? "a line that is just OK is on screen" : "no OK line on screen");
       await saveScreen("session");
 
       // ——— the reader finds the input line: a typed /clear makes Gluon ask ———

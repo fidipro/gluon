@@ -8,10 +8,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_MODELS } from "../src/harnesses.ts";
-import { checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
+import { brainAsks, brainProposes, checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
-  planLines, planRouteBlock, planTotal, price, runCapOf, sectionsOf, Spend, usd, type Available,
+  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, price, runCapOf, sectionsOf, Spend, usd, type Available,
 } from "../scripts/live-lib.ts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -376,5 +376,44 @@ describe("a dry run of the script", () => {
     const r = Bun.spawnSync([process.execPath, "--no-env-file", "--config=scripts/empty-bunfig.toml", "scripts/live.ts", "--caps", "bedrock=lots", "--dry-run"], { cwd: ROOT, env: { PATH: process.env.PATH!, HOME: tmpdir() } });
     expect(r.exitCode).toBe(2);
     expect(r.stderr.toString()).toContain("--caps: bedrock=lots is not an amount");
+  });
+});
+
+describe("--tier=journey: the real brain to an agent's reply, on hard caps", () => {
+  test("the tier takes --harness or none; its run cap is one journey's or every harness's; its section is the journey", () => {
+    expect(parseArgs(["--tier=journey"])).toMatchObject({ tier: "journey" });
+    expect(parseArgs(["--tier=journey", "--harness=codex"])).toMatchObject({ tier: "journey", harness: "codex" });
+    expect(() => parseArgs(["--harness=codex"])).toThrow(/--harness goes with/);
+    expect(runCapOf({ tier: "journey", harness: "codex" })).toBe(JOURNEY_HARNESS_CAP);
+    expect(runCapOf({ tier: "journey" })).toBe(JOURNEY_RUN_CAP);
+    expect(sectionsOf({ tier: "journey" })).toEqual(["journey"]);
+  });
+
+  test("the caps are small and nest: a journey's brain and agent parts fit its cap; every harness's fits the month's", () => {
+    expect(JOURNEY_BRAIN_CAP + JOURNEY_AGENT_CAP).toBeLessThanOrEqual(JOURNEY_HARNESS_CAP);
+    expect(JOURNEY_RUN_CAP).toBeLessThanOrEqual(JOURNEY_MONTH_CAP);
+    expect(JOURNEY_MONTH_CAP).toBeLessThanOrEqual(5);
+  });
+
+  test("the month's journeys: only journey calls, only this calendar month", () => {
+    const runs = [
+      { at: "2026-10-01T10:00:00Z", calls: [{ what: "journey codex (openrouter)", usd: 0.1 }, { what: "journey codex brain (Haiku)", usd: 0.04 }, { what: "real-harness codex (openrouter)", usd: 0.5 }] },
+      { at: "2026-09-30T23:00:00Z", calls: [{ what: "journey codex (openrouter)", usd: 3 }] },
+    ];
+    expect(journeyMonthSpend(runs, new Date("2026-10-09T00:00:00Z"))).toBeCloseTo(0.14, 6);
+  });
+
+  test("whose turn it is, from the screen: the brain asks (an open question, or the composer waits for a reply), or it proposes the agents", () => {
+    expect(brainAsks(["   3. type your own answer"])).toBe(true);
+    expect(brainAsks(["   › reply to the intake agent"])).toBe(true);
+    expect(brainProposes(["   4. keep talking"])).toBe(true);
+    expect([brainAsks(["   › describe the session you want"]), brainProposes(["   › describe the session you want"])]).toEqual([false, false]);
+  });
+
+  test("a journey's config puts the brain at the one step it was given", () => {
+    const yaml = checkConfig("codex", "openrouter", { region: null }, { route: "anthropic-api", model: "claude-haiku-5-5" });
+    expect(yaml).toContain("brain:");
+    expect(yaml).toContain("route: anthropic-api");
+    expect(checkConfig("codex", "openrouter", { region: null })).not.toContain("brain:");
   });
 });

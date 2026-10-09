@@ -40,16 +40,17 @@ import { join, resolve } from "node:path";
 import { probeConverse } from "../src/agent/bedrock-converse.ts";
 import { repoContext, systemPrompt } from "../src/agent/prompt.ts";
 import { Session, type LoopBrain, type ModelClient, type State } from "../src/agent/session.ts";
-import { brainFor, notConnected, probeStep, stepLabel } from "../src/brain.ts";
+import { brainFor, KEY as BRAIN_KEY, notConnected, probeStep, stepLabel } from "../src/brain.ts";
 import { loadConfig, saveConfig, type BrainStep, type Config } from "../src/config.ts";
 import { HARNESS_INFO, HARNESSES, isPlanConn, PROVIDERS, subscriptionOf, type Conn, type Harness } from "../src/harnesses.ts";
 import { offeredAgents } from "../src/models.ts";
 import { maskSecrets } from "../src/secrets.ts";
 import { claudePing, loginStatus, versionOf } from "../src/status.ts";
 import { probeConnection, recordProbes, summaryLine, type ConnectionProbe, type ModelProbe, type Probe } from "../src/verify.ts";
-import { availableHere, awsSetupFromHost, harnessesFor, loadDevKeys, planHarness, runHarnessSection, verdict, type Assertion } from "./live-harness.ts";
+import { availableHere, awsSetupFromHost, checkHarness, harnessesFor, loadDevKeys, planHarness, runHarnessSection, verdict, type Assertion } from "./live-harness.ts";
 import {
-  bucketOf, chatStep, DEFAULT_CAPS, DEFAULT_LEDGER, parseArgs, PROBE, planCharged, planLines, planRouteBlock, regressionSubset, runCapOf, sectionsOf, SESSION, Spend, usd,
+  bucketOf, chatStep, DEFAULT_CAPS, DEFAULT_LEDGER, JOURNEY_AGENT_CAP, JOURNEY_BRAIN, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, journeyMonthSpend, parseArgs, PROBE,
+  planCharged, planLines, planRouteBlock, regressionSubset, runCapOf, sectionsOf, SESSION, Spend, usd,
   type Args, type Bucket, type PlanItem, type Section,
 } from "./live-lib.ts";
 
@@ -423,6 +424,72 @@ async function realHarness(screens: boolean) {
   for (const a of r.asserts) asserts.push({ status: a.status });
 }
 
+// ——— --tier=journey: the user's way through on the real brain, to the agent's reply ———
+
+/** A journey's wall clock: past it, the check fails (its screens tell where it stood). */
+const JOURNEY_MS = 5 * 60_000;
+
+/** The journey's brain: the connected API route (a plan needs a sign-in in a scratch HOME) whose worst case is lowest, within its cap. */
+function journeyBrain(): { step: BrainStep; worst: number; bucket: Bucket } | { why: string } {
+  const pool = config.brain.order.filter((s) => !s.route.endsWith("-plan") && !notConnected(config, s));
+  const priced = pool.map((step) => ({ step, bucket: bucketFor(step.route), worst: usd(step.model, bucketFor(step.route), JOURNEY_BRAIN.input, JOURNEY_BRAIN.output) })).sort((a, b) => a.worst - b.worst);
+  const pick = priced[0];
+  if (!pick) return { why: "no API brain route is connected here" };
+  if (pick.worst > JOURNEY_BRAIN_CAP) return { why: `the cheapest brain route (${stepLabel(pick.step)}) could cost $${pick.worst.toFixed(4)}, over a journey's brain cap of $${JOURNEY_BRAIN_CAP}` };
+  return pick;
+}
+
+/** One journey per harness (or `--harness`'s): every cap checked before anything is called; the brain is charged at its worst case. */
+async function journey() {
+  out(`Journey tier: ${args.harness ?? "every harness"}: the real brain asks and proposes, Gluon launches the agent, the agent replies; this run may spend at most $${RUN_CAP} (a journey ≤ $${JOURNEY_HARNESS_CAP}, this month's journeys ≤ $${JOURNEY_MONTH_CAP})`);
+  const brain = journeyBrain();
+  if ("why" in brain) {
+    out(`SKIP journey: ${brain.why}`);
+    asserts.push({ status: "SKIP" });
+    return;
+  }
+  const have = availableHere(config);
+  for (const h of harnessesFor(args.harness)) {
+    const plan = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
+    const skip = (why: string) => {
+      out(`SKIP journey ${h}: ${why}`);
+      asserts.push({ status: "SKIP" });
+    };
+    if (!plan.pick.ok || !plan.binary || !plan.model || !plan.bucket) {
+      skip(!plan.pick.ok ? plan.pick.why : !plan.binary ? `${HARNESS_INFO[h].binary} is not on PATH` : "no model");
+      continue;
+    }
+    if (plan.worst > JOURNEY_AGENT_CAP) {
+      skip(`its cheapest model could cost $${plan.worst.toFixed(4)}, over a journey's agent cap of $${JOURNEY_AGENT_CAP}`);
+      continue;
+    }
+    const worst = brain.worst + plan.worst;
+    const month = journeyMonthSpend(spend.file.runs, new Date());
+    if (worst > JOURNEY_HARNESS_CAP) {
+      skip(`its worst case $${worst.toFixed(4)} is over a journey's cap of $${JOURNEY_HARNESS_CAP}`);
+      continue;
+    }
+    if (month + worst > JOURNEY_MONTH_CAP) {
+      skip(`this month's journeys have cost $${month.toFixed(4)}; this one's worst case would take them over $${JOURNEY_MONTH_CAP}`);
+      spend.run.refused.push(`journey ${h}: the month's cap`);
+      break;
+    }
+    if (!spend.allowUsd(brain.bucket, `journey ${h} brain`, brain.step.model, worst)) {
+      skip(`refused, over a cap: ${spend.run.refused.at(-1)}`);
+      break;
+    }
+    out(`\njourney ${h}: brain ${stepLabel(brain.step)} (≤ $${brain.worst.toFixed(4)}) → ${plan.pick.conn} · ${plan.model.label} (≤ $${plan.worst.toFixed(4)})`);
+    const r = await checkHarness(plan, config, {
+      spend, campaign, home: "scratch", screens: true, say: out, turnMs: 120_000, deadline: Date.now() + JOURNEY_MS,
+      brain: { step: brain.step, ...(BRAIN_KEY[brain.step.route] ? { key: BRAIN_KEY[brain.step.route] } : {}), turns: JOURNEY_BRAIN.turns },
+    });
+    // Gluon's brain usage doesn't reach this script: the brain is charged its worst case (an upper estimate), flagged as such.
+    if (!r.refused) spend.chargeUsd(brain.bucket, `journey ${h} brain (${stepLabel(brain.step)})`, brain.step.model, brain.worst, JOURNEY_BRAIN.input, JOURNEY_BRAIN.output, true);
+    for (const a of r.asserts) asserts.push({ status: a.status });
+    if (r.refused) break;
+  }
+}
+
 // ——— --dry-run: what would be called, and the worst case ———
 
 function planOf(): PlanItem[] {
@@ -464,6 +531,20 @@ function planOf(): PlanItem[] {
   if (sections.includes("nested-instructions")) {
     for (const [i, s] of (args.tier === "regression" ? sub : NESTED_STEPS).entries()) stepItem("nested-instructions", "session", i, s, SESSION);
   }
+  if (sections.includes("journey")) {
+    const brain = journeyBrain();
+    if ("why" in brain) add("journey", "the real brain", 0, "other", `skipped: ${brain.why}`);
+    else {
+      const month = journeyMonthSpend(spend.file.runs, new Date());
+      add("journey", `brain: ${stepLabel(brain.step)}, at most ${JOURNEY_BRAIN.turns} turns (this month's journeys so far: $${month.toFixed(4)} of $${JOURNEY_MONTH_CAP})`, 0, brain.bucket, "charged per journey below");
+      for (const h of harnessesFor(args.harness)) {
+        const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
+        if (!p.pick.ok) add("journey", `${h}`, 0, "other", `skipped: ${p.pick.why}`);
+        else if (!p.binary) add("journey", `${h}`, 0, p.bucket ?? "other", `skipped: ${HARNESS_INFO[h].binary} is not on PATH`);
+        else add("journey", `${h}: the brain asks and proposes → ${p.pick.conn} · ${p.model?.label} (${p.model?.id}) launched, replies once`, brain.worst + p.worst, p.bucket!, brain.worst + p.worst > JOURNEY_HARNESS_CAP ? `skipped: over a journey's cap of $${JOURNEY_HARNESS_CAP}` : undefined);
+      }
+    }
+  }
   if (sections.includes("real-harness")) {
     if (!args.harness) add("real-harness", "grok-build", 0, "subscription", "skipped: no API-key route (its xAI plan needs a sign-in)");
     for (const h of harnessesFor(args.harness)) {
@@ -491,6 +572,12 @@ function dryRun() {
 try {
   if (args.dryRun) dryRun();
   else if (args.tier === "regression") await regression();
+  else if (args.tier === "journey") {
+    await journey();
+    const v = verdict(asserts, spend.run.refused.length > 0);
+    out(`\n${v.line}`);
+    process.exitCode = v.code;
+  }
   else if (args.tier === "harness") {
     out(`Harness tier: ${args.harness}, the real-harness section alone; this run may spend at most $${RUN_CAP}`);
     await realHarness(true);
