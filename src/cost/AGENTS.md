@@ -60,7 +60,7 @@ the audit ledger. How it fits: "Status, cost and context" in `docs/concepts/arch
   fields only, delete the zip and its dir whatever happens; a record is one request, never a total (`KimiRecords`). Two launches in one directory never share a session (`pickSession` rivals, BUG-478). No cost of its own: no audit.
 - **A harness's total or context reading arrives before the usage record it includes**: one ahead of ours waits (`settleCumulative`,
   `ownContextChanged`, `SETTLE_GRACE_MS`) and `ended()` judges what is left; never compare at arrival (BUG-472, 473).
-- **A cause is named only for what is observed**: `harness-unknown-model-price` is Claude's own fallback row for an id its catalog lacks, named, never copied (BUG-471).
+- **A cause is named only for what is observed**: `harness-unknown-model-price` is Claude's own fallback row for an id its catalog lacks, named, never copied (BUG-471); `harness-list-price` is Claude's list price beside AWS's: Claude on Bedrock is priced from its `amazon-bedrock/` row, the catalog only audits (BUG-717).
 - **A re-sent telemetry batch counts once** (`src/telemetry.ts` `once`): cost and usage both.
 
 ## Keeping this file fresh

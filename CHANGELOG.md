@@ -35,6 +35,9 @@ All notable changes to Gluon are listed here. The format follows
 - A message sent while the intake agent works is queued instead of refused: it shows above the chat box, goes when the
   agent's turn ends, and `esc` cancels it. If the turn ends with a question or a proposal, it waits and `enter` sends it
   as your answer, so nothing becomes an answer unseen.
+- Claude Code on Amazon Bedrock is priced at AWS's own prices, which Bedrock bills by, instead of Claude Code's list price
+  (Sonnet 5.5's cache reads are $0.10 per million tokens on AWS's price list, not $0.20). `gluon cost-report` names Claude Code's
+  list price as the cause where its own figure differs.
 - Gluon's own updates: a newer version Gluon remembers from an earlier check is confirmed with GitHub before it is announced or
   downloaded (a remembered version that GitHub no longer lists is never acted on); while Gluon is up to date it still asks once a
   day. A version whose automatic install failed is not downloaded again for a day.

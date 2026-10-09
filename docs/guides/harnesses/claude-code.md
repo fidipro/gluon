@@ -39,7 +39,7 @@ See [Modes](../modes.md).
 ## Sessions, cost and context
 
 - **Resume.** Gluon starts it under an id it makes and reopens it with that id, so `gluon resume` works.
-- **Cost and context.** From its OpenTelemetry export to a listener on `127.0.0.1`, priced from Claude Code's own catalog. If your environment has telemetry settings of its own, both show `—`. See [Cost and context](../cost-and-context.md).
+- **Cost and context.** From its OpenTelemetry export to a listener on `127.0.0.1`, priced from Claude Code's own catalog. On Amazon Bedrock it is priced from AWS's own prices (models.dev's Bedrock row), which Bedrock bills by and which can differ from Claude Code's list price; a model without that row falls back to Claude Code's catalog. If your environment has telemetry settings of its own, both show `—`. See [Cost and context](../cost-and-context.md).
 - **`/gluon`.** Typing it in Claude Code shows Gluon's home view.
 
 ## Quirks
