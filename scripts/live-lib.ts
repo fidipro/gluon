@@ -32,10 +32,10 @@ export const HARNESS_RUN_CAP = 1;
  * harness's, and all journeys in a calendar month (the ledger's runs).
  */
 export const JOURNEY_BRAIN = { input: 36_000, output: 3_000, turns: 3 } as const;
-export const JOURNEY_BRAIN_CAP = 0.05;
+export const JOURNEY_BRAIN_CAP = 0.2;
 export const JOURNEY_AGENT_CAP = 0.2;
-export const JOURNEY_HARNESS_CAP = 0.25;
-export const JOURNEY_RUN_CAP = 1;
+export const JOURNEY_HARNESS_CAP = 0.4;
+export const JOURNEY_RUN_CAP = 1.5;
 export const JOURNEY_MONTH_CAP = 5;
 /** What every journey has been charged in `now`'s calendar month (UTC), from the ledger's runs. */
 export function journeyMonthSpend(runs: { at: string; calls: { what: string; usd: number }[] }[], now: Date): number {
