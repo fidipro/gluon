@@ -546,8 +546,12 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
       await saveScreen("proposal");
     }
     say(`  launching ${chosen.label} × ${chosen.model}${chosen.effort ? ` × ${chosen.effort}` : ""}`);
+    // The screens around the launch's Enter (`screens`): what a launch that never starts left behind.
+    await saveScreen("launch-before");
     await d.keys(["enter"]); // the launch: its spec is the one prompt
     sentPrompt = true;
+    await d.wait(1000);
+    await saveScreen("launch-1s");
     const inFrame = await until((l) => shownLabel(l) === label, 30_000);
     add("Gluon's frame shows the agent", inFrame ? "PASS" : "FAIL", inFrame ? `${label}'s session in the frame` : `no session view; shown: ${shownLabel(await lines()) ?? "home"}`);
     if (!inFrame) throw new Error("no session");
