@@ -18,6 +18,9 @@ All notable changes to Gluon are listed here. The format follows
 - The routing reason names the effort it means: the model's default and what the session gets, e.g. `effort +0 from
   haiku's default (high) → claude-code/haiku@high`; when routing rounds up to a stronger level, it says the steps it
   applied there.
+- The intake agent looks up what a quick check would settle instead of guessing: its spec's Context holds only what it saw,
+  a bug's diagnosis comes with the evidence for it and without unsupported suspects, unrequested scope stays out of the
+  Assumptions too, and a request that names only a symptom gets a question about the outcome wanted.
 
 ### Removed
 - Sessions no longer get a git worktree: Gluon says nothing about worktrees to the intake agent or the agent, and the agent

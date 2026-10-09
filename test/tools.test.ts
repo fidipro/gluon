@@ -1001,6 +1001,13 @@ describe("the project's AGENTS.md / CLAUDE.md in the brain's prompt", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).toContain("If the developer named a harness or model, in this message or an earlier one, pass it as `pinned`. Route keeps it and adds no alternatives.");
   });
+  test("BUG-713/check-not-guess: the intake asks for the outcome behind a symptom, keeps unasked scope out of Assumptions, and writes only what it saw as Context", () => {
+    const p = systemPrompt(defaults(), repoContext(dir()));
+    expect(p).toContain("   - the `ask` items of the likely types in <types>\n   - the outcome they want, when the request names only a symptom (\"search is messy\", \"the numbers look wrong\")\n");
+    expect(p).toContain("Don't widen the scope yourself, in the spec's Assumptions either (e.g. an unrelated bug you noticed, a cleanup): ask, or leave it out.");
+    expect(p).toContain("- For a bug, give your diagnosis as a hypothesis, with what you saw that supports it. Leave out suspects you have no evidence for.\n- Context holds only what you saw in the repository. If a quick lookup would settle something, look; anything you still assume goes in Assumptions.\n");
+    expect(p).not.toContain("Don't widen the scope yourself (e.g. an unrelated bug you noticed)");
+  });
   test("BUG-710/worktree-removed: the intake neither decides nor mentions a worktree: no prompt section, no propose_launch field", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).not.toMatch(/worktree/i);

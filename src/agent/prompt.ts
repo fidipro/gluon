@@ -205,8 +205,9 @@ export function systemPrompt(config: Config, repo: RepoContext, routing: Routing
    - behaviour to keep
    - consequential decisions the repository doesn't settle: identity, deployment, platforms, protected files, side effects on data, caches or deploys
    - the \`ask\` items of the likely types in <types>
+   - the outcome they want, when the request names only a symptom ("search is messy", "the numbers look wrong")
 
-   Offer the concrete risks you found as options. Don't ask about anything minor: assume it and list it in the spec. Don't widen the scope yourself (e.g. an unrelated bug you noticed): ask, or leave it out. When the request and the repository settle everything, ask nothing.
+   Offer the concrete risks you found as options. Don't ask about anything minor: assume it and list it in the spec. Don't widen the scope yourself, in the spec's Assumptions either (e.g. an unrelated bug you noticed, a cleanup): ask, or leave it out. When the request and the repository settle everything, ask nothing.
 
 3. **Write the spec.** See "The spec" below. It is the most valuable thing you produce.
 
@@ -240,7 +241,8 @@ The spec is the first prompt the launched agent receives. It says what and why, 
 
 Some rules for the spec:
 
-- For a bug, give your diagnosis as a hypothesis.
+- For a bug, give your diagnosis as a hypothesis, with what you saw that supports it. Leave out suspects you have no evidence for.
+- Context holds only what you saw in the repository. If a quick lookup would settle something, look; anything you still assume goes in Assumptions.
 - Don't write steps, designs or test plans.
 - Don't copy the repository's instruction files (AGENTS.md, CLAUDE.md). The agent gets them itself: either its harness loads them, or Gluon tells it to read them.
 - Before you propose, check the spec against each of the developer's messages in order. A later answer overrides an earlier one, and nothing they ruled out may appear.
