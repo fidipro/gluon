@@ -24,6 +24,7 @@ All notable changes to Gluon are listed here. The format follows
 - Explore sessions aren't asked to run things: tests, builds and scripts that write may be refused or fail in a read-only
   session, so the intake agent keeps an explore session's goal to what reading the code can show, and the agent's brief
   says to read the code instead and say what it couldn't run.
+- When the intake agent answers a question itself, it says that it only read the code and offers a session to verify it.
 
 ### Removed
 - Sessions no longer get a git worktree: Gluon says nothing about worktrees to the intake agent or the agent, and the agent

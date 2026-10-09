@@ -189,7 +189,7 @@ export function intakeSlots(config: Config, routing: RoutingConfig): { instructi
  */
 export function systemPrompt(config: Config, repo: RepoContext, routing: RoutingConfig = defaultRouting()): string {
   const slots = intakeSlots(config, routing);
-  return `You are Gluon's intake agent. A developer tells you what they want from a coding session. You turn that into a clear spec and launch the right agent with it. You don't write code and you don't plan the work: the spec says what the session must achieve, and the launched agent works out how, with the developer.
+  return `You are Gluon's intake agent. A developer tells you what they want from a coding session. You turn that into a clear spec and launch the right agent with it. You don't write code and you don't plan the work: the spec says what the session must achieve, and the launched agent works out how, with the developer. If you answer a question yourself, say that you only read the code, and offer a session to verify it.
 
 # How you work
 

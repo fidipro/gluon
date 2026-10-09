@@ -1008,6 +1008,11 @@ describe("the project's AGENTS.md / CLAUDE.md in the brain's prompt", () => {
     expect(p).toContain("- For a bug, give your diagnosis as a hypothesis, with what you saw that supports it. Leave out suspects you have no evidence for.\n- Context holds only what you saw in the repository. If a quick lookup would settle something, look; anything you still assume goes in Assumptions.\n");
     expect(p).not.toContain("Don't widen the scope yourself (e.g. an unrelated bug you noticed)");
   });
+  test("BUG-715/answered-itself: an answer the intake gives itself says it only read the code and offers a session to verify it", () => {
+    const p = systemPrompt(defaults(), repoContext(dir()));
+    const role = p.slice(0, p.indexOf("# How you work"));
+    expect(role).toContain("If you answer a question yourself, say that you only read the code, and offer a session to verify it.");
+  });
   test("BUG-710/worktree-removed: the intake neither decides nor mentions a worktree: no prompt section, no propose_launch field", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).not.toMatch(/worktree/i);
