@@ -18,8 +18,8 @@ export interface InkTerm {
   /** Writes bytes to the app's stdin and waits for the frame they cause. */
   keys(bytes: string): Promise<void>;
   resize(columns: number, rows: number): Promise<void>;
-  /** Waits until the frame contains `text`. */
-  waitFor(text: string, ms?: number): Promise<void>;
+  /** Waits until the frame contains `text`, or (a function) until it holds for the frame's text. */
+  waitFor(text: string | ((frame: string) => boolean), ms?: number): Promise<void>;
   unmount(): void;
 }
 
@@ -75,7 +75,8 @@ export async function inkTerm(node: ReactNode, { columns = 110, rows = 40 } = {}
     },
     async waitFor(text, ms = 2000) {
       const until = Date.now() + ms;
-      while (!Bun.stripANSI(ansi()).includes(text)) {
+      const holds = (frame: string) => (typeof text === "string" ? frame.includes(text) : text(frame));
+      while (!holds(Bun.stripANSI(ansi()))) {
         if (Date.now() > until) throw new Error(`timed out waiting for ${JSON.stringify(text)}; frame:\n${Bun.stripANSI(ansi())}`);
         await tick(10);
       }

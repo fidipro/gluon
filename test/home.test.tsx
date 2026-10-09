@@ -1580,6 +1580,53 @@ describe("home view", () => {
     t.unmount();
   });
 
+  test("BUG-716/queued: Enter while the intake agent works queues the message, shown and not sent; it is sent once the turn ends", async () => {
+    const { t, s } = await home();
+    s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
+    await t.waitFor("Exploring (");
+    await t.keys("also check mul");
+    await t.keys(KEY.enter);
+    await t.waitFor("queued: sent when the intake agent is done");
+    expect(s.sent).toEqual([]);
+    expect(t.text()).toContain("› also check mul");
+    s.set({ workingSince: null });
+    await t.waitFor((x: string) => !x.includes("queued:"));
+    expect(s.sent).toEqual(["also check mul"]);
+    t.unmount();
+  });
+
+  test("BUG-716/queued: Esc cancels a queued message before it interrupts the intake agent", async () => {
+    const { t, s } = await home();
+    s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
+    await t.waitFor("Exploring (");
+    await t.keys("also check mul");
+    await t.keys(KEY.enter);
+    await t.waitFor("queued:");
+    await t.keys(KEY.esc);
+    await t.waitFor((x: string) => !x.includes("queued:"));
+    expect(s.interrupted).toBe(0);
+    s.set({ workingSince: null });
+    await t.waitFor((x: string) => !x.includes("Exploring ("));
+    expect(s.sent).toEqual([]);
+    t.unmount();
+  });
+
+  test("BUG-716/queued: a question at the turn's end keeps the message queued, says Enter sends it as the answer, and only Enter sends it", async () => {
+    const { t, s } = await home();
+    s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
+    await t.waitFor("Exploring (");
+    await t.keys("the second one");
+    await t.keys(KEY.enter);
+    await t.waitFor("queued:");
+    s.set({ workingSince: null, pending: { kind: "question", question: { question: "Which one?", options: [{ label: "this" }, { label: "that" }] } } });
+    await t.waitFor("queued: enter sends it as your answer");
+    expect(s.sent).toEqual([]);
+    await t.keys(KEY.enter);
+    await t.waitFor((x: string) => !x.includes("queued:"));
+    expect(s.sent).toEqual(["the second one"]);
+    t.unmount();
+  });
+
   test("while the intake agent works: a working line, Esc interrupts, Enter doesn't send", async () => {
     const { t, s } = await home();
     s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
@@ -1587,7 +1634,10 @@ describe("home view", () => {
     await t.keys("more");
     await t.keys(KEY.enter);
     expect(s.sent).toEqual([]);
-    expect(t.text()).toContain("Still working");
+    expect(t.text()).toContain("queued: sent when the intake agent is done");
+    // The first Esc cancels the queued message (BUG-716), the next interrupts.
+    await t.keys(KEY.esc);
+    await t.waitFor((x: string) => !x.includes("queued:"));
     await t.keys(KEY.esc);
     // The held Esc is sent on a timer: on a loaded machine it can fire after a fixed pause (the macOS run's flake).
     for (const until = Date.now() + 5000; s.interrupted < 1 && Date.now() < until; ) await Bun.sleep(25);

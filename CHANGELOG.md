@@ -32,6 +32,9 @@ All notable changes to Gluon are listed here. The format follows
   worktree is ignored), and `gluon stats` leaves the worktree columns empty.
 
 ### Fixed
+- A message sent while the intake agent works is queued instead of refused: it shows above the chat box, goes when the
+  agent's turn ends, and `esc` cancels it. If the turn ends with a question or a proposal, it waits and `enter` sends it
+  as your answer, so nothing becomes an answer unseen.
 - Gluon's own updates: a newer version Gluon remembers from an earlier check is confirmed with GitHub before it is announced or
   downloaded (a remembered version that GitHub no longer lists is never acted on); while Gluon is up to date it still asks once a
   day. A version whose automatic install failed is not downloaded again for a day.

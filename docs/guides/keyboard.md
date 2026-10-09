@@ -17,7 +17,7 @@ On the home view, the hint line names the keys for what is selected. Press `?` w
 
 ## In the intake chat
 
-- `enter` sends your message.
+- `enter` sends your message. While the intake agent works, the message is queued above the chat box and sent when its turn ends; `esc` cancels it. If the agent ends its turn with a question or a proposal, the queued message waits, and `enter` sends it as your answer.
 - `↑` and `↓`, or a digit, then `enter`, pick an option.
 - `enter` on an agent starts the session. Type instead to change it.
 - `tab` and `shift+tab` adjust the highlighted agent's model and effort. The hint names them when it has another.

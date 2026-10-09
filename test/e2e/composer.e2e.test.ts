@@ -139,15 +139,14 @@ describe("batched input", () => {
 });
 
 describe("while the intake agent works", () => {
-  test("B21/BUG-11: Enter while working says the message wasn't sent and keeps it", async () => {
+  test("B21/BUG-11: Enter while working queues the message on screen; it isn't sent during the turn", async () => {
     const app = await start({ cwd: repo.tiny(), rows: 40, env: FULL_PACE });
     await app.type("fix");
     await app.press(KEY.enter);
     await app.type("also check mul");
     await app.press(KEY.enter);
     // Wait for the redraw: a loaded runner can be slower than the key round-trip.
-    await app.waitFor("Still working, so that wasn’t sent");
-    expect(app.screen()).toContain("   › also check mul");
+    await app.waitFor("› also check mul · queued:");
   });
 
   test("C20/BUG-11: a draft left over when a question arrives is flagged, not silently re-targeted @full", async () => {
