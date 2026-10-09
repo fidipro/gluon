@@ -252,6 +252,17 @@ GLUON_REVIEW=1 bun run test:visual     # also PNGs, contact sheets, test/visual/
   characters, cuts ending in `…`, the home view's ground painted, one highlight at home, contrast
   ≥ 3:1. A lint a real Gluon bug breaks is listed in `KNOWN_BUGS` (`scenes.visual.test.ts`) as a
   `BUG-CANDIDATE/V-…` `test.failing`: drop the scene once the bug is fixed.
+- **Goldens known to fail** on a clean checkout (the test reports them as failures; read the diff
+  before you take it as your regression):
+  - `home-groups`, every size: the golden holds styled runs on blank cells at the right of the
+    header's first row. The text is the same, and the screen looks the same. The golden recorded
+    paint left on blank cells, so it fails even at the commit that recorded it. Re-record it, or
+    have `frame.ts` ignore the style of blank cells.
+  - `session-claude` and `session-grok` at 160×50: the fake agent's argv shows the session id
+    Gluon mints for each launch (`crypto.randomUUID()` in `src/gluon.ts`), and `mask.ts` has no
+    UUID mask, so these fail on every run.
+
+  Remove an entry when its fix lands.
 - **PNGs** (`render.py`, PIL and the DejaVu fonts; without them, one note and no PNGs):
   `python3 test/visual/render.py --cells <cells.json> <out.png>` (a frame as `cellsJson` writes
   it; the shape is atop `render.py`), `--ansi <ansi.txt> <cols> <out.png>` (escape sequences,
@@ -368,5 +379,5 @@ perf suite (`test/perf/`: its metrics, ceilings, variables, `!flood`), the
 coverage matrix's shape, its runners' variables (`GLUON_FULL`, `GLUON_MATRIX_ONLY`,
 `GLUON_MATRIX_TIMES`, `GLUON_FUZZ_SEED`) or the `BUG-CANDIDATE` / `KNOWN_FAILING` convention, the
 monkey's knobs, checks or `KNOWN` list (`gluon-monkey.ts`), how CI load is reproduced, or the visual
-suite's sizes, themes, masks, lints or `render.py` CLIs (`test/visual/`). How-to only; the rules for
-tests are in `test/AGENTS.md`.
+suite's sizes, themes, masks, lints, known-failing goldens or `render.py` CLIs (`test/visual/`).
+How-to only; the rules for tests are in `test/AGENTS.md`.
