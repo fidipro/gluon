@@ -6,6 +6,12 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Claude Code's Haiku 5.5 runs at `high` effort by default (was `medium`), like GPT-6 Luna in the same slot.
+- The routing reason names the effort it means: the model's default and what the session gets, e.g. `effort +0 from
+  haiku's default (high) → claude-code/haiku@high`; when routing rounds up to a stronger level, it says the steps it
+  applied there.
+
 ### Removed
 - Sessions no longer get a git worktree: Gluon says nothing about worktrees to the intake agent or the agent, and the agent
   works where Gluon was started, as each harness does on its own. A session saved with a worktree still resumes (the

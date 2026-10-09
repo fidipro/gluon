@@ -487,7 +487,7 @@ const DEEPSEEK_FLASH = "deepseek-v4.1-flash";
  */
 export const DEFAULT_MODELS: Record<Harness, ModelEntry[]> = {
   "claude-code": [
-    claude("haiku", "Haiku 5.5", "fast and cheap; small, well-specified edits", { alias: "haiku", api: "claude-haiku-5-5", bedrock: "global.anthropic.claude-haiku-5-5", openrouter: "anthropic/claude-haiku-5.5" }, "medium"),
+    claude("haiku", "Haiku 5.5", "fast and cheap; small, well-specified edits", { alias: "haiku", api: "claude-haiku-5-5", bedrock: "global.anthropic.claude-haiku-5-5", openrouter: "anthropic/claude-haiku-5.5" }, "high"),
     claude("sonnet", "Sonnet 5.5", "strong and mid-priced; default for most everyday tasks", { alias: "sonnet", api: "claude-sonnet-5-5", bedrock: "global.anthropic.claude-sonnet-5-5", openrouter: "anthropic/claude-sonnet-5.5" }, "high"),
     claude("opus", "Opus 5.5", "most capable, expensive; hard debugging, design, large changes", { alias: "opus", api: "claude-opus-5-5", bedrock: "global.anthropic.claude-opus-5-5", openrouter: "anthropic/claude-opus-5.5" }, "medium"),
     claude("fable", "Fable 5.1", "frontier model, most expensive; the hardest, longest tasks", { alias: "fable", api: "claude-fable-5-1", bedrock: "global.anthropic.claude-fable-5-1", openrouter: "anthropic/claude-fable-5.1" }, "high"),

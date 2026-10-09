@@ -17,7 +17,7 @@ Anthropic's own harness. Strongest general coding agent; best for multi-file fea
 
 | Model | Id | Claude plan | Anthropic | Amazon Bedrock | OpenRouter | Efforts | Default effort | Notes |
 |---|---|---|---|---|---|---|---|---|
-| Haiku 5.5 | `haiku` | `haiku` | `claude-haiku-5-5` | `global.anthropic.claude-haiku-5-5` | `anthropic/claude-haiku-5.5` | `low`, `medium`, `high`, `xhigh`, `max` | `medium` | fast and cheap; small, well-specified edits |
+| Haiku 5.5 | `haiku` | `haiku` | `claude-haiku-5-5` | `global.anthropic.claude-haiku-5-5` | `anthropic/claude-haiku-5.5` | `low`, `medium`, `high`, `xhigh`, `max` | `high` | fast and cheap; small, well-specified edits |
 | Sonnet 5.5 | `sonnet` | `sonnet` | `claude-sonnet-5-5` | `global.anthropic.claude-sonnet-5-5` | `anthropic/claude-sonnet-5.5` | `low`, `medium`, `high`, `xhigh`, `max` | `high` | strong and mid-priced; default for most everyday tasks |
 | Opus 5.5 | `opus` | `opus` | `claude-opus-5-5` | `global.anthropic.claude-opus-5-5` | `anthropic/claude-opus-5.5` | `low`, `medium`, `high`, `xhigh`, `max` | `medium` | most capable, expensive; hard debugging, design, large changes |
 | Fable 5.1 | `fable` | `fable` | `claude-fable-5-1` | `global.anthropic.claude-fable-5-1` | `anthropic/claude-fable-5.1` | `low`, `medium`, `high`, `xhigh`, `max` | `high` | frontier model, most expensive; the hardest, longest tasks |

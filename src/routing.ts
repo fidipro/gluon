@@ -419,7 +419,12 @@ export function route(cfg: Config, catalog: RouteCatalog, input: RouteInput, env
       if (!same(a, recommended) && !alternatives.some((x) => same(x, a))) alternatives.push(a);
     }
   }
-  why.push(`session: ${mode}, ${LEVELS[level]}, effort ${signed(steps)} from the model's default → ${fmt(recommended)}`);
+  // The model's own default and what was applied to it: a level rounded up takes a step off per level (`agentFor`).
+  const top = found.list[0]!.m;
+  const applied = steps - (found.l - level);
+  const rounded = applied !== steps ? ` (${signed(applied)} after rounding up to ${LEVELS[found.l]})` : "";
+  const from = top.efforts.length ? ` from ${top.id}'s default (${top.defaultEffort ?? "medium"})` : ` (${top.id} takes no effort setting)`;
+  why.push(`session: ${mode}, ${LEVELS[level]}, effort ${signed(steps)}${rounded}${from} → ${fmt(recommended)}`);
   return { mode, recommended, alternatives: alternatives.slice(0, 2), why };
 }
 

@@ -20,7 +20,7 @@ test("the route catalog is the build's catalog: ids, labels, per-model efforts, 
   expect(cat.map((h) => h.id)).toEqual(Object.keys(HARNESS_INFO));
   const model = (h: string, m: string) => cat.find((x) => x.id === h)!.models.find((x) => x.id === m)!;
   expect(cat.find((h) => h.id === "claude-code")).toMatchObject({ name: "Claude Code" });
-  expect(model("claude-code", "haiku")).toMatchObject({ name: "Haiku 5.5", efforts: ["low", "medium", "high", "xhigh", "max"], defaultEffort: "medium" });
+  expect(model("claude-code", "haiku")).toMatchObject({ name: "Haiku 5.5", efforts: ["low", "medium", "high", "xhigh", "max"], defaultEffort: "high" });
   expect(model("claude-code", "sonnet")).toMatchObject({ name: "Sonnet 5.5", efforts: ["low", "medium", "high", "xhigh", "max"], defaultEffort: "high" });
   expect(model("opencode", "deepseek-flash")).toMatchObject({ family: "deepseek", current: "deepseek-v4.1-flash", defaultEffort: "max" });
   expect(model("opencode", "muse-spark-1.3-contributor")).toMatchObject({ optIn: "allow_muse_contributor", sharesDataWith: "Meta" });
@@ -67,13 +67,13 @@ const routed = (input: Parameters<typeof route>[2]) => {
 const call = (type: string, model_steps = 0, effort_steps = 0) => ({ type, model_steps, effort_steps });
 
 test("BUG-462/light on the real catalog: Haiku 5.5 first, then Luna", () => {
-  expect(routed({ types: [call("docs")] })).toBe("build claude-code/haiku@medium | codex/gpt-6-luna@high");
+  expect(routed({ types: [call("docs")] })).toBe("build claude-code/haiku@high | codex/gpt-6-luna@high");
 });
 
 test("BUG-462/prefer kimi-code on the real catalog: K2.7 Code (no effort) at light, K3 at standard, Haiku when the effort asked is above Kimi's", () => {
   const kimi = { harness: "kimi-code", because: "Prefer Kimi." };
   expect(routed({ types: [call("docs")], ...kimi })).toMatch(/^build kimi-code\/kimi-k2.7-code( |$)/);
-  expect(routed({ types: [call("docs", 0, 1)], ...kimi })).toMatch(/^build claude-code\/haiku@high/);
+  expect(routed({ types: [call("docs", 0, 1)], ...kimi })).toMatch(/^build claude-code\/haiku@xhigh/);
   expect(routed({ types: [call("feature")], ...kimi })).toMatch(/^build kimi-code\/kimi-k3@high/);
 });
 

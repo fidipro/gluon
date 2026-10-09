@@ -15,7 +15,7 @@ export const ROUTE_CATALOG: RouteCatalog = [
     id: "claude-code", name: "Claude Code",
     models: [
       // Haiku 5.5 is first in light (routing.yaml rank), ahead of Luna.
-      { id: "haiku",  name: "Haiku 5.5",  efforts: CC, defaultEffort: "medium" },
+      { id: "haiku",  name: "Haiku 5.5",  efforts: CC, defaultEffort: "high" },
       { id: "sonnet", name: "Sonnet 5.5", efforts: CC, defaultEffort: "high" },
       { id: "opus",   name: "Opus 5.5",   efforts: CC, defaultEffort: "medium" },
       // Fable shows no AA edge over Opus 5.5 (Opus scores 2-4 points higher at medium
