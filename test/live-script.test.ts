@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_MODELS } from "../src/harnesses.ts";
-import { brainAsks, brainProposes, checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
+import { brainAsks, brainBusy, brainProposes, checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
   JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, price, runCapOf, sectionsOf, Spend, usd, type Available,
@@ -403,10 +403,14 @@ describe("--tier=journey: the real brain to an agent's reply, on hard caps", () 
     expect(journeyMonthSpend(runs, new Date("2026-10-09T00:00:00Z"))).toBeCloseTo(0.14, 6);
   });
 
-  test("whose turn it is, from the screen: the brain asks (an open question, or the composer waits for a reply), or it proposes the agents", () => {
-    expect(brainAsks(["   3. type your own answer"])).toBe(true);
-    expect(brainAsks(["   › reply to the intake agent"])).toBe(true);
-    expect(brainProposes(["   4. keep talking"])).toBe(true);
+  test("whose turn it is, from the screen (the screens of the first live journey): busy, asking or proposing", () => {
+    const working = ["   ›  Your call, keep it minimal.", "   ◆  Working (1s · esc to interrupt)", "   › reply to the intake agent"];
+    const proposal = ["      ❯ 1. claude code × haiku 5.5 × medium · explore · recommended", "        2. keep talking", "   › reply to the intake agent"];
+    // The composer's placeholder is up while the brain works: that is no question (the first journey typed its answer into the proposal).
+    expect([brainBusy(working), brainAsks(working), brainProposes(working)]).toEqual([true, false, false]);
+    expect([brainBusy(proposal), brainAsks(proposal), brainProposes(proposal)]).toEqual([false, false, true]);
+    expect(brainAsks(["   3. type your own answer", "   › reply to the intake agent"])).toBe(true);
+    expect(brainAsks(["   ◆  Which file?", "   › reply to the intake agent"])).toBe(true);
     expect([brainAsks(["   › describe the session you want"]), brainProposes(["   › describe the session you want"])]).toEqual([false, false]);
   });
 

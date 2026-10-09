@@ -43,9 +43,12 @@ const TASK = (agent: string) => `Reply with just OK. Do not read, run or change 
 export const JOURNEY_TASK = (agent: string) => `Explain in one short sentence what add() in src/math.ts does. Don't change, run or create anything. Use ${agent}.`;
 /** A journey's answer to each question the brain asks (typed: it answers an open question as its own answer, or the chat). */
 export const JOURNEY_ANSWER = "Your call, keep it minimal: one short sentence, nothing changed.";
-/** On screen: the brain is waiting for the user (an open question, or the composer asking for a reply), or it proposes the agents. */
-export const brainAsks = (l: string[]) => l.some((x) => x.includes("type your own answer") || x.includes("reply to the intake agent"));
-export const brainProposes = (l: string[]) => l.some((x) => x.includes("keep talking"));
+/** On screen: the brain is still working on its turn (its spinner line). The composer's "reply to the intake agent" is up all along: no sign of a turn. */
+export const brainBusy = (l: string[]) => l.some((x) => /^\s*◆\s+Working \(/.test(x) || x.includes("esc to interrupt"));
+/** The brain proposes the agents (its choice is up). */
+export const brainProposes = (l: string[]) => !brainBusy(l) && l.some((x) => x.includes("keep talking"));
+/** The brain waits for the user: an open question, or its turn ended without a proposal (a question in prose). Never while it works. */
+export const brainAsks = (l: string[]) => !brainBusy(l) && !brainProposes(l) && (l.some((x) => x.includes("type your own answer")) || l.some((x) => x.includes("reply to the intake agent")));
 
 /** One option of the agent choice: its number, whether it's highlighted, harness label, model, effort. */
 interface Option {
@@ -466,18 +469,21 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
       let asked = 0;
       for (;;) {
         // The brain's own reply comes first: wait for the screen to say whose turn it is.
+        // Its turn starts: the spinner, or (a fast one) the proposal already. Then its turn ends.
+        await until((l) => brainBusy(l) || brainProposes(l), 15_000);
         if (!(await until((l) => brainProposes(l) || brainAsks(l), 120_000))) throw new Error(`the brain neither asked nor proposed within 120 s (turn ${turns})`);
         await d.wait(1200);
         const l = await lines();
         if (brainProposes(l)) break;
+        if (!brainAsks(l)) continue; // it started another step in the meantime
         if (turns >= o.brain.turns) throw new Error(`the brain asked again after ${turns} turns: stopped at the journey's cap, nothing launched`);
         asked++;
         say(`  the brain asks (turn ${turns}): answered`);
         await d.type(JOURNEY_ANSWER);
         await d.keys(["enter"]);
         turns++;
-        // The question closes, the brain thinks: let the asking state go before reading it again.
-        await until((x) => !brainAsks(x), 15_000);
+        // The answer goes: the brain's next turn starts before the screen is read again.
+        await until((x) => brainBusy(x) || brainProposes(x), 15_000);
       }
       add("the brain asks, then proposes the agents", "PASS", `${turns} turn(s), ${asked} question(s) answered`);
     } else {
@@ -546,8 +552,12 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
       await saveScreen("proposal");
     }
     say(`  launching ${chosen.label} × ${chosen.model}${chosen.effort ? ` × ${chosen.effort}` : ""}`);
+    // The screens around the launch's Enter (`screens`): what a launch that never starts left behind.
+    await saveScreen("launch-before");
     await d.keys(["enter"]); // the launch: its spec is the one prompt
     sentPrompt = true;
+    await d.wait(1000);
+    await saveScreen("launch-1s");
     const inFrame = await until((l) => shownLabel(l) === label, 30_000);
     add("Gluon's frame shows the agent", inFrame ? "PASS" : "FAIL", inFrame ? `${label}'s session in the frame` : `no session view; shown: ${shownLabel(await lines()) ?? "home"}`);
     if (!inFrame) throw new Error("no session");
