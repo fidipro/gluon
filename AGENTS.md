@@ -15,6 +15,7 @@ Editing any `AGENTS.md`: follow "Keeping AGENTS.md files fresh" at the end of th
 bun run regression    # fast tier: typecheck + unit + e2e minus `@full` tests (~2.5 min); `regression:full` is all (~12 min)
 bun run test:area <a,b>  # one area's tests (test/areas.ts; `regression --changed|--list`); `test:coverage`: unit coverage
 bun run test:health   # what in the tests is stale + the action (offline, seconds; docs/contributing/maintenance.md)
+bun run test:value <area>  # what an area's tests are worth: mutation gaps, deletion candidates (local, minutes)
 bun run test:unit     # unit tests, one process (`regression` shards them)
 bun run test:e2e      # e2e scenarios, all of them (~13 min)
 bun run test:visual   # Gluon's goldens + lints, local only (~6 min; -u updates; test/e2e/README.md)

@@ -48,6 +48,14 @@ test. One behaviour per test, named for what it checks: `BUG-<n>/<case>: <what h
 **9. A failure says what to do.** A check that fails names the file, what is wrong and how to fix it, so the next
 person, or agent, acts on it without reading the check.
 
+## Pruning
+
+A test is deleted on evidence, never on a hunch. `bun run test:value <area>` (local, minutes) puts small bugs into the
+area's source one at a time (a comparison flipped, a `!` dropped) and runs its tests after each: a bug no test notices is
+a gap to close; a test that catches nothing no other test catches is a candidate to delete, the slow ones first. It also
+lists the bugs the area tests at both layers. Candidates need a large sample (hundreds of mutants) before they mean much;
+a pull request that deletes tests says why for each, and waits for a maintainer's `tests-reviewed` label.
+
 ## Flaky tests
 
 CI runs a failed test once more. If it passes then, the run passes and the test is reported as flaky (a warning on
