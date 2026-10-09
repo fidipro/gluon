@@ -6,6 +6,11 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Removed
+- Sessions no longer get a git worktree: Gluon says nothing about worktrees to the intake agent or the agent, and the agent
+  works where Gluon was started, as each harness does on its own. A session saved with a worktree still resumes (the
+  worktree is ignored), and `gluon stats` leaves the worktree columns empty.
+
 ### Fixed
 - Gluon's own updates: a newer version Gluon remembers from an earlier check is confirmed with GitHub before it is announced or
   downloaded (a remembered version that GitHub no longer lists is never acted on); while Gluon is up to date it still asks once a

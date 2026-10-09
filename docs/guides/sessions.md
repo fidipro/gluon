@@ -13,7 +13,7 @@ Each row on the home view is display only: Gluon never acts on it. A header line
 - **Latest activity.** What the agent is doing now.
 - **Mode.** `· explore` or `· plan`. Build shows nothing. A session reopened with `gluon resume` shows the mode it was started in ([Modes](modes.md)).
 - **Cost and context.** Both are Gluon's own figures: see [Cost and context](cost-and-context.md).
-- **Files changed** since the session started. The work tree is shared unless the session has its own [worktree](worktrees.md).
+- **Files changed** in your checkout since the session started. Sessions work where Gluon was started, so they share the work tree.
 
 Rows are grouped (awaiting input, working, drafting). `ctrl+d` marks the selected session done, and again marks it not done: only you decide what is done. `del` removes any row, asking first.
 
@@ -57,8 +57,6 @@ Some sessions cannot be reopened: Antigravity and Kimi Code cannot be resumed, C
 
 The question comes unasked, so it ignores keys for a moment, never comes while you have text in the chat, and gives way to anything you type.
 
-Started again, a session goes on in the worktree it already had, if that is still there (see [Worktrees](worktrees.md)), not in a second one.
-
 When the session's agent is not connected or its model is gone, there is nothing to ask: the chat says it can be neither resumed nor started again and that the record stays in its workspace. To let it go, the notice names the delete option of `gluon sessions` with the workspace's id, which deletes the whole workspace (quit this Gluon first: it owns the workspace until then). A saved directory that was moved or renamed stops `gluon resume` with the same advice: move the directory back (the agents find their sessions by directory), or delete the saved session the same way.
 
 One session is not asked about but refused: a Codex, Grok Build or OpenCode session saved before Gluon recorded modes. Gluon cannot tell whether it was an explore (read-only) session and a resume would not keep that, so the chat says it was not resumed and names the delete option of `gluon sessions` (it deletes the whole workspace). It is never started again as a build session. See [Modes](modes.md).
@@ -86,7 +84,6 @@ A mapping per agent under `agents` overrides any of these for that agent. `gluon
 
 - [Keyboard and mouse](keyboard.md): the keys on the home view and inside a session.
 - [Cost and context](cost-and-context.md): how the cost and context columns are counted.
-- [Worktrees](worktrees.md): why sessions on one repository do not affect one another.
 - [Command reference](../reference/cli.md): `resume`, `sessions` and every other command.
 
 <!-- Keeping this file fresh: update in the change that alters the sessions home, the frame, saved workspaces or `gluon resume` (src/gluon.ts, src/sessions.ts, src/workspaces.ts, src/pty/compositor.ts) the handoff settings (src/handoff.ts) or `gluon stats` (src/stats.ts, src/stats-sql.ts). Which agents can resume is `resume` in src/harnesses.ts. -->

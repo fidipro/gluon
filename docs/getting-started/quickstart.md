@@ -46,8 +46,6 @@ Enter starts the session in Gluon's frame:
 - the agent's own UI inside,
 - the keys at the bottom.
 
-In a git repository the session works in its own [worktree](../guides/worktrees.md).
-
 ## Keep going
 
 Press `Ctrl+\` to open a one-key menu while every session keeps running. Then:

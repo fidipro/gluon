@@ -60,7 +60,7 @@ export class StubSession {
     if (p?.kind !== "proposal" || !p.choices[index]) return null;
     this.confirmed.push({ index, override });
     const mode = override?.mode ?? p.mode;
-    return { ...p.choices[index]!, ...override, ...(mode && mode !== "build" ? { mode } : {}), spec: p.spec, reason: p.reason, name: p.name, worktree: p.worktree };
+    return { ...p.choices[index]!, ...override, ...(mode && mode !== "build" ? { mode } : {}), spec: p.spec, reason: p.reason, name: p.name };
   }
   interrupt() {
     this.interrupted++;
@@ -80,7 +80,6 @@ export const PROPOSAL: ShownProposal = {
     { harness: "codex", model: "gpt-6.1-sol", effort: "medium" },
     { harness: "opencode", model: "deepseek-flash", effort: "low" },
   ],
-  worktree: true,
   choice: { harness: "claude-code", model: "sonnet", effort: "medium", spec: "", reason: "" },
 };
 

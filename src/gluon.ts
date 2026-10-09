@@ -14,7 +14,6 @@
  * files-changed poll. Status, cost and context only ever update the store: they never act.
  */
 import { dirname } from "node:path";
-import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { useApp } from "ink";
 import { createElement, useEffect, useState, type ReactNode } from "react";
@@ -61,7 +60,6 @@ import { refreshAllowed, refreshNetworkTables, refreshOnLaunch } from "./cost/re
 import { onTablesChanged } from "./cost/tables.ts";
 import { opencodeContextTokens } from "./cost/opencode.ts";
 import { ownTelemetry, tryStartTelemetry } from "./telemetry.ts";
-import { planWorktree, reusableWorktree, withWorktree, type WorktreePlan } from "./worktree.ts";
 import { Home, type HomeProps } from "./ui/Home.tsx";
 import type { HomeQuestion } from "./ui/list.tsx";
 import type { HeaderInfo } from "./ui/header.tsx";
@@ -602,8 +600,6 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
 
   // The work tree's changes: the header's count, and per session since its start.
   const baselines = new Map<number, Map<string, string>>();
-  // Sessions in their own worktree (`worktree.ts`): their changes are read there, from nothing.
-  const worktrees = new Map<number, WorktreePlan>();
   let lastSnapshot: Map<string, string> | null = null;
   let polling = false;
   const pollFiles = async () => {
@@ -611,7 +607,7 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
     polling = true;
     try {
       const live: PolledSession[] = [];
-      for (const [id, base] of baselines) if (runs.get(id)?.alive) live.push({ id, base, ...(worktrees.has(id) ? { worktree: worktrees.get(id)!.path } : {}) });
+      for (const [id, base] of baselines) if (runs.get(id)?.alive) live.push({ id, base });
       const polled = await pollChanges(cwd, live);
       if (!polled) return;
       const snap = polled.header;
@@ -648,15 +644,15 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
    * No pseudo-terminal here: the agent gets the terminal itself until it ends (`handOffSession`),
    * then the home view is back with one line on how it ended. One session at a time.
    */
-  async function startDirect(picked: NamedChoice, choice: NamedChoice, cmd: Command, notes: string[], version: string | null, minted?: string, again?: Again, worktree?: WorktreePlan): Promise<Refused> {
+  async function startDirect(picked: NamedChoice, choice: NamedChoice, cmd: Command, notes: string[], version: string | null, minted?: string, again?: Again): Promise<Refused> {
     const { harness } = choice;
     const settings = handoffFor(config.handoff, harness);
     const label = HARNESS_INFO[harness].label;
     let running = true;
     const view = store.launched(choice.name, { harness, model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}), ...(choice.mode && choice.mode !== "build" ? { mode: choice.mode } : {}) }, { get alive() { return running; }, end: async () => {} }, Date.now(), !again);
-    // The record keeps the spec as picked: the worktree brief is added again at every start.
-    const key = track(view, picked, minted, again, worktree);
-    const run = beginRun(view, picked, cmd, version, minted, again, worktree, key);
+    // The record keeps the spec as picked: the mode block is added again at every start.
+    const key = track(view, picked, minted, again);
+    const run = beginRun(view, picked, cmd, version, minted, again, key);
     // A resumed session comes with the chat the user has; a new one starts it over.
     if (!again) {
       host.session.close();
@@ -706,24 +702,23 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
   type Refused = { problem: string } | undefined;
 
   /** The launched row's place in the saved workspace: a new session in the record, or the one it continues. Returns its key. */
-  function track(view: SessionView, choice: NamedChoice, minted: string | undefined, again?: Again, worktree?: WorktreePlan): string {
+  function track(view: SessionView, choice: NamedChoice, minted: string | undefined, again?: Again): string {
     const resume = minted ? { id: minted, source: "minted" as const } : undefined;
-    const wt = worktree ? { path: worktree.path, branch: worktree.branch } : undefined;
     let key: string;
     if (again) {
       key = again.child.key;
-      // Started again: a new id (or none) and worktree, not the ones the harness refused (a Codex or OpenCode one sends its id by hook).
-      if (!again.resume) recorder.update(key, { name: view.name, resume, worktree: wt, mode: choice.mode ?? "build" });
+      // Started again: a new id (or none), not the one the harness refused (a Codex or OpenCode one sends its id by hook).
+      if (!again.resume) recorder.update(key, { name: view.name, resume, mode: choice.mode ?? "build" });
       if (again.child.done) store.update(view.id, { markedDone: true });
     } else {
-      key = recorder.add({ name: view.name, harness: choice.harness, model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}), mode: choice.mode ?? "build", spec: choice.spec, startedAt: view.startedAt, ...(resume ? { resume } : {}), ...(wt ? { worktree: wt } : {}) }).key;
+      key = recorder.add({ name: view.name, harness: choice.harness, model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}), mode: choice.mode ?? "build", spec: choice.spec, startedAt: view.startedAt, ...(resume ? { resume } : {}) }).key;
     }
     keyOf.set(view.id, key);
     return key;
   }
 
-  /** The session's row in the local analytics (`src/analytics.ts`), from what the user picked: the spec as shown, not Gluon's mode and worktree additions. */
-  function beginRun(view: SessionView, picked: NamedChoice, cmd: Command, version: string | null, minted: string | undefined, again: Again | undefined, worktree: WorktreePlan | undefined, key: string): Run | undefined {
+  /** The session's row in the local analytics (`src/analytics.ts`), from what the user picked: the spec as shown, not Gluon's mode additions. */
+  function beginRun(view: SessionView, picked: NamedChoice, cmd: Command, version: string | null, minted: string | undefined, again: Again | undefined, key: string): Run | undefined {
     const saved = again?.resume ? again.child.resume : undefined;
     const agentSessionId = minted ?? saved?.id;
     return analytics.begin({
@@ -734,7 +729,6 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
       cwd,
       ...(host.header.repo ? { repo: host.header.repo } : {}),
       ...(host.header.branch ? { branch: host.header.branch } : {}),
-      ...(worktree ? { worktree: { path: worktree.path, branch: worktree.branch } } : {}),
       harness: picked.harness,
       ...(version ? { harnessVersion: version } : {}),
       model: picked.model,
@@ -763,32 +757,11 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
   async function start(picked: NamedChoice, again?: Again): Promise<Refused> {
     const chat = host.session;
     const { harness } = picked;
-    // Where the session works is Gluon's to decide, the same for every agent; the agent creates it.
     const notes: string[] = [];
     // The brief says what the mode lets the agent do, whatever the spec says (ctrl+t may have changed the mode after the brain wrote it: BUG-410).
     // A resume goes through the harness's own resume: no mode block in it, no mode applied.
     // The launcher adds, per option, a line for each instruction file the harness doesn't load and (OpenCode) the subagent models (`src/intake.ts`).
-    let choice = again?.resume ? picked : { ...picked, spec: withMode(withLauncherLines(picked.spec, launcherLines({ routing, catalog: routeCatalog({ ...config, agents }, agents, routing), harness, model: picked.model, instructionFiles: (repo.instructions ?? []).map((f) => f.file) })), picked.mode) };
-    let worktree: WorktreePlan | undefined;
-    // A reopened session keeps the conversation (and the worktree it names) it had: nothing is planned for it.
-    // Explore is read-only: it never gets a worktree, whatever the proposal said (creating one is a change).
-    const saved = again?.child.worktree;
-    // Only a worktree this checkout lists, at the place and on the branch Gluon planned it: the record is a file anyone can edit (`reusableWorktree`).
-    const kept = saved && repo.isRepo && existsSync(saved.path) && (await reusableWorktree(saved, cwd)) ? saved : undefined;
-    // Started again without its conversation (no way or id to resume), it goes on in the worktree it already has, with its uncommitted work, not in a second one (QA-resume-13).
-    if (!again?.resume && kept && picked.worktree !== false && picked.mode !== "explore") {
-      worktree = { ...kept, start: "", existing: true };
-      choice = { ...choice, spec: withWorktree(choice.spec, worktree) };
-    } else if (!again?.resume && picked.worktree !== false && picked.mode !== "explore" && repo.isRepo) {
-      const plan = await planWorktree(picked.name, cwd);
-      if (typeof plan === "string") notes.push(`no worktree for ${picked.name}: ${plan}; the agent works in place`);
-      else {
-        worktree = plan;
-        choice = { ...choice, spec: withWorktree(choice.spec, plan) };
-      }
-    }
-    // A reopened session is in the worktree it had: its changes are counted there, and the end says where it is.
-    else if (again?.resume && kept) worktree = { ...kept, start: "" };
+    const choice = again?.resume ? picked : { ...picked, spec: withMode(withLauncherLines(picked.spec, launcherLines({ routing, catalog: routeCatalog({ ...config, agents }, agents, routing), harness, model: picked.model, instructionFiles: (repo.instructions ?? []).map((f) => f.file) })), picked.mode) };
     const settings = handoffFor(config.handoff, harness);
     const label = HARNESS_INFO[harness].label;
     const refuse = (problem: string, notice = problem): Refused => {
@@ -831,7 +804,7 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
     // (A resume types nothing: the mode's line went in the first time.)
     const typed = !pty && !again?.resume ? typedModeProblem(harness, choice.mode) : null;
     if (typed) return refuse(typed, maskSecrets(`Couldn't start ${label}: ${typed}`));
-    if (!pty) return startDirect(picked, choice, cmd, notes, version, minted, again, worktree);
+    if (!pty) return startDirect(picked, choice, cmd, notes, version, minted, again);
     if (telemetry && (harness === "claude-code" || harness === "grok-build") && ownTelemetry(process.env, harness)) notes.push(`cost and context aren't shown for this session: your environment has OpenTelemetry settings of its own (OTEL_*, ${harness === "grok-build" ? "GROK_EXTERNAL_OTEL" : "CLAUDE_CODE_ENABLE_TELEMETRY"}), which Gluon leaves as they are.`);
     const approx = cmd.conn !== undefined && isPlanConn(cmd.conn);
     let id = -1;
@@ -996,8 +969,8 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
     runs.set(id, session);
     if (kimi) kimiTicks.set(id, kimi.tick);
     if (billed) billedTicks.set(id, () => billed!.tick(tracker.ownUsdNow(), tracker.usageExpected(), tracker.requestsNow()));
-    const key = track(view, picked, minted, again, worktree);
-    run = beginRun(view, picked, cmd, version, minted, again, worktree, key);
+    const key = track(view, picked, minted, again);
+    run = beginRun(view, picked, cmd, version, minted, again, key);
     // Codex and OpenCode send their session id by hook (`session` event): saved when it comes.
     if (HARNESS_INFO[harness].resume === "captured")
       session.onSessionId((sid) => {
@@ -1007,10 +980,7 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
     // Codex's hooks name the thread they run in: that is the main conversation (a `/fork` or `/new` moves it); context follows it, cost sums all.
     if (harness === "codex") session.onMainSession((sid) => channel?.setMainConversation(sid));
     if (again?.resume) store.update(id, { activity: RESUMED });
-    if (worktree) {
-      worktrees.set(id, worktree);
-      baselines.set(id, new Map());
-    } else if (lastSnapshot) baselines.set(id, lastSnapshot);
+    if (lastSnapshot) baselines.set(id, lastSnapshot);
     else
       void statusSnapshot(cwd).then((s) => {
         if (s) baselines.set(id, s);
@@ -1172,8 +1142,6 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
     s.onExit((code) => {
       hooks.onEnded(code, s.reason);
       baselines.delete(id);
-      const wt = worktrees.get(id);
-      worktrees.delete(id);
       // Quitting: every agent ends; the frame goes with Gluon.
       if (shuttingDown) return;
       // An ended session closes: its row goes (and its screen, home shown if it was up: the
@@ -1185,8 +1153,6 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
       if (refused) kept.add(key);
       store.remove(id);
       if (s.reason === "exit" && code !== 0 && name) host.session.notice(exitNotice(name, code), "info");
-      // Never removed by Gluon: say where it is, so it isn't forgotten.
-      if (wt && name && existsSync(wt.path)) host.session.notice(`${name}'s worktree is still at ${wt.path} (branch ${wt.branch}).`, "info");
       if (refused) return later(() => offerAgain(resumed, `${HARNESS_INFO[resumed.harness].label} exited with code ${code} right after resuming`));
       // `on_exit: quit`: Gluon goes with the last session the agent itself ended, when no draft is open.
       if (s.reason === "exit" && onExit === "quit" && store.live().length === 0 && !store.draft()) void shutdown(code);

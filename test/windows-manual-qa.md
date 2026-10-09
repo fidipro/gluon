@@ -7,7 +7,7 @@ the theme, the frame or a launch, on a machine with Gluon installed (`install.ps
 (Claude Code's `install.ps1`) and one by npm (`npm i -g @openai/codex`). `gluon doctor` and every
 launch call real models (a few cents): pick the cheapest model.
 
-Run steps 1 to 14 in **Windows Terminal** (PowerShell profile), then repeat 1 to 4 and 9 in the
+Run steps 1 to 13 in **Windows Terminal** (PowerShell profile), then repeat 1 to 4 and 9 in the
 **legacy console** (`conhost.exe` → `powershell`) and in a **cmd** profile. Record the date and the result in
 the maintainers' private notes, not here.
 
@@ -46,14 +46,12 @@ the maintainers' private notes, not here.
    is typed into the composer (ConPTY keeps focus reports on).
 10. **Zoom.** In a session, `Ctrl+\` then `z`: the frame goes and the agent has the whole window but the
     last row (the zoom bar); `Ctrl+\` `z` again brings the frame back with no stale rows. Resize while zoomed.
-11. **Worktrees.** In a git repository, start a session: the agent works in `.gluon\worktrees\gluon-<name>` on
-    branch `gluon/<name>`, and the row's files-changed count follows. "no worktree" in the reply keeps it in the checkout.
-12. **Quitting.** Quit while the intake agent searches a large repo (no rg) and while sessions run: no `gluon`, `bun`,
+11. **Quitting.** Quit while the intake agent searches a large repo (no rg) and while sessions run: no `gluon`, `bun`,
     `rg` or agent process is left in Task Manager; the cursor is visible and mouse clicks don't print escape codes.
-13. **History.** After a launch, `gluon stats` shows the session and `gluon stats sessions` lists it.
+12. **History.** After a launch, `gluon stats` shows the session and `gluon stats sessions` lists it.
     `gluon stats --delete` asks, then empties it (the file stays) while Gluon is still open in another window.
     `analytics.db` and its `-wal` in `%LOCALAPPDATA%\gluon` are readable only by you (Properties → Security).
-14. **Return from a source or npm install** (`GLUON_SELF` is a `.cmd`: BUG-144). Run Gluon
+13. **Return from a source or npm install** (`GLUON_SELF` is a `.cmd`: BUG-144). Run Gluon
     with `bun run demo` (and once from the npm package), launch OpenCode and type `/gluon`: it
     shows the sessions home; then in Claude Code type `/clear` and answer Enter: that session ends.
 

@@ -121,7 +121,6 @@ export interface RunState {
   cwd?: string;
   repo?: string;
   branch?: string;
-  worktree?: { path: string; branch: string };
   harness: string;
   harnessVersion?: string;
   model: string;
@@ -330,11 +329,6 @@ export class Analytics {
         case "branch":
           s[k] = clean(String(v)) ?? "";
           break;
-        case "worktree": {
-          const w = v as { path: string; branch: string };
-          s.worktree = { path: clean(w.path) ?? "", branch: clean(w.branch) ?? "" };
-          break;
-        }
         case "routingTypes":
         case "routingWhy":
           s[k] = (v as string[]).map((x) => maskSecrets(String(x)));
@@ -369,8 +363,9 @@ export class Analytics {
       cwd: s.cwd ?? null,
       repo: s.repo ?? null,
       branch: s.branch ?? null,
-      worktree_path: s.worktree?.path ?? null,
-      worktree_branch: s.worktree?.branch ?? null,
+      // Sessions no longer get a worktree of Gluon's: the columns stay (`MIGRATIONS` only grow), empty.
+      worktree_path: null,
+      worktree_branch: null,
       harness: s.harness,
       harness_version: s.harnessVersion ?? null,
       model: s.model,

@@ -189,8 +189,7 @@ describe("BUG-312/resume: what Gluon keeps while it runs", () => {
     expect(w).toMatchObject({ cwd: repo.tiny(), sessions: [{ name: "Gluon-alpha-task", harness: "claude-code", model: "sonnet", effort: "high", resume: { source: "minted" } }] });
     expect(w!.sessions[0]!.resume!.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(w!.sessions[0]!.spec.length).toBeGreaterThan(10);
-    // The worktree it was planned in (the agent creates it), and this process's id for the file.
-    expect(w!.sessions[0]!.worktree).toMatchObject({ path: expect.stringContaining(".gluon"), branch: expect.stringMatching(/^gluon\//) });
+    // This process's id for the file.
     expect(w!.pid).toBeGreaterThan(0);
     // The agent was started under that very id, with the spec.
     const [argv] = starts(app);
@@ -271,7 +270,6 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     const specLines = before.sessions[0]!.spec.split("\n").filter((l) => l.trim().length > 12);
     expect(specLines.length).toBeGreaterThan(0);
     for (const l of specLines) expect(app.agentLog()).not.toContain(l.trim());
-    expect(app.agentLog()).not.toContain("Where to work");
     const runs = fakeRuns(s);
     expect(runs.at(-1)).toMatch(new RegExp(`^claude .*--resume=${minted} @ .*tiny$`));
     // The same file and the same session key: no second record.
@@ -336,7 +334,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     await app.waitFor("Gluon-codex-task (Codex) can't be resumed (it never reported its session id)");
     // Antigravity started again with its saved spec.
     await app.waitFor(() => starts(app).length === 2);
-    expect(app.agentLog()).toContain("=<--prompt-interactive=agy spec\n");
+    expect(app.agentLog()).toContain("=<--prompt-interactive=agy spec>");
     await answer(app, KEYS.esc);
     await app.waitFor((x) => !x.includes("can't be resumed"));
     await app.waitFor(() => saved(s)[0]?.sessions.length === 2);
@@ -361,8 +359,8 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(fresh).toContain("--session-id");
     const newId = fresh[fresh.indexOf("--session-id") + 1]!;
     expect(newId).not.toBe(UUID);
-    // The spec is the saved one (a new worktree brief follows it, on lines of its own: `starts` only reads one-line arguments).
-    expect(app.agentLog()).toContain("=<fix the add bug\n");
+    // The spec is the saved one.
+    expect(app.agentLog()).toContain("=<fix the add bug>");
     await app.waitFor(() => saved(s)[0]?.sessions[0]?.resume?.id === newId);
     expect(saved(s)[0]!.sessions.map((c) => c.key)).toEqual(["k1"]);
     expect(saved(s)[0]!.sessions[0]!.resume).toEqual({ id: newId, source: "minted" });
@@ -490,44 +488,6 @@ describe("BUG-298/resume: the review's findings", () => {
     await again.waitFor(asked);
     await answer(again, KEYS.esc);
     await again.waitFor(() => saved(s).length === 0);
-  });
-
-  test.skipIf(MAC_STEALS)("BUG-301/resume: without a pseudo-terminal the record keeps the spec as picked, with no worktree brief (a start again would stack a second) @full", async () => {
-    const s = sandbox();
-    const app = await start({ cwd: repo.tiny(), rows: 60, env: { ...s.env, FAKE_TUI: "", GLUON_TEST_NO_PTY: "1" } });
-    await toLaunch(app);
-    // The agent was given the brief; the record was not.
-    expect(app.agentLog()).toContain("Where to work");
-    await app.waitFor(() => saved(s).length === 1);
-    const [w] = saved(s);
-    expect(w!.sessions[0]!.spec).not.toContain("Where to work");
-    expect(w!.sessions[0]!.spec.length).toBeGreaterThan(10);
-    expect(w!.sessions[0]!.worktree).toMatchObject({ branch: expect.stringMatching(/^gluon\//) });
-    app.kill();
-  });
-
-  test("BUG-302/resume: a reopened session is still in its worktree: when it ends the chat says where the worktree is", async () => {
-    const s = sandbox();
-    const dir = repo.tiny();
-    const path = join(dir, ".gluon", "worktrees", "gluon-restore-check");
-    // A real worktree of the checkout: a record's path is used only when the checkout lists it (`reusableWorktree`, BUG-660).
-    const made = Bun.spawnSync(["git", "worktree", "add", "-q", "-b", "gluon/restore-check", path, "HEAD"], { cwd: dir, stdout: "pipe", stderr: "pipe", env: process.env });
-    expect(made.exitCode).toBe(0);
-    try {
-      seed(s, workspace(dir, { sessions: [child({ worktree: { path, branch: "gluon/restore-check" } })] }));
-      const app = await resumeApp(s, ["abcdef"], dir, { FAKE_EXIT: "0" });
-      await app.waitFor("Resumed");
-      await app.press(KEYS.enter);
-      await app.waitFor("TUI ready");
-      await app.type("/exit");
-      await app.press(KEYS.enter);
-      await app.waitFor(HOME_VIEW);
-      await waitText(app, "Gluon-alpha-task's worktree is still at");
-      await waitText(app, "(branch gluon/restore-check)");
-      app.kill();
-    } finally {
-      rmSync(join(dir, ".gluon", "worktrees", "gluon-restore-check"), { recursive: true, force: true });
-    }
   });
 
   test.skipIf(WIN)("BUG-303/resume: a directory that can't be saved is recorded nowhere: no workspace in the header, no resume line on quit, and the chat says why @full", async () => {

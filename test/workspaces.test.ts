@@ -281,50 +281,20 @@ describe("BUG-312/resume: the recorder", () => {
   });
 });
 
-describe("BUG-302/resume: the worktree a session was planned in", () => {
+describe("BUG-710/worktree-removed: a session saved by a Gluon that gave it a worktree", () => {
   const wt = { path: "/work/tiny/.gluon/worktrees/gluon-fix-add", branch: "gluon/fix-add" };
 
-  test("it round-trips with the session", () => {
-    saveWorkspace(workspace({ sessions: [child({ worktree: wt })] }));
-    expect(loadWorkspace("abcdef")!.sessions[0]!.worktree).toEqual(wt);
-  });
-
-  test("a path that isn't a Gluon worktree, with a `..`, or a branch that isn't gluon/<name> drops only the worktree (git is run in that path)", () => {
-    const bad = [
-      { path: "/etc", branch: "gluon/x" },
-      { path: "/work/tiny/.gluon/worktrees/gluon-fix-add/..", branch: "gluon/x" },
-      { path: "/work/../.gluon/worktrees/gluon-x", branch: "gluon/x" },
-      { path: "/work/tiny/.gluon/worktrees/other", branch: "gluon/x" },
-      { path: "\\\\evil\\share\\.gluon\\worktrees\\gluon-x", branch: "gluon/x" },
-      { path: wt.path, branch: "--upload-pack=x" },
-      { path: wt.path, branch: "main" },
-      { path: wt.path, branch: "gluon/a b" },
-      { path: wt.path, branch: "gluon/../x" },
-      { path: wt.path },
-      "x",
-      7,
-    ];
-    for (const worktree of bad) {
-      const ws = parseWorkspace(raw({ ...workspace(), sessions: [{ ...child(), worktree }] }))!;
-      expect(ws.sessions).toHaveLength(1);
-      expect(ws.sessions[0]!.worktree).toBeUndefined();
-    }
-    expect(parseWorkspace(raw({ ...workspace(), sessions: [{ ...child(), worktree: { path: "C:\\work\\tiny\\.gluon\\worktrees\\gluon-fix-add", branch: "gluon/fix-add" } }] }))!.sessions[0]!.worktree).toBeDefined();
-  });
-
-  test("BUG-641/variants: a branch under another prefix (`gluon-2/…`, chosen when a branch is named `gluon`) round-trips; `gluon-x/…` does not", () => {
-    const other = { ...wt, branch: "gluon-2/fix-add" };
-    expect(parseWorkspace(raw({ ...workspace(), sessions: [{ ...child(), worktree: other }] }))!.sessions[0]!.worktree).toEqual(other);
-    expect(parseWorkspace(raw({ ...workspace(), sessions: [{ ...child(), worktree: { ...wt, branch: "gluon-x/fix-add" } }] }))!.sessions[0]!.worktree).toBeUndefined();
-  });
-
-  test("a patch sets and clears it", () => {
-    const rec = new Recorder("/work/tiny", undefined, {});
-    const c = rec.add({ ...base0, name: "a" });
-    rec.update(c.key, { worktree: wt });
-    expect(loadWorkspace(rec.id!)!.sessions[0]!.worktree).toEqual(wt);
-    rec.update(c.key, { worktree: undefined });
-    expect(loadWorkspace(rec.id!)!.sessions[0]!.worktree).toBeUndefined();
+  test("loads without the worktree, and a write after it saves none", () => {
+    saveWorkspace(workspace());
+    const file = fileOf("abcdef");
+    const old = JSON.parse(readFileSync(file, "utf8"));
+    old.sessions[0].worktree = wt;
+    writeFileSync(file, JSON.stringify(old));
+    const ws = loadWorkspace("abcdef")!;
+    expect(ws.sessions).toHaveLength(1);
+    expect(ws.sessions[0]).not.toHaveProperty("worktree");
+    saveWorkspace(ws);
+    expect(readFileSync(file, "utf8")).not.toContain("worktree");
   });
 });
 const base0 = { harness: "claude-code" as const, model: "sonnet", spec: "fix add", startedAt: 5 };
@@ -606,22 +576,20 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(deleteWorkspace("dangaa")).toBe(false);
   });
 
-  test("BUG-635/variants: a session whose resume id or worktree the reader would drop is refused out loud, not written and lost on the next read; a good one beside it stays", () => {
+  test("BUG-635/variants: a session whose resume id the reader would drop is refused out loud, not written and lost on the next read; a good one beside it stays", () => {
     const told: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace, onError: (m) => told.push(m) });
     const base = { name: "Gluon-a", harness: "claude-code" as const, model: "sonnet", spec: "s", startedAt: 1 };
     rec.add(base);
     rec.add({ ...base, name: "Gluon-bad-id", resume: { id: "a.b/c", source: "minted" } });
-    rec.add({ ...base, name: "Gluon-bad-tree", worktree: { path: "/work/tiny/elsewhere", branch: "gluon/x" } });
-    rec.add({ ...base, name: "Gluon-good", done: false, resume: { id: "0b1f3c5e-1111-4222-8333-444455556666", source: "minted" }, worktree: { path: "/work/tiny/.gluon/worktrees/gluon-good", branch: "gluon/good" } });
+    rec.add({ ...base, name: "Gluon-good", done: false, resume: { id: "0b1f3c5e-1111-4222-8333-444455556666", source: "minted" } });
     expect(loadWorkspace(rec.id!)!.sessions.map((s) => s.name)).toEqual(["Gluon-a", "Gluon-good"]);
     expect(rec.children).toHaveLength(2);
-    expect(told).toHaveLength(2);
+    expect(told).toHaveLength(1);
     expect(told[0]).toContain('resume of session "Gluon-bad-id"');
-    expect(told[1]).toContain('worktree of session "Gluon-bad-tree"');
     // A later update to a bad value is a failed write, told once; the saved file keeps the last readable state.
     rec.update(rec.children[0]!.key, { resume: { id: "-x", source: "captured" } });
-    expect(told).toHaveLength(3);
+    expect(told).toHaveLength(2);
     expect(loadWorkspace(rec.id!)!.sessions[0]!.resume).toBeUndefined();
   });
 

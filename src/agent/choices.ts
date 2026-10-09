@@ -22,8 +22,6 @@ export interface Proposal {
   choices: AgentTriple[];
   spec: string;
   reason: string;
-  /** Whether the session works in its own git worktree (the default); false: in the checkout (`worktree.ts`). */
-  worktree: boolean;
   /** How the session starts, for every option; none: build (the harness as it is). */
   mode?: Mode;
   /** The types the session covers (names from routing.yaml), as given to `route`: for stats and evals. */
@@ -121,8 +119,7 @@ export interface Routed {
  * the alternatives come from the last route (`routed`), never from the input: the intake can't propose
  * something route didn't return. The recommended agent must be valid (`validateChoice`, effort required
  * where the agent takes one); an alternative that isn't, or repeats an earlier option, is dropped; a missing
- * or empty name is derived from the spec, and either one is named `Gluon-…` (`sessionName`). A worktree is
- * the default: only `worktree: false` drops it (explore never gets one at the start: `Session.confirm`, BUG-410; ctrl+t back to build restores the brain's choice: BUG-457). A mode is kept when it is explore
+ * or empty name is derived from the spec, and either one is named `Gluon-…` (`sessionName`). A mode is kept when it is explore
  * or plan; build is no mode. The types are the input's that route was given (else all of route's).
  * `config.agents` are the agents the brain was offered.
  */
@@ -151,7 +148,6 @@ export function parseProposal(config: Config, input: Record<string, unknown>, ro
     choices,
     spec,
     reason,
-    worktree: input.worktree !== false && input.worktree !== "false",
     ...inMode,
     types: named.length ? [...new Set(named)] : routed.types,
     why: routed.why,

@@ -73,8 +73,6 @@ export type Pending =
 /** A launch the developer confirmed, with the session's name. */
 export type NamedChoice = LaunchChoice & {
   name: string;
-  /** In its own git worktree (`worktree.ts`); only an explicit false is the checkout. */
-  worktree?: boolean;
   /** The proposal's routing data (`route`'s types and why lines): recorded by the local analytics (`src/analytics.ts`), never sent anywhere. */
   types?: string[];
   why?: string[];
@@ -249,8 +247,7 @@ export class Session {
     if (pending?.kind !== "proposal") return null;
     const choice = pickChoice(this.config, pending, index, override);
     if (typeof choice === "string") return null;
-    // Explore is read-only and creating a worktree is a change: it runs in place, whatever the proposal said (BUG-410).
-    return { ...choice, name: pending.name, worktree: choice.mode === "explore" ? false : pending.worktree, ...(pending.types ? { types: [...pending.types] } : {}), ...(pending.why ? { why: [...pending.why] } : {}) };
+    return { ...choice, name: pending.name, ...(pending.types ? { types: [...pending.types] } : {}), ...(pending.why ? { why: [...pending.why] } : {}) };
   }
 
   /** Shows a message from Gluon itself (not the brain) in the history. */

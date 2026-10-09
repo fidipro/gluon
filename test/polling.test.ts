@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { EVENTS_PER_READ, EventsWatch, FULL_LIST_MS, RACY_MS, createEventsDir, removeEventsDir, scanEvents, writeEvent } from "../src/events.ts";
 import { pollChanges, type PolledSession } from "../src/files-poll.ts";
 
@@ -28,34 +28,13 @@ describe("files changed: one snapshot per work tree", () => {
     expect([...r!.changed]).toEqual([[1, 3], [2, 2], [3, 2], [4, 2], [5, 2]]);
   });
 
-  test("BUG-668/QA-perf-03: sessions in different worktrees each get their own snapshot; two in one worktree (or in the work tree Gluon runs in) share it", async () => {
-    // pollChanges asks for a worktree by its resolved path (`C:\wt\one` on Windows)
-    const one = resolve("/wt/one");
-    const two = resolve("/wt/two");
-    const c = counting({ "/repo": snap("a"), [one]: snap("x"), [two]: snap("x", "y") });
-    const sessions: PolledSession[] = [
-      { id: 1, base: new Map(), worktree: "/wt/one" },
-      { id: 2, base: new Map(), worktree: "/wt/two" },
-      { id: 3, base: snap("x"), worktree: "/wt/one" },
-      { id: 4, base: new Map(), worktree: "/wt/one/" }, // another spelling of the same work tree
-      { id: 5, base: new Map(), worktree: "/repo" },
-      { id: 6, base: new Map() },
-    ];
-    const r = await pollChanges("/repo", sessions, c.snapshot);
-    expect(c.asked.sort()).toEqual(["/repo", one, two].sort());
-    expect([...r!.changed]).toEqual([[1, 1], [2, 2], [3, 0], [4, 1], [5, 1], [6, 1]]);
-  });
-
-  test("a worktree the agent has not made yet counts nothing; an unreadable work tree for Gluon polls nothing", async () => {
-    const c = counting({ "/repo": snap("a") });
-    const r = await pollChanges("/repo", [{ id: 1, base: new Map(), worktree: "/wt/none" }], c.snapshot);
-    expect(r!.changed.get(1)).toBe(0);
+  test("an unreadable work tree for Gluon polls nothing", async () => {
     const none = counting({});
     expect(await pollChanges("/repo", [{ id: 1, base: new Map() }], none.snapshot)).toBeNull();
     expect(none.asked).toEqual(["/repo"]);
   });
 
-  test.skipIf(WIN)("BUG-668/QA-perf-03: git processes per poll: three for the work tree, three per worktree, whatever the number of sessions", async () => {
+  test.skipIf(WIN)("BUG-668/QA-perf-03: git processes per poll: three for the work tree, whatever the number of sessions", async () => {
     const real = Bun.which("git")!;
     const repo = join(TMP, "repo");
     mkdirSync(repo);
@@ -64,7 +43,6 @@ describe("files changed: one snapshot per work tree", () => {
     writeFileSync(join(repo, "a.txt"), "1\n");
     g("add", ".");
     g("commit", "-qm", "init");
-    g("worktree", "add", "-q", join(TMP, "wt"), "-b", "side");
     const bin = join(TMP, "bin");
     const log = join(TMP, "git.log");
     mkdirSync(bin);
@@ -80,15 +58,15 @@ describe("files changed: one snapshot per work tree", () => {
       }
     };
     try {
-      const sessions = (n: number, from = 1, worktree?: string): PolledSession[] => Array.from({ length: n }, (_, i) => ({ id: from + i, base: new Map(), ...(worktree ? { worktree } : {}) }));
+      const sessions = (n: number): PolledSession[] => Array.from({ length: n }, (_, i) => ({ id: 1 + i, base: new Map() }));
       await pollChanges(repo, sessions(6));
       expect(spawned()).toBe(3);
       rmSync(log);
-      writeFileSync(join(TMP, "wt", "new.txt"), "x\n");
-      const r = await pollChanges(repo, [...sessions(4), ...sessions(3, 11, join(TMP, "wt"))]);
-      expect(spawned()).toBe(6);
-      expect(r!.changed.get(1)).toBe(0);
-      expect(r!.changed.get(11)).toBe(1);
+      writeFileSync(join(repo, "new.txt"), "x\n");
+      const r = await pollChanges(repo, sessions(12));
+      expect(spawned()).toBe(3);
+      expect(r!.changed.get(1)).toBe(1);
+      expect(r!.changed.get(12)).toBe(1);
     } finally {
       process.env.PATH = was;
     }

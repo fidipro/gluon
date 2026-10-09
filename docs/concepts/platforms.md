@@ -73,9 +73,6 @@ Linux's, so a Windows agent (`/mnt/c/…/claude.exe`, an npm `codex.cmd`) may be
 - a Windows install alone is reported ("install it inside WSL") and never run;
 - `gluon install` doesn't use a Windows `npm` or `curl` seen from WSL.
 
-A git worktree made by WSL's git isn't usable by Windows git or an IDE, and the reverse (git records
-absolute paths); `git worktree repair` fixes the links after a move.
-
 ## Windows
 
 - Use `gluon.exe` (`install.ps1`, or the release file). The npm-style tarball doesn't run on Windows

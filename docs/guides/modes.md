@@ -36,14 +36,12 @@ The flags and settings behind each mode are `HARNESS_INFO.modes` in `src/harness
 
 ## What Gluon adds to the spec
 
-- Explore never gets a [worktree](worktrees.md).
 - A short block at the end of the spec says what the mode allows, whatever the intake agent wrote before `ctrl+t` changed it.
 - When your repository has an instruction file the chosen agent does not load itself (`CLAUDE.md` for Codex, say), the spec ends with a line telling it to read that file.
 - Kimi Code takes no prompt on its command line, so in every mode Gluon types its brief line (`Read the session brief in <file> and start.`) into it. If the line cannot be typed, because you typed first or its input box never showed, Gluon shows the line in the chat and over the top of the agent's frame, so you can type it yourself. It goes away when you press Esc.
 
 ## Next steps
 
-- [Worktrees](worktrees.md): where build and plan sessions work.
 - [Routing](routing.md): how the intake agent's choice of mode feeds routing.
 - [Kimi Code](harnesses/kimi-code.md): why it has no explore mode.
 

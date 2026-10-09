@@ -102,7 +102,7 @@ function demoTask(messages: Anthropic.MessageParam[]): string {
 
 /** The demo's mode: explore when the developer asks to understand or explain, plan when they ask for a plan, else build (none). */
 function demoMode(task: string): Record<string, unknown> {
-  if (/\b(explain|understand|how does|how do|why does|investigate|review)\b/i.test(task)) return { mode: "explore", worktree: false };
+  if (/\b(explain|understand|how does|how do|why does|investigate|review)\b/i.test(task)) return { mode: "explore" };
   if (/\b(plan|design|propose)\b/i.test(task)) return { mode: "plan" };
   return {};
 }
@@ -191,7 +191,7 @@ export function demoClient(routing: RoutingConfig = defaultRouting()): ModelClie
         const type = (routeCall(task, cheap).types as { type: string }[])[0]!.type;
         const why = cheap ? "A small, clear change; a cheaper setup is enough" : "A focused change with a clear test path";
         return {
-          tools: [{ name: "propose_launch", input: { name: nameFromSpec(task), spec: demoSpec(messages), types: [type], ...(demoMode(task).mode === "explore" ? { worktree: false } : {}), reason: `${why};${picked || " routing picks the agent"}.` } }],
+          tools: [{ name: "propose_launch", input: { name: nameFromSpec(task), spec: demoSpec(messages), types: [type], reason: `${why};${picked || " routing picks the agent"}.` } }],
         };
       }
     }

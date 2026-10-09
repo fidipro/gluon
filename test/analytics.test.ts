@@ -190,7 +190,7 @@ describe("the file", () => {
 });
 
 describe("a session's row", () => {
-  test("begin, set and end write the columns: identity, agent, routing, worktree, ids, cost, context, how it ended", () => {
+  test("begin, set and end write the columns: identity, agent, routing, ids, cost, context, how it ended", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -202,7 +202,6 @@ describe("a session's row", () => {
         cwd: "/work/tiny",
         repo: "owner/tiny",
         branch: "main",
-        worktree: { path: "/work/tiny/.gluon/x", branch: "gluon/x" },
         harnessVersion: "2.1.4",
         effort: "high",
         mode: "plan",
@@ -226,8 +225,8 @@ describe("a session's row", () => {
       cwd: "/work/tiny",
       repo: "owner/tiny",
       branch: "main",
-      worktree_path: "/work/tiny/.gluon/x",
-      worktree_branch: "gluon/x",
+      worktree_path: null,
+      worktree_branch: null,
       harness: "claude-code",
       harness_version: "2.1.4",
       model: "sonnet",

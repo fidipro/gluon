@@ -89,7 +89,7 @@ describe("the session name", () => {
 describe("propose_launch's input", () => {
   test("the schema takes the intake's fields only: no agent fields; route carries the agents", () => {
     const schema = TOOLS.find((t) => t.name === "propose_launch")!.input_schema as { properties: Record<string, unknown>; required: string[] };
-    expect(Object.keys(schema.properties)).toEqual(["name", "spec", "types", "worktree", "reason"]);
+    expect(Object.keys(schema.properties)).toEqual(["name", "spec", "types", "reason"]);
     expect(schema.required).toEqual(["name", "spec", "types", "reason"]);
     const route = TOOLS.find((t) => t.name === "route")!.input_schema as { properties: Record<string, unknown>; required: string[] };
     expect(Object.keys(route.properties)).toEqual(["types", "mode", "pinned", "harness", "because"]);
@@ -99,7 +99,7 @@ describe("propose_launch's input", () => {
   test("the Claude-plan brain's MCP tools (zod from the schemas) take the intake's input and refuse a step out of range", () => {
     // As `subscriptionBrain` builds them: the SDK wraps the shape in an object.
     const zod = (name: string) => z.object((z.fromJSONSchema(TOOLS.find((t) => t.name === name)!.input_schema as never) as z.ZodObject).shape);
-    const propose = { ...main, name: "flaky", worktree: false };
+    const propose = { ...main, name: "flaky" };
     expect(zod("propose_launch").parse(propose)).toEqual(propose);
     expect(zod("propose_launch").safeParse(main).success).toBe(false); // the name is required
     const call = { types: [{ type: "debug", model_steps: 1, effort_steps: 0, reasons: "unknown cause" }, { type: "test", model_steps: 0, effort_steps: 1 }], pinned: "codex", mode: "plan" };
@@ -110,7 +110,7 @@ describe("propose_launch's input", () => {
   });
 
   test("the proposal is route's: the recommended agent, the alternatives and the mode come from it, the types from the call", () => {
-    expect(parseProposal(config, main, R)).toEqual({ name: "Gluon-fix-flaky-launcher", choices: [{ harness: "claude-code", model: "sonnet", effort: "medium" }], spec: main.spec, reason: "fits", worktree: true, types: ["debug"], why: R.why });
+    expect(parseProposal(config, main, R)).toEqual({ name: "Gluon-fix-flaky-launcher", choices: [{ harness: "claude-code", model: "sonnet", effort: "medium" }], spec: main.spec, reason: "fits", types: ["debug"], why: R.why });
     const more = routed({ alternatives: [{ harness: "codex", model: "gpt-6.1-sol", effort: "medium" }], types: ["debug", "test"] });
     const p = parseProposal(config, { ...main, types: ["test", "bogus", 7, "test"] }, more) as Proposal;
     expect(p.choices).toEqual([{ harness: "claude-code", model: "sonnet", effort: "medium" }, { harness: "codex", model: "gpt-6.1-sol", effort: "medium" }]);
@@ -120,17 +120,6 @@ describe("propose_launch's input", () => {
     expect((parseProposal(config, { ...main, types: undefined }, more) as Proposal).types).toEqual(["debug", "test"]);
     // Agent fields in the input are ignored: route decides.
     expect((parseProposal(config, { ...main, harness: "codex", model: "gpt-6-luna", effort: "low", alternatives: [{ harness: "codex", model: "gpt-6-luna", effort: "low" }] }, R) as Proposal).choices).toEqual([R.recommended]);
-  });
-
-  test("issue 52: a worktree is the default; only worktree false drops it; explore never has one", () => {
-    expect((parseProposal(config, main, R) as Proposal).worktree).toBe(true);
-    expect((parseProposal(config, { ...main, worktree: true }, R) as Proposal).worktree).toBe(true);
-    expect((parseProposal(config, { ...main, worktree: false }, R) as Proposal).worktree).toBe(false);
-    expect((parseProposal(config, { ...main, worktree: "false" }, R) as Proposal).worktree).toBe(false);
-    expect((parseProposal(config, { ...main, worktree: "yes" }, R) as Proposal).worktree).toBe(true);
-    // Explore's no-worktree is applied at the start (`Session.confirm`), not baked into the proposal (BUG-457).
-    expect((parseProposal(config, { ...main, worktree: true }, routed({ mode: "explore" })) as Proposal).worktree).toBe(true);
-    expect((parseProposal(config, { ...main, worktree: true }, routed({ mode: "plan" })) as Proposal).worktree).toBe(true);
   });
 
   test("launch modes: the proposal's mode is route's: explore or plan; build is none; alternatives don't carry one", () => {
@@ -288,7 +277,7 @@ describe("Tab adjust", () => {
   test("every adjusted option of an offered agent can be picked", () => {
     // The offered agents (`offeredAgents`): here, the Claude plan's own models.
     const offered = { ...config, agents: agents.map((a) => (a.harness === "claude-code" ? { ...a, models: a.models.filter((m) => ["haiku", "sonnet", "opus", "fable"].includes(m.id)) } : a)) };
-    const proposal: Proposal = { name: "x", choices: [claude], spec: "s", reason: "r", worktree: true };
+    const proposal: Proposal = { name: "x", choices: [claude], spec: "s", reason: "r" };
     let c = claude;
     for (let i = 0; i < 20; i++) {
       c = i % 3 ? cycleEffort(c, offered.agents) : cycleModel(c, offered.agents);
@@ -332,8 +321,8 @@ describe("the demo brain", () => {
   }, 15_000);
 
   test("launch modes: explore when the developer asks to understand, plan when they ask for a plan, else none", async () => {
-    expect(await play("explain how the launcher picks a model")).toMatchObject({ mode: "explore", worktree: false, types: ["understand"] });
-    expect(await play("design the tab strip, plan first")).toMatchObject({ mode: "plan", worktree: true });
+    expect(await play("explain how the launcher picks a model")).toMatchObject({ mode: "explore", types: ["understand"] });
+    expect(await play("design the tab strip, plan first")).toMatchObject({ mode: "plan" });
     expect(await play("rename a helper")).not.toHaveProperty("mode");
   }, 15_000);
 
@@ -379,11 +368,6 @@ describe("QA: parseProposal on odd input", () => {
     expect(ok({ spec: "!!!", name: "🚀" }).name).toBe("Gluon-session");
     expect(ok({ ...main, types: ["nonesuch", "debug", "debug"] }).types).toEqual(["debug"]);
     expect(ok({ ...main, types: "debug" }).types).toEqual(R.types);
-  });
-
-  test("worktree: only the boolean false, or the text 'false', turns it off", () => {
-    for (const worktree of [undefined, true, 0, "no", null, "", "False"]) expect(ok({ ...main, worktree }).worktree).toBe(true);
-    for (const worktree of [false, "false"]) expect(ok({ ...main, worktree }).worktree).toBe(false);
   });
 
   test("BUG-639/QA-brain-12: a spec too big to be saved with its session (the workspace file drops a spec over 1 000 000 characters) is refused when proposed, not launched into a session that can't be resumed", () => {
