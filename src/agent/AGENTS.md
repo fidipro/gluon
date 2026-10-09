@@ -37,9 +37,8 @@ The brain: conversation, LLM clients, read-only repo tools.
   (several tasks, exploration); a spec is its goal, files found, constraints, decisions — no
   acceptance criteria, steps or test plans. The prompt's wording is the intake proposal's: change it
   deliberately.
-- **The brain only says whether a session gets a worktree** (`worktree` of `propose_launch`; no word
-  about it in the spec; explore never gets one, `confirm` and `start`: BUG-410): Gluon picks the path and appends the block (`worktree.ts`, issue 52), runs
-  only read-only `gitQuery` there, creates and deletes nothing; the agent removes it only on a yes.
+- **Worktrees aren't Gluon's business**: no word of them to the brain or the agent; the agent works where it was
+  started (BUG-710). The repo tools' `.gluon` skips (`SKIP_DIRS`) stay only for checkouts an older Gluon left one in.
 - **A mode comes from `route` and belongs to the proposal, not to an option**: the developer's ctrl+t
   picks one for every option (`pickChoice`); don't put it in the options (`choices`).
 - **Code, not the model, picks the agent**: `propose_launch` takes no agent fields; `Session` keeps the last

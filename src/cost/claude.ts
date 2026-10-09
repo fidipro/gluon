@@ -130,6 +130,9 @@ export function claudePriceFromTier(t: ClaudeTierRow): ClaudePrice {
   return { ...row(t), ...(long ? { longPrompt: { ...row(long), abovePromptTokens: long.above_prompt_tokens } } : {}) };
 }
 
+/** The cause named when Gluon priced a request from the connection's own row (Bedrock's) and Claude Code at its catalog's list price. */
+export const HARNESS_LIST_PRICE = "harness-list-price";
+
 /** The cause named when Claude Code priced an id its catalog doesn't list (an OpenRouter or gateway spelling) at a default row of its own. */
 export const HARNESS_UNKNOWN_MODEL_PRICE = "harness-unknown-model-price";
 

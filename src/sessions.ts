@@ -10,7 +10,7 @@
  */
 import { numberedName } from "./agent/choices.ts";
 import type { AgentState } from "./events.ts";
-import type { Effort, Harness, Mode } from "./harnesses.ts";
+import type { Effort, Harness, Mode, Permissions } from "./harnesses.ts";
 
 export type SessionState = "awaiting" | "working" | "done" | "drafting";
 
@@ -30,6 +30,8 @@ export interface AgentTripleView {
   effort?: Effort;
   /** How it started, when not build (explore, plan); none for a resumed session (the harness keeps its own). */
   mode?: Mode;
+  /** Who approves its commands and edits, in build mode (ctrl+p); none or `own`: the harness itself. */
+  permissions?: Permissions;
 }
 
 export interface SessionView {

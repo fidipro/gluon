@@ -11,7 +11,8 @@
  *   in the composer highlights option N and Enter picks it; anything else typed highlights the
  *   last row (own answer / keep talking) and Enter sends it, so "2 tests" is an answer (BUG-159);
  *   Tab on a question's option puts it in the composer to add your words (issue 55); Tab /
- *   Shift+Tab on an agent cycle its model / effort, Ctrl+O folds the spec (shown in
+ *   Shift+Tab on an agent cycle its model / effort, Ctrl+T the whole proposal's mode, Ctrl+P the
+ *   agent's permissions in build mode (`permissionLevels`: its own first), Ctrl+O folds the spec (shown in
  *   its box above the agents) to one line and back, Esc closes the options (the chat keeps them:
  *   a typed reply answers).
  * - otherwise, with an empty composer: ↑↓ move over the group labels and the sessions (BUG-194);
@@ -22,7 +23,8 @@
  *   row's chat discarded after asking (`onDiscard`); the hint line says which. Without a
  *   pseudo-terminal (`canOpen` false) an ended session can't be opened: Enter says so.
  * - PgUp/PgDn scroll the chat; while the agent choice is open, its spec only (when cut to fit;
- *   BUG-218), so the options never leave the screen. Esc
+ *   BUG-218), so the options never leave the screen. Enter while the intake agent works queues the
+ *   message until its turn ends (`queued`; BUG-716). Esc cancels a queued message, then
  *   interrupts the intake agent, or (twice) clears the draft;
  *   Ctrl+C clears the draft, interrupts, or (twice, idle) quits (`onQuit`).
  * - `?` on an empty composer with no options open: the key list, in place of the list and the chat
@@ -38,10 +40,10 @@
  */
 import { Box, measureElement, Text, usePaste, useInput, useWindowSize, type DOMElement, type Key } from "ink";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { cycleEffort, cycleMode, cycleModel, type AgentTriple } from "../agent/choices.ts";
+import { cycleEffort, cycleMode, cycleModel, cyclePermissions, type AgentTriple, type ChoiceOverride } from "../agent/choices.ts";
 import type { NamedChoice, Session, State } from "../agent/session.ts";
 import type { AgentOption, Config, Effort } from "../config.ts";
-import { HARNESS_INFO, modeUnavailable, type Mode } from "../harnesses.ts";
+import { HARNESS_INFO, modeUnavailable, permissionLevels, type Mode } from "../harnesses.ts";
 import { ANSWERING, counts, groupOf, PICKING, tabs, TALKING, type SessionState, type SessionStore, type SessionView } from "../sessions.ts";
 import { CHAT_INDENT, choiceHints, composerHeight, questionHints, FIRST_LINE, GluonComposer, openBlockRows, Rule, specRows, Transcript } from "./chat.tsx";
 import * as ed from "./editor.ts";
@@ -149,6 +151,8 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
   const [specOffset, setSpecOffsetState] = useState(0);
   const [scroll, setScrollState] = useState(0);
   const [nudge, setNudge] = useState<string | null>(null);
+  // A message sent while the intake agent worked: held until its turn ends (BUG-716).
+  const [queued, setQueuedState] = useState<string | null>(null);
   // The `?` key list is open (BUG-216).
   const [keysOpen, setKeysOpenState] = useState(false);
   // How far the key list is scrolled, when it doesn't fit (BUG-229).
@@ -163,6 +167,7 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
   const modeRef = useRef(mode);
   const closedRef = useRef(closed);
   const scrollRef = useRef(scroll);
+  const queuedRef = useRef(queued);
   const specOffsetRef = useRef(specOffset);
   const keysOpenRef = useRef(keysOpen);
   const keysOffsetRef = useRef(keysOffset);
@@ -202,6 +207,7 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
   const setMode = ref(modeRef, setModeState);
   const setClosed = ref(closedRef, setClosedState);
   const setScroll = ref(scrollRef, setScrollState);
+  const setQueued = ref(queuedRef, setQueuedState);
   const setSpecOffset = ref(specOffsetRef, setSpecOffsetState);
   const setKeysOpen = ref(keysOpenRef, setKeysOpenState);
   const setKeysOffset = ref(keysOffsetRef, setKeysOffsetState);
@@ -315,6 +321,17 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     void session.submit(text.trim());
   };
 
+  // A queued message goes once the turn ends, never during one (`Session.submit` is not for a turn in progress). A question
+  // or proposal waiting then keeps it: Enter sends it as the answer, so nothing silently becomes one (BUG-11, BUG-716).
+  useEffect(() => {
+    const q = queuedRef.current;
+    if (!q || session.busy || session.snapshot.pending) return;
+    setQueued(null);
+    setScroll(0);
+    store.ensureDraft(now());
+    void session.submit(q);
+  }, [busy, state.pending, queued]);
+
   const confirmTwice = (key: string, message: string) => {
     if (pressedTwice(armed, key)) return true;
     setNudge(message);
@@ -337,10 +354,11 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     }
     const base = p.choices[i]!;
     const t = triplesRef.current[i] ?? base;
-    const override: { model?: string; effort?: Effort; mode?: Mode } = {
+    const override: ChoiceOverride = {
       ...(t.model !== base.model ? { model: t.model } : {}),
       ...(t.effort !== base.effort ? { effort: t.effort } : {}),
       ...(modeRef.current !== (p.mode ?? "build") ? { mode: modeRef.current } : {}),
+      ...(t.permissions && t.permissions !== "own" ? { permissions: t.permissions } : {}),
     };
     const choice = session.confirm(i, override);
     if (choice) onStart(choice);
@@ -529,6 +547,8 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
       return;
     }
     if (key.escape) {
+      // A queued message is cancelled first; the next Esc interrupts.
+      if (queuedRef.current) return setQueued(null);
       if (isBusy) return session.interrupt();
       if (!blank) {
         if (confirmTwice("esc", "Press esc again to clear the draft")) setDraft(ed.EMPTY);
@@ -545,6 +565,15 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     if (key.ctrl && input === "t") {
       // Skipping a mode the highlighted agent can't run (Kimi Code's explore: BUG-672).
       if (options && pending?.kind === "proposal") setMode(cycleMode(modeRef.current, triplesRef.current[shownOption(d.text, optSelRef.current, count)]?.harness));
+      return;
+    }
+    // Ctrl+P: the highlighted agent's next permission level. Build's alone: explore and plan set their own.
+    if (key.ctrl && input === "p") {
+      const t = triplesRef.current[shownOption(d.text, optSelRef.current, count)];
+      if (!(options && pending?.kind === "proposal" && t)) return;
+      if (modeRef.current !== "build") return setNudge(`Permissions are for build mode: ${modeRef.current} sets its own (ctrl+t changes the mode)`);
+      if (permissionLevels(t.harness).length < 2) return setNudge(`${HARNESS_INFO[t.harness].label} doesn't ask before every command or edit: nothing to change`);
+      setTriples(triplesRef.current.map((x) => (x === t ? { ...x, permissions: cyclePermissions(x.permissions, x.harness) } : x)));
       return;
     }
     if (key.tab) {
@@ -565,7 +594,11 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     if (key.return) {
       if (key.meta || key.shift) return setDraft((x) => ed.insert(x, "\n"));
       if (isBusy) {
-        if (!blank) setNudge("Still working, so that wasn’t sent. esc interrupts.");
+        // Queued, not sent: it goes when the turn ends (several Enters add to it).
+        if (!blank) {
+          setQueued(queuedRef.current ? `${queuedRef.current}\n${d.text.trim()}` : d.text.trim());
+          setDraft(ed.EMPTY);
+        }
         return;
       }
       const digit = options && /^[1-9]$/.test(d.text.trim()) && Number(d.text.trim()) <= count ? Number(d.text.trim()) - 1 : null;
@@ -573,6 +606,12 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
         setDraft(ed.EMPTY);
         setOptSel(digit);
         return choose(digit);
+      }
+      // Held because a question or proposal came at the turn's end: Enter sends it as the answer, with what was typed since.
+      if (queuedRef.current) {
+        const text = [queuedRef.current, d.text.trim()].filter(Boolean).join("\n");
+        setQueued(null);
+        return send(text);
       }
       if (!blank) return send(d.text);
       if (d.text) setDraft(ed.EMPTY);
@@ -643,7 +682,7 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
   const padX = columns >= 24 ? 2 : 0;
   const width = Math.max(1, columns - 2 * padX);
   const composerRows = Math.max(1, Math.min(6, Math.floor(frame / 4)));
-  const bottom = composerHeight(draft, width, composerRows) + (nudge ? 1 : 0);
+  const bottom = composerHeight(draft, width, composerRows) + (nudge ? 1 : 0) + (queued ? 1 : 0);
   const compact = frame < SHORT_FRAME;
   // The open agent choice shows the spec in a box above the agents: the rows of its text here.
   const pending = state.pending;
@@ -745,6 +784,12 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
             </Box>
           </>
         )}
+        {queued ? (
+          <Text wrap="truncate-end">
+            <Text color={palette.text}>{` › ${queued.replace(/\s+/g, " ")}`}</Text>
+            <Text color={palette.dim}>{` · queued: ${!busy && pending ? `enter sends it as ${pending.kind === "question" ? "your answer" : "a change to the session"}` : "sent when the intake agent is done"} · esc cancels`}</Text>
+          </Text>
+        ) : null}
         {nudge ? (
           <Text color={palette.amber} wrap="truncate-end">
             {` ${nudge}`}

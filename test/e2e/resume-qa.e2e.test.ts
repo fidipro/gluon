@@ -9,7 +9,6 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseWorkspace, processStart, type ChildRecord, type Workspace } from "../../src/workspaces.ts";
-import { SELF_GUARD_MS } from "../../src/pty/compositor.ts";
 import { KEYS } from "./actions.ts";
 import { freshConfig, repo, WIN, type FakeAgent } from "./fixtures.ts";
 import { ASK_YAML, EVENT_HOOK } from "./gluon-kit.ts";
@@ -35,12 +34,6 @@ function seed(s: Sandbox, w: unknown, id = "abcdef") {
   writeFileSync(join(s.ws, `${id}.json`), JSON.stringify(w));
 }
 const saved = (s: Sandbox): Workspace[] => (existsSync(s.ws) ? readdirSync(s.ws).filter((f) => f.endsWith(".json")).map((f) => parseWorkspace(readFileSync(join(s.ws, f), "utf8"))!) : []);
-/** A real worktree of `dir` at `path` on a new `branch` (what the agent makes at its start). */
-function addWorktree(dir: string, path: string, branch: string) {
-  const r = Bun.spawnSync(["git", "worktree", "add", "-q", "-b", branch, path, "HEAD"], { cwd: dir, stdout: "pipe", stderr: "pipe", env: process.env });
-  if (r.exitCode !== 0) throw new Error(`worktree add: ${r.stderr.toString()}`);
-}
-
 /** The text of the screen with its line breaks (the chat wraps) turned into spaces. */
 const flat = (app: App) => app.screen().replace(/\s+/g, " ");
 
@@ -153,83 +146,6 @@ describe("QA-resume: the directory a resume enters", () => {
     expect(r.code).toBe(1);
     expect(r.stderr).toContain("no longer exists");
     expect(r.stderr).toContain("gluon sessions --delete abcdef");
-  });
-});
-
-describe("QA-resume: starting a saved session again", () => {
-  /** A path as the brief spells it: forward slashes on Windows (git takes them, and a backslash in a Git Bash command is an escape: `worktreeBrief`). */
-  const inBrief = (p: string) => (WIN ? p.replaceAll("\\", "/") : p);
-
-  test("BUG-660/QA-resume-13: starting again a session that can't be resumed (Antigravity, Kimi, no id) reuses the worktree it already has, or says where the earlier work is (it plans a second one, `-2`, drops the first from the record, and the new agent isn't told of it)", async () => {
-    const s = sandbox();
-    const dir = repo.tiny();
-    const old = join(dir, ".gluon", "worktrees", "gluon-agy-task");
-    addWorktree(dir, old, "gluon/agy-task");
-    seed(s, workspace(dir, { sessions: [child({ key: "ka", name: "Gluon-agy-task", harness: "antigravity", model: "gemini-3.8-flash", spec: "agy spec", resume: undefined, worktree: { path: old, branch: "gluon/agy-task" } })] }));
-    const app = await start({ cwd: dir, cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
-    await app.waitFor((x) => x.replace(/\s+/g, " ").includes("can't be resumed"));
-    await Bun.sleep((SELF_GUARD_MS + 150) * SLOW);
-    await app.press(KEYS.enter);
-    await app.waitFor(() => app.agentLog().includes("agy spec"));
-    expect(app.agentLog()).toContain(`- Worktree: \`${inBrief(old)}\``);
-    expect(saved(s)[0]!.sessions[0]!.worktree?.path).toBe(old);
-  });
-
-  test("BUG-660/variants: a worktree that is gone from the disk is planned anew, at its first free name, and the record follows", async () => {
-    const s = sandbox();
-    const dir = repo.tiny();
-    const was = join(dir, ".gluon", "worktrees", "gluon-agy-lost-9");
-    seed(s, workspace(dir, { sessions: [child({ key: "ka", name: "Gluon-agy-lost", harness: "antigravity", model: "gemini-3.8-flash", spec: "agy lost spec", resume: undefined, worktree: { path: was, branch: "gluon/agy-lost-9" } })] }));
-    const app = await start({ cwd: dir, cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
-    await app.waitFor((x) => x.replace(/\s+/g, " ").includes("can't be resumed"));
-    await Bun.sleep((SELF_GUARD_MS + 150) * SLOW);
-    await app.press(KEYS.enter);
-    await app.waitFor(() => app.agentLog().includes("agy lost spec"));
-    const fresh = join(dir, ".gluon", "worktrees", "gluon-agy-lost");
-    expect(app.agentLog()).toContain(`- Worktree: \`${inBrief(fresh)}\``);
-    expect(app.agentLog()).toContain("worktree add");
-    await app.waitFor(() => saved(s)[0]?.sessions[0]?.worktree?.path === fresh);
-  });
-
-  test("BUG-660/variants: the brief of a worktree it already has says it is there and not to create it", async () => {
-    const s = sandbox();
-    const dir = repo.tiny();
-    const have = join(dir, ".gluon", "worktrees", "gluon-agy-have");
-    addWorktree(dir, have, "gluon/agy-have");
-    seed(s, workspace(dir, { sessions: [child({ key: "ka", name: "Gluon-agy-have", harness: "antigravity", model: "gemini-3.8-flash", spec: "agy have spec", resume: undefined, worktree: { path: have, branch: "gluon/agy-have" } })] }));
-    const app = await start({ cwd: dir, cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
-    await app.waitFor((x) => x.replace(/\s+/g, " ").includes("can't be resumed"));
-    await Bun.sleep((SELF_GUARD_MS + 150) * SLOW);
-    await app.press(KEYS.enter);
-    await app.waitFor(() => app.agentLog().includes("agy have spec"));
-    expect(app.agentLog()).toContain("Don't create it");
-    expect(app.agentLog()).toContain("uncommitted work");
-    expect(app.agentLog()).not.toContain("worktree add");
-  });
-
-  test("BUG-660/variants: a record that names a directory outside the checkout (a path with a quote and `$(…)` in it) is not reused: a worktree is planned anew and nothing is told to work or run there", async () => {
-    const s = sandbox();
-    const dir = repo.tiny();
-    // A Windows file name can't hold a double quote: a single one stands in there.
-    const outside = mkdtempSync(join(tmpdir(), `gluon-qa-out$(touch pwned)${WIN ? "'" : '"'}-`));
-    const evil = join(outside, ".gluon", "worktrees", "gluon-evil");
-    mkdirSync(evil, { recursive: true });
-    try {
-      seed(s, workspace(dir, { sessions: [child({ key: "ka", name: "Gluon-agy-evil", harness: "antigravity", model: "gemini-3.8-flash", spec: "agy evil spec", resume: undefined, worktree: { path: evil, branch: "gluon/evil" } })] }));
-      const app = await start({ cwd: dir, cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
-      await app.waitFor((x) => x.replace(/\s+/g, " ").includes("can't be resumed"));
-      await Bun.sleep((SELF_GUARD_MS + 150) * SLOW);
-      await app.press(KEYS.enter);
-      await app.waitFor(() => app.agentLog().includes("agy evil spec"));
-      const fresh = join(dir, ".gluon", "worktrees", "gluon-agy-evil");
-      expect(app.agentLog()).toContain(`- Worktree: \`${inBrief(fresh)}\``);
-      expect(app.agentLog()).not.toContain("touch pwned");
-      expect(app.agentLog()).not.toContain("Don't create it");
-      await app.waitFor(() => saved(s)[0]?.sessions[0]?.worktree?.path === fresh);
-      expect(existsSync(join(dir, "pwned"))).toBe(false);
-    } finally {
-      rmSync(outside, { recursive: true, force: true });
-    }
   });
 });
 

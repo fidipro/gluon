@@ -68,6 +68,7 @@ export const KEYS = {
   ctrlJ: "\n",
   ctrlO: "\x0f",
   ctrlT: "\x14",
+  ctrlP: "\x10",
   ctrlU: "\x15",
   ctrlW: "\x17",
   /** Shift+Enter as xterm's modifyOtherKeys reports it (a plain terminal sends Enter's `\r`). */

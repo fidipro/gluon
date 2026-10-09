@@ -25,14 +25,28 @@ const limits = (l: Partial<NonNullable<Config["limits"]>>) => cfg({ limits: { ..
 
 // --- the default rank, everything connected
 
-test("light: Haiku 5.5 first (at its medium default), then Luna", () => {
-  expect(r({ types: [T("docs")] })).toBe("build claude-code/haiku@medium | codex/gpt-6-luna@high");
-  expect(r({ types: [T("understand")] })).toMatch(/^explore claude-code\/haiku@medium/);
+test("light: Haiku 5.5 first (at its high default), then Luna", () => {
+  expect(r({ types: [T("docs")] })).toBe("build claude-code/haiku@high | codex/gpt-6-luna@high");
+  expect(r({ types: [T("understand")] })).toMatch(/^explore claude-code\/haiku@high/);
+});
+
+test("BUG-711/effort-text: the session line names the model's default effort and the effort it gets", () => {
+  const out = route(cfg(), CATALOG, { types: [T("docs")] }, {});
+  if ("error" in out) throw new Error(out.error);
+  expect(out.why).toContain("session: build, light, effort +0 from haiku's default (high) → claude-code/haiku@high");
+});
+
+test("BUG-711/round-up: a level rounded up names the effort steps it applies, not the ones asked", () => {
+  // Claude Code alone has nothing at standard: Sonnet, one level up, gets one step less than its high default.
+  const out = route(cfg(), CATALOG, { types: [T("feature")] }, claudeOnly);
+  if ("error" in out) throw new Error(out.error);
+  expect(out.recommended).toEqual({ harness: "claude-code", model: "sonnet", effort: "medium" });
+  expect(out.why).toContain("session: build, standard, effort +0 (-1 after rounding up to strong) from sonnet's default (high) → claude-code/sonnet@medium");
 });
 
 test("standard: cheapest first (DeepSeek Flash at its max default, then Gemini 3.8 Flash), then one level down", () => {
   expect(r({ types: [T("feature")] }))
-    .toBe("build opencode/deepseek-flash@max | antigravity/gemini-3.8-flash@high, claude-code/haiku@medium");
+    .toBe("build opencode/deepseek-flash@max | antigravity/gemini-3.8-flash@high, claude-code/haiku@high");
 });
 
 test("strong: Sonnet before Sol", () => {
@@ -59,8 +73,8 @@ test("steps are validated", () => {
 });
 
 test("lighter steps go down but never below light", () => {
-  expect(r({ types: [T("feature", -1)] })).toMatch(/^build claude-code\/haiku@medium/);
-  expect(r({ types: [T("docs", -2)] })).toMatch(/^build claude-code\/haiku@medium/);
+  expect(r({ types: [T("feature", -1)] })).toMatch(/^build claude-code\/haiku@high/);
+  expect(r({ types: [T("docs", -2)] })).toMatch(/^build claude-code\/haiku@high/);
 });
 
 test("several types take the strongest mode, level and effort", () => {
@@ -87,21 +101,21 @@ test("a model that can't give the effort is skipped for the next one that can", 
 test("Kimi: K2.7 Code has no effort control, so more effort moves on to a model that has it", () => {
   const kimi = { harness: "kimi-code", because: "Prefer Kimi." };
   expect(r({ types: [T("docs")], ...kimi })).toMatch(/^build kimi-code\/kimi-k2.7-code /);
-  expect(r({ types: [T("docs", 0, 1)], ...kimi })).toMatch(/^build claude-code\/haiku@high/);
+  expect(r({ types: [T("docs", 0, 1)], ...kimi })).toMatch(/^build claude-code\/haiku@xhigh/);
   expect(r({ types: [T("feature")], ...kimi })).toMatch(/^build kimi-code\/kimi-k3@high/);
 });
 
 // --- rounding up lowers effort
 
 test("Claude Code only: light → Haiku medium, standard → Sonnet medium, strong → Sonnet high", () => {
-  expect(r({ types: [T("docs")] }, cfg(), claudeOnly)).toMatch(/^build claude-code\/haiku@medium/);
+  expect(r({ types: [T("docs")] }, cfg(), claudeOnly)).toMatch(/^build claude-code\/haiku@high/);
   expect(r({ types: [T("feature")] }, cfg(), claudeOnly)).toMatch(/^build claude-code\/sonnet@medium/);
   expect(r({ types: [T("debug", 1)] }, cfg(), claudeOnly)).toMatch(/^build claude-code\/sonnet@high/);
 });
 
 test("Bedrock-only (Claude Code + Codex): standard rounds up to strong at one step less effort", () => {
   expect(r({ types: [T("feature")] }, cfg(), { connected: ["claude-code", "codex"] }))
-    .toBe("build claude-code/sonnet@medium | codex/gpt-6.1-sol@low, claude-code/haiku@medium");
+    .toBe("build claude-code/sonnet@medium | codex/gpt-6.1-sol@low, claude-code/haiku@high");
 });
 
 test("nothing connected at or above the level is an error", () => {
@@ -253,7 +267,7 @@ test("BUG-442/a developer mode that isn't one is refused, and so is a config wit
 test("Haiku 5.5 is first in light and denied nothing by default; never_models still takes it out", () => {
   expect(base.rank.light![0]).toBe("claude-code/haiku");
   expect(base.limits?.never_models).toEqual([]);
-  expect(r({ types: [T("docs", 0, 1)], pinned: "claude-code/haiku" })).toBe("build claude-code/haiku@high | ");
+  expect(r({ types: [T("docs", 0, 1)], pinned: "claude-code/haiku" })).toBe("build claude-code/haiku@xhigh | ");
   expect(r({ types: [T("docs")] }, limits({ never_models: ["haiku"] }))).toBe("build codex/gpt-6-luna@high | kimi-code/kimi-k2.7-code");
   expect(r({ types: [T("docs")], pinned: "claude-code/haiku" }, limits({ never_models: ["haiku"] }))).toBe("claude-code/haiku isn't available (unknown, or denied in your config)");
 });

@@ -21,6 +21,18 @@ export const MODES: readonly Mode[] = ["build", "explore", "plan"];
 /** A mode the harness can't run (`ModeLaunch.unavailable`), said to the developer and to the brain. */
 export const modeUnavailable = (label: string, mode: Mode, why: string): string => `${label} can't start in ${mode} mode: ${why}`;
 
+/**
+ * Who approves the agent's commands and edits in a build session (ctrl+p in the agent choice, `--launch --permissions`):
+ * `own` is the harness as it is (no flag: its own default and the user's settings); the others pass the harness's own flag
+ * (`HarnessInfo.permissions`), mildest first: `accept-edits` lets edits through, `auto` routine commands and edits too,
+ * `never-ask` everything. Explore and plan set their own and ignore it.
+ */
+export type Permissions = "own" | "accept-edits" | "auto" | "never-ask";
+export const PERMISSIONS: readonly Permissions[] = ["own", "accept-edits", "auto", "never-ask"];
+
+/** A level a harness doesn't offer (`permissionLevels`), said to the developer and to `--launch`. */
+export const permissionsUnavailable = (label: string, p: Permissions): string => `${label} has no ${p} permissions`;
+
 /** What a harness needs to start in a mode other than build (`HarnessInfo.modes`). */
 export interface ModeLaunch {
   /** Options before the spec (with the connection's and the adapter's). */
@@ -220,6 +232,11 @@ export interface HarnessInfo {
   instructionFiles: { files: string[]; firstOnly?: boolean };
   /** How it starts in explore and plan (build adds nothing). */
   modes: Record<Exclude<Mode, "build">, ModeLaunch>;
+  /**
+   * Its permission levels besides its own (`Permissions`), each the options a build session gets before the spec. Only a
+   * harness that asks before every command or edit by default has any.
+   */
+  permissions?: Partial<Record<Exclude<Permissions, "own">, string[]>>;
   /** API-key providers, in the order offered. */
   providers: ProviderId[];
   /** Several providers at once (OpenCode: its plan and OpenRouter); otherwise one connection: a provider or the subscription. */
@@ -268,6 +285,9 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
       explore: { argv: ["--permission-mode", "dontAsk", "--disallowedTools", "Edit", "Write", "NotebookEdit", "EnterPlanMode", "ExitPlanMode", "EnterWorktree"], partlyKeptOnResume: true },
       plan: { argv: ["--permission-mode", "plan"] },
     },
+    // Checked against `claude --help` 2.1.295 (`--permission-mode` choices) and its docs: with no flag it starts in auto
+    // where the model and account allow it, else in its manual mode, which asks before every edit and every other command.
+    permissions: { "accept-edits": ["--permission-mode", "acceptEdits"], auto: ["--permission-mode", "auto"] },
     providers: ["anthropic", "bedrock", "openrouter"],
     subscription: { vendor: "claude", plan: "Claude plan", loginArgv: ["claude", "auth", "login"] },
     resume: "minted",
@@ -295,6 +315,8 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
       explore: { argv: ["-s", "read-only", "-a", "never"] },
       plan: { typed: "/plan" },
     },
+    // No permission levels: in a trusted repository codex 0.161 (`--help`, its docs) runs workspace-write with on-request
+    // approvals, so edits and commands inside the workspace don't ask.
     providers: ["openai", "bedrock", "openrouter"],
     subscription: { vendor: "chatgpt", plan: "ChatGPT plan", loginArgv: ["codex", "login"] },
     resume: "captured",
@@ -317,6 +339,9 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
       explore: { argv: ["--mode=plan"], note: "plan mode" },
       plan: { argv: ["--mode=plan"] },
     },
+    // Checked against `agy --help` 1.3.2 and its docs: shell commands ask by default (workspace edits: its docs disagree).
+    // `--mode` takes accept-edits (edits only); `--dangerously-skip-permissions` approves every request.
+    permissions: { "accept-edits": ["--mode=accept-edits"], "never-ask": ["--dangerously-skip-permissions"] },
     providers: ["gemini"],
     subscription: { vendor: "google", plan: "Google account", loginArgv: ["agy"], loginNote: "Antigravity signs in from its own screen; sign in there, then quit it (ctrl+c) to come back." },
     keyNote: { gemini: "Antigravity uses GEMINI_API_KEY only when its own settings say `modelProvider: gemini`. Gluon doesn't edit Antigravity's settings: set that yourself (Antigravity's settings.json)." },
@@ -341,6 +366,9 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
       explore: { argv: ["--sandbox", "read-only", "--deny", "Edit", "--deny", "Write", "--deny", "Bash"] },
       plan: { typed: "/plan" },
     },
+    // Checked against `grok --help` 1.0.46 and its docs: by default edits and non-read-only commands ask. Its TUI's
+    // `--permission-mode` is unverified (see explore above), so only `--always-approve` ("Auto-approve all tool executions").
+    permissions: { "never-ask": ["--always-approve"] },
     providers: ["xai"],
     subscription: { vendor: "xai", plan: "SuperGrok / X account", loginArgv: ["grok", "login"] },
     resume: "minted",
@@ -385,6 +413,7 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
       },
       plan: { opencodeConfig: { default_agent: "plan" } },
     },
+    // No permission levels: OpenCode 2.0.21's build agent allows edits and shell by default (its permissions docs).
     // Menu order: the API key first, as for every harness. Routing is separate: the prepaid plan wins a model both serve (`resolveModel`).
     providers: ["openrouter", "opencode-go"],
     multiProvider: true,
@@ -416,6 +445,9 @@ export const HARNESS_INFO: Record<Harness, HarnessInfo> = {
       explore: { unavailable: "its interactive mode ignores an agent file, so no flag can take its writing and shell tools away; use plan mode, or build" },
       plan: { argv: ["--plan"] },
     },
+    // Checked against `kimi --help` 2.1.1 and its docs: by default every edit and command asks. `--yolo`: routine edits and
+    // commands run, risky actions still ask; `--auto`: never asks.
+    permissions: { auto: ["--yolo"], "never-ask": ["--auto"] },
     providers: ["moonshot", "openrouter"],
     subscription: {
       vendor: "moonshot",
@@ -487,7 +519,7 @@ const DEEPSEEK_FLASH = "deepseek-v4.1-flash";
  */
 export const DEFAULT_MODELS: Record<Harness, ModelEntry[]> = {
   "claude-code": [
-    claude("haiku", "Haiku 5.5", "fast and cheap; small, well-specified edits", { alias: "haiku", api: "claude-haiku-5-5", bedrock: "global.anthropic.claude-haiku-5-5", openrouter: "anthropic/claude-haiku-5.5" }, "medium"),
+    claude("haiku", "Haiku 5.5", "fast and cheap; small, well-specified edits", { alias: "haiku", api: "claude-haiku-5-5", bedrock: "global.anthropic.claude-haiku-5-5", openrouter: "anthropic/claude-haiku-5.5" }, "high"),
     claude("sonnet", "Sonnet 5.5", "strong and mid-priced; default for most everyday tasks", { alias: "sonnet", api: "claude-sonnet-5-5", bedrock: "global.anthropic.claude-sonnet-5-5", openrouter: "anthropic/claude-sonnet-5.5" }, "high"),
     claude("opus", "Opus 5.5", "most capable, expensive; hard debugging, design, large changes", { alias: "opus", api: "claude-opus-5-5", bedrock: "global.anthropic.claude-opus-5-5", openrouter: "anthropic/claude-opus-5.5" }, "medium"),
     claude("fable", "Fable 5.1", "frontier model, most expensive; the hardest, longest tasks", { alias: "fable", api: "claude-fable-5-1", bedrock: "global.anthropic.claude-fable-5-1", openrouter: "anthropic/claude-fable-5.1" }, "high"),
@@ -560,3 +592,9 @@ export const isPlanConn = (conn: Conn): boolean => conn === "plan" || !!PROVIDER
 
 /** The sign-in of a subscription connection of this harness: its own plan's, or the plan provider's. */
 export const subscriptionOf = (harness: Harness, conn: Conn): Subscription | undefined => (conn === "plan" ? HARNESS_INFO[harness].subscription : PROVIDERS[conn].subscription);
+
+/** The permission levels a harness offers in build mode, its own first (ctrl+p cycles them). */
+export function permissionLevels(harness: Harness): Permissions[] {
+  const levels = HARNESS_INFO[harness]?.permissions ?? {};
+  return PERMISSIONS.filter((p) => p === "own" || levels[p]);
+}

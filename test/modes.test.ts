@@ -4,9 +4,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defaults } from "../src/config.ts";
-import { HARNESS_INFO, HARNESSES, MODES, type Harness, type Mode } from "../src/harnesses.ts";
-import { buildCommand, handOff, handOffSession, launchPlan, modeBrief, modeLostOnResume, typedModeProblem, typedModeRefusal, withMode, type LaunchChoice } from "../src/launchers.ts";
+import { HARNESS_INFO, HARNESSES, MODES, permissionLevels, type Harness, type Mode, type Permissions } from "../src/harnesses.ts";
+import { buildCommand, handOff, handOffSession, launchPlan, modeBrief, modeLostOnResume, typedModeProblem, typedModeRefusal, validateChoice, withMode, type LaunchChoice } from "../src/launchers.ts";
 import { handoffFor } from "../src/handoff.ts";
+import { repoContext, systemPrompt } from "../src/agent/prompt.ts";
 
 const config = defaults();
 const MODEL: Record<Harness, string> = { "claude-code": "sonnet", codex: "gpt-6.1-sol", antigravity: "gemini-3.8-flash", "grok-build": "grok-4.7", opencode: "deepseek-flash", "kimi-code": "kimi-k3" };
@@ -175,6 +176,57 @@ describe("buildCommand", () => {
 
   test("BUG-612/resume-modes: modeLostOnResume names the harnesses whose explore is in the launch and that can resume: Codex, Grok Build, OpenCode", () => {
     expect(HARNESSES.filter((h) => modeLostOnResume(h))).toEqual(["codex", "grok-build", "opencode"]);
+  });
+});
+
+describe("permissions (ctrl+p, --permissions): who approves the agent's commands and edits in build mode", () => {
+  const effortOf = (h: Harness) => (h === "opencode" ? undefined : "low");
+  const argv = (h: Harness, permissions: Permissions, mode?: Mode, session?: { id: string; resume: true }) =>
+    buildCommand(config, { ...choice(h, mode, effortOf(h), "x"), permissions }, undefined, session).argv;
+
+  test("BUG-712/permissions: a level passes the harness's own flag before the spec; `own` is the harness as it is", () => {
+    expect(argv("claude-code", "accept-edits")).toEqual(["claude", "--model", "sonnet", "--effort", "low", "--permission-mode", "acceptEdits", "--", "x"]);
+    expect(argv("claude-code", "auto")).toEqual(["claude", "--model", "sonnet", "--effort", "low", "--permission-mode", "auto", "--", "x"]);
+    expect(argv("antigravity", "accept-edits")).toEqual(["agy", "--model=gemini-3.8-flash-low", "--mode=accept-edits", "--prompt-interactive=x"]);
+    expect(argv("antigravity", "never-ask")).toEqual(["agy", "--model=gemini-3.8-flash-low", "--dangerously-skip-permissions", "--prompt-interactive=x"]);
+    expect(argv("grok-build", "never-ask")).toEqual(["grok", "-m", "grok-4.7", "--reasoning-effort", "low", "--always-approve", "--", "x"]);
+    expect(argv("kimi-code", "auto")).toContain("--yolo");
+    expect(argv("kimi-code", "never-ask")).toContain("--auto");
+    for (const h of HARNESSES) expect([h, argv(h, "own")]).toEqual([h, buildCommand(config, choice(h, undefined, effortOf(h), "x")).argv]);
+  });
+
+  test("BUG-712/permissions: the levels each harness offers; Codex and OpenCode don't ask before every command or edit, so only their own", () => {
+    expect(Object.fromEntries(HARNESSES.map((h) => [h, permissionLevels(h)]))).toEqual({
+      "claude-code": ["own", "accept-edits", "auto"],
+      codex: ["own"],
+      antigravity: ["own", "accept-edits", "never-ask"],
+      "grok-build": ["own", "never-ask"],
+      opencode: ["own"],
+      "kimi-code": ["own", "auto", "never-ask"],
+    });
+  });
+
+  test("BUG-712/permissions: a level the harness doesn't have is refused; explore and plan keep their own flags and ignore it", () => {
+    expect(() => argv("codex", "never-ask")).toThrow("Codex has no never-ask permissions");
+    expect(validateChoice(config, { ...choice("opencode", undefined, undefined, "x"), permissions: "auto" })).toContain("OpenCode has no auto permissions");
+    expect(validateChoice(config, { ...choice("claude-code", undefined, "low", "x"), permissions: "auto" })).toBeNull();
+    for (const mode of ["explore", "plan"] as const) expect(argv("claude-code", "auto", mode)).toEqual(buildCommand(config, choice("claude-code", mode, "low", "x")).argv);
+  });
+
+  test("BUG-712/permissions-resume: a resumed build session gets its permissions flag again", () => {
+    const id = "11111111-2222-4333-8444-555555555555";
+    expect(argv("claude-code", "accept-edits", undefined, { id, resume: true }).join(" ")).toContain("--permission-mode acceptEdits");
+    expect(argv("grok-build", "never-ask", undefined, { id, resume: true })).toContain("--always-approve");
+  });
+});
+
+describe("explore can't run things", () => {
+  test("BUG-714/explore-runs: explore's brief says commands that write (tests and builds too) may be refused or fail, so read the code and say what couldn't run", () => {
+    expect(modeBrief("explore")).toContain("If the goal above asks for a change, report what it would take instead of making it. Commands that write anything, tests and builds included, may be refused or fail here: read the code instead, and say what you couldn't run.");
+  });
+
+  test("BUG-714/explore-runs: the intake keeps an explore session's Done when to what reading the code can show", () => {
+    expect(systemPrompt(defaults(), repoContext(mkdtempSync(join(tmp, "repo-"))))).toContain("- If route returns explore mode, the session can read but may not be able to run tests, builds or scripts: keep Done when to what reading the code can show.\n");
   });
 });
 

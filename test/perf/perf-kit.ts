@@ -118,7 +118,7 @@ process.on("exit", () => {
   for (const d of tmps) rmSync(d, { recursive: true, force: true });
 });
 
-/** A repo of its own for one app: its sessions' worktrees go in it, and no other app's. */
+/** A repo of its own for one app: its sessions work in it, and no other app's. */
 export function freshRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "gluon-perf-repo-"));
   tmps.push(dir);

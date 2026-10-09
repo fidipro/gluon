@@ -173,18 +173,13 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "propose_launch",
     description:
-      "Propose the session: its name, the agent-ready spec (one spec for every option), the types, the worktree setting and a one-sentence reason. Gluon attaches the mode, the recommended agent and the alternatives from your last route call, so call route first. The developer starts the session with one of the options, adjusting its model or effort, or replies with changes; on a reply, call route again, then propose again.",
+      "Propose the session: its name, the agent-ready spec (one spec for every option), the types and a one-sentence reason. Gluon attaches the mode, the recommended agent and the alternatives from your last route call, so call route first. The developer starts the session with one of the options, adjusting its model or effort, or replies with changes; on a reply, call route again, then propose again.",
     input_schema: {
       type: "object",
       properties: {
         name: { type: "string", description: "the session's name: a short kebab-case slug of 2-4 words, at most 18 characters (e.g. fix-flaky-launcher)" },
         spec: { type: "string", description: "the agent-ready spec, in markdown: goal, context, decisions and constraints, assumptions, done when" },
         types: { type: "array", items: { type: "string" }, description: "the type names the session covers, as given to route (for stats and evals)" },
-        worktree: {
-          type: "boolean",
-          description:
-            "whether the session works in its own git worktree, which Gluon describes to the agent: true (the default) in a git repository; false outside one, for work on uncommitted or unpushed changes, or when the developer asked for no worktree. Gluon sets it false itself in explore mode",
-        },
         reason: { type: "string", description: "one sentence: what drove the pick (from route's why), and anything you suspected but didn't confirm, so the developer can pick a stronger option" },
       },
       required: ["name", "spec", "types", "reason"],
@@ -575,6 +570,7 @@ export async function runRepoTool(root: string, name: string, input: Record<stri
       const git = binPath("git");
       // Secret files are listed by name on purpose (their content is what read_file and the searches refuse).
       // Literal pathspecs: `:(top)` is a file name, not a way out of a subdirectory root (BUG-137).
+      // `.gluon` (here and in grep): an older Gluon's sessions' worktrees, which a checkout may still hold (`SKIP_DIRS` in `scan.ts`).
       let r = git && (await isGitRepo(root, git, signal)) ? await runGit(root, git, ["--literal-pathspecs", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "-x", ".gluon", "--", rel(dir)], MAX_LIST, signal, { sep: "\0" }) : null;
       if (!r || r.total === 0) r = await listFallback(root, rel(dir), MAX_LIST, signal);
       r.lines = r.lines.map((f) => f.replace(LEADING_DOT, ""));

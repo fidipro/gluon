@@ -1222,4 +1222,24 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     t.claudeRequest({ model: "global.anthropic.claude-haiku-5-5", input: 1000, output: 600, cacheRead: 150_000, cacheWrite: 10_000 });
     expect(t.figure()!.usd).toBeCloseTo(0.01575, 9);
   });
+
+  test("BUG-717/bedrock-price: on Bedrock a Claude model is priced from models.dev's amazon-bedrock row (AWS bills its own list, not Claude's); Claude's list price, its own figure, is the named cause of the difference", () => {
+    const ledger = new Ledger();
+    // The fixture's regional Sonnet 5.5 row (input $2.20, cache read $0.22) where Claude's catalog lists $2 and $0.20.
+    const t = frozenTracker({ harness: "claude-code", conn: "bedrock", ledger, now: () => 1, table: MODELS_DEV, claudeCatalog: CLAUDE_CATALOG });
+    t.claudeRequest({ model: "us.anthropic.claude-sonnet-5-5", input: 1_000_000, output: 0, cacheRead: 1_000_000, cacheWrite: 0, reportedUsd: 2.2 });
+    expect(t.figure()!.usd).toBeCloseTo(2.42, 9);
+    expect(ledger.entries.find((e) => e.kind === "observation")).toMatchObject({ cause: "harness-list-price", reportedMicros: 2_200_000, ownMicros: 2_420_000 });
+    // Claude Code names the model plainly on Bedrock (`claude-sonnet-5-5`, as seen live): the row is the launched profile's geography's.
+    const plain = frozenTracker({ harness: "claude-code", conn: "bedrock", launchedKey: "amazon-bedrock/us.anthropic.claude-sonnet-5-5", now: () => 1, table: MODELS_DEV, claudeCatalog: CLAUDE_CATALOG });
+    plain.claudeRequest({ model: "claude-sonnet-5-5", input: 1_000_000, output: 0, cacheRead: 1_000_000, cacheWrite: 0 });
+    expect(plain.figure()!.usd).toBeCloseTo(2.42, 9);
+    // A Bedrock id with no amazon-bedrock row still takes Claude's catalog; another connection keeps Claude's list price.
+    const missing = frozenTracker({ harness: "claude-code", conn: "bedrock", now: () => 1, table: { ...MODELS_DEV, entries: Object.fromEntries(Object.entries(MODELS_DEV.entries).filter(([k]) => !k.startsWith("amazon-bedrock/"))) }, claudeCatalog: CLAUDE_CATALOG });
+    missing.claudeRequest({ model: "us.anthropic.claude-sonnet-5-5", input: 1_000_000, output: 0, cacheRead: 1_000_000, cacheWrite: 0 });
+    expect(missing.figure()!.usd).toBeCloseTo(2.2, 9);
+    const direct = frozenTracker({ harness: "claude-code", conn: "anthropic", now: () => 1, table: MODELS_DEV, claudeCatalog: CLAUDE_CATALOG });
+    direct.claudeRequest({ model: "claude-sonnet-5-5", input: 1_000_000, output: 0, cacheRead: 1_000_000, cacheWrite: 0 });
+    expect(direct.figure()!.usd).toBeCloseTo(2.2, 9);
+  });
 });

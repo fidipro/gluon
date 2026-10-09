@@ -5,7 +5,7 @@
  */
 import type { Activity } from "../agent/tools.ts";
 import type { Config } from "../config.ts";
-import { HARNESS_INFO, type Harness, type Mode } from "../harnesses.ts";
+import { HARNESS_INFO, type Harness, type Mode, type Permissions } from "../harnesses.ts";
 import { contextLabel, costLabel, elapsed, GROUP_LABEL, GROUPS, groupOf, HARNESS_WORD, ordered, type AgentTripleView, type SessionState, type SessionView } from "../sessions.ts";
 import type { GluonRole } from "./theme.ts";
 
@@ -93,13 +93,20 @@ export function modeWord(harness: Harness, mode: Mode | undefined): string {
   return note ? `${mode} (${note})` : mode;
 }
 
-/** `harness` bright, ` × model × effort` dim, then ` · mode` unless build; `agent not chosen yet` (dim) for a draft. */
+/** Permissions as shown (ctrl+p): nothing for the harness's own, or outside build (explore and plan set their own); `accept edits`, `auto`, `never ask`. */
+export function permissionsWord(mode: Mode | undefined, permissions: Permissions | undefined): string {
+  if ((mode && mode !== "build") || !permissions || permissions === "own") return "";
+  return permissions.replace("-", " ");
+}
+
+/** `harness` bright, ` × model × effort` dim, then ` · mode` unless build, ` · permissions` unless the harness's own; `agent not chosen yet` (dim) for a draft. */
 export function tripleSegs(agent: AgentTripleView | null, config?: Pick<Config, "models">): Seg[] {
   if (!agent) return [{ text: "agent not chosen yet", role: "dim" }];
   const mode = modeWord(agent.harness, agent.mode);
+  const permissions = permissionsWord(agent.mode, agent.permissions);
   return [
     { text: HARNESS_WORD[agent.harness], role: "bright" },
-    { text: ` × ${modelWord(config, agent.harness, agent.model)}${agent.effort ? ` × ${agent.effort}` : ""}${mode ? ` · ${mode}` : ""}`, role: "dim" },
+    { text: ` × ${modelWord(config, agent.harness, agent.model)}${agent.effort ? ` × ${agent.effort}` : ""}${mode ? ` · ${mode}` : ""}${permissions ? ` · ${permissions}` : ""}`, role: "dim" },
   ];
 }
 
@@ -495,6 +502,7 @@ export function keyGroups(homeKey: string, canOpen = true, mouse = true): KeyGro
     ["tab", "the agent's model"],
     ["shift+tab", "the agent's effort"],
     ["ctrl+t", "the mode"],
+    ["ctrl+p", "the agent's permissions"],
     ["pgup pgdn", mouse ? "scroll, wheel too" : "scroll"],
     ["ctrl+o", "fold the spec"],
     ["esc", "interrupt · close options"],

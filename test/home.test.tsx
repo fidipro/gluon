@@ -231,9 +231,9 @@ describe("chat cells", () => {
     const offered = [opt("codex", ["gpt-6.1-sol"], ["low", "medium", "high"]), opt("opencode", ["muse-spark-1.3", "deepseek-flash"], []), opt("claude-code", ["sonnet", "opus"], ["low", "medium"])];
     // Codex on a plan with one model: no `tab model`.
     expect(keys(choiceHints({ harness: "codex", model: "gpt-6.1-sol", effort: "medium" }, offered))).toEqual(["↑↓", "enter", "esc", "shift+tab", "ctrl+t"]);
-    // OpenCode, whose models take no effort: no `shift+tab effort`.
+    // OpenCode, whose models take no effort: no `shift+tab effort`. Neither Codex nor OpenCode has permission levels: no `ctrl+p`.
     expect(keys(choiceHints({ harness: "opencode", model: "muse-spark-1.3" }, offered))).toEqual(["↑↓", "enter", "esc", "tab", "ctrl+t"]);
-    expect(keys(choiceHints({ harness: "claude-code", model: "sonnet", effort: "low" }, offered))).toEqual(["↑↓", "enter", "esc", "tab", "shift+tab", "ctrl+t"]);
+    expect(keys(choiceHints({ harness: "claude-code", model: "sonnet", effort: "low" }, offered))).toEqual(["↑↓", "enter", "esc", "tab", "shift+tab", "ctrl+t", "ctrl+p"]);
     // `keep talking` highlighted: neither.
     expect(keys(choiceHints(undefined, offered))).toEqual(["↑↓", "enter", "esc"]);
   });
@@ -241,7 +241,7 @@ describe("chat cells", () => {
   test("BUG-225/C: the choice's hint says what Enter does — starts the session, keeps talking, or sends what is typed — enter and esc before the optional tab keys; the question's in the hint line's words", () => {
     const pairs = (h: [string, string][]) => h.map(([k, l]) => `${k} ${l}`);
     const t = { harness: "claude-code" as const, model: "sonnet", effort: "medium" as const };
-    expect(pairs(choiceHints(t, agents))).toEqual(["↑↓ choose", "enter starts the session", "esc cancels", "tab model", "shift+tab effort", "ctrl+t mode"]);
+    expect(pairs(choiceHints(t, agents))).toEqual(["↑↓ choose", "enter starts the session", "esc cancels", "tab model", "shift+tab effort", "ctrl+t mode", "ctrl+p permissions"]);
     expect(pairs(choiceHints(undefined, agents))).toEqual(["↑↓ choose", "enter keeps talking", "esc cancels"]);
     expect(pairs(choiceHints(t, agents, "text"))).toEqual(["enter sends", "esc esc clears it"]);
     expect(pairs(choiceHints(t, agents, 2))).toEqual(["enter picks 2", "esc esc clears it"]);
@@ -331,7 +331,7 @@ function mice() {
   };
 }
 
-const KEY = { up: "\x1b[A", down: "\x1b[B", right: "\x1b[C", enter: "\r", tab: "\t", shiftTab: "\x1b[Z", esc: "\x1b", ctrlC: "\x03", ctrlO: "\x0f", ctrlT: "\x14", pgUp: "\x1b[5~", pgDn: "\x1b[6~" };
+const KEY = { up: "\x1b[A", down: "\x1b[B", right: "\x1b[C", enter: "\r", tab: "\t", shiftTab: "\x1b[Z", esc: "\x1b", ctrlC: "\x03", ctrlO: "\x0f", ctrlT: "\x14", ctrlP: "\x10", pgUp: "\x1b[5~", pgDn: "\x1b[6~" };
 /** Esc is held a moment to tell it from a late OSC 11 reply (`LateOscFilter`). */
 const escWait = () => new Promise((r) => setTimeout(r, 250));
 
@@ -480,6 +480,48 @@ describe("home view", () => {
     s.set({ pending: { kind: "proposal", ...PROPOSAL } });
     await t.waitFor("ctrl+t mode");
     t.unmount();
+  });
+
+  test("BUG-712/permissions: ctrl+p cycles the highlighted agent's permissions (Claude Code: its own, accept edits, auto); its row shows it, Enter starts with it", async () => {
+    const { t, s, got } = await home();
+    expect(t.text()).not.toMatch(/accept edits|· auto/);
+    await t.keys(KEY.ctrlP);
+    expect(t.text()).toMatch(/1\. claude code × sonnet 5\.5 × medium · accept edits · recommended/);
+    expect(t.text()).not.toMatch(/2\. codex .*accept edits/);
+    await t.keys(KEY.ctrlP);
+    expect(t.text()).toMatch(/1\. claude code × sonnet 5\.5 × medium · auto · recommended/);
+    await t.keys(KEY.enter);
+    expect(s.confirmed).toEqual([{ index: 0, override: { permissions: "auto" } }]);
+    expect(got.started).toEqual([expect.objectContaining({ harness: "claude-code", permissions: "auto" })]);
+    t.unmount();
+  });
+
+  test("BUG-712/permissions: ctrl+p back to its own is no override; an agent with no levels, or explore, says why and changes nothing; the hint names ctrl+p only where it does something", async () => {
+    const { t } = await home({ columns: 160 });
+    const hint = () => t.text().split("\n").find((l) => /^ {6,}↑↓ choose · enter /.test(l))!;
+    expect(hint()).toContain("ctrl+p permissions");
+    for (let i = 0; i < 3; i++) await t.keys(KEY.ctrlP);
+    expect(t.text()).not.toMatch(/accept edits|· auto/);
+    await t.keys(KEY.down);
+    expect(hint()).not.toContain("ctrl+p");
+    await t.keys(KEY.ctrlP);
+    await t.waitFor("Codex doesn't ask before every command or edit");
+    await t.keys(KEY.up);
+    await t.keys(KEY.ctrlP);
+    await t.keys(KEY.ctrlT);
+    // Explore sets its own: the row drops the level, and ctrl+p there only says so.
+    expect(t.text()).toMatch(/1\. claude code × sonnet 5\.5 × medium · explore · recommended/);
+    await t.keys(KEY.ctrlP);
+    await t.waitFor("Permissions are for build mode");
+    await t.keys(KEY.ctrlT);
+    await t.keys(KEY.ctrlT);
+    expect(t.text()).toMatch(/1\. claude code × sonnet 5\.5 × medium · accept edits · recommended/);
+    t.unmount();
+    const again = await home();
+    for (let i = 0; i < 3; i++) await again.t.keys(KEY.ctrlP);
+    await again.t.keys(KEY.enter);
+    expect(again.s.confirmed).toEqual([{ index: 0, override: {} }]);
+    again.t.unmount();
   });
 
   test("BUG-221/C: the choice's hint follows the highlighted agent's model (efforts are the model's: DeepSeek takes some), neither key on keep talking", async () => {
@@ -1538,6 +1580,53 @@ describe("home view", () => {
     t.unmount();
   });
 
+  test("BUG-716/queued: Enter while the intake agent works queues the message, shown and not sent; it is sent once the turn ends", async () => {
+    const { t, s } = await home();
+    s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
+    await t.waitFor("Exploring (");
+    await t.keys("also check mul");
+    await t.keys(KEY.enter);
+    await t.waitFor("queued: sent when the intake agent is done");
+    expect(s.sent).toEqual([]);
+    expect(t.text()).toContain("› also check mul");
+    s.set({ workingSince: null });
+    await t.waitFor((x: string) => !x.includes("queued:"));
+    expect(s.sent).toEqual(["also check mul"]);
+    t.unmount();
+  });
+
+  test("BUG-716/queued: Esc cancels a queued message before it interrupts the intake agent", async () => {
+    const { t, s } = await home();
+    s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
+    await t.waitFor("Exploring (");
+    await t.keys("also check mul");
+    await t.keys(KEY.enter);
+    await t.waitFor("queued:");
+    await t.keys(KEY.esc);
+    await t.waitFor((x: string) => !x.includes("queued:"));
+    expect(s.interrupted).toBe(0);
+    s.set({ workingSince: null });
+    await t.waitFor((x: string) => !x.includes("Exploring ("));
+    expect(s.sent).toEqual([]);
+    t.unmount();
+  });
+
+  test("BUG-716/queued: a question at the turn's end keeps the message queued, says Enter sends it as the answer, and only Enter sends it", async () => {
+    const { t, s } = await home();
+    s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
+    await t.waitFor("Exploring (");
+    await t.keys("the second one");
+    await t.keys(KEY.enter);
+    await t.waitFor("queued:");
+    s.set({ workingSince: null, pending: { kind: "question", question: { question: "Which one?", options: [{ label: "this" }, { label: "that" }] } } });
+    await t.waitFor("queued: enter sends it as your answer");
+    expect(s.sent).toEqual([]);
+    await t.keys(KEY.enter);
+    await t.waitFor((x: string) => !x.includes("queued:"));
+    expect(s.sent).toEqual(["the second one"]);
+    t.unmount();
+  });
+
   test("while the intake agent works: a working line, Esc interrupts, Enter doesn't send", async () => {
     const { t, s } = await home();
     s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
@@ -1545,7 +1634,10 @@ describe("home view", () => {
     await t.keys("more");
     await t.keys(KEY.enter);
     expect(s.sent).toEqual([]);
-    expect(t.text()).toContain("Still working");
+    expect(t.text()).toContain("queued: sent when the intake agent is done");
+    // The first Esc cancels the queued message (BUG-716), the next interrupts.
+    await t.keys(KEY.esc);
+    await t.waitFor((x: string) => !x.includes("queued:"));
     await t.keys(KEY.esc);
     // The held Esc is sent on a timer: on a loaded machine it can fire after a fixed pause (the macOS run's flake).
     for (const until = Date.now() + 5000; s.interrupted < 1 && Date.now() < until; ) await Bun.sleep(25);

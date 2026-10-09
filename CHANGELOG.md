@@ -6,7 +6,38 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `ctrl+p` in the agent choice sets who approves a build session's commands and edits, for an agent that asks before every
+  one: its own behaviour (the default, unchanged), or one of its own levels: accept edits and auto (Claude Code), accept
+  edits and never ask (Antigravity), never ask (Grok Build), auto and never ask (Kimi Code). The option's row shows the
+  level, a resumed session gets it again, and `gluon --launch` takes it as `--permissions`. Codex and OpenCode have none:
+  they don't ask before every command or edit.
+
+### Changed
+- Claude Code's Haiku 5.5 runs at `high` effort by default (was `medium`), like GPT-6 Luna in the same slot.
+- The routing reason names the effort it means: the model's default and what the session gets, e.g. `effort +0 from
+  haiku's default (high) → claude-code/haiku@high`; when routing rounds up to a stronger level, it says the steps it
+  applied there.
+- The intake agent looks up what a quick check would settle instead of guessing: its spec's Context holds only what it saw,
+  a bug's diagnosis comes with the evidence for it and without unsupported suspects, unrequested scope stays out of the
+  Assumptions too, and a request that names only a symptom gets a question about the outcome wanted.
+- Explore sessions aren't asked to run things: tests, builds and scripts that write may be refused or fail in a read-only
+  session, so the intake agent keeps an explore session's goal to what reading the code can show, and the agent's brief
+  says to read the code instead and say what it couldn't run.
+- When the intake agent answers a question itself, it says that it only read the code and offers a session to verify it.
+
+### Removed
+- Sessions no longer get a git worktree: Gluon says nothing about worktrees to the intake agent or the agent, and the agent
+  works where Gluon was started, as each harness does on its own. A session saved with a worktree still resumes (the
+  worktree is ignored), and `gluon stats` leaves the worktree columns empty.
+
 ### Fixed
+- A message sent while the intake agent works is queued instead of refused: it shows above the chat box, goes when the
+  agent's turn ends, and `esc` cancels it. If the turn ends with a question or a proposal, it waits and `enter` sends it
+  as your answer, so nothing becomes an answer unseen.
+- Claude Code on Amazon Bedrock is priced at AWS's own prices, which Bedrock bills by, instead of Claude Code's list price
+  (Sonnet 5.5's cache reads are $0.10 per million tokens on AWS's price list, not $0.20). `gluon cost-report` names Claude Code's
+  list price as the cause where its own figure differs.
 - Gluon's own updates: a newer version Gluon remembers from an earlier check is confirmed with GitHub before it is announced or
   downloaded (a remembered version that GitHub no longer lists is never acted on); while Gluon is up to date it still asks once a
   day. A version whose automatic install failed is not downloaded again for a day.

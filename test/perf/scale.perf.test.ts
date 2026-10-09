@@ -1,6 +1,6 @@
 /**
  * Many sessions: Gluon's memory, idle CPU, keystroke latency and tab switches with 1, 5, 10, 20 and
- * 40 sessions open (each its own worktree and fake agent), and its memory with every session's
+ * 40 sessions open (each its own fake agent), and its memory with every session's
  * scrollback full (5000 rows of 200 cells). Latencies are held to the perception limits on Gluon's
  * share (measured minus the harness floor; `perf-kit.ts`), except the home composer's, which has
  * its own test (`typing.perf.test.ts`). `bun run test:perf`.

@@ -1001,13 +1001,24 @@ describe("the project's AGENTS.md / CLAUDE.md in the brain's prompt", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).toContain("If the developer named a harness or model, in this message or an earlier one, pass it as `pinned`. Route keeps it and adds no alternatives.");
   });
-  test("issue 52: sessions are isolated in a git worktree by default, said to the developer, with the exceptions; Gluon describes the worktree in the spec", () => {
+  test("BUG-713/check-not-guess: the intake asks for the outcome behind a symptom, keeps unasked scope out of Assumptions, and writes only what it saw as Context", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
-    expect(p).toContain("a session that can change files works in its own git worktree by default. Gluon handles the details, so don't mention worktrees in the spec.");
-    expect(p).toContain("Just before proposing, say in one sentence whether the session runs in its own worktree or in place, and why.");
-    expect(p).toContain("Set worktree to false in three cases");
-    expect(p).toContain("uncommitted or unpushed work");
-    expect(p).toContain("a read-only session always runs in place");
+    expect(p).toContain("   - the `ask` items of the likely types in <types>\n   - the outcome they want, when the request names only a symptom (\"search is messy\", \"the numbers look wrong\")\n");
+    expect(p).toContain("Don't widen the scope yourself, in the spec's Assumptions either (e.g. an unrelated bug you noticed, a cleanup): ask, or leave it out.");
+    expect(p).toContain("- For a bug, give your diagnosis as a hypothesis, with what you saw that supports it. Leave out suspects you have no evidence for.\n- Context holds only what you saw in the repository. If a quick lookup would settle something, look; anything you still assume goes in Assumptions.\n");
+    expect(p).not.toContain("Don't widen the scope yourself (e.g. an unrelated bug you noticed)");
+  });
+  test("BUG-715/answered-itself: an answer the intake gives itself says it only read the code and offers a session to verify it", () => {
+    const p = systemPrompt(defaults(), repoContext(dir()));
+    const role = p.slice(0, p.indexOf("# How you work"));
+    expect(role).toContain("If you answer a question yourself, say that you only read the code, and offer a session to verify it.");
+  });
+  test("BUG-710/worktree-removed: the intake neither decides nor mentions a worktree: no prompt section, no propose_launch field", () => {
+    const p = systemPrompt(defaults(), repoContext(dir()));
+    expect(p).not.toMatch(/worktree/i);
+    const propose = TOOLS.find((t) => t.name === "propose_launch")!;
+    expect(Object.keys(propose.input_schema.properties ?? {})).not.toContain("worktree");
+    expect(propose.description).not.toMatch(/worktree/i);
   });
   test("the prompt explains the instructions a tool result may carry, with or without root files", () => {
     const d = dir();

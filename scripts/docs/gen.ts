@@ -70,6 +70,7 @@ const FLAG_DOC: Record<string, string> = {
   model: "The model for `--launch`: an id from the catalog that the agent's connection serves.",
   effort: "The effort for `--launch`, one of the levels the model takes.",
   mode: "With `--launch`: `build` (the default), `explore` (read-only) or `plan` (the agent's plan mode).",
+  permissions: "With `--launch` in build mode: `own` (the default: the agent asks as it does on its own), `accept-edits`, `auto` or `never-ask`, where the agent has that level ([Modes](../guides/modes.md#permissions)).",
   "dry-run": "With `--launch`: print the command instead of running it.",
   all: "With `gluon resume` and `gluon sessions`: every directory's saved sessions, not just this one's.",
   force: "With `gluon resume` and `gluon sessions --delete`: even while another Gluon has the workspace open.",

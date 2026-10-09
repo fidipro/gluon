@@ -34,9 +34,6 @@ export const MASKS: Mask[] = [
   { name: "dollars", pattern: /~?\$(\d+\.\d{2})/g },
   // Temp paths: the run's dirs (mkdtemp suffixes differ every run).
   { name: "tempPath", pattern: new RegExp(`((?:${TEMP_ROOTS})/[^\\s│'"<>]*)`, "g") },
-  // A temp path the screen wrapped (the worktree command an agent is told): the part on a later row has no temp root left
-  // for `tempPath`, but still ends in the repo's fixed `/tiny/.gluon/` (its random dir names are what differ).
-  { name: "wrappedTempPath", pattern: /([\w.-]+(?:\/[\w.-]+)*)(?=\/tiny\/\.gluon\/)/g },
   // The OpenTelemetry receiver an agent is given (`telemetry.ts`): its port, and its token, which
   // the agent's printed argv may wrap across rows (the head after `="`, the tail before `"}}}`).
   { name: "otelPort", pattern: /127\.0\.0\.1:(\d+)/g },

@@ -12,7 +12,7 @@ This is not the same as [saved workspaces](sessions.md#save-and-resume-sessions)
 Each session you start, resume, restart or launch directly from the command line adds a row. A row holds:
 
 - **Identity.** The session's id, its name, and how it started: new, resumed, restarted (for example after `/clear`) or a one-shot launch.
-- **Where.** The directory, the repository, the branch, and the worktree if the session had its own.
+- **Where.** The directory, the repository and the branch. The worktree columns stay empty: sessions no longer get a worktree of Gluon's.
 - **Which agent.** The agent, its version, the model, the effort, the mode and how it was connected.
 - **Why that agent.** What the intake agent classified the work as, and why it chose this agent.
 - **The spec.** The prompt the session was given, as you saw it, with keys masked. A very long spec is cut at 100,000 characters.

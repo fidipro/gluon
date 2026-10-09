@@ -7,7 +7,7 @@ import { maskSecrets } from "../secrets.ts";
 import { routeCatalog, routeEnv } from "../intake.ts";
 import { defaultRouting } from "../routing-config.ts";
 import { route, type Config as RoutingConfig, type RouteInput } from "../routing.ts";
-import { parseProposal, pickChoice, type AgentTriple, type Proposal, type Routed } from "./choices.ts";
+import { parseProposal, pickChoice, type AgentTriple, type ChoiceOverride, type Proposal, type Routed } from "./choices.ts";
 import { pathInstructions } from "./prompt.ts";
 import { describeRepoTool, MAX_NEXT_QUESTIONS, REPO_TOOLS, runRepoTool, TOOLS, type Activity, type Question } from "./tools.ts";
 
@@ -73,8 +73,6 @@ export type Pending =
 /** A launch the developer confirmed, with the session's name. */
 export type NamedChoice = LaunchChoice & {
   name: string;
-  /** In its own git worktree (`worktree.ts`); only an explicit false is the checkout. */
-  worktree?: boolean;
   /** The proposal's routing data (`route`'s types and why lines): recorded by the local analytics (`src/analytics.ts`), never sent anywhere. */
   types?: string[];
   why?: string[];
@@ -241,16 +239,15 @@ export class Session {
 
   /**
    * The developer started the session with option `index` of the proposal (0: the recommended one),
-   * its model or effort changed by `override` (Tab adjust) and its mode (ctrl+t; wins over the proposal's). Null when nothing is proposed, the
+   * its model or effort changed by `override` (Tab adjust), its mode (ctrl+t; wins over the proposal's) and its permissions (ctrl+p). Null when nothing is proposed, the
    * option isn't one, or the override isn't offered for that agent.
    */
-  confirm(index = 0, override?: { model?: string; effort?: Effort; mode?: Mode }): NamedChoice | null {
+  confirm(index = 0, override?: ChoiceOverride): NamedChoice | null {
     const pending = this.state.pending;
     if (pending?.kind !== "proposal") return null;
     const choice = pickChoice(this.config, pending, index, override);
     if (typeof choice === "string") return null;
-    // Explore is read-only and creating a worktree is a change: it runs in place, whatever the proposal said (BUG-410).
-    return { ...choice, name: pending.name, worktree: choice.mode === "explore" ? false : pending.worktree, ...(pending.types ? { types: [...pending.types] } : {}), ...(pending.why ? { why: [...pending.why] } : {}) };
+    return { ...choice, name: pending.name, ...(pending.types ? { types: [...pending.types] } : {}), ...(pending.why ? { why: [...pending.why] } : {}) };
   }
 
   /** Shows a message from Gluon itself (not the brain) in the history. */

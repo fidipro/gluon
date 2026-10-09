@@ -417,7 +417,7 @@ async function reachHome(c: Ctx, state: StateId) {
       // A message to the intake agent: it works for a second or so (the input lands meanwhile).
       const ready = () => working(app) && composer(app) === "";
       if (ready()) return;
-      // Still at it from the last one: an Enter now would only keep the draft ("Still working…").
+      // Still at it from the last one: an Enter now would only queue the message for the turn's end.
       if (working(app)) await app.idle(20_000);
       c.dirt.add("asked");
       await app.type("more");

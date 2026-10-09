@@ -91,7 +91,7 @@ export function dropSecretMatches(r: RunResult, nul = false): void {
   r.lines = kept;
 }
 
-// `.gluon`: sessions' git worktrees, whole copies of the repository (`src/worktree.ts`).
+// `.gluon`: an older Gluon put sessions' git worktrees there, whole copies of the repository; a checkout may still have one.
 const SKIP_DIRS = new Set([".git", "node_modules", ".gluon"]);
 
 /** The files under `rel` (a file or directory, relative to `root`), "/"-separated, sorted; no symlinks, .git, node_modules, .gluon or `.env*` directories below it. */

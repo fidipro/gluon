@@ -9,7 +9,7 @@ import { cycleEffort, cycleModel, type AgentTriple } from "../agent/choices.ts";
 import type { Item, Pending, ShownProposal, State } from "../agent/session.ts";
 import type { Question } from "../agent/tools.ts";
 import type { AgentOption, Config } from "../config.ts";
-import type { Mode } from "../harnesses.ts";
+import { permissionLevels, type Mode } from "../harnesses.ts";
 import { composerRows, elapsed } from "./bottom.tsx";
 import type { Draft } from "./editor.ts";
 import { summarizeExplored, truncate, tripleSegs, type Seg } from "./layout.ts";
@@ -206,7 +206,7 @@ const typedHints = (typed: "text" | number): [string, string][] => [
 ];
 
 /** Keys a hint names after the essential ones (Enter, Esc), so a cut drops them first (BUG-225). */
-const OPTIONAL_KEYS = new Set(["tab", "shift+tab", "ctrl+t", "type"]);
+const OPTIONAL_KEYS = new Set(["tab", "shift+tab", "ctrl+t", "ctrl+p", "type"]);
 
 /** A hint's text: `key label · key label`; `essential`: without the optional keys (the home view's hint line). */
 export const hintText = (hints: readonly [string, string][], essential = true) =>
@@ -259,12 +259,13 @@ export const CHOICE_HINTS: [string, string][] = [
   ["tab", "model"],
   ["shift+tab", "effort"],
   ["ctrl+t", "mode"],
+  ["ctrl+p", "permissions"],
 ];
 
 /**
  * The hint under the agent choice for the highlighted agent `t` (none: `keep talking`), saying what
  * Enter does (BUG-225): Tab only when it has another model to switch to, Shift+Tab only another
- * effort (`cycleModel`, `cycleEffort` over the offered `agents`; BUG-221). With something `typed`,
+ * effort (`cycleModel`, `cycleEffort` over the offered `agents`; BUG-221), Ctrl+P only an agent with permission levels (`permissionLevels`). With something `typed`,
  * what Enter does with it. The home view's hint line says the same words.
  */
 export function choiceHints(t: AgentTriple | undefined, agents: AgentOption[], typed: OptionsTyped = null): [string, string][] {
@@ -272,7 +273,8 @@ export function choiceHints(t: AgentTriple | undefined, agents: AgentOption[], t
   if (!t) return [["↑↓", "choose"], ["enter", "keeps talking"], ["esc", "cancels"]];
   const model = cycleModel(t, agents).model !== t.model;
   const effort = (cycleEffort(t, agents).effort ?? null) !== (t.effort ?? null);
-  return CHOICE_HINTS.filter(([key]) => (key === "tab" ? model : key === "shift+tab" ? effort : true));
+  const permissions = permissionLevels(t.harness).length > 1;
+  return CHOICE_HINTS.filter(([key]) => (key === "tab" ? model : key === "shift+tab" ? effort : key === "ctrl+p" ? permissions : true));
 }
 
 /** Columns before the spec box's left border. */

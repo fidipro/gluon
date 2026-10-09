@@ -17,11 +17,12 @@ On the home view, the hint line names the keys for what is selected. Press `?` w
 
 ## In the intake chat
 
-- `enter` sends your message.
+- `enter` sends your message. While the intake agent works, the message is queued above the chat box and sent when its turn ends; `esc` cancels it. If the agent ends its turn with a question or a proposal, the queued message waits, and `enter` sends it as your answer.
 - `↑` and `↓`, or a digit, then `enter`, pick an option.
 - `enter` on an agent starts the session. Type instead to change it.
 - `tab` and `shift+tab` adjust the highlighted agent's model and effort. The hint names them when it has another.
 - `ctrl+t` cycles the [mode](modes.md) (build, explore, plan) of the proposal.
+- `ctrl+p` cycles the highlighted agent's [permissions](modes.md#permissions) in build mode, for an agent that asks before every command or edit. The hint names it then.
 - `pgup` and `pgdn` scroll the spec when it is cut to fit. While the agents are shown, they scroll only the spec. `esc` closes the agents, then they scroll the chat.
 - `ctrl+o` folds the spec to one line and back.
 

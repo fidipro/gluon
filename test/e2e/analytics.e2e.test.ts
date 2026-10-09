@@ -78,7 +78,7 @@ describe("local analytics", () => {
       expect(row!.agent_session_id).toMatch(/^[0-9a-f-]{36}$/);
       expect(JSON.parse(row!.routing_types!)).toEqual(expect.arrayContaining([expect.any(String)]));
       expect(JSON.parse(row!.routing_why!).length).toBeGreaterThan(0);
-      expect(row!.worktree_path).toContain(".gluon");
+      expect(row!.worktree_path).toBeNull();
       expect(row!.started_at).toBeGreaterThan(0);
       // The agent was started under that very id.
       expect(app.agentLog()).toContain(row!.agent_session_id!);

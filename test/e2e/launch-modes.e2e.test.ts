@@ -34,7 +34,7 @@ test("BUG-409/launch-modes: the note that Codex's /plan line couldn't be typed i
   expect(app.screen().replace(/\s+/g, " ")).toContain("type this yourself: /plan Read the session brief in");
 });
 
-test("BUG-410/launch-modes: ctrl+t to explore (strictly read-only) on a proposal with a worktree gives no worktree brief, and the brief says what explore allows @full", async () => {
+test("BUG-410/launch-modes: ctrl+t to explore (strictly read-only) gives the brief that says what explore allows @full", async () => {
   const app = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(app, "fix the thing");
   await app.press(KEYS.ctrlT);
@@ -42,13 +42,10 @@ test("BUG-410/launch-modes: ctrl+t to explore (strictly read-only) on a proposal
   await app.waitFor((s) => s.includes("TUI ready") && s.includes("◆ gluon"), 20_000);
   const log = app.agentLog();
   expect(log).toContain("dontAsk");
-  // The mode is read-only: the brief that tells the agent to create a worktree must not come with it, and its own block does.
-  expect(log).not.toContain("git worktree add");
-  expect(log).not.toContain("Where to work");
   expect(log).toContain("## Mode: explore");
 });
 
-test("BUG-410/launch-modes @full: the brief follows the mode ctrl+t ended on, whatever the spec was written for: plan keeps the worktree and says plan, build says neither mode", async () => {
+test("BUG-410/launch-modes @full: the brief follows the mode ctrl+t ended on, whatever the spec was written for: plan says plan, build says neither mode", async () => {
   const plan = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(plan, "fix the thing");
   await plan.press(KEYS.ctrlT);
@@ -57,8 +54,7 @@ test("BUG-410/launch-modes @full: the brief follows the mode ctrl+t ended on, wh
   await plan.waitFor((s) => s.includes("TUI ready") && s.includes("◆ gluon"), 20_000);
   expect(plan.agentLog()).toContain("## Mode: plan");
   expect(plan.agentLog()).not.toContain("## Mode: explore");
-  expect(plan.agentLog()).toContain("git worktree add");
-  // build, explore, plan, build again: the proposal's own worktree, and no mode block.
+  // build, explore, plan, build again: no mode block.
   const build = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(build, "fix the thing");
   for (let i = 0; i < 3; i++) await build.press(KEYS.ctrlT);
@@ -66,7 +62,6 @@ test("BUG-410/launch-modes @full: the brief follows the mode ctrl+t ended on, wh
   await build.waitFor((s) => s.includes("TUI ready") && s.includes("◆ gluon"), 20_000);
   expect(build.agentLog()).not.toContain("## Mode:");
   expect(build.agentLog()).not.toContain("dontAsk");
-  expect(build.agentLog()).toContain("git worktree add");
 });
 
 for (const cols of [60, 40]) {

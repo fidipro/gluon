@@ -7,7 +7,7 @@
  * harness's own total is shown instead, marked (`own: false`).
  */
 import { isPlanConn, PROVIDERS, type Conn, type Harness } from "../harnesses.ts";
-import { claudeCost, claudeFallbackHypotheses, claudeHypotheses, claudePriceFrom, claudePriceFromTier, HARNESS_UNKNOWN_MODEL_PRICE, type ClaudePrice } from "./claude.ts";
+import { claudeCost, claudeFallbackHypotheses, claudeHypotheses, claudePriceFrom, claudePriceFromTier, HARNESS_LIST_PRICE, HARNESS_UNKNOWN_MODEL_PRICE, type ClaudePrice } from "./claude.ts";
 import { codexCost } from "./codex.ts";
 import { grokCost, grokTableEntry } from "./grok.ts";
 import type { GrokUsageReport } from "./grok-usage.ts";
@@ -327,6 +327,20 @@ export class CostTracker {
     return provider === "anthropic" ? [`anthropic/${model}`, `anthropic/${dateless(model)}`] : [`${provider}/${model}`];
   }
 
+  /**
+   * On Bedrock, the `amazon-bedrock/` keys of a Claude request's model: the name as reported, then, since Claude Code reports the plain
+   * name (`claude-sonnet-5-5`, seen live), the catalog's Bedrock id in the launched profile's geography (`global.`, `us.` …: AWS prices them apart).
+   */
+  private bedrockKeys(model: string, catalogModel: { providerIds: Record<string, string> } | undefined): string[] {
+    const keys = [`amazon-bedrock/${model}`];
+    const id = catalogModel?.providerIds.bedrock;
+    if (!id) return keys;
+    const geo = /^amazon-bedrock\/([a-z]+)\.anthropic\./.exec(this.o.launchedKey ?? "")?.[1];
+    if (geo) keys.push(`amazon-bedrock/${geo}.${id.replace(/^[a-z]+\.(?=anthropic\.)/, "")}`);
+    keys.push(`amazon-bedrock/${id}`);
+    return keys;
+  }
+
   /** `digest`: the table that priced the request (Claude Code's catalog or models.dev); default models.dev's. */
   /** The assumptions of a request, plus `launched-model-price` when the launched model's price stood in for the reported model's. */
   private withLaunched(assumptions: Assumption[], found: { launched: boolean } | undefined): Assumption[] {
@@ -360,8 +374,12 @@ export class CostTracker {
     // Claude's table is its own catalog: until it is pinned the request waits (a model it lacks then falls to models.dev's price, which must be pinned too).
     if (!catalog) return this.defer({ k: "claude", r });
     const catalogModel = claudeCatalogModel(model, catalog);
-    const tier = catalogModel && catalog.pricingTiers[catalogModel.pricing];
-    const found = tier ? undefined : this.entryFor(this.claudeKeys(model));
+    const listTier = catalogModel && catalog.pricingTiers[catalogModel.pricing];
+    // Bedrock bills by AWS's own price list, which isn't always Claude's (Sonnet 5.5's cache read: $0.10/M on AWS's list, global, against $0.20/M in
+    // Claude's catalog, checked 2026-10): its models.dev `amazon-bedrock/<id>` row prices the request; Claude's list price stays the audit (BUG-717).
+    const bedrockRow = this.o.conn === "bedrock" ? this.entryFor(this.bedrockKeys(model, catalogModel), false) : undefined;
+    const tier = bedrockRow ? undefined : listTier;
+    const found = tier ? undefined : bedrockRow ?? this.entryFor(this.claudeKeys(model));
     if (!tier && !found) return this.table ? this.unknown("otel", model, counts) : this.defer({ k: "claude", r });
     // Fast mode: a catalog model has the price row Claude Code's price function gives it (a model with none is priced as usual, as Claude does);
     // a model outside the catalog takes models.dev's fast row, when it has one.
@@ -386,7 +404,9 @@ export class CostTracker {
       const reportedMicros = Math.round(r.reportedUsd * 1e6);
       // An id Claude Code's catalog lacks is priced by it at a row of its own: a reported cost on one of those rows is named (never copied).
       const fallback = catalogModel ? [] : claudeFallbackHypotheses(Object.values(catalog.pricingTiers).map(claudePriceFromTier), withTtl, c.micros);
-      const cause = explain(reportedMicros - c.micros, [...claudeHypotheses(price, withTtl, fastPrice, ttl), ...fallback], toleranceMicros(reportedMicros));
+      // Priced from AWS's row, Claude Code's own figure is its list price: named when that is the difference.
+      const listPrice = bedrockRow && listTier ? [{ name: HARNESS_LIST_PRICE, deltaMicros: claudeCost(claudePriceFromTier(listTier), withTtl).micros - c.micros }] : [];
+      const cause = explain(reportedMicros - c.micros, [...claudeHypotheses(price, withTtl, fastPrice, ttl), ...fallback, ...listPrice], toleranceMicros(reportedMicros));
       if (cause === HARNESS_UNKNOWN_MODEL_PRICE) this.fallbackResidualMicros += reportedMicros - c.micros;
       observation = { reportedMicros, cause };
     }

@@ -9,8 +9,8 @@
  */
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { click, FOCUS, HOME_KEY, KEYS, mouseReports, wheelDown, wheelUp, type Action } from "./actions.ts";
-import { freshConfig, repo, WIN } from "./fixtures.ts";
-import { EVENT_HOOK, gluon, home, launch, launchAs, openSessions, say, toChoice } from "./gluon-kit.ts";
+import { repo, WIN } from "./fixtures.ts";
+import { gluon, home, launch, launchAs, openSessions, say, toChoice } from "./gluon-kit.ts";
 import { assertInvariants } from "./gluon-invariants.ts";
 import { type App, HOME_VIEW, SLOW, start, stopAll } from "./harness.ts";
 import { GLUON_HEX } from "../../src/ui/theme.ts";
@@ -613,28 +613,5 @@ describe("Gluon: switching sessions (issue #47)", () => {
     await app.press(KEYS.esc);
     await app.waitFor(() => !QUESTION_BAR.test(bar(app)));
     assertInvariants(app, { tab: "session-2" });
-  });
-});
-
-describe("Gluon: where a session works (issue 52)", () => {
-  test("issue 52: in a git repository the agent's spec ends with where its worktree goes @full", async () => {
-    const dir = repo.tiny();
-    const app = await gluon(100, 30, {}, undefined, ["claude"]);
-    await launch(app, "alpha task");
-    const log = app.agentLog().replaceAll("\\", "/");
-    const path = `${dir.replaceAll("\\", "/")}/.gluon/worktrees/gluon-alpha-task`;
-    expect(log).toContain("## Where to work");
-    expect(log).toContain(`git worktree add -b gluon/alpha-task "${path}" HEAD`);
-    expect(log).toContain("Do nothing until the developer agrees");
-    // The spec comes first and the block after it; Gluon created nothing.
-    expect(log.indexOf("Where to work")).toBeGreaterThan(log.indexOf("alpha task"));
-    expect(await Bun.file(`${path}/.git`).exists()).toBe(false);
-  });
-
-  test("issue 52: outside a git repository the agent gets the spec alone @full", async () => {
-    const cfg = freshConfig(`kit-${process.pid}-wt-nogit`, "handoff:\n  on_clear: ask\n");
-    const app = await start({ cwd: repo.noGit(), cols: 100, rows: 30, agents: ["claude"], env: { GLUON_CONFIG: cfg, FAKE_TUI: "1", FAKE_EVENT_HOOK: EVENT_HOOK } });
-    await launch(app, "alpha task");
-    expect(app.agentLog()).not.toContain("Where to work");
   });
 });

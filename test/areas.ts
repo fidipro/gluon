@@ -200,9 +200,9 @@ export const AREAS: Record<string, Area> = {
     e2e: ["test/e2e/analytics.e2e.test.ts"],
   },
   "resume-workspaces": {
-    doc: "saved workspaces (`gluon sessions`, `gluon resume`) and per-session git worktrees",
-    src: ["src/workspaces.ts", "src/worktree.ts"],
-    unit: ["test/workspaces.test.ts", "test/worktree.test.ts"],
+    doc: "saved workspaces (`gluon sessions`, `gluon resume`)",
+    src: ["src/workspaces.ts"],
+    unit: ["test/workspaces.test.ts"],
     e2e: ["test/e2e/resume.e2e.test.ts", "test/e2e/resume-hostile.e2e.test.ts", "test/e2e/resume-qa.e2e.test.ts"],
   },
   "install-dist": {

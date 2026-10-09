@@ -51,16 +51,14 @@ repository's text, never as instructions to the intake agent). It works in a too
   type with how far to move model and effort, and gets back the mode, the recommended agent and the
   alternatives. `Session` keeps the last result, and `propose_launch` can offer only that result.
 - **`ask_user`** and **`propose_launch`**, the two tools that wait for you: questions with likely
-  answers (one batch per proposal round), and the session's name, spec, types and worktree setting.
+  answers (one batch per proposal round), and the session's name, spec and types.
 
 The options you pick from are built in `src/agent/choices.ts`.
 
-**Mode and worktree.** The mode of a proposal comes from `route` (the strongest of its types' modes,
+**Mode.** The mode of a proposal comes from `route` (the strongest of its types' modes,
 or the one you asked for); Ctrl+T changes it before Enter. Gluon writes the mode block into the
-spec itself, so the intake agent doesn't. Where a worktree goes is Gluon's decision, not the model's
-or the harness's (`src/worktree.ts`): the same for all six agents, inside the main checkout, and
-Gluon creates nothing itself: the spec tells the agent to. See [worktrees](../guides/worktrees.md)
-and [modes](../guides/modes.md).
+spec itself, so the intake agent doesn't. The agent works where Gluon was started, as each harness
+does on its own: Gluon says nothing about worktrees. See [modes](../guides/modes.md).
 
 **The repository tools are read-only and sandboxed to the repository**: no path out of it (`..`,
 absolute paths, symlinks, other drives), no writes, no shell. Secret files can't be read or
@@ -240,7 +238,7 @@ line mode and the cursor and exits 128 plus the signal's number.
 ### Saved sessions and resume
 
 A **workspace** is one Gluon run in a repository: an id (`gluon resume abc123`), a name, the
-directory, and a record per session (name, harness, model, effort, spec, worktree, mode and the
+directory, and a record per session (name, harness, model, effort, spec, mode and the
 harness's own resume id). The intake chat is not saved. It is one private file per workspace
 next to the config (`src/workspaces.ts`), written whole on every change. Quitting or a crash ends
 the agents but keeps the record. `gluon resume` refuses a workspace another live Gluon has open.

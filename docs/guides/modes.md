@@ -8,7 +8,7 @@ A mode is how a session starts. The intake agent proposes one with the agent, an
 | Mode | What it does |
 |---|---|
 | `build` | The agent as it is. This is the default, and the row shows nothing. |
-| `explore` | Strictly read-only: understand, investigate or review without changes. Rows show `· explore`. |
+| `explore` | Strictly read-only: understand, investigate or review without changes. Rows show `· explore`. Commands that write anything, tests and builds included, may not run: Claude Code refuses any command that would ask, and in Codex's read-only sandbox they fail. The agent reads the code instead and says what it couldn't run, and the intake agent keeps the session's goal to what reading can show. |
 | `plan` | The agent's own plan mode: a plan to agree before anything changes. Rows show `· plan`. |
 
 Press `ctrl+t` in the agent choice to cycle build, explore and plan for the whole choice (a mode the highlighted agent cannot run, like explore for Kimi Code, is skipped). The sessions list shows each session's mode. From the command line, a direct launch can take a mode without the chat, and a dry run prints what it would run ([command line reference](../reference/cli.md)).
@@ -16,6 +16,25 @@ Press `ctrl+t` in the agent choice to cycle build, explore and plan for the whol
 A saved session keeps its mode, and a session reopened with `gluon resume` goes through the agent's own resume with `explore` applied again: Codex gets its read-only sandbox and no approvals again, Grok Build its sandbox and deny rules, OpenCode its read-only agent, Claude Code its read-only permission mode and removed write tools (its own session keeps the permission mode as well). `plan` is not applied again (it is a state of the conversation: once you approve a plan the agent leaves it), and Gluon types and sends nothing again, no `/plan` and no brief. The row shows the mode the session was started in.
 
 A Codex, Grok Build or OpenCode session saved by an earlier Gluon has no mode on record, so Gluon cannot tell whether it was read-only and does not resume it: the chat says so and names the delete option of `gluon sessions` ([command line reference](../reference/cli.md)), which deletes the whole workspace. Claude Code sessions without a mode resume as before, since its own session keeps its permission mode.
+
+## Permissions
+
+In build mode an agent asks for your approval as it does on its own. Some ask before every edit and every command. For those, `ctrl+p` in the agent choice cycles the highlighted agent's permissions, its own first; the row shows any other level.
+
+| Level | What the agent does without asking |
+|---|---|
+| its own | Whatever it does by default and your settings allow. The row shows nothing. |
+| `accept edits` | Edits files. Commands still ask. |
+| `auto` | Routine edits and commands. Risky actions still ask. |
+| `never ask` | Everything. Use it only where that is safe. |
+
+- **Claude Code**: accept edits, auto.
+- **Antigravity**: accept edits, never ask.
+- **Grok Build**: never ask.
+- **Kimi Code**: auto, never ask.
+- **Codex and OpenCode** have none: they don't ask before every command or edit (Codex works in its workspace sandbox; OpenCode's build agent may edit and run commands).
+
+Permissions are for build: explore and plan set their own, and `ctrl+p` there only says so. A session reopened with `gluon resume` gets its level again. A direct launch takes one too ([command line reference](../reference/cli.md)). The flags behind each level are `HARNESS_INFO.permissions` in `src/harnesses.ts`.
 
 ## What each mode does per agent
 
@@ -36,15 +55,13 @@ The flags and settings behind each mode are `HARNESS_INFO.modes` in `src/harness
 
 ## What Gluon adds to the spec
 
-- Explore never gets a [worktree](worktrees.md).
 - A short block at the end of the spec says what the mode allows, whatever the intake agent wrote before `ctrl+t` changed it.
 - When your repository has an instruction file the chosen agent does not load itself (`CLAUDE.md` for Codex, say), the spec ends with a line telling it to read that file.
 - Kimi Code takes no prompt on its command line, so in every mode Gluon types its brief line (`Read the session brief in <file> and start.`) into it. If the line cannot be typed, because you typed first or its input box never showed, Gluon shows the line in the chat and over the top of the agent's frame, so you can type it yourself. It goes away when you press Esc.
 
 ## Next steps
 
-- [Worktrees](worktrees.md): where build and plan sessions work.
 - [Routing](routing.md): how the intake agent's choice of mode feeds routing.
 - [Kimi Code](harnesses/kimi-code.md): why it has no explore mode.
 
-<!-- Keeping this file fresh: update in the change that alters what starts a harness in explore or plan (HARNESS_INFO.modes in src/harnesses.ts), the typed `/plan` or brief line (src/launchers.ts, src/intake.ts) or the mode block added to a spec (src/intake.ts). Recheck against docs/contributing/maintenance.md after a harness update. -->
+<!-- Keeping this file fresh: update in the change that alters what starts a harness in explore or plan (HARNESS_INFO.modes in src/harnesses.ts) or its permission levels (HARNESS_INFO.permissions), the typed `/plan` or brief line (src/launchers.ts, src/intake.ts) or the mode block added to a spec (src/intake.ts). Recheck against docs/contributing/maintenance.md after a harness update. -->

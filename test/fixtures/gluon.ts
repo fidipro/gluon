@@ -6,6 +6,7 @@
 import type { Effort } from "../../src/config.ts";
 import type { Mode } from "../../src/harnesses.ts";
 import type { NamedChoice, Session, ShownProposal, State } from "../../src/agent/session.ts";
+import type { ChoiceOverride } from "../../src/agent/choices.ts";
 import { SessionStore, type RunHandle } from "../../src/sessions.ts";
 
 export const NOW = 1_800_000_000_000;
@@ -33,7 +34,7 @@ export function mockupStore(): SessionStore {
 export class StubSession {
   state: State = { items: [], live: [], pending: null, workingSince: null, status: "Working" };
   sent: string[] = [];
-  confirmed: { index: number; override?: { model?: string; effort?: Effort; mode?: Mode } }[] = [];
+  confirmed: { index: number; override?: ChoiceOverride }[] = [];
   interrupted = 0;
   private listeners = new Set<(s: State) => void>();
 
@@ -55,12 +56,12 @@ export class StubSession {
   async submit(text: string) {
     this.sent.push(text);
   }
-  confirm(index = 0, override?: { model?: string; effort?: Effort; mode?: Mode }): NamedChoice | null {
+  confirm(index = 0, override?: ChoiceOverride): NamedChoice | null {
     const p = this.state.pending;
     if (p?.kind !== "proposal" || !p.choices[index]) return null;
     this.confirmed.push({ index, override });
     const mode = override?.mode ?? p.mode;
-    return { ...p.choices[index]!, ...override, ...(mode && mode !== "build" ? { mode } : {}), spec: p.spec, reason: p.reason, name: p.name, worktree: p.worktree };
+    return { ...p.choices[index]!, ...override, ...(mode && mode !== "build" ? { mode } : {}), spec: p.spec, reason: p.reason, name: p.name };
   }
   interrupt() {
     this.interrupted++;
@@ -80,7 +81,6 @@ export const PROPOSAL: ShownProposal = {
     { harness: "codex", model: "gpt-6.1-sol", effort: "medium" },
     { harness: "opencode", model: "deepseek-flash", effort: "low" },
   ],
-  worktree: true,
   choice: { harness: "claude-code", model: "sonnet", effort: "medium", spec: "", reason: "" },
 };
 

@@ -247,14 +247,6 @@ test("route's result is what a proposal offers: its agents, its mode, why; a rep
   expect(s.confirm()?.mode).toBe("plan");
 });
 
-test("BUG-457/launch-modes: ctrl+t from explore to build or plan gives back the brain's worktree choice (the proposal doesn't bake explore's none into it)", async () => {
-  const s = new Session(scripted([[route("r1", { ...ROUTE, mode: "explore" }), tool("p1", "propose_launch", { ...intake, worktree: true })]]).client, config, "sys", root);
-  await s.submit("how does it work");
-  expect(s.snapshot.pending).toMatchObject({ kind: "proposal", mode: "explore", worktree: true });
-  expect(s.confirm()?.worktree).toBe(false);
-  expect(s.confirm(0, { mode: "build" })?.worktree).toBe(true);
-});
-
 test("BUG-458/route: a message from the developer after a route (no proposal yet) needs a new route; the old one can't carry it", async () => {
   const { client, requests } = scripted([
     [route("r1")],
@@ -322,8 +314,8 @@ test("a proposal shows its name and options; confirm starts the option picked, a
   });
   expect(s.snapshot.items.find((i) => i.kind === "proposal")).toMatchObject({ name: "Gluon-thing-fix", choices: pending?.kind === "proposal" ? pending.choices : [] });
 
-  expect(s.confirm()).toEqual({ ...sonnet, spec, reason: "fits", name: "Gluon-thing-fix", worktree: true, types: ["feature"], why: expect.any(Array) });
-  expect(s.confirm(1)).toEqual({ ...sol, spec, reason: "fits", name: "Gluon-thing-fix", worktree: true, types: ["feature"], why: expect.any(Array) });
+  expect(s.confirm()).toEqual({ ...sonnet, spec, reason: "fits", name: "Gluon-thing-fix", types: ["feature"], why: expect.any(Array) });
+  expect(s.confirm(1)).toEqual({ ...sol, spec, reason: "fits", name: "Gluon-thing-fix", types: ["feature"], why: expect.any(Array) });
   expect(s.confirm(2)).toMatchObject({ ...flash, spec, name: "Gluon-thing-fix" });
   expect(s.confirm(0, { model: "opus", effort: "high" })).toMatchObject({ harness: "claude-code", model: "opus", effort: "high", name: "Gluon-thing-fix" });
   expect(s.confirm(1, { effort: "xhigh" })).toMatchObject({ harness: "codex", model: "gpt-6.1-sol", effort: "xhigh" });
@@ -343,13 +335,6 @@ test("a proposal without a name gets one from its spec", async () => {
   expect(s.confirm()?.name).toBe("Gluon-fix-flaky-launcher");
 });
 
-test("issue 52: the developer's start carries whether the session works in a worktree", async () => {
-  const { client } = scripted([[route("r1"), tool("p1", "propose_launch", { ...intake, worktree: false })]]);
-  const s = new Session(client, config, "sys", root);
-  await s.submit("fix it");
-  expect(s.confirm()?.worktree).toBe(false);
-});
-
 test("launch modes: the developer's start carries route's mode; the override from ctrl+t wins; build is none", async () => {
   const { client } = scripted([[route("r1", { ...ROUTE, mode: "explore" }), tool("p1", "propose_launch", intake)]]);
   const s = new Session(client, config, "sys", root);
@@ -362,26 +347,6 @@ test("launch modes: the developer's start carries route's mode; the override fro
   await t.submit("fix it");
   expect(t.confirm()).not.toHaveProperty("mode");
   expect(t.confirm(0, { mode: "plan" })?.mode).toBe("plan");
-});
-
-test("BUG-410/launch-modes: explore never gets a worktree, whether route gave explore or ctrl+t chose it; leaving explore gives back the proposal's own choice", async () => {
-  // The proposal's worktree decision is true: explore overrides it (for every option), build and plan keep it.
-  const wt = new Session(scripted([[route("r1", { ...ROUTE, mode: "explore" }), tool("p1", "propose_launch", { ...intake, worktree: true })]]).client, config, "sys", root);
-  await wt.submit("how does it work");
-  expect(wt.confirm()?.worktree).toBe(false);
-  // BUG-457/launch-modes: leaving explore (ctrl+t) gives back the brain's own choice, as before route.
-  expect(wt.confirm(0, { mode: "build" })?.worktree).toBe(true);
-  expect(wt.confirm(0, { mode: "plan" })?.worktree).toBe(true);
-  const plain = new Session(scripted([[route("r1"), tool("p1", "propose_launch", intake)]]).client, config, "sys", root);
-  await plain.submit("fix it");
-  expect(plain.confirm()?.worktree).toBe(true);
-  expect(plain.confirm(0, { mode: "plan" })?.worktree).toBe(true);
-  expect(plain.confirm(0, { mode: "explore" })?.worktree).toBe(false);
-  expect(plain.confirm(0, { mode: "explore" })?.mode).toBe("explore");
-  // A proposal without a worktree stays without one in every mode.
-  const none = new Session(scripted([[route("r1", { ...ROUTE, mode: "plan" }), tool("p1", "propose_launch", { ...intake, worktree: false })]]).client, config, "sys", root);
-  await none.submit("how does it work");
-  for (const mode of ["build", "explore", "plan"] as const) expect(none.confirm(0, { mode })?.worktree).toBe(false);
 });
 
 test("the spec Gluon launches is the brain's, with no line about returning to Gluon added (also on a revision and for Codex)", async () => {
