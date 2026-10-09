@@ -338,7 +338,7 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
  * says (the developer may have switched the mode after the brain wrote it: BUG-410). Neutral to the harness.
  */
 export function modeBrief(mode: Mode | undefined): string | null {
-  if (mode === "explore") return "## Mode: explore\n\nThis session is read-only: investigate and report what you find. Make no changes: edit, create or delete no files, and change no repository state or settings. If the goal above asks for a change, report what it would take instead of making it.";
+  if (mode === "explore") return "## Mode: explore\n\nThis session is read-only: investigate and report what you find. Make no changes: edit, create or delete no files, and change no repository state or settings. If the goal above asks for a change, report what it would take instead of making it. Commands that write anything, tests and builds included, may be refused or fail here: read the code instead, and say what you couldn't run.";
   if (mode === "plan") return "## Mode: plan\n\nProduce a plan for the developer to approve; don't implement it, and make no changes until they approve. If the goal above asks for the change itself, plan that change instead.";
   return null;
 }

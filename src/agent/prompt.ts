@@ -243,6 +243,7 @@ Some rules for the spec:
 
 - For a bug, give your diagnosis as a hypothesis, with what you saw that supports it. Leave out suspects you have no evidence for.
 - Context holds only what you saw in the repository. If a quick lookup would settle something, look; anything you still assume goes in Assumptions.
+- If route returns explore mode, the session can read but may not be able to run tests, builds or scripts: keep Done when to what reading the code can show.
 - Don't write steps, designs or test plans.
 - Don't copy the repository's instruction files (AGENTS.md, CLAUDE.md). The agent gets them itself: either its harness loads them, or Gluon tells it to read them.
 - Before you propose, check the spec against each of the developer's messages in order. A later answer overrides an earlier one, and nothing they ruled out may appear.

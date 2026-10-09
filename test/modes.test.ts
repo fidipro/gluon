@@ -7,6 +7,7 @@ import { defaults } from "../src/config.ts";
 import { HARNESS_INFO, HARNESSES, MODES, permissionLevels, type Harness, type Mode, type Permissions } from "../src/harnesses.ts";
 import { buildCommand, handOff, handOffSession, launchPlan, modeBrief, modeLostOnResume, typedModeProblem, typedModeRefusal, validateChoice, withMode, type LaunchChoice } from "../src/launchers.ts";
 import { handoffFor } from "../src/handoff.ts";
+import { repoContext, systemPrompt } from "../src/agent/prompt.ts";
 
 const config = defaults();
 const MODEL: Record<Harness, string> = { "claude-code": "sonnet", codex: "gpt-6.1-sol", antigravity: "gemini-3.8-flash", "grok-build": "grok-4.7", opencode: "deepseek-flash", "kimi-code": "kimi-k3" };
@@ -216,6 +217,16 @@ describe("permissions (ctrl+p, --permissions): who approves the agent's commands
     const id = "11111111-2222-4333-8444-555555555555";
     expect(argv("claude-code", "accept-edits", undefined, { id, resume: true }).join(" ")).toContain("--permission-mode acceptEdits");
     expect(argv("grok-build", "never-ask", undefined, { id, resume: true })).toContain("--always-approve");
+  });
+});
+
+describe("explore can't run things", () => {
+  test("BUG-714/explore-runs: explore's brief says commands that write (tests and builds too) may be refused or fail, so read the code and say what couldn't run", () => {
+    expect(modeBrief("explore")).toContain("If the goal above asks for a change, report what it would take instead of making it. Commands that write anything, tests and builds included, may be refused or fail here: read the code instead, and say what you couldn't run.");
+  });
+
+  test("BUG-714/explore-runs: the intake keeps an explore session's Done when to what reading the code can show", () => {
+    expect(systemPrompt(defaults(), repoContext(mkdtempSync(join(tmp, "repo-"))))).toContain("- If route returns explore mode, the session can read but may not be able to run tests, builds or scripts: keep Done when to what reading the code can show.\n");
   });
 });
 

@@ -8,7 +8,7 @@ A mode is how a session starts. The intake agent proposes one with the agent, an
 | Mode | What it does |
 |---|---|
 | `build` | The agent as it is. This is the default, and the row shows nothing. |
-| `explore` | Strictly read-only: understand, investigate or review without changes. Rows show `· explore`. |
+| `explore` | Strictly read-only: understand, investigate or review without changes. Rows show `· explore`. Commands that write anything, tests and builds included, may not run: Claude Code refuses any command that would ask, and in Codex's read-only sandbox they fail. The agent reads the code instead and says what it couldn't run, and the intake agent keeps the session's goal to what reading can show. |
 | `plan` | The agent's own plan mode: a plan to agree before anything changes. Rows show `· plan`. |
 
 Press `ctrl+t` in the agent choice to cycle build, explore and plan for the whole choice (a mode the highlighted agent cannot run, like explore for Kimi Code, is skipped). The sessions list shows each session's mode. From the command line, a direct launch can take a mode without the chat, and a dry run prints what it would run ([command line reference](../reference/cli.md)).

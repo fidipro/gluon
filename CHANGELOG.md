@@ -21,6 +21,9 @@ All notable changes to Gluon are listed here. The format follows
 - The intake agent looks up what a quick check would settle instead of guessing: its spec's Context holds only what it saw,
   a bug's diagnosis comes with the evidence for it and without unsupported suspects, unrequested scope stays out of the
   Assumptions too, and a request that names only a symptom gets a question about the outcome wanted.
+- Explore sessions aren't asked to run things: tests, builds and scripts that write may be refused or fail in a read-only
+  session, so the intake agent keeps an explore session's goal to what reading the code can show, and the agent's brief
+  says to read the code instead and say what it couldn't run.
 
 ### Removed
 - Sessions no longer get a git worktree: Gluon says nothing about worktrees to the intake agent or the agent, and the agent
