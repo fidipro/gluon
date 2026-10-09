@@ -242,8 +242,8 @@ export const AREAS: Record<string, Area> = {
     doc: "Markdown, the generated reference, the docs site, README, AGENTS.md files; the area manifest's own test",
     platforms: "linux",
     src: ["src/**/AGENTS.md"],
-    files: ["**/*.md", "**/*.mdx", "docs/**", "site/**", "scripts/docs/**", "scripts/test-health.ts", "test/test-style.ts", "test/test-style.baseline.json", "scripts/red-check.ts", "scripts/test-guard.ts", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"],
-    unit: ["test/areas.test.ts", "test/test-health.test.ts", "test/test-style.test.ts", "test/test-guards.test.ts", "test/markdown.test.ts", "test/contributor-docs.test.ts", "test/docs-gen.test.ts", "test/docs-links.test.ts", "test/docs-no-copies.test.ts", "test/docs-site.test.ts", "test/readme.test.ts"],
+    files: ["**/*.md", "**/*.mdx", "docs/**", "site/**", "scripts/docs/**", "scripts/test-health.ts", "scripts/test-value.ts", "test/test-style.ts", "test/test-style.baseline.json", "scripts/red-check.ts", "scripts/test-guard.ts", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"],
+    unit: ["test/areas.test.ts", "test/test-health.test.ts", "test/test-style.test.ts", "test/test-guards.test.ts", "test/test-value.test.ts", "test/markdown.test.ts", "test/contributor-docs.test.ts", "test/docs-gen.test.ts", "test/docs-links.test.ts", "test/docs-no-copies.test.ts", "test/docs-site.test.ts", "test/readme.test.ts"],
     e2e: [],
   },
   perf: {
