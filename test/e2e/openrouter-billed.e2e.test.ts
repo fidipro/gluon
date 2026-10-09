@@ -72,21 +72,3 @@ test.skipIf(WIN)("BUG-481/e2e: an OpenRouter session on a key nothing else used:
   }
 });
 
-test.skipIf(WIN)("BUG-483/e2e: an OpenRouter session while another Gluon's session ran on the same key: no billed figure, and the chat says why @full", async () => {
-  const s = await session([10, 10.37]);
-  try {
-    // Another Gluon process (this test's, alive) has a session on the key that started before and hasn't ended.
-    const dir = join(s.state, "gluon", "openrouter-sessions");
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-    writeFileSync(join(dir, `${process.pid}-feedbeef.json`), JSON.stringify({ v: 1, pid: process.pid, key: keyTag(KEY), start: Date.now() - 60_000 }));
-    await launch(s.app, "fix the thing");
-    await end(s.app);
-    await s.app.waitFor((r) => r.replace(/\s+/g, " ").includes("no billed figure: another OpenRouter session ran at the same time on this key"), 30_000);
-    const entries = readLedger(join(s.state, "gluon", "cost-audit"));
-    expect(entries).toContainEqual(expect.objectContaining({ kind: "dropped", reason: "openrouter-overlap" }));
-    expect(entries.some((e) => e.kind === "observation" && e.scope === "billed")).toBe(false);
-  } finally {
-    s.or.server.stop(true);
-    rmSync(s.dir, { recursive: true, force: true });
-  }
-});

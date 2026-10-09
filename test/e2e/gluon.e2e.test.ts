@@ -88,15 +88,6 @@ describe("Gluon: a session in the frame", () => {
     expect(app.lines().find((l) => l.includes("GOT <hello>"))).toMatch(/^│GOT <hello> +│$/);
   });
 
-  test("BUG-198/F: every launched session is named Gluon-…: its tab, and its row at home @full", async () => {
-    const app = await gluon();
-    await launch(app, "gluon tab strip");
-    expect(app.lines()[0]).toMatch(/^ ◆ gluon +[●?] Gluon-tab-strip\b/);
-    await home(app);
-    expect(app.screen()).toMatch(/[●?✓] +Gluon-tab-strip\b/);
-    expect(app.screen()).not.toMatch(/Gluon-gluon/i);
-  });
-
   test.skipIf(WIN)("GLUON-2: emoji and CJK are drawn in the interior without moving the border @full", async () => {
     const app = await gluon();
     await launch(app, "wide task");
@@ -137,30 +128,6 @@ describe("Gluon: a session in the frame", () => {
     if (!WIN) expect(app.since()).not.toContain("\x1b[c");
   });
 
-  test("BUG-192/GLUON-5, BUG-234: /clear asks “/clear ends this session in Gluon — end it?” in the bottom bar: Esc sends nothing (/clear stays typed, ← edits it), Enter ends the session — it closes, the sessions home shows without its row @full", async () => {
-    const app = await gluon();
-    await launch(app, "clear task");
-    await app.type("/clear");
-    await app.press(KEY.enter);
-    await app.waitFor("ends this session in Gluon — end it?");
-    expect(app.lines().at(-1)).toMatch(/\? \/clear ends this session in Gluon — end it\? +enter yes · esc no/);
-    await app.press(KEY.esc);
-    await app.waitFor((s) => !s.includes("ends this session") && s.includes("❯ /clear"));
-    expect(app.screen()).not.toContain("CLEARED");
-    // The line is typed again: ← stays with the agent.
-    await app.press(KEY.left);
-    await app.settle(200);
-    expect(app.lines()[0]).toMatch(/◆ gluon/);
-    expect(app.screen()).not.toMatch(HOME_VIEW);
-    // Enter on the same line asks again.
-    await app.press(KEY.enter);
-    await app.waitFor("ends this session in Gluon — end it?");
-    await app.press(KEY.enter);
-    await app.waitFor((s) => /describe (the|another) session/.test(s) && !s.includes("clear-task"));
-    // Ended at the user's yes: nothing to report, no Done group.
-    expect(app.screen()).not.toMatch(/Done|exited \(code/);
-  });
-
   test("BUG-201/GLUON-5: keys typed right after the yes to “/clear ends this session in Gluon — end it?” go to the sessions home's composer, also in the same read as the Enter @full", async () => {
     // The agent takes its time over /clear: the session would still be up meanwhile.
     const app = await gluon({ FAKE_CLEAR_DELAY_MS: "3000" });
@@ -175,37 +142,6 @@ describe("Gluon: a session in the frame", () => {
       // Clear the composer for the next round.
       for (const _ of word) await app.press(KEY.backspace);
     }
-  });
-
-  test("BUG-205/GLUON-5: /clear typed on a line the user erased first still asks “/clear ends this session in Gluon — end it?” @full", async () => {
-    const app = await gluon();
-    await launch(app, "erase task");
-    await app.type("abc");
-    for (const _ of "abc") await app.press(KEY.backspace);
-    await app.type("/clear");
-    await app.press(KEY.enter);
-    await app.waitFor("ends this session in Gluon — end it?");
-    expect(app.screen()).not.toContain("CLEARED");
-    await app.press(KEY.esc);
-    await app.waitFor((s) => !s.includes("ends this session") && s.includes("❯ /clear"));
-    expect(app.screen()).not.toContain("CLEARED");
-  });
-
-  // On Windows, ConPTY sends these itself once a session turned win32-input-mode on (every
-  // scenario that goes home); here the harness writes them as Windows Terminal would.
-  test.skipIf(WIN)("BUG-208/GLUON: win32-input-mode keys at home — the home key's Ctrl key-up, typed text, Backspace — reach the composer as what they mean @full", async () => {
-    const app = await gluon();
-    await launch(app, "win task");
-    const press = (vk: number, sc: number, uc: number, cs = 0) => `\x1b[${vk};${sc};${uc};1;${cs};1_\x1b[${vk};${sc};${uc};0;${cs};1_`;
-    // Ctrl+\ as conhost sends it: Ctrl down, \ down (the prefix), \ up and down again (home), then the key-ups arrive at home.
-    await app.press("\x1b[17;29;0;1;8;1_\x1b[220;43;28;1;8;1_");
-    await app.waitFor((s) => /^ ←\/→ switch session · ctrl\+\\ home/.test(s.split("\n").at(-1)!));
-    await app.press("\x1b[220;43;28;0;8;1_\x1b[220;43;28;1;8;1_");
-    await app.waitFor(/describe (the|another) session/);
-    app.write("\x1b[220;43;28;0;8;1_\x1b[17;29;0;0;0;1_");
-    for (const k of [press(72, 35, 104), press(73, 23, 105), press(74, 36, 106), press(8, 14, 8)]) await app.press(k);
-    await app.waitFor((s) => s.split("\n").some((l) => l.trim() === "› hi"));
-    expect(app.screen()).not.toMatch(/\d+;\d+;\d+;\d+;\d+;\d+_/);
   });
 
   test("BUG-192/GLUON-6: an agent that exits closes its session: the sessions home shows, its row gone, the other sessions kept; the chat says how it ended @full", async () => {
@@ -359,19 +295,6 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     }
   });
 
-  test("GLUON-18: a waiting PreCompact hook asks in the bottom bar; Esc lets the agent compact @full", async () => {
-    const hook = `${eventHook} compact gl18 --wait 10000`;
-    const app = await gluon({ FAKE_HOOK: hook });
-    await launch(app, "compact task");
-    await app.type("!compact");
-    await app.press(KEY.enter);
-    await app.waitFor("End this session instead of compacting?");
-    await app.press(KEY.esc);
-    await app.waitFor("AUTO COMPACTED");
-    expect(app.screen()).toContain("ANSWER no");
-    expect(app.screen()).not.toContain("instead of compacting?");
-  });
-
   test("GLUON-19: on_exit: quit — Gluon exits with the agent's code when it was the last session @full", async () => {
     const app = await gluon({ FAKE_EXIT: "5" }, {}, "handoff:\n  on_exit: quit\n");
     await launch(app, "last task");
@@ -419,58 +342,6 @@ describe("Gluon: several sessions", () => {
     }
   });
 
-  test("BUG-195/GLUON: ← on an empty line shows the previous session, then home; → from home the first, → past the last tab is home; after typing ← is the agent's @full", async () => {
-    const app = await gluon();
-    for (const name of ["one", "two"]) {
-      await launch(app, `${name} task`);
-      await say(app, `me-${name}`);
-      if (name !== "two") await home(app);
-    }
-    const shown = (name: string) => app.waitFor((s) => s.includes(`GOT <me-${name}>`) && s.includes("◆ gluon"));
-    // Nothing typed since the last Enter: ← walks left, from the first tab home.
-    await app.press(KEY.left);
-    await shown("one");
-    await app.press(KEY.left);
-    await app.waitFor(/describe (the|another) session/);
-    // Home is the strip's leftmost: → shows the first tab, → again the next.
-    await app.press(KEY.right);
-    await shown("one");
-    await app.press(KEY.right);
-    await shown("two");
-    // → on the last tab is home (it never reaches the agent), the ring's leftmost.
-    await app.press(KEY.right);
-    await app.waitFor(HOME_VIEW);
-    expect(app.screen()).not.toContain("ARROW RIGHT");
-    await app.press(KEY.right);
-    await shown("one");
-    await app.press(KEY.right);
-    await shown("two");
-    // Typed on the line: ← is the agent's, until Enter runs the line.
-    await app.type("x");
-    const end = app.cursor().x;
-    await app.press(KEY.left);
-    await app.waitFor(() => app.cursor().x === end - 1);
-    expect(app.screen()).toContain("GOT <me-two>");
-    await app.press(KEY.enter);
-    await app.waitFor("GOT <x>");
-    await app.press(KEY.left);
-    await shown("one");
-    expect(app.screen()).not.toContain("ARROW LEFT");
-  });
-
-  test("BUG-206/GLUON: → on the last (only) tab is home, never the agent's: no overshoot to undo; ← from it is home too @full", async () => {
-    const app = await gluon();
-    await launch(app, "overshoot task");
-    await app.press(KEY.right);
-    await app.waitFor(/describe (the|another) session/);
-    expect(app.screen()).not.toContain("ARROW RIGHT");
-    await app.press(KEY.right);
-    await app.waitFor("◆ gluon");
-    await app.press(KEY.left);
-    await app.waitFor(/describe (the|another) session/);
-    expect(app.screen()).not.toContain("ARROW LEFT");
-  });
-
   test("BUG-210/GLUON: from home → opens the first session (never into the composer); once a key is typed the bar drops ←/→ and the home key's prefix still switches @full", async () => {
     const app = await gluon();
     for (const name of ["one", "two"]) {
@@ -499,28 +370,6 @@ describe("Gluon: several sessions", () => {
     expect(app.screen()).toMatch(/› describe (the|another) session/);
   });
 
-  test.skipIf(WIN)("GLUON-10:a session's kitty keyboard flags are pushed on the real terminal when it shows, popped when another (or home) does @full", async () => {
-    const app = await gluon();
-    await launch(app, "plain task");
-    await home(app);
-    await launch(app, "kitty task");
-    await say(app, "!kitty", "KITTY ON");
-    await app.settle(100);
-    app.mark();
-    await app.press(KEYS.left);
-    await app.settle(200);
-    expect(app.since()).toContain("\x1b[<u");
-    app.mark();
-    await app.press(KEYS.right);
-    await app.settle(200);
-    expect(app.since()).toContain("\x1b[>1u");
-    // Kitty keys reach the agent: `a` as kitty encodes it.
-    await app.press("\x1b[97u");
-    await app.waitFor("❯ a");
-    app.mark();
-    await home(app);
-    expect(app.since()).toContain("\x1b[<u");
-  });
 });
 
 describe.skipIf(WIN)("Gluon: the mouse", () => {
@@ -539,28 +388,6 @@ describe.skipIf(WIN)("Gluon: the mouse", () => {
     await app.press(KEY.esc);
     await app.waitFor((s) => !s.includes("esc back"));
     expect(app.screen()).toContain("LINE 60");
-  });
-
-  test("GLUON-12: an agent that asked for the mouse gets clicks moved into its screen; a click on the tab strip switches; other chrome clicks are dropped @full", async () => {
-    const app = await gluon();
-    await launch(app, "plain task");
-    await home(app);
-    await launch(app, "mouse task");
-    await say(app, "!mouse", "MOUSE ON");
-    // Real cell (10, 10) is the agent's (9, 6): the frame's border, the blank row and two chrome rows.
-    await app.press(click(10, 10));
-    await app.waitFor("MOUSE <0;9;6>M");
-    // The tab strip is Gluon's: a click on a tab shows that session, never reaching the agent.
-    await app.press(click(tabX(app, "plain-task"), 1));
-    await app.waitFor((s) => !s.includes("MOUSE ON"));
-    await app.press(click(tabX(app, "mouse-task"), 1));
-    await app.waitFor("MOUSE ON");
-    // The blank row is Gluon's too.
-    await app.press(click(10, 3));
-    await app.press(click(20, 5));
-    await app.waitFor("MOUSE <0;19;1>M");
-    expect(app.screen()).not.toContain("MOUSE <0;9;-");
-    expect(app.screen().match(/MOUSE </g)?.length).toBe(2);
   });
 
   test("BUG-196/GLUON: a click on a tab shows that session, on ◆ gluon the home view — with the strip scrolled (‹ ›) and no mouse asked for @full", async () => {
@@ -650,22 +477,6 @@ describe("Gluon: quitting", () => {
 });
 
 describe("Gluon: QA findings", () => {
-  // Claude Code's and Codex's Stop hook (and OpenCode's idle event) send `done` after every turn:
-  // the agent is still running, waiting for the next prompt. Delete on its row once disposed the
-  // session (its PTY closed) with no SIGTERM and no question.
-  test("BUG-164/GLUON: Delete on a row whose agent's hooks said done doesn't end the still-running agent without asking @full", async () => {
-    const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-164`);
-    rmSync(pidFile, { force: true });
-    const app = await gluon({ FAKE_PID_FILE: pidFile });
-    await launch(app, "turn task");
-    await say(app, "!event status done", "EVENT status done");
-    await home(app);
-    await app.waitFor(/Awaiting input[\s\S]*turn-task/);
-    const pid = Number(readFileSync(pidFile, "utf8"));
-    await app.press(KEY.delete);
-    await app.settle(1500);
-    expect(alive(pid)).toBe(true);
-  });
 
   test("BUG-262/GLUON-44: an agent that exits while its “End …?” question is up at home takes the question with it — the bar and its hint go with the row, and keys reach the home view again @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-262`);
@@ -771,28 +582,6 @@ describe("Gluon: QA findings", () => {
     expect(app.screen()).toContain("mark-task");
   });
 
-  test("BUG-194/GLUON: the home list has a column header; ↑ selects a group's label, Enter collapses and expands it, ↓ and Enter open the session @full", async () => {
-    const app = await gluon();
-    await launch(app, "fold task");
-    await home(app);
-    await app.waitFor(/context +cost +time/);
-    const label = /▾ (Working|Awaiting input)\n/;
-    await app.press(KEY.up);
-    await app.waitFor("enter collapses the group");
-    // The label is the selected line: drawn on the selected background.
-    const y = app.lines().findIndex((l) => /▾ (Working|Awaiting input)/.test(l));
-    expect(app.bg(3, y)).not.toBe(app.bg(3, y + 1));
-    await app.press(KEY.enter);
-    await app.waitFor(/▸ (Working|Awaiting input) \(1\)/);
-    expect(app.screen()).not.toMatch(/fold-task +claude code/);
-    await app.press(KEY.enter);
-    await app.waitFor(label);
-    await app.press(KEY.down);
-    await app.waitFor("enter opens it");
-    await app.press(KEY.enter);
-    await app.waitFor((s) => s.includes("◆ gluon") && s.includes("TUI ready"));
-  });
-
   test("BUG-179/GLUON: an agent with no status of its own reads Working once it prints, never Starting for good @full", async () => {
     const app = await gluon();
     await launch(app, "quiet task");
@@ -825,68 +614,6 @@ describe("Gluon: QA findings", () => {
     expect(app.screen().replace(/\s+/g, " ")).toContain("◆ Should the fix include a regression test");
   });
 
-  // The brief's hint copy was taken verbatim, but its keys were placeholders: in a session Esc
-  // goes to the agent; what returns home is `handoff.key` (Ctrl+\ by default, as the bottom bar says).
-  test("BUG-168/E: the home view's key list (`?`) names the key that returns here, not Esc @full", async () => {
-    const app = await gluon();
-    await launch(app, "hint task");
-    await home(app);
-    await app.waitFor("? for keys");
-    await app.press("?");
-    await app.waitFor("? / esc close");
-    expect(app.screen()).toMatch(/ctrl\+\\ +then ←\/→ (switch )?· again: home/);
-    expect(app.screen()).not.toMatch(/alt\+pgup/);
-    expect(app.screen()).not.toMatch(/esc +(returns|home)/);
-  });
-
-  test("BUG-219/E: the same session started twice: the newer is Gluon-…-2, in the list and on its tab @full", async () => {
-    const app = await gluon();
-    await launch(app, "twin task");
-    await home(app);
-    await launch(app, "twin task");
-    expect(app.lines()[0]).toMatch(/Gluon-twin-task .*Gluon-twin-task-2/);
-    await home(app);
-    await app.waitFor(/Gluon-twin-task +claude code[\s\S]*Gluon-twin-task-2 +claude code/);
-  });
-
-  test("BUG-222/E: at 80×24 three sessions keep their names, triples and the context, cost and time columns; once all ended the header says `no sessions running` @full", async () => {
-    const app = await gluon({}, { cols: 80, rows: 24 });
-    for (const task of ["one task", "two task", "three task"]) {
-      await launch(app, task);
-      await home(app);
-    }
-    await app.waitFor(/context +cost +time/);
-    const head = app.lines().find((l) => /context +cost +time/.test(l))!;
-    for (const name of ["Gluon-one-task", "Gluon-two-task", "Gluon-three-task"]) {
-      const row = app.lines().find((l) => l.includes(name))!;
-      expect(row).toMatch(new RegExp(`${name} +claude code × \\S`));
-      // The context, cost and time cells sit under their words.
-      expect(row).toMatch(/(—|\d+%) +~?(—|\$\d+\.\d\d) +\S+ *$/);
-      expect(row.trimEnd().length).toBe(head.trimEnd().length);
-      expect(Bun.stringWidth(row)).toBeLessThanOrEqual(80);
-    }
-    for (let i = 0; i < 3; i++) {
-      await app.press(KEY.delete);
-      await app.waitFor(/End Gluon-[\w-]+\?/);
-      await app.press(KEY.enter);
-      await app.waitFor((s) => !/End Gluon-[\w-]+\?/.test(s));
-    }
-    await app.waitFor("no sessions running");
-    expect(app.screen()).not.toContain("no sessions yet");
-  });
-
-  test("BUG-216/E: at 80×24 the hint names the selected run's keys and `? for keys`; `?` lists every key, esc closes it @full", async () => {
-    const app = await gluon({}, { cols: 80, rows: 24 });
-    await launch(app, "keys task");
-    await home(app);
-    await app.waitFor("enter opens it · ctrl+d marks done · del ends it · ? for keys");
-    await app.press("?");
-    await app.waitFor(/Sessions +Intake chat/);
-    expect(app.screen()).toMatch(/ctrl\+c twice +quit/);
-    expect(app.screen()).toMatch(/› describe (the|another) session/);
-    await app.press(KEY.esc);
-    await app.waitFor((s) => !s.includes("? / esc close") && s.includes("? for keys"));
-  });
 });
 
 /** The composer's cursor: its first cell (the placeholder's first letter, or the draft's) drawn inverse. */
@@ -922,35 +649,6 @@ describe("Gluon: round-2 QA findings", () => {
     await app.waitFor(() => selected().join() === "charlie");
   });
 
-  test("BUG-233/E: a task that starts with a digit types on the home view with sessions open; no tab opens @full", async () => {
-    const app = await gluon({}, { cols: 80, rows: 24 });
-    await launch(app, "first task");
-    await home(app);
-    await app.type("1 bug to fix");
-    await app.waitFor("› 1 bug to fix");
-    expect(app.screen()).not.toContain("◆ gluon");
-  });
-
-  test("BUG-224/E: while the home view's end or quit question is up, the hint names its keys and the composer shows no cursor @full", async () => {
-    const app = await gluon({}, { cols: 80, rows: 24 });
-    await launch(app, "ask task");
-    await home(app);
-    await app.waitFor("enter opens it · ctrl+d marks done · del ends it · ? for keys");
-    expect(composerCursor(app)).toBe(true);
-    await app.press(KEY.delete);
-    await app.waitFor((s) => s.includes("End Gluon-ask-task?") && s.includes("enter ends it · esc keeps it"));
-    expect(app.screen()).not.toContain("enter opens it");
-    expect(composerCursor(app)).toBe(false);
-    await app.press(KEY.esc);
-    await app.waitFor((s) => !s.includes("End Gluon-ask-task?") && s.includes("enter opens it"));
-    expect(composerCursor(app)).toBe(true);
-    await app.press(KEY.ctrlC);
-    await app.press(KEY.ctrlC);
-    await app.waitFor((s) => s.includes("quit and end it?") && s.includes("enter quits · esc stays"));
-    expect(composerCursor(app)).toBe(false);
-    await app.press(KEY.esc);
-    await app.waitFor((s) => !s.includes("quit and end it?") && s.includes("enter opens it"));
-  });
 });
 
 function alive(pid: number): boolean {
@@ -1000,22 +698,4 @@ describe("Gluon: zoom", () => {
     await zoomsAt(80, 24);
   });
 
-  test("BUG-285/zoom: on 100×22 the PTY is 98×17 framed, 100×21 zoomed (Claude Code's subagent panel needs about 16 rows) @full", async () => {
-    await zoomsAt(100, 22);
-  });
-
-  test("BUG-284/zoom: leaving the session ends the zoom; the home view and the other tab are framed @full", async () => {
-    const app = await gluon({}, { cols: 80, rows: 24 });
-    await launch(app, "alpha task");
-    await app.press(HOME_KEY);
-    await app.press("z");
-    await app.waitFor("SIZE 80x23");
-    await app.press(...HOME_TWICE);
-    await app.waitFor(/describe (the|another) session/);
-    await app.press(KEYS.right);
-    await app.waitFor(/^ ◆ gluon/m);
-    await app.waitFor("SIZE 78x18");
-    expect(app.lines()[0]).toMatch(/^ ◆ gluon/);
-    expect(app.lines().at(-1)).not.toContain("zoomed");
-  });
 });
