@@ -17,6 +17,25 @@ A saved session keeps its mode, and a session reopened with `gluon resume` goes 
 
 A Codex, Grok Build or OpenCode session saved by an earlier Gluon has no mode on record, so Gluon cannot tell whether it was read-only and does not resume it: the chat says so and names the delete option of `gluon sessions` ([command line reference](../reference/cli.md)), which deletes the whole workspace. Claude Code sessions without a mode resume as before, since its own session keeps its permission mode.
 
+## Permissions
+
+In build mode an agent asks for your approval as it does on its own. Some ask before every edit and every command. For those, `ctrl+p` in the agent choice cycles the highlighted agent's permissions, its own first; the row shows any other level.
+
+| Level | What the agent does without asking |
+|---|---|
+| its own | Whatever it does by default and your settings allow. The row shows nothing. |
+| `accept edits` | Edits files. Commands still ask. |
+| `auto` | Routine edits and commands. Risky actions still ask. |
+| `never ask` | Everything. Use it only where that is safe. |
+
+- **Claude Code**: accept edits, auto.
+- **Antigravity**: accept edits, never ask.
+- **Grok Build**: never ask.
+- **Kimi Code**: auto, never ask.
+- **Codex and OpenCode** have none: they don't ask before every command or edit (Codex works in its workspace sandbox; OpenCode's build agent may edit and run commands).
+
+Permissions are for build: explore and plan set their own, and `ctrl+p` there only says so. A session reopened with `gluon resume` gets its level again. A direct launch takes one too ([command line reference](../reference/cli.md)). The flags behind each level are `HARNESS_INFO.permissions` in `src/harnesses.ts`.
+
 ## What each mode does per agent
 
 What a mode does is the agent's own, so it differs.
@@ -45,4 +64,4 @@ The flags and settings behind each mode are `HARNESS_INFO.modes` in `src/harness
 - [Routing](routing.md): how the intake agent's choice of mode feeds routing.
 - [Kimi Code](harnesses/kimi-code.md): why it has no explore mode.
 
-<!-- Keeping this file fresh: update in the change that alters what starts a harness in explore or plan (HARNESS_INFO.modes in src/harnesses.ts), the typed `/plan` or brief line (src/launchers.ts, src/intake.ts) or the mode block added to a spec (src/intake.ts). Recheck against docs/contributing/maintenance.md after a harness update. -->
+<!-- Keeping this file fresh: update in the change that alters what starts a harness in explore or plan (HARNESS_INFO.modes in src/harnesses.ts) or its permission levels (HARNESS_INFO.permissions), the typed `/plan` or brief line (src/launchers.ts, src/intake.ts) or the mode block added to a spec (src/intake.ts). Recheck against docs/contributing/maintenance.md after a harness update. -->

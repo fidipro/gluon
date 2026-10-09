@@ -14,7 +14,7 @@ import { ConfigError, configPath, connsOf, defaults, HARNESSES, loadConfig, type
 import { binPath, cleanStaleSpecs, installed, missingReason } from "./detect.ts";
 import { doctor, showBrain } from "./doctor.ts";
 import { harnessNamed, installCommand } from "./install.ts";
-import { HARNESS_INFO, MODES, type Mode } from "./harnesses.ts";
+import { HARNESS_INFO, MODES, PERMISSIONS, type Mode, type Permissions } from "./harnesses.ts";
 import { BINARIES, buildCommand, findAgent, handOff, launchProblem, typedModeProblem, validateChoice, type Command, type LaunchChoice } from "./launchers.ts";
 import { versionProblem } from "./status.ts";
 import { CLI_OPTIONS, HINT_COMMANDS, SUBCOMMANDS, usageText } from "./usage.ts";
@@ -445,11 +445,14 @@ if (positionals[0] === "connect" && positionals.length <= 2) {
 
 if (values.launch) {
   if (values.mode !== undefined && !MODES.includes(values.mode as Mode)) fail(`--mode takes one of: ${MODES.join(", ")}`);
+  if (values.permissions !== undefined && !PERMISSIONS.includes(values.permissions as Permissions)) fail(`--permissions takes one of: ${PERMISSIONS.join(", ")}`);
+  if (values.permissions !== undefined && values.permissions !== "own" && values.mode !== undefined && values.mode !== "build") fail(`--permissions is for build mode: ${values.mode} sets its own`);
   const choice: LaunchChoice = {
     harness: values.launch as Harness,
     model: values.model ?? "",
     effort: values.effort as Effort | undefined,
     ...(values.mode !== undefined ? { mode: values.mode as Mode } : {}),
+    ...(values.permissions !== undefined && values.permissions !== "own" ? { permissions: values.permissions as Permissions } : {}),
     spec: positionals.join(" "),
     reason: "launched directly",
   };

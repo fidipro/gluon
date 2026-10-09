@@ -34,6 +34,7 @@ Antigravity has no read-only mode, only plan mode and accept-edits. So:
 
 - **`explore`** starts it in its plan mode, and the row says `explore (plan mode)`.
 - **`plan`** starts it in its plan mode.
+- **Permissions.** In build mode `ctrl+p` sets accept edits (edits only; commands still ask) or never ask (every request approved).
 
 See [Modes](../modes.md).
 

@@ -9,6 +9,7 @@ export const CLI_OPTIONS = {
   model: { type: "string" },
   effort: { type: "string" },
   mode: { type: "string" },
+  permissions: { type: "string" },
   "dry-run": { type: "boolean" },
   all: { type: "boolean" },
   force: { type: "boolean" },
@@ -33,9 +34,11 @@ export function usageText(config: Config, version: string = pkg.version): string
   gluon                                   open Gluon: your sessions and the intake chat
   gluon "<what to build>"                 open Gluon with this as the first message
   gluon --demo                            the same UI with a scripted intake agent (no API calls)
-  gluon --launch <harness> --model <m> [--effort <e>] [--mode <m>] [--dry-run] -- "<prompt>"
+  gluon --launch <harness> --model <m> [--effort <e>] [--mode <m>] [--permissions <p>] [--dry-run] -- "<prompt>"
                                           skip the chat and launch an agent directly
                                           (--mode: build, the default; explore, read-only; plan, the agent's plan mode)
+                                          (--permissions, build only: own, the default; accept-edits, auto or
+                                          never-ask, where the agent has that level)
   gluon setup                             connect your coding agents (API key or subscription)
   gluon connect <harness>                 connect or reconnect one agent
   gluon install [<harness>…]              install missing agents with their official installers

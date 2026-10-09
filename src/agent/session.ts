@@ -7,7 +7,7 @@ import { maskSecrets } from "../secrets.ts";
 import { routeCatalog, routeEnv } from "../intake.ts";
 import { defaultRouting } from "../routing-config.ts";
 import { route, type Config as RoutingConfig, type RouteInput } from "../routing.ts";
-import { parseProposal, pickChoice, type AgentTriple, type Proposal, type Routed } from "./choices.ts";
+import { parseProposal, pickChoice, type AgentTriple, type ChoiceOverride, type Proposal, type Routed } from "./choices.ts";
 import { pathInstructions } from "./prompt.ts";
 import { describeRepoTool, MAX_NEXT_QUESTIONS, REPO_TOOLS, runRepoTool, TOOLS, type Activity, type Question } from "./tools.ts";
 
@@ -239,10 +239,10 @@ export class Session {
 
   /**
    * The developer started the session with option `index` of the proposal (0: the recommended one),
-   * its model or effort changed by `override` (Tab adjust) and its mode (ctrl+t; wins over the proposal's). Null when nothing is proposed, the
+   * its model or effort changed by `override` (Tab adjust), its mode (ctrl+t; wins over the proposal's) and its permissions (ctrl+p). Null when nothing is proposed, the
    * option isn't one, or the override isn't offered for that agent.
    */
-  confirm(index = 0, override?: { model?: string; effort?: Effort; mode?: Mode }): NamedChoice | null {
+  confirm(index = 0, override?: ChoiceOverride): NamedChoice | null {
     const pending = this.state.pending;
     if (pending?.kind !== "proposal") return null;
     const choice = pickChoice(this.config, pending, index, override);

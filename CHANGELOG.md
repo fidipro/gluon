@@ -6,6 +6,13 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `ctrl+p` in the agent choice sets who approves a build session's commands and edits, for an agent that asks before every
+  one: its own behaviour (the default, unchanged), or one of its own levels: accept edits and auto (Claude Code), accept
+  edits and never ask (Antigravity), never ask (Grok Build), auto and never ask (Kimi Code). The option's row shows the
+  level, a resumed session gets it again, and `gluon --launch` takes it as `--permissions`. Codex and OpenCode have none:
+  they don't ask before every command or edit.
+
 ### Changed
 - Claude Code's Haiku 5.5 runs at `high` effort by default (was `medium`), like GPT-6 Luna in the same slot.
 - The routing reason names the effort it means: the model's default and what the session gets, e.g. `effort +0 from

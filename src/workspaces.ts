@@ -22,7 +22,7 @@ import { EFFORTS } from "./agent/effort.ts";
 import { configPath, type Effort, type Harness } from "./config.ts";
 import { longPath, neutralCwd } from "./detect.ts";
 import { safeLine } from "./events.ts";
-import { HARNESSES, MODES, type Mode } from "./harnesses.ts";
+import { HARNESSES, MODES, PERMISSIONS, type Mode, type Permissions } from "./harnesses.ts";
 import { knownSecretValues, maskSecrets, SECRET_ENV, writePrivate, writePrivateExclusive } from "./secrets.ts";
 
 /** Where a session's resume id came from: minted by Gluon before the launch, or sent by the agent's hook. */
@@ -40,6 +40,8 @@ export interface ChildRecord {
    * `src/launchers.ts`); a record from before Gluon saved it has none (`modeLostOnResume`).
    */
   mode?: Mode;
+  /** Who approves its commands and edits, when not the harness itself (ctrl+p); a resume passes the flag again (`buildCommand`). */
+  permissions?: Permissions;
   /** The spec the session started with (keys masked). */
   spec: string;
   done?: boolean;
@@ -147,6 +149,8 @@ function parseChild(v: unknown, mask = true): ChildRecord | null {
   const child: ChildRecord = { key: o.key, name, harness: o.harness as Harness, model, spec: o.spec, startedAt: o.startedAt };
   if (o.effort !== undefined) child.effort = o.effort as Effort;
   if (o.mode !== undefined) child.mode = o.mode as Mode;
+  // An unknown level only loses the level: the harness's own asks more, never less.
+  if (PERMISSIONS.includes(o.permissions as Permissions) && o.permissions !== "own") child.permissions = o.permissions as Permissions;
   if (o.done === true) child.done = true;
   const r = o.resume as Record<string, unknown> | undefined;
   // A bad resume id only loses the resume: the session can still be relaunched from its spec.
@@ -196,7 +200,7 @@ function maskedChild(s: ChildRecord, known: string): ChildRecord {
 }
 
 /** The fields of a record the reader checks or changes; the name is only tidied (safeLine) and the spec is kept as it is (its length is checked on its own). */
-const CHILD_FIELDS = ["key", "harness", "model", "effort", "mode", "done", "startedAt", "resume"] as const;
+const CHILD_FIELDS = ["key", "harness", "model", "effort", "mode", "permissions", "done", "startedAt", "resume"] as const;
 /** Any other field would be written as it is, unmasked, and read back as nothing. */
 const KNOWN_FIELDS = new Set<string>([...CHILD_FIELDS, "name", "spec"]);
 const HEADER_FIELDS = new Set<string>(["v", "id", "name", "cwd", "createdAt", "updatedAt", "pid", "start", "sessions"]);

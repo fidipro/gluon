@@ -3,7 +3,7 @@
  * developer picks from, and the Tab adjust of one triple. Pure: no I/O.
  */
 import type { AgentOption, Config, Effort } from "../config.ts";
-import { HARNESS_INFO, MODES, type Harness, type Mode } from "../harnesses.ts";
+import { HARNESS_INFO, MODES, permissionLevels, type Harness, type Mode, type Permissions } from "../harnesses.ts";
 import { validateChoice, type LaunchChoice } from "../launchers.ts";
 import { MAX_SPEC } from "../workspaces.ts";
 
@@ -12,6 +12,8 @@ export interface AgentTriple {
   harness: LaunchChoice["harness"];
   model: string;
   effort?: Effort;
+  /** ctrl+p's level on an option of the agent choice (the home view's); route never sets one. */
+  permissions?: Permissions;
 }
 
 /** What `propose_launch` proposes, once valid: one spec for every option, the recommended option first. */
@@ -154,18 +156,22 @@ export function parseProposal(config: Config, input: Record<string, unknown>, ro
   };
 }
 
+/** What the developer changed on an option of the agent choice before Enter (`pickChoice`). */
+export type ChoiceOverride = { model?: string; effort?: Effort; mode?: Mode; permissions?: Permissions };
+
 /**
  * The option a developer picked, with `override` (model and/or effort from a Tab adjust, a mode
- * from ctrl+t; the override's wins over the proposal's) applied, as a launch, or why it can't be
- * launched. The harness never changes. Build is no mode.
+ * from ctrl+t, the option's permissions from ctrl+p; the override's wins over the proposal's) applied, as a launch, or why it can't be
+ * launched. The harness never changes. Build is no mode; permissions are build's alone (other modes set their own), and `own` is none.
  */
-export function pickChoice(config: Config, proposal: Proposal, index = 0, override: { model?: string; effort?: Effort; mode?: Mode } = {}): LaunchChoice | string {
+export function pickChoice(config: Config, proposal: Proposal, index = 0, override: ChoiceOverride = {}): LaunchChoice | string {
   const base = proposal.choices[index];
   if (!base) return `no option ${index + 1}`;
   // An `effort` key set to undefined is an override too: the adjusted model takes none (Tab from a model with an effort to one without).
   const picked = triple({ ...base, ...(override.model !== undefined ? { model: override.model } : {}), ...("effort" in override ? { effort: override.effort } : {}) });
   const mode = override.mode ?? proposal.mode;
-  const choice: LaunchChoice = { ...picked, ...(mode && mode !== "build" ? { mode } : {}), spec: proposal.spec, reason: proposal.reason };
+  const permissions = (!mode || mode === "build") && override.permissions && override.permissions !== "own" ? override.permissions : undefined;
+  const choice: LaunchChoice = { ...picked, ...(mode && mode !== "build" ? { mode } : {}), ...(permissions ? { permissions } : {}), spec: proposal.spec, reason: proposal.reason };
   return validateChoice(config, choice, { requireEffort: true }) ?? choice;
 }
 
@@ -212,4 +218,10 @@ export function cycleMode(current: Mode | undefined, harness?: Harness): Mode {
     if (runs(next)) return next;
   }
   return current ?? "build";
+}
+
+/** ctrl+p: the highlighted option's next permission level (`permissionLevels`: its harness's own first), wrapping; `own` for one with none. */
+export function cyclePermissions(current: Permissions | undefined, harness: Harness): Permissions {
+  const levels = permissionLevels(harness);
+  return levels[(levels.indexOf(current ?? "own") + 1) % levels.length] ?? "own";
 }

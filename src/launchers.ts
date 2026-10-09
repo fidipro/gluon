@@ -3,7 +3,7 @@ import { constants as osConstants, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { ADAPTER_DIR, ADAPTER_DIR_JSON, SELF, type AdapterOutput } from "./adapters/types.ts";
 import { awsSetup, configPath, connsOf, type AgentOption, type Config, type Harness } from "./config.ts";
-import { effortsOn, HARNESS_INFO, MODES, modeUnavailable, OPENAI_API_BASE, OPENROUTER_ANTHROPIC_BASE, OPENROUTER_OPENAI_BASE, PROVIDERS, type Conn, type Effort, type HarnessInfo, type Mode, type ModeLaunch, type ModelEntry, type SessionRef } from "./harnesses.ts";
+import { effortsOn, HARNESS_INFO, MODES, modeUnavailable, OPENAI_API_BASE, OPENROUTER_ANTHROPIC_BASE, OPENROUTER_OPENAI_BASE, permissionLevels, permissionsUnavailable, PROVIDERS, type Conn, type Effort, type HarnessInfo, type Mode, type ModeLaunch, type ModelEntry, type Permissions, type SessionRef } from "./harnesses.ts";
 import { RESUME_ID } from "./workspaces.ts";
 import { assertShimArgs, binPath, cmdSafe, isShim, killTree, missingReason, shortPath, showChar, unsafeChar } from "./detect.ts";
 import { createEventsDir, EVENTS_ENV, HANDOFF_ENV, readEvents, SELF_ENV, writeAnswer } from "./events.ts";
@@ -22,6 +22,8 @@ export interface LaunchChoice {
   effort?: Effort;
   /** How the session starts; none: build. */
   mode?: Mode;
+  /** Who approves the agent's commands and edits in build mode (`Permissions`); none: the harness's own. */
+  permissions?: Permissions;
   spec: string;
   reason: string;
 }
@@ -81,6 +83,7 @@ export function validateChoice(config: Config, c: LaunchChoice, { requireEffort 
   if (unserved) return unserved;
   const unavailable = c.mode && c.mode !== "build" ? HARNESS_INFO[c.harness]?.modes[c.mode]?.unavailable : undefined;
   if (unavailable) return modeUnavailable(agent.label, c.mode!, unavailable);
+  if (c.permissions && !permissionLevels(c.harness).includes(c.permissions)) return permissionsUnavailable(agent.label, c.permissions);
   // Efforts belong to the model: DeepSeek takes low, high, max; Kimi, Claude and Codex each their own. On a connection that can't apply them (`effortConns`) there are none.
   const option = agent.models.find((m) => m.id === c.model)!;
   const entry = config.models[c.harness]?.find((m) => m.id === c.model);
@@ -302,6 +305,12 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
       if (v && key) env[v] = key;
   }
   if (launch?.argv) extra.push(...launch.argv);
+  // Permissions are build's alone (explore and plan set their own); a resume applies them again, as a new launch does.
+  if (c.permissions && c.permissions !== "own" && !mode) {
+    const flags = info.permissions?.[c.permissions];
+    if (!flags) throw new Error(permissionsUnavailable(info.label, c.permissions));
+    extra.push(...flags);
+  }
   // Plan mode has an effort of its own: without this Codex switches to its own default when /plan is typed.
   if (launch?.typed && c.effort && c.harness === "codex") extra.push("-c", `plan_mode_reasoning_effort="${c.effort}"`);
   if (adapter) {

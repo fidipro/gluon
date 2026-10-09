@@ -47,6 +47,14 @@ describe("BUG-312/resume: the saved workspace file", () => {
     expect(loadWorkspace("abcdef")).toEqual(ws);
   });
 
+  test("BUG-712/permissions-resume: a session's permissions round-trip; an unknown level is dropped, not the session (the harness's own asks more, never less)", () => {
+    const ws = workspace({ sessions: [child({ key: "k1", permissions: "auto" }), child({ key: "k2" })] });
+    saveWorkspace(ws);
+    expect(loadWorkspace("abcdef")!.sessions.map((c) => c.permissions)).toEqual(["auto", undefined]);
+    const odd = parseWorkspace(raw({ ...workspace(), sessions: ["yolo", "own", 1].map((permissions, i) => ({ ...child({ key: `b${i}` }), permissions })) }));
+    expect(odd!.sessions.map((c) => [c.key, c.permissions])).toEqual([["b0", undefined], ["b1", undefined], ["b2", undefined]]);
+  });
+
   test("BUG-612/resume-modes: a mode that is no known mode (or no string) is a bad record like a bad effort: that session is dropped, the others kept", () => {
     const bad = ["yolo", "", "EXPLORE", 1, null, ["explore"], { x: 1 }].map((mode, i) => ({ ...child({ key: `b${i}` }), mode }));
     const ws = parseWorkspace(raw({ ...workspace(), sessions: [child({ key: "k1", mode: "explore" }), ...bad, child({ key: "k9" })] }));

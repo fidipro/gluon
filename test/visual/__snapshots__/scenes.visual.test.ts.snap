@@ -2029,7 +2029,7 @@ text
 41 │      ❯ 1. claude code × sonnet 5.5 × high · recommended
 42 │        2. opencode × deepseek flash × max
 43 │        3. keep talking
-44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode
+44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode · ctrl+p permissions
 45 │
 46 │  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 47 │   › reply to the intake agent
@@ -2090,7 +2090,7 @@ runs
 41 [5,22,s14] [22,42,s15] [42,56,s16] [56,158,s17]
 42 [5,11,s7] [11,19,s5] [19,42,s4]
 43 [5,23,s7]
-44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,102,s4]
+44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,105,s4] [105,111,s3] [111,123,s4]
 46 [2,158,s6]
 47 [2,5,s18] [5,6,s19] [6,30,s4]
 48 [2,158,s6]
@@ -2133,7 +2133,7 @@ text
 29 │      ❯ 1. claude code × sonnet 5.5 × high · recommended
 30 │        2. opencode × deepseek flash × max
 31 │        3. keep talking
-32 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode
+32 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode · ctrl+p permissions
 33 │
 34 │
 35 │
@@ -2187,10 +2187,10 @@ runs
 25 [2,4,s2] [6,36,s10]
 27 [2,4,s2] [6,107,s10]
 28 [7,47,s4]
-29 [5,22,s11] [22,42,s12] [42,56,s13] [56,107,s14]
+29 [5,22,s11] [22,42,s12] [42,56,s13] [56,123,s14]
 30 [5,11,s10] [11,19,s5] [19,42,s4]
 31 [5,23,s10]
-32 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,102,s4]
+32 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,105,s4] [105,111,s3] [111,123,s4]
 46 [2,158,s6]
 47 [2,5,s15] [5,6,s16] [6,30,s4]
 48 [2,158,s6]
@@ -2245,7 +2245,7 @@ text
 41 │      ❯ 1. claude code × sonnet 5.5 × high · recommended
 42 │        2. opencode × deepseek flash × max
 43 │        3. keep talking
-44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode
+44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode · ctrl+p permissions
 45 │
 46 │  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 47 │   › reply to the intake agent
@@ -2306,7 +2306,7 @@ runs
 41 [5,22,s14] [22,42,s15] [42,56,s16] [56,158,s17]
 42 [5,11,s7] [11,19,s5] [19,42,s4]
 43 [5,23,s7]
-44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,102,s4]
+44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,105,s4] [105,111,s3] [111,123,s4]
 46 [2,158,s6]
 47 [2,5,s18] [5,6,s19] [6,30,s4]
 48 [2,158,s6]
@@ -2361,7 +2361,7 @@ text
 41 │      ❯ 1. claude code × sonnet 5.5 × high · recommended
 42 │        2. opencode × deepseek flash × max
 43 │        3. keep talking
-44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode
+44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode · ctrl+p permissions
 45 │
 46 │  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 47 │   › reply to the intake agent
@@ -2422,7 +2422,7 @@ runs
 41 [5,22,s14] [22,42,s15] [42,56,s16] [56,158,s17]
 42 [5,11,s7] [11,19,s5] [19,42,s4]
 43 [5,23,s7]
-44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,102,s4]
+44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,105,s4] [105,111,s3] [111,123,s4]
 46 [2,158,s6]
 47 [2,5,s18] [5,6,s19] [6,30,s4]
 48 [2,158,s6]
@@ -4197,7 +4197,7 @@ text
 12 │   del           end it (or the draft)
 13 │   ctrl+c twice  quit
 14 │
-15 │   ? / esc close · pgup pgdn / wheel ↓ 19 more
+15 │   ? / esc close · pgup pgdn / wheel ↓ 20 more
 16 │  ──────────────────────────────────────────────
 17 │   › describe another session
 18 │  ──────────────────────────────────────────────
@@ -4541,12 +4541,12 @@ text
 10 │   →             open the first tab       tab        the agent's model
 11 │   click         select · again opens     shift+tab  the agent's effort
 12 │   drag          select and copy text     ctrl+t     the mode
-13 │   ctrl+d        mark done, or not        pgup pgdn  scroll, wheel too
-14 │   del           end it (or the draft)    ctrl+o     fold the spec
-15 │   ctrl+c twice  quit                     esc        interrupt · close options
-16 │                                          esc esc    clear the draft
-17 │   In a session                           ctrl+j     new line
-18 │   ctrl+\\        then ←/→ · again: home
+13 │   ctrl+d        mark done, or not        ctrl+p     the agent's permissions
+14 │   del           end it (or the draft)    pgup pgdn  scroll, wheel too
+15 │   ctrl+c twice  quit                     ctrl+o     fold the spec
+16 │                                          esc        interrupt · close options
+17 │   In a session                           esc esc    clear the draft
+18 │   ctrl+\\        then ←/→ · again: home   ctrl+j     new line
 19 │   ? / esc close · pgup pgdn / wheel ↓ 5 more
 20 │  ────────────────────────────────────────────────────────────────────────────
 21 │   › describe another session
@@ -4574,12 +4574,12 @@ runs
 10 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,70,s4]
 11 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,71,s4]
 12 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,61,s4]
-13 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,70,s4]
-14 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,66,s4]
-15 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,78,s4]
-16 [2,42,s4] [42,53,s3] [53,68,s4]
-17 [2,3,s4] [3,15,s5] [15,42,s4] [42,53,s3] [53,61,s4]
-18 [2,3,s4] [3,17,s3] [17,42,s4]
+13 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,76,s4]
+14 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,70,s4]
+15 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,66,s4]
+16 [2,42,s4] [42,53,s3] [53,78,s4]
+17 [2,3,s4] [3,15,s5] [15,42,s4] [42,53,s3] [53,68,s4]
+18 [2,3,s4] [3,17,s3] [17,42,s4] [42,53,s3] [53,61,s4]
 19 [2,3,s4] [3,10,s3] [10,19,s4] [19,36,s3] [36,45,s4]
 20 [2,78,s6]
 21 [2,5,s7] [5,6,s8] [6,29,s4]
@@ -4925,14 +4925,14 @@ text
 10 │   →             open the first tab       ←/→         switch, nothing typed    tab        the agent's model
 11 │   click         select · again opens     click       a tab, ◆ gluon, ‹ ›      shift+tab  the agent's effort
 12 │   drag          select and copy text     shift+pgup  scroll, wheel too        ctrl+t     the mode
-13 │   ctrl+d        mark done, or not                                             pgup pgdn  scroll, wheel too
-14 │   del           end it (or the draft)                                         ctrl+o     fold the spec
-15 │   ctrl+c twice  quit                                                          esc        interrupt · close options
-16 │                                                                               esc esc    clear the draft
-17 │                                                                               ctrl+j     new line
-18 │
-19 │   ? / esc close
-20 │
+13 │   ctrl+d        mark done, or not                                             ctrl+p     the agent's permissions
+14 │   del           end it (or the draft)                                         pgup pgdn  scroll, wheel too
+15 │   ctrl+c twice  quit                                                          ctrl+o     fold the spec
+16 │                                                                               esc        interrupt · close options
+17 │                                                                               esc esc    clear the draft
+18 │                                                                               ctrl+j     new line
+19 │
+20 │   ? / esc close
 21 │
 22 │
 23 │
@@ -4974,12 +4974,13 @@ runs
 10 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,107,s4]
 11 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,108,s4]
 12 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,98,s4]
-13 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,107,s4]
-14 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,103,s4]
-15 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,115,s4]
-16 [2,79,s4] [79,90,s3] [90,105,s4]
-17 [2,79,s4] [79,90,s3] [90,98,s4]
-19 [2,3,s4] [3,10,s3] [10,16,s4]
+13 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,113,s4]
+14 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,107,s4]
+15 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,103,s4]
+16 [2,79,s4] [79,90,s3] [90,115,s4]
+17 [2,79,s4] [79,90,s3] [90,105,s4]
+18 [2,79,s4] [79,90,s3] [90,98,s4]
+20 [2,3,s4] [3,10,s3] [10,16,s4]
 36 [2,118,s6]
 37 [2,5,s7] [5,6,s8] [6,29,s4]
 38 [2,118,s6]
@@ -5405,14 +5406,14 @@ text
 10 │   →             open the first tab       ←/→         switch, nothing typed    tab        the agent's model
 11 │   click         select · again opens     click       a tab, ◆ gluon, ‹ ›      shift+tab  the agent's effort
 12 │   drag          select and copy text     shift+pgup  scroll, wheel too        ctrl+t     the mode
-13 │   ctrl+d        mark done, or not                                             pgup pgdn  scroll, wheel too
-14 │   del           end it (or the draft)                                         ctrl+o     fold the spec
-15 │   ctrl+c twice  quit                                                          esc        interrupt · close options
-16 │                                                                               esc esc    clear the draft
-17 │                                                                               ctrl+j     new line
-18 │
-19 │   ? / esc close
-20 │
+13 │   ctrl+d        mark done, or not                                             ctrl+p     the agent's permissions
+14 │   del           end it (or the draft)                                         pgup pgdn  scroll, wheel too
+15 │   ctrl+c twice  quit                                                          ctrl+o     fold the spec
+16 │                                                                               esc        interrupt · close options
+17 │                                                                               esc esc    clear the draft
+18 │                                                                               ctrl+j     new line
+19 │
+20 │   ? / esc close
 21 │
 22 │
 23 │
@@ -5464,12 +5465,13 @@ runs
 10 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,107,s4]
 11 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,108,s4]
 12 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,98,s4]
-13 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,107,s4]
-14 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,103,s4]
-15 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,115,s4]
-16 [2,79,s4] [79,90,s3] [90,105,s4]
-17 [2,79,s4] [79,90,s3] [90,98,s4]
-19 [2,3,s4] [3,10,s3] [10,16,s4]
+13 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,113,s4]
+14 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,107,s4]
+15 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,103,s4]
+16 [2,79,s4] [79,90,s3] [90,115,s4]
+17 [2,79,s4] [79,90,s3] [90,105,s4]
+18 [2,79,s4] [79,90,s3] [90,98,s4]
+20 [2,3,s4] [3,10,s3] [10,16,s4]
 46 [2,158,s6]
 47 [2,5,s7] [5,6,s8] [6,29,s4]
 48 [2,158,s6]
@@ -5906,7 +5908,7 @@ text
 12 │   del           end it (or the draft)
 13 │   ctrl+c twice  quit
 14 │
-15 │   ? / esc close · pgup pgdn / wheel ↓ 19 more
+15 │   ? / esc close · pgup pgdn / wheel ↓ 20 more
 16 │  ──────────────────────────────────────────────
 17 │   › describe another session
 18 │  ──────────────────────────────────────────────
@@ -6266,14 +6268,14 @@ text
 10 │   →             open the first tab       ←/→         switch, nothing typed    tab        the agent's model
 11 │   click         select · again opens     click       a tab, ◆ gluon, ‹ ›      shift+tab  the agent's effort
 12 │   drag          select and copy text     shift+pgup  scroll, wheel too        ctrl+t     the mode
-13 │   ctrl+d        mark done, or not                                             pgup pgdn  scroll, wheel too
-14 │   del           end it (or the draft)                                         ctrl+o     fold the spec
-15 │   ctrl+c twice  quit                                                          esc        interrupt · close options
-16 │                                                                               esc esc    clear the draft
-17 │                                                                               ctrl+j     new line
-18 │
-19 │   ? / esc close
-20 │
+13 │   ctrl+d        mark done, or not                                             ctrl+p     the agent's permissions
+14 │   del           end it (or the draft)                                         pgup pgdn  scroll, wheel too
+15 │   ctrl+c twice  quit                                                          ctrl+o     fold the spec
+16 │                                                                               esc        interrupt · close options
+17 │                                                                               esc esc    clear the draft
+18 │                                                                               ctrl+j     new line
+19 │
+20 │   ? / esc close
 21 │
 22 │
 23 │
@@ -6315,12 +6317,13 @@ runs
 10 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,107,s4]
 11 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,108,s4]
 12 [2,3,s4] [3,17,s3] [17,42,s4] [42,54,s3] [54,79,s4] [79,90,s3] [90,98,s4]
-13 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,107,s4]
-14 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,103,s4]
-15 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,115,s4]
-16 [2,79,s4] [79,90,s3] [90,105,s4]
-17 [2,79,s4] [79,90,s3] [90,98,s4]
-19 [2,3,s4] [3,10,s3] [10,16,s4]
+13 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,113,s4]
+14 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,107,s4]
+15 [2,3,s4] [3,17,s3] [17,79,s4] [79,90,s3] [90,103,s4]
+16 [2,79,s4] [79,90,s3] [90,115,s4]
+17 [2,79,s4] [79,90,s3] [90,105,s4]
+18 [2,79,s4] [79,90,s3] [90,98,s4]
+20 [2,3,s4] [3,10,s3] [10,16,s4]
 36 [2,118,s6]
 37 [2,5,s7] [5,6,s8] [6,29,s4]
 38 [2,118,s6]
@@ -8432,7 +8435,7 @@ text
 41 │        2. codex × gpt-6.1 sol × medium
 42 │        3. opencode × deepseek flash × max
 43 │        4. keep talking
-44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode
+44 │       ↑↓ choose · enter starts the session · esc cancels · tab model · shift+tab effort · ctrl+t mode · ctrl+p permissions
 45 │
 46 │  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 47 │   › reply to the intake agent
@@ -8497,7 +8500,7 @@ runs
 41 [5,11,s8] [11,16,s5] [16,39,s4]
 42 [5,11,s8] [11,19,s5] [19,42,s4]
 43 [5,23,s8]
-44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,102,s4]
+44 [7,9,s3] [9,19,s4] [19,24,s3] [24,46,s4] [46,49,s3] [49,60,s4] [60,63,s3] [63,72,s4] [72,81,s3] [81,91,s4] [91,97,s3] [97,105,s4] [105,111,s3] [111,123,s4]
 46 [2,158,s7]
 47 [2,5,s19] [5,6,s20] [6,30,s4]
 48 [2,158,s7]

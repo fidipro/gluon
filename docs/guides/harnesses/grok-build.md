@@ -36,6 +36,7 @@ Grok Build's interface ignores the permission flag, so a mode is not a flag.
 
 - **`explore`** starts it in its read-only sandbox with `Edit`, `Write` and `Bash` denied. It can read, search and list files but run no shell commands. Denying is what stops the prompts.
 - **`plan`** has no flag, so Gluon types `/plan` into it once it is up. It works only in Gluon's frame: a direct launch from the command line and a terminal without a pseudo-terminal refuse it.
+- **Permissions.** In build mode `ctrl+p` sets never ask: every tool runs without asking (your deny rules still hold).
 
 See [Modes](../modes.md).
 

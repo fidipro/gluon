@@ -33,7 +33,7 @@ import { activeValue, configPath, connsOf, ensureHandoffSection, saveConfig, set
 import { binPath, installed } from "./detect.ts";
 import { safeLine, stepGate } from "./events.ts";
 import { handoffFor } from "./handoff.ts";
-import { HARNESS_INFO, idOn, isPlanConn, tooOld, type Conn, type Harness } from "./harnesses.ts";
+import { HARNESS_INFO, idOn, isPlanConn, permissionLevels, tooOld, type Conn, type Harness } from "./harnesses.ts";
 import { buildCommand, handOffSession, launchProblem, modeLostOnResume, NO_PTY_NOTE, typedModeProblem, validateChoice, withMode, type Command, type SessionEnd } from "./launchers.ts";
 import { launcherLines, optedInBy, routeCatalog, withLauncherLines } from "./intake.ts";
 import { offeredAgents } from "./models.ts";
@@ -708,10 +708,10 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
     if (again) {
       key = again.child.key;
       // Started again: a new id (or none), not the one the harness refused (a Codex or OpenCode one sends its id by hook).
-      if (!again.resume) recorder.update(key, { name: view.name, resume, mode: choice.mode ?? "build" });
+      if (!again.resume) recorder.update(key, { name: view.name, resume, mode: choice.mode ?? "build", permissions: choice.permissions });
       if (again.child.done) store.update(view.id, { markedDone: true });
     } else {
-      key = recorder.add({ name: view.name, harness: choice.harness, model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}), mode: choice.mode ?? "build", spec: choice.spec, startedAt: view.startedAt, ...(resume ? { resume } : {}) }).key;
+      key = recorder.add({ name: view.name, harness: choice.harness, model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}), mode: choice.mode ?? "build", ...(choice.permissions ? { permissions: choice.permissions } : {}), spec: choice.spec, startedAt: view.startedAt, ...(resume ? { resume } : {}) }).key;
     }
     keyOf.set(view.id, key);
     return key;
@@ -1177,7 +1177,7 @@ export async function runGluon(ctx: GluonContext): Promise<never> {
 
   // A saved effort the model no longer takes (efforts are per model now: some take none) is dropped, not a reason the session can't come back (BUG-423).
   const takes = (c: ChildRecord) => !c.effort || !!config.models[c.harness].find((m) => m.id === c.model)?.efforts.includes(c.effort);
-  const choiceOf = (c: ChildRecord): NamedChoice => ({ name: c.name, harness: c.harness, model: c.model, ...(c.effort && takes(c) ? { effort: c.effort } : {}), ...(c.mode ? { mode: c.mode } : {}), spec: c.spec, reason: "resumed" });
+  const choiceOf = (c: ChildRecord): NamedChoice => ({ name: c.name, harness: c.harness, model: c.model, ...(c.effort && takes(c) ? { effort: c.effort } : {}), ...(c.mode ? { mode: c.mode } : {}), ...(c.permissions && permissionLevels(c.harness).includes(c.permissions) ? { permissions: c.permissions } : {}), spec: c.spec, reason: "resumed" });
 
   /** Why a saved session can't be launched at all now (its agent is gone or its model is), or null. */
   function launchCheck(c: ChildRecord): string | null {

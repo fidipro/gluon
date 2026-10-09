@@ -35,6 +35,7 @@ Kimi's installer needs Linux with glibc (it refuses Alpine) or macOS. On Windows
 
 - **`plan`** starts it in its plan mode: writing and editing are limited to the plan file, but its shell still asks.
 - **There is no `explore`.** Its interactive mode ignores an agent file, so nothing can make it read-only, and Gluon never starts it in explore. `ctrl+t` skips it while Kimi Code is the highlighted agent; a proposal or an Enter that would start it is refused with the reason, and routing leaves Kimi Code out of an explore session.
+- **Permissions.** In build mode `ctrl+p` sets auto (routine edits and commands run, risky ones still ask) or never ask.
 
 See [Modes](../modes.md).
 

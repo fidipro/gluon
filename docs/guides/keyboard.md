@@ -22,6 +22,7 @@ On the home view, the hint line names the keys for what is selected. Press `?` w
 - `enter` on an agent starts the session. Type instead to change it.
 - `tab` and `shift+tab` adjust the highlighted agent's model and effort. The hint names them when it has another.
 - `ctrl+t` cycles the [mode](modes.md) (build, explore, plan) of the proposal.
+- `ctrl+p` cycles the highlighted agent's [permissions](modes.md#permissions) in build mode, for an agent that asks before every command or edit. The hint names it then.
 - `pgup` and `pgdn` scroll the spec when it is cut to fit. While the agents are shown, they scroll only the spec. `esc` closes the agents, then they scroll the chat.
 - `ctrl+o` folds the spec to one line and back.
 

@@ -316,6 +316,8 @@ rule("h.question", "k.tab", { case: "issue-55/tab" });
 rule(["h.proposal", "h.spec"], "k.tab", homeDoes("cycleModel"));
 rule(["h.proposal", "h.spec"], "k.shiftTab", homeDoes("cycleEffort"));
 rule(["h.proposal", "h.spec"], "k.ctrlT", homeDoes("cycleMode"));
+// Ctrl+P cycles the highlighted agent's permissions (home.test.tsx `BUG-712/permissions`).
+rule(["h.proposal", "h.spec"], "k.ctrlP", { case: "BUG-712/permissions" });
 rule(["h.proposal", "h.spec"], "k.ctrlO", homeDoes("foldSpec"));
 rule(["h.proposal", "h.spec"], PAGE, homeDoes("scrollSpec"));
 rule("h.keys", k("esc", "question"), homeDoes("closeKeys"));
@@ -443,6 +445,7 @@ export const KEY_GROUP_INPUTS: Record<string, InputId[]> = {
   "shift+tab": ["k.shiftTab"],
   "pgup pgdn": ["k.pgup", "k.pgdn"],
   "ctrl+t": ["k.ctrlT"],
+  "ctrl+p": ["k.ctrlP"],
   "ctrl+o": ["k.ctrlO"],
   esc: ["k.esc"],
   "esc esc": ["k.esc"],

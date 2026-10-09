@@ -15,9 +15,11 @@ gluon <version> — Gluon, a control platform for coding agents
   gluon                                   open Gluon: your sessions and the intake chat
   gluon "<what to build>"                 open Gluon with this as the first message
   gluon --demo                            the same UI with a scripted intake agent (no API calls)
-  gluon --launch <harness> --model <m> [--effort <e>] [--mode <m>] [--dry-run] -- "<prompt>"
+  gluon --launch <harness> --model <m> [--effort <e>] [--mode <m>] [--permissions <p>] [--dry-run] -- "<prompt>"
                                           skip the chat and launch an agent directly
                                           (--mode: build, the default; explore, read-only; plan, the agent's plan mode)
+                                          (--permissions, build only: own, the default; accept-edits, auto or
+                                          never-ask, where the agent has that level)
   gluon setup                             connect your coding agents (API key or subscription)
   gluon connect <harness>                 connect or reconnect one agent
   gluon install [<harness>…]              install missing agents with their official installers
@@ -89,6 +91,7 @@ A first word that is none of these starts a session with it as the first message
 | `--model` |  | value | The model for `--launch`: an id from the catalog that the agent's connection serves. |
 | `--effort` |  | value | The effort for `--launch`, one of the levels the model takes. |
 | `--mode` |  | value | With `--launch`: `build` (the default), `explore` (read-only) or `plan` (the agent's plan mode). |
+| `--permissions` |  | value | With `--launch` in build mode: `own` (the default: the agent asks as it does on its own), `accept-edits`, `auto` or `never-ask`, where the agent has that level ([Modes](../guides/modes.md#permissions)). |
 | `--dry-run` |  | flag | With `--launch`: print the command instead of running it. |
 | `--all` |  | flag | With `gluon resume` and `gluon sessions`: every directory's saved sessions, not just this one's. |
 | `--force` |  | flag | With `gluon resume` and `gluon sessions --delete`: even while another Gluon has the workspace open. |

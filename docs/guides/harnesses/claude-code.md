@@ -32,6 +32,7 @@ Claude Code reads `CLAUDE.md` from your repository, and `AGENTS.md` only when th
 
 - **`explore`** starts it in a read-only permission mode with its write tools, plan mode and worktrees removed.
 - **`plan`** starts it in its own plan mode.
+- **Permissions.** In build mode `ctrl+p` sets accept edits or auto (Claude Code's own permission modes) for a session; its own start mode is the default.
 
 See [Modes](../modes.md).
 

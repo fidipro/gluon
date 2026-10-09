@@ -11,7 +11,8 @@
  *   in the composer highlights option N and Enter picks it; anything else typed highlights the
  *   last row (own answer / keep talking) and Enter sends it, so "2 tests" is an answer (BUG-159);
  *   Tab on a question's option puts it in the composer to add your words (issue 55); Tab /
- *   Shift+Tab on an agent cycle its model / effort, Ctrl+O folds the spec (shown in
+ *   Shift+Tab on an agent cycle its model / effort, Ctrl+T the whole proposal's mode, Ctrl+P the
+ *   agent's permissions in build mode (`permissionLevels`: its own first), Ctrl+O folds the spec (shown in
  *   its box above the agents) to one line and back, Esc closes the options (the chat keeps them:
  *   a typed reply answers).
  * - otherwise, with an empty composer: ↑↓ move over the group labels and the sessions (BUG-194);
@@ -38,10 +39,10 @@
  */
 import { Box, measureElement, Text, usePaste, useInput, useWindowSize, type DOMElement, type Key } from "ink";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { cycleEffort, cycleMode, cycleModel, type AgentTriple } from "../agent/choices.ts";
+import { cycleEffort, cycleMode, cycleModel, cyclePermissions, type AgentTriple, type ChoiceOverride } from "../agent/choices.ts";
 import type { NamedChoice, Session, State } from "../agent/session.ts";
 import type { AgentOption, Config, Effort } from "../config.ts";
-import { HARNESS_INFO, modeUnavailable, type Mode } from "../harnesses.ts";
+import { HARNESS_INFO, modeUnavailable, permissionLevels, type Mode } from "../harnesses.ts";
 import { ANSWERING, counts, groupOf, PICKING, tabs, TALKING, type SessionState, type SessionStore, type SessionView } from "../sessions.ts";
 import { CHAT_INDENT, choiceHints, composerHeight, questionHints, FIRST_LINE, GluonComposer, openBlockRows, Rule, specRows, Transcript } from "./chat.tsx";
 import * as ed from "./editor.ts";
@@ -337,10 +338,11 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     }
     const base = p.choices[i]!;
     const t = triplesRef.current[i] ?? base;
-    const override: { model?: string; effort?: Effort; mode?: Mode } = {
+    const override: ChoiceOverride = {
       ...(t.model !== base.model ? { model: t.model } : {}),
       ...(t.effort !== base.effort ? { effort: t.effort } : {}),
       ...(modeRef.current !== (p.mode ?? "build") ? { mode: modeRef.current } : {}),
+      ...(t.permissions && t.permissions !== "own" ? { permissions: t.permissions } : {}),
     };
     const choice = session.confirm(i, override);
     if (choice) onStart(choice);
@@ -545,6 +547,15 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     if (key.ctrl && input === "t") {
       // Skipping a mode the highlighted agent can't run (Kimi Code's explore: BUG-672).
       if (options && pending?.kind === "proposal") setMode(cycleMode(modeRef.current, triplesRef.current[shownOption(d.text, optSelRef.current, count)]?.harness));
+      return;
+    }
+    // Ctrl+P: the highlighted agent's next permission level. Build's alone: explore and plan set their own.
+    if (key.ctrl && input === "p") {
+      const t = triplesRef.current[shownOption(d.text, optSelRef.current, count)];
+      if (!(options && pending?.kind === "proposal" && t)) return;
+      if (modeRef.current !== "build") return setNudge(`Permissions are for build mode: ${modeRef.current} sets its own (ctrl+t changes the mode)`);
+      if (permissionLevels(t.harness).length < 2) return setNudge(`${HARNESS_INFO[t.harness].label} doesn't ask before every command or edit: nothing to change`);
+      setTriples(triplesRef.current.map((x) => (x === t ? { ...x, permissions: cyclePermissions(x.permissions, x.harness) } : x)));
       return;
     }
     if (key.tab) {
