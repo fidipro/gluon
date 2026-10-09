@@ -60,7 +60,7 @@ probes. Never make a test call a real model, agent or API.
 
 `bun run test:unit` and `bun run test:e2e` run one half each, `bun test -t "<title>"` one test, and
 `bun run test:health` lists what in the tests has gone stale. `test/e2e/README.md` explains the
-end-to-end harness.
+end-to-end harness; [Writing tests](docs/contributing/testing.md), the rules CI holds a test to.
 
 - **A fixed bug gets a regression test** in `test/` (a unit test if it needs no terminal, otherwise an
   end-to-end scenario in the `test/e2e/` file for its area). A maintainer gives it its bug number.

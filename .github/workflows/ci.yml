@@ -22,6 +22,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # labeled / unlabeled: `tests-reviewed` and `red-exempt` take effect (the whole run again: its gate is the one that counts).
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
   # The nightly full run (every OS, test:dist, Docker, the cross-build).
@@ -417,10 +419,54 @@ jobs:
           bun-version-file: .bun-version
       - run: bun scripts/dco.ts "origin/$BASE_REF" HEAD
 
+  # A test the pull request adds for a bug no test named before must fail without its fix: the branch's tests against the
+  # base's src/ (scripts/red-check.ts). A fix with no src/ change (a script, a workflow): the `red-exempt` label.
+  red-check:
+    needs: plan
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'red-exempt')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BASE_REF: ${{ github.base_ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the merge-base and the base's src/
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - run: bun scripts/red-check.ts "origin/$BASE_REF"
+
+  # Tests removed, assertions removed, tests switched off or out of the blocking run: only with a person's `tests-reviewed`
+  # label (scripts/test-guard.ts). An agent never weakens a test to get green.
+  test-guard:
+    needs: plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      TESTS_REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'tests-reviewed') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun scripts/test-guard.ts "origin/$BASE_REF"
+
   # The one required check (the main ruleset): every job this run needed passed or was skipped. An OS a change doesn't
   # need is a skipped matrix, never a required check left pending.
   gate:
-    needs: [plan, regression, secrets, dco]
+    needs: [plan, regression, secrets, dco, red-check, test-guard]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

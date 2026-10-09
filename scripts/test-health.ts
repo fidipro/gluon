@@ -60,8 +60,8 @@ export function fixtureStatus(installed: string, fixtures: string[]): "match" | 
 export type Candidate = { id: string; marker: "BUG-CANDIDATE" | "MODEL-GAP"; file: string; line: number; title: string };
 const MARKER = /\b(BUG-CANDIDATE|MODEL-GAP)\//g;
 const STRING_ARG = /\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-/** Files that mention the marker without being candidates (the monkey writes `test("BUG-CANDIDATE/GM-…")` into its reports; the health test holds sample titles). */
-const NOT_TESTS = ["test/e2e/gluon-monkey.ts", "test/test-health.test.ts"];
+/** Files that mention the markers without being candidates or quarantines (the monkey writes `test("BUG-CANDIDATE/GM-…")` into its reports; the health and guard tests hold sample titles). */
+const NOT_TESTS = ["test/e2e/gluon-monkey.ts", "test/test-health.test.ts", "test/test-guards.test.ts", "test/test-style.test.ts"];
 
 /**
  * Every test title that starts `BUG-CANDIDATE/<id>:` or `MODEL-GAP/<id>:` (the first string argument of a call, so a
