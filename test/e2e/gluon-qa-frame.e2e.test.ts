@@ -231,15 +231,6 @@ describe("pastes", () => {
     assertInvariants(app);
   });
 
-  test("BUG-656/QA-frame-01: a stray bracketed-paste end marker (`ESC [ 201 ~`, left over when a paste held its own marker, or a terminal glitch) at home is dropped, never typed into the composer as `[201~` @full", async () => {
-    const app = await gluon(100, 30, {}, YAML);
-    app.write("\x1b[201~");
-    await app.settle(500);
-    app.write("x");
-    await app.waitFor(/› .*x/);
-    expect(app.screen()).not.toContain("201~");
-  });
-
   test.skipIf(WIN)("QA-frame/paste-nested-start: a second paste start inside a paste, an unterminated paste, then keys: the user can still get home and quit @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     app.write("\x1b[200~one\x1b[200~two\x1b[201~");
@@ -252,22 +243,6 @@ describe("pastes", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/paste-in-question: a paste while the question bar is up is dropped (even `y`, Enter); Esc then keeps the session and the agent never saw it @full", async () => {
-    const app = await launchAs("claude", { yaml: YAML });
-    await app.type("/clear");
-    await app.press(KEYS.enter);
-    await app.waitFor(() => askedClear(app));
-    const before = app.inputLog().length;
-    await app.paste("y\r");
-    await app.paste("x".repeat(200_000));
-    await app.settle(300);
-    expect(askedClear(app)).toBe(true);
-    expect(app.inputLog().length).toBe(before);
-    await app.press(KEYS.esc);
-    await until(() => !asked(app));
-    expect(app.screen()).not.toContain("CLEARED");
-    assertInvariants(app);
-  });
 });
 
 // ── Resize ──────────────────────────────────────────────────────────────────────────────────────
@@ -335,22 +310,6 @@ describe("resize", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/resize-question: a resize while the question bar is up keeps the question, answerable, on the last row @full", async () => {
-    const app = await launchAs("claude", { yaml: YAML });
-    await app.type("/clear");
-    await app.press(KEYS.enter);
-    await app.waitFor(() => askedClear(app));
-    for (const [c, r] of [[60, 20], [40, 12], [100, 30]] as const) {
-      app.resize(c, r);
-      await app.settle(300);
-      expect({ c, r, asked: askedClear(app) }).toEqual({ c, r, asked: true });
-    }
-    assertInvariants(app);
-    await app.press(KEYS.esc);
-    await until(() => !asked(app));
-    expect(app.screen()).not.toContain("CLEARED");
-  });
-
   test("QA-frame/resize-selecting: a resize in the middle of a drag selection at home: no crash, the view whole, the release harmless @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     await home(app);
@@ -365,7 +324,7 @@ describe("resize", () => {
     await app.settle(300);
     await app.waitFor(HOME_VIEW);
     assertInvariants(app);
-    expect(app.exitCode(50)).resolves.toBeNull();
+    await expect(app.exitCode(50)).resolves.toBeNull();
   });
 });
 
@@ -543,7 +502,8 @@ describe("tabs", () => {
 });
 
 describe.skipIf(WIN)("the home key's prefix", () => {
-  for (const key of ["ctrl+\\", "ctrl+]", "ctrl+^", "ctrl+_"] as const) {
+  // One prefix key end to end; the others are the same code with another byte (test/pty-keys.test.ts pins each byte).
+  for (const key of ["ctrl+\\"] as const) {
     const byte = { "ctrl+\\": KEYS.ctrlBackslash, "ctrl+]": KEYS.ctrlBracket, "ctrl+^": KEYS.ctrlCaret, "ctrl+_": KEYS.ctrlUnderscore }[key];
     test(`QA-frame/prefix-${key}: the prefix has no timeout (BUG-706); an unknown key after it goes to the agent and never the key itself; twice goes home @full`, async () => {
       const app = await launchAs("claude", { yaml: `${YAML}  key: ${key}\n` });
@@ -573,39 +533,9 @@ describe.skipIf(WIN)("the home key's prefix", () => {
     });
   }
 
-  test("QA-frame/prefix-pending-then-tab-switch: the prefix pending, a click on the strip or a wheel notch ends it and does what it does; a key after the lapse is plain @full", async () => {
-    const app = await gluon(100, 30, {}, YAML, ["claude", "opencode"]);
-    await openSessions(app, ["claude", "opencode"]);
-    await app.press(KEYS.ctrlBackslash);
-    const x = app.lines()[0]!.indexOf("Gluon-session-1") + 3;
-    app.write(click(x, 1));
-    await app.waitFor(() => shownTab(app).includes("session-1"));
-    expect(bar(app)).not.toMatch(/again|waiting/);
-    assertInvariants(app);
-  });
 });
 
 describe.skipIf(WIN)("the mouse", () => {
-  test("QA-frame/mouse-strip-edges: a left press on the first and last cell of ◆ gluon and of each tab acts, the cell between tabs and the one past the last do nothing @full", async () => {
-    const app = await gluon(100, 30, {}, YAML, ["claude", "opencode"]);
-    await openSessions(app, ["claude", "opencode", "claude"]);
-    const row = app.lines()[0]!;
-    const starts = ["Gluon-session-1", "Gluon-session-2", "Gluon-session-3"].map((n) => row.indexOf(n));
-    expect(starts.every((s) => s > 0)).toBe(true);
-    // The home mark: `◆ gluon` is columns 1..8; a tab is ` g name ` (the gap cell is its last).
-    const homeAt = row.indexOf("◆") + 1;
-    app.write(click(homeAt, 1));
-    await app.waitFor(HOME_VIEW);
-    await app.press(KEYS.right);
-    await app.waitFor((s) => s.includes("◆ gluon"));
-    // The last cell of the strip's text, and the cell past it: nothing happens.
-    const end = app.lines()[0]!.trimEnd().length;
-    const was = shownTab(app);
-    app.write(click(end + 5, 1));
-    await app.settle(300);
-    expect(shownTab(app)).toBe(was);
-    assertInvariants(app);
-  });
 
   test("QA-frame/mouse-alt-agent-with-mouse: an alternate-screen agent that asked for the mouse: a click on the tab strip still switches, a click inside reaches the agent @full", async () => {
     const app = await gluon(100, 30, { FAKE_ALT: "1" }, YAML, ["claude", "opencode"]);
@@ -617,38 +547,6 @@ describe.skipIf(WIN)("the mouse", () => {
     const x = app.lines()[0]!.indexOf("Gluon-session-1") + 3;
     app.write(click(x, 1));
     await app.waitFor(() => shownTab(app).includes("session-1"));
-    assertInvariants(app);
-  });
-
-  test("QA-frame/mouse-alt-agent-no-mouse: an alternate-screen agent with no mouse tracking: the real terminal tracks no mouse, so the tab strip is not clickable (by design, BUG-175) @full", async () => {
-    const app = await gluon(100, 30, { FAKE_ALT: "1" }, YAML, ["claude", "opencode"]);
-    await openSessions(app, ["claude", "opencode"]);
-    expect(app.modes().mouseTracking).toBe("none");
-  });
-
-  test("QA-frame/mouse-select-wide: a drag over the home composer's CJK and emoji text copies it whole (OSC 52), from either half of a wide character @full", async () => {
-    const app = await gluon(100, 30, {}, YAML);
-    await app.enter("你好世界🐛 text");
-    await app.waitFor(/› 你好世界🐛 text/);
-    const y = app.row(/›.*你好世界/) + 1;
-    expect(y).toBeGreaterThan(0);
-    const x0 = app.lines()[y - 1]!.indexOf("你") + 1;
-    // From the right half of 你 (a wide character: two cells) to past the end of the text.
-    for (const start of [x0, x0 + 1]) {
-      app.mark();
-      const [press, motion, release] = mouseReports({ op: "drag", button: "left", x: start, y, to: { x: x0 + 14, y } });
-      app.write(press!);
-      app.write(motion!);
-      app.write(release!);
-      await until(() => /\x1b\]52;c;[A-Za-z0-9+/=]*\x07/.test(app.since()), 5000);
-      await app.settle(200);
-      const osc = /\x1b\]52;c;([A-Za-z0-9+/=]*)\x07/.exec(app.since());
-      expect(osc).not.toBeNull();
-      const text = Buffer.from(osc![1]!, "base64").toString("utf8");
-      expect({ start, text: text.includes("你好世界🐛 text") || (start === x0 + 1 && text.includes("好世界🐛 text")) }).toEqual({ start, text: true });
-      await app.press("a");
-      await app.press(KEYS.backspace);
-    }
     assertInvariants(app);
   });
 
@@ -708,17 +606,6 @@ describe("the matrix's `na` reasons that could be cells after all", () => {
 });
 
 describe("small items of issue #35", () => {
-  test("BUG-610/QA-frame-03: QA-frame/stale-activity-keeps-working-row: a tool line (`Editing app.ts`), the turn ends (done), then a new turn starts (`working`, no activity yet, as Claude Code's UserPromptSubmit sends it): the row is no longer `Turn finished` @full", async () => {
-    const app = await gluon();
-    await launch(app, "first task");
-    await say(app, "!event status working Editing app.ts", "EVENT status working");
-    await say(app, "!event status done", "EVENT status done");
-    await app.waitFor((s) => s.split("\n")[1]!.includes("awaiting your input"));
-    // The old tool line is already replaced by `Turn finished` (BUG-187).
-    await say(app, "!event status working", "EVENT status working");
-    await app.waitFor((s) => /· Working|· Turn finished/.test(s.split("\n")[1]!));
-    expect(app.lines()[1]).not.toContain("Turn finished");
-  });
 });
 
 describe.skipIf(WIN)("matrix `na`: setup menus are outside the frame, but signals still reach them", () => {

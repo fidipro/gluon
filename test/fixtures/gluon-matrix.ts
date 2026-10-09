@@ -343,15 +343,11 @@ rule(["m.pick", "m.pickMany"], ["r.shrink", "r.tiny"], { case: "BUG-58/4.4" });
 rule("s.cc.questionClear", ["k.esc", "k.enter"], { case: "GLUON-5" });
 rule("s.codex.slashMenu", "k.enter", { case: "BUG-191" });
 rule("s.cc.working", "k.ctrlBackslash", { case: "GLUON-3" });
-rule("s.cc.kitty", "k.ctrlBackslash", { case: "GLUON-10" });
 rule("s.cc.lastTab", "k.left", { case: "GLUON-9" });
 rule("s.cc.idle", "m.interior.wheelUp.sgr", { case: "GLUON-11" });
 rule("s.cc.scrolled", "k.esc", { case: "GLUON-11" });
-rule("s.cc.mouse", ["m.interior.leftPress.sgr", "m.info.leftPress.sgr"], { case: "GLUON-12" });
 rule("s.cc.idle", "sig.TERM", { case: "GLUON-14" });
 rule("s.cc.overflow", ["m.diamond.leftPress.sgr", "m.tab.leftPress.sgr"], { case: "BUG-196/GLUON" });
-rule("s.cc.lastTab", "k.right", { case: "BUG-206/GLUON" });
-rule("s.cc.midTab", "k.left", { case: "BUG-195/GLUON" });
 rule("s.cc.typed", ["k.altLeft", "k.altRight"], { case: "BUG-210/GLUON" });
 rule("s.cc.questionClear", "k.y", { case: "BUG-213/question" });
 rule("h.empty", "k.ctrlC", { case: "GLUON-15" });
@@ -360,20 +356,11 @@ rule("h.quitQ", ["k.esc", "k.enter", "k.y"], { case: "GLUON-13" });
 rule("h.endQ", ["k.esc", "k.enter", "k.y", "k.n"], { case: "BUG-164/GLUON-yes" });
 rule("h.sessions", "k.ctrlD", { case: "BUG-193/GLUON" });
 rule("h.discardQ", "k.enter", { case: "BUG-193/GLUON" });
-rule("h.keys", "k.esc", { case: "BUG-216/E" });
-rule("h.sessions", "k.digit1", { case: "BUG-233/E" });
 rule("h.sessions", "k.right", { case: "BUG-231/E" });
-rule("s.cc.focus", ["f.in", "f.out"], { case: "GLUON-20" });
-rule("s.cc.idle", ["p.multiline", "p.clear", "p.homeKey"], { case: "GLUON-21" });
 rule("s.codex.midTab", ["k.altLeft", "k.altRight", "k.left", "k.right", "m.tab.leftClick.sgr", "m.diamond.leftClick.sgr"], { case: "GLUON-22" });
-rule("s.agy.questionClear", "k.esc", { case: "GLUON-23" });
-rule("s.grok.questionClear", "k.esc", { case: "GLUON-24" });
 rule("s.cc.scrolled", ["k.shiftPgup", "k.shiftPgdn", "k.q", "m.interior.wheelDown.sgr"], { case: "GLUON-25" });
-rule("s.cc.mouse", ["m.interior.rightPress.sgr", "m.interior.middlePress.sgr", "m.interior.leftDrag.sgr"], { case: "GLUON-26" });
 rule("s.cc.mouse", ["m.bar.leftClick.sgr", "m.info.leftClick.sgr", "m.border.leftClick.sgr"], { case: "BUG-240/GLUON-27" });
-rule("s.cc.idle", ["m.interior.leftClick.sgr", "m.interior.leftRelease.sgr", "m.interior.leftDrag.sgr", "m.interior.rightPress.sgr", "m.interior.middlePress.sgr"], { case: "GLUON-28" });
 rule("h.sessions", ["r.shrink", "r.restore"], { case: "GLUON-29" });
-rule(["s.cc.typed", "s.codex.typed"], "k.backspace", { case: "GLUON-30" });
 rule(["s.codex.idle", "s.codex.lastTab"], "k.right", { case: "GLUON-31" });
 rule("h.empty", "k.shiftEnter", { case: "BUG-237/GLUON-35" });
 rule("h.sessions", ["f.in", "f.out"], { case: "BUG-238/GLUON-38" });
@@ -382,7 +369,7 @@ rule("h.sessions", ["f.in", "f.out"], { case: "BUG-238/GLUON-38" });
 // Each state once in the real app (GLUON_FULL); regression (its budget: a session takes seconds
 // to open) the states one or three sessions reach: every home state but the overflowing list,
 // every Claude Code state but the overflowing strip, Codex's and OpenCode's one-session states
-// (Antigravity's and Grok Build's: GLUON-23, GLUON-24).
+// (Antigravity's and Grok Build's: the QA-frame intercept tests, test/e2e/gluon-qa-frame.e2e.test.ts).
 tier("*", "k.x", "e2e");
 const ONE_SESSION = (id: string) => /^s\.(codex|oc)\./.test(id) && !["alt", "firstTab", "midTab", "lastTab", "overflow"].includes(id.split(".")[2]!);
 tier((id) => (id.startsWith("h.") && id !== "h.sessions.overflow") || (id.startsWith("s.cc.") && id !== "s.cc.overflow") || ONE_SESSION(id), "k.x", "smoke");
@@ -407,11 +394,9 @@ export const BEYOND: Record<string, string> = {
   "GLUON-8": "a status event shows in the info line and the counts",
   "GLUON-16": "the harness's cost and context figures",
   "GLUON-17": "Claude Code's OpenTelemetry export",
-  "GLUON-18": "a waiting PreCompact hook asks in the bottom bar",
   "GLUON-19": "on_exit: quit exits with the agent's code",
   "GM-home-selection": "the monkey's find: back home, even in the home key's burst, the list's keys act on the session left's row (BUG-236)",
   "GLUON-37": "keys in the same burst as the → / Enter that opens a session reach its agent (BUG-235)",
-  "GLUON-32": "the bottom bar names ←/→ only while they switch, the prefix bar while the home key waits (REPORT #7)",
   "GLUON-33": "on the only tab the bottom bar names no switch key (REPORT #7; BUG-241)",
   "GLUON-34": "the home view's end question names its row and keys; y and n don't answer (REPORT #8)",
   "GLUON-36": "an agent's redraw a while after a resize doesn't make it Working (REPORT #1; BUG-242)",

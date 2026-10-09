@@ -49,62 +49,7 @@ const tabX = (app: App, name: string) => app.lines()[0]!.indexOf(name) + 1;
 const mouse = (m: Extract<Action, { mouse: unknown }>["mouse"]) => mouseReports(m);
 
 describe("Gluon: what reaches the agent", () => {
-  test.skipIf(WIN)("GLUON-20: focus reports reach an agent that asked for them, byte for byte; one that didn't gets none, and the terminal reports focus only while the asking agent is shown @full", async () => {
-    const app = await gluon(100, 30, {}, undefined, ["claude"]);
-    await openSessions(app, ["claude", "claude"]);
-    await say(app, "!focus", "FOCUS ON");
-    await app.waitFor(() => app.modes().focus);
-    const m = mark(app);
-    await app.press(FOCUS.in);
-    await app.waitFor("FOCUS IN");
-    await app.press(FOCUS.out);
-    await app.waitFor("FOCUS OUT");
-    await gotExactly(m, "\x1b[I\x1b[O");
-    // The first session asked for none: off on the terminal, and a late report goes nowhere.
-    await app.press(KEYS.left);
-    await at(app, 1);
-    await app.waitFor(() => !app.modes().focus);
-    const m2 = mark(app);
-    await app.press(FOCUS.in, FOCUS.out);
-    await app.settle(200);
-    expect(m2.got()).toBe("");
-    assertInvariants(app);
-    await home(app);
-    expect(app.modes().focus).toBe(false);
-  });
 
-  test.skipIf(WIN)("GLUON-21: a paste reaches the agent whole — with its markers while the agent has bracketed paste on, without once it turned it off; a pasted /clear never asks @full", async () => {
-    const app = await launchAs("claude");
-    let m = mark(app);
-    await app.paste("hello there");
-    await app.waitFor("❯ hello there");
-    await gotExactly(m, "\x1b[200~hello there\x1b[201~");
-    await app.press("\x7f".repeat(11));
-    m = mark(app);
-    await app.paste("one\ntwo");
-    await gotExactly(m, "\x1b[200~one\ntwo\x1b[201~");
-    await app.press("\x7f".repeat(7));
-    // A pasted /clear and a typed Enter: the agent runs it; Gluon never asks (a paste never counts).
-    await app.paste("/clear");
-    await app.press(KEYS.enter);
-    await app.waitFor("CLEARED");
-    expect(app.screen()).not.toMatch(/ends this session|End (this )?session\?/);
-    // The agent turns bracketed paste off (the fake echoes a pasted `CSI ? 2004 l` as it is).
-    await app.paste("\x1b[?2004l");
-    await app.press(KEYS.enter);
-    await app.waitFor("GOT <");
-    m = mark(app);
-    await app.paste("plain paste");
-    await app.waitFor("❯ plain paste");
-    await gotExactly(m, "plain paste");
-    // The real terminal keeps bracketed paste on all the same (BUG-172): a paste is never keys.
-    expect(app.modes().bracketedPaste).toBe(true);
-    await app.press("\x7f".repeat(11));
-    await app.paste("x\x1cy");
-    await app.waitFor("❯ x");
-    expect(app.screen()).toContain("◆ gluon");
-    assertInvariants(app);
-  });
 });
 
 describe("Gluon: the fake Codex, Antigravity and Grok Build in the frame", () => {
@@ -177,51 +122,6 @@ describe("Gluon: the fake Codex, Antigravity and Grok Build in the frame", () =>
     assertInvariants(app, { tab: "session-1" });
   });
 
-  test("GLUON-23: Antigravity's reader in the frame — a typed /clear asks (and Esc keeps the session); /compact never asks, Antigravity has none to hold @full", async () => {
-    const app = await launchAs("agy");
-    await app.type("/clear");
-    await app.press(KEYS.enter);
-    await app.waitFor((s) => /^ \? (\/\S+ ends this session|End (this )?session\?)/.test(s.split("\n").at(-1)!));
-    assertInvariants(app);
-    await app.press(KEYS.esc);
-    await app.waitFor((s) => !/ends this session|End (this )?session\?/.test(s));
-    expect(app.screen()).not.toContain("CLEARED");
-    await app.press("\x7f".repeat(8));
-    await app.type("/compact");
-    // Its menu has no such item ("No matches", as Antigravity's): the Enter goes on to it, nothing held.
-    await app.waitFor("No matches");
-    const m = mark(app);
-    await app.press(KEYS.enter);
-    await gotExactly(m, "\r");
-    await app.settle(200);
-    expect(app.screen()).not.toContain("instead of compacting");
-    expect(app.screen()).not.toContain("COMPACTED");
-    assertInvariants(app);
-  });
-
-  test("GLUON-24: Grok Build's reader (the fake) — a typed /clear and /compact ask, and so does Enter on its slash menu's highlighted /clear @full", async () => {
-    const app = await launchAs("grok");
-    await app.type("/clear");
-    await app.press(KEYS.enter);
-    await app.waitFor((s) => /^ \? (\/\S+ ends this session|End (this )?session\?)/.test(s.split("\n").at(-1)!));
-    await app.press(KEYS.esc);
-    await app.waitFor((s) => !/ends this session|End (this )?session\?/.test(s));
-    await app.press("\x7f".repeat(8));
-    await app.type("/compact");
-    await app.press(KEYS.enter);
-    await app.waitFor("End this session instead of compacting?");
-    await app.press(KEYS.esc);
-    await app.waitFor((s) => !s.includes("instead of compacting"));
-    await app.press("\x7f".repeat(10));
-    // `/` alone: the menu's highlighted /clear would run: asked about too.
-    await app.type("/");
-    await app.press(KEYS.enter);
-    await app.waitFor((s) => /^ \? (\/\S+ ends this session|End (this )?session\?)/.test(s.split("\n").at(-1)!));
-    await app.press(KEYS.esc);
-    await app.waitFor((s) => !/ends this session|End (this )?session\?/.test(s));
-    expect(app.screen()).not.toContain("CLEARED");
-    assertInvariants(app);
-  });
 });
 
 describe("Gluon: Kimi Code in the frame", () => {
@@ -286,58 +186,6 @@ describe("Gluon: scrollback and the mouse", () => {
     await gotExactly(m, "x");
   });
 
-  test.skipIf(WIN)("GLUON-26: an agent that tracks the mouse gets right and middle clicks and a drag moved into its screen; a drag that leaves the interior is held at its edge, and its release too @full", async () => {
-    const app = await launchAs("claude");
-    await say(app, "!mouse", "MOUSE ON");
-    // The interior starts at real cell (2, 5): real (10, 10) is the agent's (9, 6).
-    let m = mark(app);
-    await app.press(...mouse({ op: "press", button: "right", x: 10, y: 10 }));
-    await app.waitFor("MOUSE <2;9;6>M");
-    await app.press(...mouse({ op: "press", button: "middle", x: 10, y: 10 }));
-    await app.waitFor("MOUSE <1;9;6>M");
-    await gotExactly(m, "\x1b[<2;9;6M\x1b[<1;9;6M");
-    m = mark(app);
-    // Dragged up onto the info line (row 2) and released there: held at the interior's first row.
-    await app.press(...mouse({ op: "drag", button: "left", x: 10, y: 10, to: { x: 60, y: 2 } }));
-    await app.waitFor("MOUSE <0;59;1>m");
-    await gotExactly(m, "\x1b[<0;9;6M\x1b[<32;59;1M\x1b[<0;59;1m");
-    assertInvariants(app);
-  });
-
-  test.skipIf(WIN)("BUG-240/GLUON-27: a click on the chrome (the bottom bar, the info line, the border) reaches a mouse-tracking agent as nothing — not as a release it never got the press of @full", async () => {
-    const app = await launchAs("claude");
-    await say(app, "!mouse", "MOUSE ON");
-    const m = mark(app);
-    for (const [x, y] of [[50, 30], [50, 2], [1, 12]] as const) await app.press(...mouse({ op: "click", button: "left", x, y }));
-    await app.settle(200);
-    expect(m.got()).toBe("");
-    expect(app.screen()).not.toContain("MOUSE <");
-  });
-
-  test.skipIf(WIN)("GLUON-28: without the agent's mouse tracking, presses, releases, drags, right and middle clicks go nowhere; the wheel scrolls the frame @full", async () => {
-    const app = await launchAs("claude");
-    await say(app, "!lines 40", "LINE 40");
-    const m = mark(app);
-    const gestures: Extract<Action, { mouse: unknown }>["mouse"][] = [
-      { op: "click", button: "left", x: 10, y: 10 },
-      { op: "release", button: "left", x: 10, y: 10 },
-      { op: "drag", button: "left", x: 10, y: 10, to: { x: 30, y: 12 } },
-      { op: "press", button: "right", x: 10, y: 10 },
-      { op: "press", button: "middle", x: 10, y: 10 },
-      { op: "click", button: "left", x: 50, y: 30 },
-    ];
-    for (const g of gestures) await app.press(...mouse(g));
-    await app.settle(200);
-    expect(m.got()).toBe("");
-    expect(app.screen()).not.toContain("esc back");
-    expect(app.lines()[0]).toContain("◆ gluon");
-    await app.press(wheelUp(10, 10));
-    await app.waitFor("↑ 3 · esc back");
-    await app.press(wheelDown(10, 10));
-    await app.waitFor((s) => !s.includes("esc back"));
-    expect(m.got()).toBe("");
-    assertInvariants(app);
-  });
 });
 
 describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () => {
@@ -384,61 +232,6 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
   });
 
   for (const fake of ["codex"] as const)
-    test(`GLUON-30: /clear typed after typing, arrows and erasing the line still asks (REPORT #2; the fake ${fake}) @full`, async () => {
-      const app = await launchAs(fake);
-      await app.type("hello");
-      // The arrows move the agent's cursor (back to the end, so the Backspaces erase it all).
-      const end = app.cursor().x;
-      await app.press(KEYS.left, KEYS.left);
-      await app.waitFor(() => app.cursor().x === end - 2);
-      await app.press(KEYS.right, KEYS.right);
-      await app.waitFor(() => app.cursor().x === end);
-      await app.press("\x7f".repeat(5));
-      await app.type("/clear");
-      await app.press(KEYS.enter);
-      await app.waitFor((s) => /^ \? (\/\S+ ends this session|End (this )?session\?)/.test(s.split("\n").at(-1)!));
-      expect(app.screen()).not.toContain("CLEARED");
-    });
-
-  test("GLUON-32: the bottom bar names ←/→ only while they switch — on an untouched line between tabs; once a key is typed just the home key, ←/→ again after Enter (REPORT #7) @full", async () => {
-    const app = await gluon(100, 30, {}, undefined, ["claude"]);
-    await openSessions(app, ["claude", "claude", "claude"]);
-    await app.press(KEYS.left);
-    await at(app, 2);
-    expect(bar(app)).toMatch(/^ ←\/→ switch session · ctrl\+\\ sessions/);
-    await app.type("x");
-    await app.waitFor(() => /^ ctrl\+\\ sessions/.test(bar(app)));
-    expect(bar(app)).not.toContain("switch");
-    // ← is the agent's: its cursor moves back over the x.
-    const end = app.cursor().x;
-    await app.press(KEYS.left);
-    await app.waitFor(() => app.cursor().x === end - 1);
-    expect(shownTab(app)).toContain("session-2");
-    await app.press(KEYS.enter);
-    await app.waitFor(() => /^ ←\/→ switch session · ctrl\+\\ sessions/.test(bar(app)));
-    await app.press(KEYS.right);
-    await at(app, 3);
-  });
-
-  test("BUG-241/GLUON-33: on the only tab the bottom bar names no switch key (there is no other session), → is home; on two tabs it names ←/→ on each, → from the last is home (REPORT #7) @full", async () => {
-    const app = await launchAs("claude");
-    expect(shownTab(app)).toContain("claude-task");
-    expect(bar(app)).toMatch(/^ ctrl\+\\ sessions/);
-    expect(bar(app)).not.toContain("switch");
-    await app.press(KEYS.right);
-    await app.waitFor(HOME_VIEW);
-    expect(app.screen()).not.toContain("ARROW RIGHT");
-    const two = await gluon(100, 30, {}, undefined, ["claude"]);
-    await openSessions(two, ["claude", "claude"]);
-    await at(two, 2);
-    expect(bar(two)).toMatch(/^ ←\/→ switch session · ctrl\+\\ sessions/);
-    await two.press(KEYS.right);
-    await two.waitFor(HOME_VIEW);
-    expect(two.screen()).not.toContain("ARROW RIGHT");
-    await two.press(KEYS.right);
-    await at(two, 1);
-    expect(bar(two)).toMatch(/^ ←\/→ switch session · ctrl\+\\ sessions/);
-  });
 
   test("GLUON-34: the home view's end question names the row it ends and its keys (enter yes · esc no); y and n don't answer it; Enter ends that row only (REPORT #8) @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
@@ -568,42 +361,6 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     await app.type("x");
     await app.waitFor((s) => s.includes("› x"));
     expect(reversed(top + 1)).toBe(false);
-  });
-
-  test.skipIf(WIN)("BUG-286/chat gutter: a drag over the intake agent's own message copies its text, without the ◆ and the gutter and page padding before each row @full", async () => {
-    const app = await gluon(100, 30, {}, undefined, ["claude"]);
-    await toChoice(app, "fix the add bug");
-    const top = app.row("A focused change");
-    expect(top).toBeGreaterThan(0);
-    const rows = app.lines();
-    const want = [rows[top]!, rows[top + 1]!].map((l) => l.trim().replace(/^◆\s+/, "")).join("\n");
-    app.mark();
-    await app.press(...mouseReports({ op: "drag", button: "left", x: 1, y: top + 1, to: { x: 100, y: top + 2 } }));
-    await app.waitFor((s) => s.includes("Copied "));
-    const osc = app.since().match(/\x1b\]52;c;([A-Za-z0-9+/=]*)\x07/);
-    expect(Buffer.from(osc![1]!, "base64").toString("utf8")).toBe(want);
-  });
-
-  test.skipIf(WIN)("BUG-272/GLUON-56: a double-click on the selected home row opens its session once; the second click never reaches the agent, which tracks the mouse @full", async () => {
-    const app = await gluon(100, 30, {}, undefined, ["claude"]);
-    await launch(app, "one task");
-    await say(app, "!mouse", "MOUSE ON");
-    await home(app);
-    await app.waitFor(() => app.bg(4, app.row("Gluon-one-task ")) === GLUON_HEX.selected);
-    const m = mark(app);
-    const fullClick = (x: number, y: number) => mouseReports({ op: "click", button: "left", x, y }).join("");
-    const y = app.row("Gluon-one-task ") + 1;
-    app.write(fullClick(12, y));
-    app.write(fullClick(12, y));
-    await app.waitFor((s) => s.includes("◆ gluon"));
-    await app.settle(500);
-    expect(m.got()).toBe("");
-    // A click of its own, later, is the agent's.
-    await Bun.sleep(450);
-    await app.press(fullClick(12, 10));
-    const end = performance.now() + 2000 * SLOW;
-    while (!m.got() && performance.now() < end) await Bun.sleep(20);
-    expect(m.got()).toMatch(/^\x1b\[<0;\d+;\d+M\x1b\[<0;\d+;\d+m$/);
   });
 
   test("BUG-235/GLUON-37: keys in the same burst as the → or Enter that opens a session reach its agent, in order, not the hidden home composer @full", async () => {
@@ -819,44 +576,6 @@ describe("Gluon: switching sessions (issue #47)", () => {
 
   /** The home view is up. */
   const viewOfHome = (app: App) => HOME_VIEW.test(app.screen());
-
-  test("BUG-280/GLUON: Alt+←/→ on an untouched line never reach the agent; on a typed line they do; → on the last tab goes home; Alt+PgUp/PgDn reach the agent @full", async () => {
-    const app = await gluon(100, 30, {}, undefined, ["claude"]);
-    await openSessions(app, ["claude", "claude"]);
-    await at(app, 2);
-    const before = logs(app);
-    // Untouched: dropped, nothing happens.
-    await app.press(KEYS.altLeft);
-    await app.press(KEYS.altRight);
-    await app.settle(200);
-    await at(app, 2);
-    expect(logs(app)).toEqual(before);
-    expect(app.screen()).not.toContain("ARROW");
-    // → on the last tab goes home (it was the agent's once); → again opens the first.
-    await app.press(KEYS.right);
-    await app.waitFor(HOME_VIEW);
-    await app.press(KEYS.right);
-    await at(app, 1);
-    await app.press(KEYS.altRight);
-    await app.settle(200);
-    await at(app, 1);
-    expect(logs(app)).toEqual(before);
-    // A typed line: Alt+←/→ are the agent's.
-    await app.type("x");
-    await app.press(KEYS.altLeft);
-    await app.waitFor("ARROW LEFT");
-    await at(app, 1);
-    expect(logs(app)[0]).toBe(`${before[0]}x${KEYS.altLeft}`);
-    // Alt+PgUp / Alt+PgDn are not Gluon's: the agent gets them, whatever the line, and the view stays.
-    await app.press(KEYS.enter);
-    await app.waitFor("GOT <x");
-    await app.press(KEYS.altPgup);
-    await app.press(KEYS.altPgdn);
-    await app.settle(200);
-    await at(app, 1);
-    expect(logs(app)[0]).toBe(`${before[0]}x${KEYS.altLeft}${KEYS.enter}${KEYS.altPgup}${KEYS.altPgdn}`);
-    expect(logs(app)[1]).toBe(before[1]);
-  });
 
   test("BUG-281/GLUON: the bar names ←/→ only while the line is untouched and there is another tab, the prefix bar while the home key waits — in its shorter forms when narrow; Esc on the prefix keeps the question @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);

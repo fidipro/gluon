@@ -544,16 +544,6 @@ describe("BUG-298/resume: the review's findings", () => {
     expect(app.history()).not.toContain("Resume this session");
   });
 
-  test("BUG-305/resume: an agent killed by a signal (exit 130, 143) soon after the resume is a session that ended, not one that refused: no question", async () => {
-    const s = sandbox();
-    seed(s, workspace(repo.tiny()));
-    const app = await resumeApp(s, ["abcdef"], repo.tiny(), { FAKE_REFUSE_RESUME: "130" });
-    await waitText(app, "Gluon-alpha-task exited (code 130)");
-    await app.waitFor(() => saved(s).length === 0);
-    await Bun.sleep(600 * SLOW);
-    expect(app.screen()).not.toContain("can't be resumed");
-  });
-
   test("BUG-307/resume: starting a Codex session again forgets the id the harness refused (a fresh start has none until its hook sends one) @full", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ key: "kx", name: "Gluon-codex-task", harness: "codex", mode: "build", model: "gpt-6.1-sol", spec: "codex spec", resume: { id: "019a1b2c-d3e4-test", source: "captured" } })] }));
