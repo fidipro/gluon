@@ -63,6 +63,10 @@ type Step = {
   item?: Record<string, unknown>;
   /** Waits for turn/interrupt. */
   hang?: boolean;
+  /** Waits for turn/interrupt and goes on with the next steps (codex still finishing what it started). */
+  awaitInterrupt?: boolean;
+  /** The turn completes as interrupted here. */
+  interrupted?: boolean;
   fail?: { message: string; codexErrorInfo?: string };
   /** The turn completes, then the process exits (a crash between turns). */
   exit?: boolean;
@@ -110,6 +114,11 @@ async function playTurn(turnId: string, steps: Step[]) {
     }
     if (step.approval) await request(step.approval, { threadId: THREAD, turnId, itemId, command: "rm -rf /" });
     if (step.item) notify("item/started", { threadId: THREAD, turnId, startedAtMs: 0, item: { id: itemId, ...step.item } });
+    if (step.awaitInterrupt) await new Promise<void>((resolve) => (onInterrupt = resolve));
+    if (step.interrupted) {
+      notify("turn/completed", { threadId: THREAD, turn: { id: turnId, items: [], status: "interrupted", error: null } });
+      return;
+    }
     if (step.hang) {
       await new Promise<void>((resolve) => (onInterrupt = resolve));
       notify("turn/completed", { threadId: THREAD, turn: { id: turnId, items: [], status: "interrupted", error: null } });
@@ -176,6 +185,8 @@ function handle(m: { id?: number; method?: string; params?: any; result?: unknow
       return notify("thread/started", { thread });
     }
     case "mcpServerStatus/list":
+      // FAKE_CODEX_MCP_STATUS_FAIL: a codex that can't (or no longer can) say.
+      if (process.env.FAKE_CODEX_MCP_STATUS_FAIL) return fail("unknown method mcpServerStatus/list");
       // FAKE_CODEX_OWN_MCP: servers codex adds by itself (not in config/read), on.
       return reply({ data: [...(script.mcpServers ?? []).map((name) => ({ name, runtimeStatus: disabled.has(name) ? "disabled" : "ready" })), ...(process.env.FAKE_CODEX_OWN_MCP ?? "").split(",").filter(Boolean).map((name) => ({ name, runtimeStatus: "ready" }))], nextCursor: null });
     case "turn/start": {

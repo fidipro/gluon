@@ -512,7 +512,7 @@ if (!demo && !step) {
   const { active, steps } = await chooseBrain(config, cwd);
   step = active === null ? null : config.brain.order[active]!;
   const chosen = active === null ? null : steps[active]?.result;
-  for (const w of chosen?.ok ? (chosen.warnings ?? []) : []) console.log(`! ${w}`);
+  for (const w of chosen?.ok ? (chosen.warnings ?? []) : []) console.log(maskSecrets(`! ${w}`));
   if (!step) fail("no step of the intake agent order (`brain.order`) works: run `gluon doctor` to see why, or try --demo");
 }
 

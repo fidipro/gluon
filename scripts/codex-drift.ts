@@ -130,14 +130,19 @@ const code = (s: string) => `\`${s.replace(/[^\w.:-]/g, "?")}\``;
 export function report(d: Drift): string {
   const lines = [`## codex ${d.version.replace(/[^\w.+-]/g, "?")}`, ""];
   if (!drifted(d)) lines.push("Nothing to do for the intake agent: the model is sent Gluon's tools only, and every item type is classified.");
-  // Models with the same result share a line.
-  const byResult = new Map<string, string[]>();
+  // Models with the same result share a line; a tool problem and a turn that didn't finish say different things.
+  const byResult = new Map<string, { models: string[]; tools: boolean }>();
   for (const t of d.tools) {
     const what = [t.extra.length && `tools of codex's own: ${t.extra.map(code).join(", ")}`, t.missing.length && `without Gluon's ${t.missing.map(code).join(", ")}`, t.error && `failed: ${t.error.replace(/[`@<>\[\]\n]/g, "?")}`].filter(Boolean).join("; ");
-    byResult.set(what, [...(byResult.get(what) ?? []), t.model]);
+    const r = byResult.get(what) ?? { models: [], tools: t.extra.length > 0 || t.missing.length > 0 };
+    r.models.push(t.model);
+    byResult.set(what, r);
   }
-  for (const [what, models] of byResult) {
-    lines.push(`- **The model request (${models.map(code).join(", ")})**: ${what}. Find the feature or setting that gives a tool (\`CODEX_FEATURES_OFF\`, the thread's config, \`CATALOG_TOOLS_OFF\`); a failure may be a feature codex needs that Gluon turned off (below). Until then the intake agent may be offered it.`);
+  for (const [what, { models, tools }] of byResult) {
+    const next = tools
+      ? "Find the feature or setting that gives a tool (`CODEX_FEATURES_OFF`, the thread's config, `CATALOG_TOOLS_OFF`). Until then the intake agent may be offered it."
+      : "The brain's turn didn't finish against the local provider: check it still starts on this codex (a feature Gluon turned off unchecked, below, may be one codex needs).";
+    lines.push(`- **The model request (${models.map(code).join(", ")})**: ${what}. ${next}`);
   }
   if (d.catalog) lines.push(`- **Model catalog**: ${d.catalog.replace(/[`@<>\[\]\n]/g, "?")}. Until Gluon reads it again the intake agent can't start on this codex.`);
   if (d.items.length) lines.push(`- **New thread-item types**: ${d.items.map(code).join(", ")}. Each goes in \`BRAIN_ITEMS\` or \`FOREIGN_ITEMS\`; until then a turn that has one is interrupted and the model told.`);

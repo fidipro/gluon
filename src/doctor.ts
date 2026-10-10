@@ -96,7 +96,10 @@ async function harnessReport(config: Config, h: Harness, cwd: string): Promise<{
       ok = false;
       continue;
     }
-    for (const m of p.models) lines.push(...(m.result.ok ? [`    ✓ ${m.entry.id} · ${m.id}`, ...warningLines(m.result.warnings, "        ")] : [`    ✗ ${m.entry.id} · ${m.id} · ${m.result.error}`]));
+    // A warning about the harness itself (the same for each of its models) is said once, under the first model.
+    const said = new Set<string>();
+    const fresh = (ws: string[] | undefined) => (ws ?? []).filter((w) => !said.has(w) && said.add(w));
+    for (const m of p.models) lines.push(...(m.result.ok ? [`    ✓ ${m.entry.id} · ${m.id}`, ...warningLines(fresh(m.result.warnings), "        ")] : [`    ✗ ${m.entry.id} · ${m.id} · ${m.result.error}`]));
     if (!p.models.some((m) => m.result.ok)) ok = false;
     else lines.push(`    ${summary.replace(/^[✓✗] /, "")}`);
   }

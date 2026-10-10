@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, featuresToDisable, foreignItem, foreignNote, MAX_INTERRUPTS, notAvailableReminder, parseLoginStatus, probeChatgptPlan, uncheckedCatalogFields, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
+import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, featuresToDisable, foreignItem, foreignNote, MAX_INTERRUPTS, notAvailableReminder, parseLoginStatus, shown, probeChatgptPlan, uncheckedCatalogFields, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
 import * as codexModule from "../src/agent/codex.ts";
 import { ownPercent, ownWindow } from "../src/cost/context.ts";
 import { FIXTURE_CODEX_WINDOWS as CODEX_WINDOWS } from "./fixtures/fixture-tables.ts";
@@ -419,6 +419,16 @@ describe("review of PR #1", () => {
     // A server of the user's config that stays on although Gluon turned it off: a warning too (the brain runs anyway).
     const stuck = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_MCP_STAYS_ON: "docs" }).spawn });
     expect(stuck).toEqual({ ok: true, warnings: [expect.stringContaining("Codex kept your MCP servers on although Gluon turned them off for the intake agent (docs)")] });
+    // A codex that can't say which servers are on, even with servers in the config: a warning.
+    const silent = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_MCP_STATUS_FAIL: "1" }).spawn });
+    expect(silent).toEqual({ ok: true, warnings: [expect.stringContaining("Codex didn't say which MCP servers are on")] });
+    // A server with a dot in its name can't be turned off by the thread's config: one warning, the brain runs.
+    const dotted = fake({ turns: [[{ text: "ok" }]], mcpServers: ["my.server", "docs"] });
+    expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: dotted.spawn })).toEqual({ ok: true, warnings: [expect.stringContaining('Gluon can\'t turn off your MCP servers "my.server" for the intake agent')] });
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]], mcpServers: ["my.server"] }).spawn);
+    await s.submit("hello");
+    expect(state().items.map((i) => i.kind)).toEqual(["user", "notice", "assistant"]);
+    s.close();
   });
 
   test("BUG-79/start-hint: a codex that fails to start after Gluon turned off features it hasn't checked is told which (codex may need one); one that starts isn't", async () => {
@@ -656,8 +666,39 @@ describe("BUG-709: a tool of Codex's own that gets through is interrupted, the m
     await until(() => s.snapshot.items.at(-1)?.kind === "assistant");
     expect(f.toolResults()[0]).toBe("The developer answered: Yes");
     expect(interrupts()).toBe(1);
+    // The answer reaches codex before the interrupt (an interrupt first would abort the call and drop it)...
+    const log = f.received();
+    const answered = log.findIndex((m) => m.method === undefined && JSON.stringify(m.result ?? "").includes("The developer answered: Yes"));
+    expect(answered).toBeGreaterThanOrEqual(0);
+    expect(answered).toBeLessThan(log.findIndex((m) => m.method === "turn/interrupt"));
+    // ...and the note says it again, should codex have dropped it anyway.
+    expect(starts()).toEqual(["hello", `${foreignNote("webSearch")} What the developer answered in that step still stands: The developer answered: Yes`]);
+    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Thanks." });
+    s.close();
+  });
+
+  test("BUG-709/late-call: a call of Gluon's that codex sends after Gluon's interrupt is answered at once and never shown, so no question is left with nowhere to go", async () => {
+    const question = { question: "Add a test?", options: [{ label: "Yes" }, { label: "No" }] };
+    const { f, s, starts } = run([[{ item: { type: "webSearch" } }, { awaitInterrupt: true }, { tool: { name: "ask_user", input: question } }, { interrupted: true }], [{ text: "Thanks." }]]);
+    await s.submit("hello");
+    expect(f.toolResults()[0]).toBe("Gluon interrupted this step; ask again in the next one.");
+    expect(s.snapshot.pending).toBeNull();
+    expect(s.snapshot.items.some((i) => i.kind === "question")).toBe(false);
     expect(starts()).toEqual(["hello", foreignNote("webSearch")]);
     expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Thanks." });
+    s.close();
+  });
+
+  test("BUG-709/names: names codex sends are cleaned (backticks, control, invisible and direction characters) and capped; the reminder keeps at most 20", async () => {
+    expect(shown("a`b\u0007c\u009bd\u202ee\u200bf\u2028g")).toBe("abcdefg");
+    expect(shown("x".repeat(200))).toHaveLength(60);
+    expect(shown("`\u0000")).toBe("unnamed");
+    const many = Array.from({ length: 25 }, (_, i) => ({ item: { type: `new_kind_${i}` } }) as Step);
+    const { s, starts } = run([[...many, { hang: true }], [{ text: "ok" }], [{ text: "ok" }]]);
+    await s.submit("first");
+    await s.submit("second");
+    const reminder = starts()[2]!.split("\n\n")[0]!;
+    expect(reminder.match(/`new_kind_\d+`/g)).toHaveLength(20);
     s.close();
   });
 
