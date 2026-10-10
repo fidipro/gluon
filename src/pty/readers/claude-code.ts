@@ -6,11 +6,13 @@ import { cellIndexAt, joinRows, logicalRow, slashCommand, textOf } from "./gener
  * `────` border above and one below the last row of input (continuation rows are indented two
  * spaces). The slash menu sits right above the top border: item rows are `  /name   description`,
  * wrapped descriptions are indented rows. The highlighted item is drawn wholly in one accent
- * colour; the others are grey with the matched letters bold in the default colour.
+ * colour; the others are grey with the matched letters bold in the default colour. From 2.1.296 the
+ * items are `    /name` and the highlighted one is marked `  ❯ /name` (BUG-718). The empty box shows
+ * a faint placeholder (`Try "…"`) from the cursor on (BUG-719).
  *
- * With NO_COLOR (or a theme without these colours) the highlight can't be read: `selectedCommand`
- * is null and the input line alone decides — a typed `/cl` picked from the menu then goes on
- * without a question (unsure → forward), never a wrong one.
+ * With NO_COLOR (or a theme without these colours) a highlight without the `❯` mark can't be read:
+ * `selectedCommand` is null and the input line alone decides — a typed `/cl` picked from the menu
+ * then goes on without a question (unsure → forward), never a wrong one.
  */
 const isBorder = (cells: Cell[]) => cells.length > 10 && cells.slice(0, 10).every((c) => c.char === "─");
 
@@ -41,16 +43,20 @@ interface Item {
   slashFg: number;
   /** Bold cells in the default colour (matched letters of an item that isn't highlighted). */
   boldDefault: boolean;
+  /** Marked `❯` (2.1.296 on): the highlighted item. */
+  marked: boolean;
 }
 
 function menu(screen: Screen, top: number): Item[] {
   const items: Item[] = [];
   for (let y = top - 1; y >= 0; y--) {
     const { text, cells } = screen.line(y);
-    const command = text.startsWith("  /") ? slashCommand(text.slice(2)) : null;
+    // `  /name` (2.1.286), or `    /name` and the highlighted `  ❯ /name` (2.1.296).
+    const at = text.startsWith("  /") ? 2 : /^ {2}(?:❯ | {2})\//.test(text) ? 4 : -1;
+    const command = at < 0 ? null : slashCommand(text.slice(at));
     if (command) {
-      const name = cells.slice(2, 2 + command.length);
-      items.unshift({ y, command, slashFg: cells[2]!.fg, boldDefault: name.some((c) => c.bold && c.fg === -1) });
+      const name = cells.slice(at, at + command.length);
+      items.unshift({ y, command, slashFg: cells[at]!.fg, boldDefault: name.some((c) => c.bold && c.fg === -1), marked: text[2] === "❯" });
     } else if (!/^ {8,}\S/.test(text)) break; // not a wrapped description either: the menu ended
   }
   return items;
@@ -77,12 +83,13 @@ export const claudeCode: ScreenReader = {
       let end = cells.length;
       if (y === cur.y) {
         // A hint after the cursor ("[name]" after a completed command) is drawn in another colour
-        // than the input itself.
+        // than the input itself; the empty box's placeholder is faint from the cursor on (BUG-719).
         const at = cellIndexAt(cells, cur.x);
         const inputFg = cells[2]?.fg ?? -1;
         let i = at + 1;
         while (i < cells.length && cells[i]!.char === " ") i++;
-        if (i < cells.length && (cells[i]!.dim || (cells[i]!.fg !== -1 && cells[i]!.fg !== inputFg))) end = i;
+        if (cells[at]?.dim) end = at;
+        else if (i < cells.length && (cells[i]!.dim || (cells[i]!.fg !== -1 && cells[i]!.fg !== inputFg))) end = i;
       }
       return textOf(cells, wrapped ? 0 : 2, end);
     }).trim();
@@ -92,6 +99,8 @@ export const claudeCode: ScreenReader = {
     if (!b) return null;
     const items = menu(screen, b.top);
     if (!items.length) return null;
+    const marked = items.filter((it) => it.marked);
+    if (marked.length) return marked.length === 1 ? marked[0]!.command : null;
     if (items.length === 1) return items[0]!.slashFg !== -1 ? items[0]!.command : null;
     // The odd one out by colour.
     const count = new Map<number, number>();

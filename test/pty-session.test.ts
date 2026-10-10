@@ -1307,6 +1307,33 @@ describe.concurrent("issue-40: the screen fallback and the hooks, for every harn
     });
   }
 
+  // Antigravity 1.3.3 under tmux re-sends `ESC[?2004h ESC[>4;2m` every 2 s while idle: it stayed Working for good.
+  test("BUG-721/agy-tmux: output that only sets terminal modes is not work and doesn't restart the quiet; drawn output still is", async () => {
+    let now = 0;
+    const { cols, rows, ansi } = captured("antigravity", "idle");
+    const { s, pty } = session({ harness: "antigravity", now: () => now, tickMs: 10 });
+    s.resize(cols, rows);
+    pty.print(ansi);
+    await settle(30);
+    expect(s.state.state).toBe("working");
+    const keepAlive = "\x1b[?2004h\x1b[>4;2m";
+    for (let t = 0; t < 2; t++) {
+      now += 1500;
+      pty.print(keepAlive);
+      await settle(30);
+    }
+    now += 100;
+    await until(() => s.state.state === "awaiting");
+    // Past the resize's redraw window: mode settings keep it awaiting, anything drawn is work again.
+    now += REDRAW_WAIT_MS;
+    pty.print(keepAlive);
+    await settle(60);
+    expect(s.state.state).toBe("awaiting");
+    pty.print(`${keepAlive}x`);
+    await until(() => s.state.state === "working");
+    s.dispose();
+  });
+
   for (const harness of ["claude-code", "codex", "opencode", "antigravity"] as const) {
     test(`${harness}, no hooks: a quiet screen with no input box on it (it is thinking) stays Working`, async () => {
       let now = 0;

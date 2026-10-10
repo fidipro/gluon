@@ -51,6 +51,11 @@ All notable changes to Gluon are listed here. The format follows
   day. A version whose automatic install failed is not downloaded again for a day.
 - On macOS, `gluon stats sql` keeps its 256 MB memory cap: macOS's SQLite ignores the heap limit Gluon sets, so the query's process
   now watches its own memory there and stops a query that passes it ("the query needs more than 256 MB of memory").
+- Claude Code 2.1.296: Gluon reads its new slash menu, which marks the highlighted item with `❯`, so Enter on a highlighted `/clear`
+  (after typing `/cl`, say) asks first again instead of clearing at once, and the empty input box's `Try "…"` hint isn't read as
+  typed text.
+- Antigravity in a Gluon started inside tmux no longer shows Working for good: there agy re-sends two terminal mode settings every
+  2 seconds while it waits, and Gluon took them for work. Output that only sets terminal modes isn't work now.
 
 ## [1.1.0] - 2026-10-08
 

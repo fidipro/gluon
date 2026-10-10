@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_MODELS } from "../src/harnesses.ts";
 import { brainAsks, brainBusy, brainProposes, checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
+import { loginLine } from "../scripts/live-driver.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
   JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, price, runCapOf, sectionsOf, Spend, usd, type Available,
@@ -419,5 +420,15 @@ describe("--tier=journey: the real brain to an agent's reply, on hard caps", () 
     expect(yaml).toContain("brain:");
     expect(yaml).toContain("route: anthropic-api");
     expect(checkConfig("codex", "openrouter", { region: null })).not.toContain("brain:");
+  });
+});
+
+describe("the sign-in guard", () => {
+  // Antigravity 1.3.3 on a Gemini key: its banner's auth row stopped the check as a sign-in screen.
+  test("BUG-720/agy-banner: Antigravity's banner row naming its Gemini API key is a status; a sign-in menu or a key prompt still stops the run", () => {
+    expect(loginLine(["│     ▀▀▀▀▀▀       Gemini API key                                   │", "│ >                                  │"])).toBeNull();
+    expect(loginLine(["     ▀▀▀▀▀▀       Gemini API key"])).toBeNull();
+    for (const l of ["│ Select login method:                │", "Enter your Gemini API key:", "│ Gemini API key: ______ │", "Paste your API key"])
+      expect(loginLine(["│ Antigravity CLI 1.3.3 │", l])).toBe(l.trim());
   });
 });
