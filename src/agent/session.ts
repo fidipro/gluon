@@ -39,6 +39,8 @@ export interface LoopHooks {
   tool(name: string, input: Record<string, unknown>): Promise<ToolOutput>;
   /** The brain's process stopped after a conversation and was started again: it remembers nothing. */
   restarted?(): void;
+  /** Something the developer should know about this turn (e.g. Gluon interrupted a tool that isn't its own); the turn goes on. */
+  notice?(text: string): void;
 }
 
 /** A brain that runs the tool loop itself (the Claude Agent SDK), calling back into the session. */
@@ -553,6 +555,10 @@ export class Session {
       restarted: () => {
         this.instructionDirs.clear();
         this.notice("The intake agent restarted; it doesn't remember this conversation — repeat what matters.", "info");
+      },
+      notice: (text) => {
+        this.flushLive();
+        this.notice(text, "info");
       },
       tool: async (name, input) => {
         if (signal.aborted) return { content: "Stopped.", error: true };

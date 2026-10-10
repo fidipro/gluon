@@ -22,9 +22,11 @@
  * names it, so a newer codex's new feature is off without anyone looking at it first. A feature that
  * stays on anyway (codex forces it), or a catalog field Gluon doesn't know (CATALOG_FIELDS: passed
  * through, it may be one codex needs), is a warning (`gluon doctor`). During a turn, an item of a
- * type outside BRAIN_ITEMS (a tool of Codex's own that got through and was used) stops the
- * app-server: that turn fails, the next starts afresh. `scripts/codex-drift.ts` checks each codex
- * release the way the model sees it, the tools in the request it sends, and opens an issue.
+ * type outside BRAIN_ITEMS (a tool of Codex's own that got through and was used, or something new)
+ * is interrupted, and the model is told in a next turn of the same thread to use Gluon's tools; the
+ * answer goes on (≤ MAX_INTERRUPTS per message, then it finishes as it is). Approvals are always
+ * declined (DENIALS). `scripts/codex-drift.ts` checks each codex release the way the model sees it,
+ * the tools in the request it sends, and opens an issue.
  *
  * `dynamicTools` is an experimental app-server API: a Codex update may break it. The probe catches
  * that, and the brain order falls through to the next step. A ChatGPT account may also refuse
@@ -557,7 +559,7 @@ export const BRAIN_ITEMS = new Set(["userMessage", "agentMessage", "reasoning", 
 
 /**
  * The other item types of codex 0.162: a tool of Codex's own, or work Gluon never asks for. A type
- * in neither set is new: `scripts/codex-drift.ts` reports it, and the brain refuses it like these.
+ * in neither set is new: `scripts/codex-drift.ts` reports it, and the brain interrupts it like these.
  */
 export const FOREIGN_ITEMS = new Set([
   "commandExecution",
@@ -577,16 +579,33 @@ export const FOREIGN_ITEMS = new Set([
 
 const GLUON_TOOLS = new Set(TOOLS.map((t) => t.name));
 
+/** An item the brain must not have: a tool of Codex's own (FOREIGN_ITEMS, a dynamic tool not Gluon's) or a type Gluon has never seen. */
+export type Foreign = { kind: "tool" | "unknown"; name: string };
+
 /**
- * The refusal for an `item/started` or `item/completed` whose item the brain must never have: a
- * type outside BRAIN_ITEMS, or a dynamic tool that isn't one of Gluon's. Null for anything else.
+ * What an `item/started` or `item/completed` holds that the brain must not have: a type outside
+ * BRAIN_ITEMS, or a dynamic tool that isn't one of Gluon's. Null for anything else.
  */
-export function foreignItem(method: string, p: any): string | null {
+export function foreignItem(method: string, p: any): Foreign | null {
   if (method !== "item/started" && method !== "item/completed") return null;
   const item = p?.item;
   const type = typeof item?.type === "string" ? item.type : "an item without a type";
-  const what = !BRAIN_ITEMS.has(type) ? type : type === "dynamicToolCall" && !GLUON_TOOLS.has(String(item.tool)) ? `the tool ${JSON.stringify(String(item.tool))}` : null;
-  return what && `${UNSUPPORTED}: Codex gave the intake agent a tool of its own (${what}), so Gluon stopped it. Update Gluon, or use another step of brain.order`;
+  if (type === "dynamicToolCall") return GLUON_TOOLS.has(String(item.tool)) ? null : { kind: "tool", name: String(item.tool) };
+  if (BRAIN_ITEMS.has(type)) return null;
+  return { kind: FOREIGN_ITEMS.has(type) ? "tool" : "unknown", name: type };
+}
+
+/** How often Gluon interrupts one developer message for a foreign item before it lets the answer finish (a loop guard). */
+export const MAX_INTERRUPTS = 3;
+
+/** What the model is told after Gluon interrupted it: Gluon's own words, as the next turn's input. */
+export function foreignNote(name: string): string {
+  return `Gluon interrupted your last step: \`${name}\` isn't available in this session. Use only these tools: ${TOOLS.map((t) => t.name).join(", ")}. Continue the task.`;
+}
+
+/** The reminder in front of each developer message once something wasn't available. */
+export function notAvailableReminder(names: Iterable<string>): string {
+  return `(Gluon: not available in this session: ${[...names].map((n) => `\`${n}\``).join(", ")}. Use only Gluon's tools.)`;
 }
 
 /** Approval requests get a denial (the brain never runs commands or edits files); anything else an error. */
@@ -610,6 +629,13 @@ type Turn = {
   texts: Map<string, Anthropic.TextBlock>;
   inflight: number;
   error: string | null;
+  /** Gluon interrupted Codex for a foreign item: what to tell the model in the next turn. */
+  note: string | null;
+  /** Gluon's interrupts in this developer message (≤ MAX_INTERRUPTS); `letRun`: past it, the answer finishes. */
+  interrupts: number;
+  letRun: boolean;
+  /** The turn a `turn/interrupt` was sent for: one per turn (the event and the turn's id race to ask). */
+  interruptedTurn: string | null;
 };
 
 /**
@@ -625,6 +651,8 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
   let turn: Turn | null = null;
   /** The app-server stopped after its thread started: the next one starts without it (the developer is told). */
   let lost = false;
+  /** What Codex offered that isn't Gluon's, this session: each developer message is reminded. */
+  const notAvailable = new Set<string>();
 
   const openCall = (t: Turn) => {
     t.call = { content: [], ended: false };
@@ -648,28 +676,57 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
     return block;
   };
 
-  /**
-   * Codex gave the brain a tool of its own: the app-server stops at once (with what it runs), the
-   * turn fails with why, and the next message starts a new one (the developer is told it forgot).
-   */
-  const stop = (reason: string) => {
+  /** Asks Codex to end the turn (its Esc); the app-server and the thread stay. */
+  const interruptTurn = (t: Turn) => {
     const session = live;
-    live = null;
-    lost ||= !!session?.started;
-    session?.server?.close();
-    turn?.reject(new Error(reason));
+    if (!session || !t.id || t.interruptedTurn === t.id) return;
+    const turnId = (t.interruptedTurn = t.id);
+    void session.ready.then((threadId) => session.server!.request("turn/interrupt", { threadId, turnId })).catch(() => {});
+  };
+
+  /**
+   * Codex gave the brain something of its own (a tool, or an item Gluon has never seen): Gluon
+   * interrupts the turn, says so, and tells the model in a next turn of the same thread, never
+   * stopping. Past MAX_INTERRUPTS in one developer message, the answer finishes as it is (a loop
+   * guard: an item codex sends by itself would otherwise interrupt every turn).
+   */
+  const onForeign = (f: Foreign) => {
+    notAvailable.add(f.name);
+    const t = turn;
+    if (!t || t.letRun || t.note || t.interrupted) return;
+    const what = f.kind === "tool" ? `a tool of its own (\`${f.name}\`)` : `something Gluon doesn't know (\`${f.name}\`)`;
+    if (t.interrupts >= MAX_INTERRUPTS) {
+      t.letRun = true;
+      t.hooks.notice?.(`Codex kept using ${what}; Gluon let this answer finish. A Gluon update will cover it.`);
+      return;
+    }
+    t.interrupts++;
+    t.note = foreignNote(f.name);
+    t.hooks.notice?.(`Codex gave the intake agent ${what}; Gluon interrupted it and told it to use Gluon's tools.`);
+    interruptTurn(t);
+  };
+
+  /** Starts a turn on the thread (the developer's message, or Gluon's note after an interrupt). */
+  const startTurn = (t: Turn, session: NonNullable<typeof live>, text: string) => {
+    session.ready
+      .then((threadId) => session.server!.request("turn/start", { threadId, input: [{ type: "text", text, text_elements: [] }], ...(session.effort ? { effort: session.effort } : {}) }))
+      .then((res) => {
+        t.id ??= res?.turn?.id ?? null;
+        if (t.interrupted || t.note) interruptTurn(t);
+      })
+      .catch((e: Error) => t.reject(e));
   };
 
   const onNotification = (method: string, p: any) => {
     const foreign = foreignItem(method, p);
-    if (foreign) return stop(foreign);
+    if (foreign) return onForeign(foreign);
     const t = turn;
     if (!t) return;
     if (p?.turnId && t.id && p.turnId !== t.id) return;
     switch (method) {
       case "turn/started":
         t.id ??= p.turn?.id ?? null;
-        if (t.interrupted) interrupt(t);
+        if (t.interrupted || t.note) interruptTurn(t);
         break;
       case "item/started":
         if (p.item?.type === "agentMessage") textBlock(t, p.item.id);
@@ -698,6 +755,14 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
         if (t.id && p.turn?.id && p.turn.id !== t.id) return;
         endCall(t);
         const status = p.turn?.status;
+        const note = t.note;
+        t.note = null;
+        // Gluon's own interrupt (not the developer's Esc): the same message goes on in a next turn, told why.
+        if (note && status === "interrupted" && !t.interrupted && live) {
+          t.id = null;
+          t.error = null;
+          return startTurn(t, live, note);
+        }
         if (status === "completed") t.resolve();
         else if (status === "interrupted") t.reject(new Error("Interrupted"));
         else t.reject(new Error(turnError(p.turn?.error, opts.model) ?? t.error ?? "the brain's turn failed"));
@@ -766,12 +831,10 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
     return session;
   };
 
+  /** The developer's Esc: the turn ends as "Interrupted", with no note. */
   const interrupt = (t: Turn) => {
     t.interrupted = true;
-    const session = live;
-    if (!session || !t.id) return;
-    const turnId = t.id;
-    void session.ready.then((threadId) => session.server!.request("turn/interrupt", { threadId, turnId })).catch(() => {});
+    interruptTurn(t);
   };
 
   return {
@@ -791,6 +854,10 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
           texts: new Map(),
           inflight: 0,
           error: null,
+          note: null,
+          interrupts: 0,
+          letRun: false,
+          interruptedTurn: null,
         };
         turn = t;
         const restarted = !live && lost;
@@ -805,13 +872,7 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
           hooks.restarted?.();
         }
         signal.addEventListener("abort", () => interrupt(t), { once: true });
-        session.ready
-          .then((threadId) => session.server!.request("turn/start", { threadId, input: [{ type: "text", text, text_elements: [] }], ...(session.effort ? { effort: session.effort } : {}) }))
-          .then((res) => {
-            t.id ??= res?.turn?.id ?? null;
-            if (t.interrupted) interrupt(t);
-          })
-          .catch((e: Error) => t.reject(e));
+        startTurn(t, session, notAvailable.size ? `${notAvailableReminder(notAvailable)}\n\n${text}` : text);
       });
     },
     close() {
@@ -954,10 +1015,12 @@ export async function probeChatgptPlan(
       const done = new Promise<void>((resolve, reject) => {
         let error: string | null = null;
         server.onNotification = (method, p) => {
+          // The brain interrupts such an item and tells the model; the check notes it and lets its one turn finish.
           const foreign = foreignItem(method, p);
           if (foreign) {
-            server.close();
-            return reject(new Error(foreign));
+            const note = `Codex gave the intake agent ${foreign.kind === "tool" ? "a tool of its own" : "something Gluon doesn't know"} (${foreign.name}) during the check. It runs anyway: Gluon interrupts it and tells the model to use Gluon's tools; a Gluon update will cover it.`;
+            if (!warnings.includes(note)) warnings.push(note);
+            return;
           }
           if (method === "error" && !p?.willRetry) error = turnError(p?.error, model);
           if (method !== "turn/completed") return;

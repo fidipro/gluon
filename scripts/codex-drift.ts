@@ -5,7 +5,7 @@
  * brain runs as it does for a user (`chatgptPlanBrain`: the same features turned off, catalog, thread)
  * and sends one message to a model provider on 127.0.0.1, which records each request and answers with
  * a short reply; every tool in a request must be one of Gluon's. Also: a catalog Gluon can't read, a
- * thread-item type outside BRAIN_ITEMS and FOREIGN_ITEMS (a turn that has one is stopped). What the
+ * thread-item type outside BRAIN_ITEMS and FOREIGN_ITEMS (a turn that has one is interrupted). What the
  * brain runs with anyway is noted, not drift: new features (turned off unchecked), features codex
  * keeps on and catalog fields Gluon hasn't checked (the tool check says whether they give tools).
  * codex-watch.yml runs it on every new codex release. Prints a Markdown report; exits 0 (nothing to
@@ -140,7 +140,7 @@ export function report(d: Drift): string {
     lines.push(`- **The model request (${models.map(code).join(", ")})**: ${what}. Find the feature or setting that gives a tool (\`CODEX_FEATURES_OFF\`, the thread's config, \`CATALOG_TOOLS_OFF\`); a failure may be a feature codex needs that Gluon turned off (below). Until then the intake agent may be offered it.`);
   }
   if (d.catalog) lines.push(`- **Model catalog**: ${d.catalog.replace(/[`@<>\[\]\n]/g, "?")}. Until Gluon reads it again the intake agent can't start on this codex.`);
-  if (d.items.length) lines.push(`- **New thread-item types**: ${d.items.map(code).join(", ")}. Each goes in \`BRAIN_ITEMS\` or \`FOREIGN_ITEMS\`; until then a turn that has one is stopped.`);
+  if (d.items.length) lines.push(`- **New thread-item types**: ${d.items.map(code).join(", ")}. Each goes in \`BRAIN_ITEMS\` or \`FOREIGN_ITEMS\`; until then a turn that has one is interrupted and the model told.`);
   if (d.newOff.length) lines.push(`- New features, turned off unchecked (nothing to do unless the intake agent needs one): ${d.newOff.map(code).join(", ")}.`);
   if (d.features.length) lines.push(`- Features codex keeps on when Gluon turns them off (the brain runs with them, and \`gluon doctor\` warns; the tool check above says whether they give tools): ${d.features.map(code).join(", ")}. Each goes in \`CODEX_FEATURES_KEPT\` with why it gives the model no tool.`);
   if (d.catalogFields.length) lines.push(`- Catalog fields Gluon hasn't checked, passed to codex as they are (\`gluon doctor\` warns; the tool check above says whether they give tools): ${d.catalogFields.map(code).join(", ")}. Each goes in \`CATALOG_FIELDS\`, or in \`CATALOG_TOOLS_OFF\` if it adds tools.`);

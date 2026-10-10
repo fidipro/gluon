@@ -56,8 +56,8 @@ The brain: conversation, LLM clients, read-only repo tools.
   through.
 - **Codex tools come from features, the model catalog and the thread** (codex 0.162). The brain always runs (the owner's
   rule: unchecked drift is warned and fixed by a release, never refused; BUG-79): features outside `CODEX_FEATURES_KEPT` off,
-  `CODEX_FEATURES_OFF` always; one still on, or a field outside `CATALOG_FIELDS`, is a probe warning. Only `BRAIN_ITEMS` in a
-  turn (BUG-709). `scripts/codex-drift.ts` checks the model request's tools. `--disable` only names codex lists (BUG-708).
+  `CODEX_FEATURES_OFF` always; one still on, or a field outside `CATALOG_FIELDS`, is a probe warning. An item outside `BRAIN_ITEMS`
+  is interrupted and the model told, never a stop (`MAX_INTERRUPTS`; BUG-709). `scripts/codex-drift.ts` checks the request's tools.
 
 ## Keeping this file fresh
 
