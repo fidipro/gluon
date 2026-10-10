@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, foreignItem, knownFeatures, parseLoginStatus, probeChatgptPlan, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
+import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, featuresToDisable, foreignItem, parseLoginStatus, probeChatgptPlan, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
 import * as codexModule from "../src/agent/codex.ts";
 import { ownPercent, ownWindow } from "../src/cost/context.ts";
 import { FIXTURE_CODEX_WINDOWS as CODEX_WINDOWS } from "./fixtures/fixture-tables.ts";
@@ -317,20 +317,26 @@ describe("hard rules", () => {
   });
 });
 
-describe("the brain's tools: Gluon's five, nothing of Codex's", () => {
+describe("the brain's tools: Gluon's own, nothing of Codex's", () => {
   /** Features left on, and why: none of them gives the model a tool or runs a command. */
   const KEPT = CODEX_FEATURES_KEPT;
 
-  test("CODEX_FEATURES_OFF covers every feature of `codex features list` that isn't kept on purpose", () => {
-    const rows = readFileSync(join(import.meta.dir, "fixtures", "codex-features-list.txt"), "utf8").trim().split("\n").map((l) => l.trim().split(/\s{2,}/));
+  test("every feature of `codex features list` that isn't kept on purpose is turned off, and the ones that give tools always", () => {
+    const list = readFileSync(join(import.meta.dir, "fixtures", "codex-features-list.txt"), "utf8");
+    const rows = list.trim().split("\n").map((l) => l.trim().split(/\s{2,}/));
+    const off = featuresToDisable(list);
     const live = rows.filter(([, stage]) => stage !== "removed" && stage !== "deprecated").map(([name]) => name!);
     expect(live.length).toBeGreaterThan(50);
-    // A feature that is neither off nor kept is one Gluon hasn't looked at: decide, then list it.
-    expect(live.filter((f) => !CODEX_FEATURES_OFF.includes(f) && !(f in KEPT))).toEqual([]);
+    // A feature that is neither kept nor looked at is turned off unchecked.
+    expect(live.filter((f) => !off.includes(f) && !(f in KEPT))).toEqual([]);
     for (const f of ["shell_tool", "unified_exec", "shell_snapshot", "apps", "plugins", "remote_plugin", "browser_use", "in_app_browser", "computer_use", "view_image", "multi_agent", "multi_agent_v2", "code_mode", "code_mode_only", "current_time_reminder", "worktrees", "workspace_dependencies", "write_stdin_approval", "skill_mcp_dependency_install"]) {
       expect(CODEX_FEATURES_OFF).toContain(f);
+      expect(off).toContain(f);
     }
     expect(CODEX_FEATURES_OFF).not.toContain("code_mode_host");
+    expect(off).not.toContain("code_mode_host");
+    // Kept and always off: only what codex forces on today.
+    expect(CODEX_FEATURES_OFF.filter((f) => f in KEPT)).toEqual(["unified_exec"]);
     // Every name is one this codex knows (an older codex gets only the names it lists: BUG-708).
     const known = new Set(rows.map(([name]) => name));
     expect(CODEX_FEATURES_OFF.filter((f) => !known.has(f))).toEqual([]);
@@ -362,11 +368,11 @@ describe("the brain's tools: Gluon's five, nothing of Codex's", () => {
 });
 
 describe("review of PR #1", () => {
-  test("BUG-79/4: a codex with a feature or catalog field Gluon hasn't checked is refused, and the order falls through", async () => {
+  test("BUG-79/4: a codex that keeps on a feature Gluon hasn't checked, or sets a catalog field it hasn't, is refused, and the order falls through", async () => {
     // As checked: the fixture's features after the disables, and the fake catalog, pass.
     expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }).spawn })).toEqual({ ok: true });
-    // A new feature, on by default.
-    const feature = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools                       stable             true" });
+    // A new feature, on by default, that codex keeps on when Gluon turns it off.
+    const feature = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools                       stable             true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
     const refused = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: feature.spawn });
     expect(refused).toEqual({ ok: false, error: expect.stringContaining("this codex version isn't supported for the intake agent on the ChatGPT plan yet") });
     expect(!refused.ok && refused.error).toContain("hosted_agent_tools");
@@ -379,7 +385,7 @@ describe("review of PR #1", () => {
     const empty = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: [], new_label: null }) });
     expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: empty.spawn })).toEqual({ ok: true });
     // The session's brain says so too, instead of starting.
-    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true" }).spawn);
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" }).spawn);
     await s.submit("hello");
     expect(state().items.at(-1)).toMatchObject({ kind: "notice", tone: "error", text: expect.stringContaining("hosted_agent_tools") });
     s.close();
@@ -388,6 +394,32 @@ describe("review of PR #1", () => {
     expect(uncheckedFeatures(rows(""))).toEqual([]);
     expect(uncheckedFeatures(rows("new_one  experimental  true\nother  stable  false"))).toEqual(["new_one"]);
     expect(() => uncheckedFeatures("Usage: codex features")).toThrow(/isn't in the shape/);
+  });
+
+  test("BUG-79/new-feature: a feature on by default that Gluon hasn't checked is turned off unchecked, for the app-server and the thread, and the brain works", async () => {
+    const extra = { FAKE_CODEX_FEATURES_EXTRA: "next_new_mode  stable  true" };
+    const f = fake({ turns: [[{ text: "ok" }]] }, extra);
+    expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: f.spawn })).toEqual({ ok: true });
+    const server = f.spawned.find((x) => x.argv[1] === "app-server")!;
+    expect(server.argv[server.argv.indexOf("next_new_mode") - 1]).toBe("--disable");
+    expect(f.received().find((m) => m.method === "thread/start")!.params.config["features.next_new_mode"]).toBe(false);
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, extra).spawn);
+    await s.submit("hello");
+    expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
+    s.close();
+  });
+
+  test("BUG-79/start-hint: a codex that fails to start after Gluon turned off features it hasn't checked is told which (codex may need one); one that starts isn't", async () => {
+    const env = { FAKE_CODEX_FEATURES_EXTRA: "next_new_mode  stable  true" };
+    const crash = fake({ turns: [] }, env);
+    // `features list` and `debug models` from the fake; the app-server exits at once, as a codex missing a feature might.
+    const spawn: SpawnCodex = (argv, e) => (argv[1] === "app-server" ? Bun.spawn(["bun", "-e", "console.error('Error: thread needs a feature'); process.exit(1)"], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: e }) : crash.spawn(argv, e));
+    const out = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn });
+    expect(out).toEqual({ ok: false, error: expect.stringContaining("Gluon turned off features of this codex it hasn't checked: ") });
+    expect(!out.ok && out.error).toContain("next_new_mode");
+    // A failure once the thread runs (the plan's own refusal) isn't about features.
+    const later = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ fail: { message: "usage limit", codexErrorInfo: "usageLimitExceeded" } }]] }, env).spawn });
+    expect(later).toEqual({ ok: false, error: expect.not.stringContaining("hasn't checked") });
   });
 
   test("BUG-80/5: `codex login status` that never answers times out like the other status checks", async () => {
@@ -464,8 +496,8 @@ async function refusalNotice(extraEnv: Record<string, string>): Promise<string> 
 }
 
 test("QA: a codex with an unchecked feature or catalog field is refused in the chat in words a user can act on: what was found, why it matters, what to do; and no app-server is started", async () => {
-  const feature = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true" });
-  expect(feature).toContain("this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.161)");
+  const feature = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
+  expect(feature).toContain("this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.162)");
   expect(feature).toContain("hosted_agent_tools");
   expect(feature).toContain("which may give the intake agent tools of Codex's own");
   expect(feature).toContain("Update Gluon, or use another step of brain.order");
@@ -477,7 +509,7 @@ test("QA: a codex with an unchecked feature or catalog field is refused in the c
 });
 
 test("BUG-628/QA-brain-13: the refusal of a codex Gluon hasn't checked isn't followed by 'Send your message again to retry' (a retry can only be refused again; the message itself says to update Gluon or use another step)", async () => {
-  const text = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true" });
+  const text = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
   expect(text).not.toMatch(/send your message again/i);
 });
 
@@ -544,10 +576,10 @@ describe("BUG-708: a codex that doesn't know every feature Gluon turns off", () 
     expect(out).toEqual({ ok: false, error: expect.stringContaining("`codex features list` failed (exit code 2): Error: something codex said") });
   });
 
-  test("BUG-708/known: knownFeatures keeps CODEX_FEATURES_OFF's order and drops what the list lacks", () => {
-    const list = ["shell_tool  stable  true", "apps  stable  true", ...Array.from({ length: 10 }, (_, i) => `f${i}  stable  false`)].join("\n");
-    expect(knownFeatures(list)).toEqual(["shell_tool", "apps"]);
-    expect(() => knownFeatures("Usage: codex features")).toThrow(/isn't in the shape/);
+  test("BUG-708/known: featuresToDisable names only what the list has: all but the kept and the removed, and the always-off even when kept", () => {
+    const list = ["shell_tool  stable  true", "apps  stable  true", "unified_exec  stable  true", "code_mode_host  stable  true", "gone_one  removed  true", ...Array.from({ length: 10 }, (_, i) => `f${i}  stable  false`)].join("\n");
+    expect(featuresToDisable(list)).toEqual(["shell_tool", "apps", "unified_exec", ...Array.from({ length: 10 }, (_, i) => `f${i}`)]);
+    expect(() => featuresToDisable("Usage: codex features")).toThrow(/isn't in the shape/);
   });
 });
 

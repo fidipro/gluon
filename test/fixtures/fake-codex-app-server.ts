@@ -5,6 +5,9 @@
  *
  * $FAKE_CODEX_SCRIPT (JSON): { turns: Step[][], mcpServers?: string[], account?: object | null }
  * `debug models` prints a small model catalog (with the tool fields the brain must clear) instead.
+ * Given a model provider's `base_url` (`-c model_providers.<id>={…base_url="…"…}`, as
+ * scripts/codex-drift.ts passes), each turn/start first POSTs the model request there: the thread's
+ * dynamic tools, in the shape codex sends them, and FAKE_CODEX_EXTRA_TOOLS (names) as tools of its own.
  */
 import { appendFileSync } from "node:fs";
 // Imported, not read from disk: the fake also runs inside the compiled fake agent (Windows).
@@ -18,12 +21,11 @@ if (process.argv[2] === "debug" && process.argv[3] === "models") {
   process.exit(0);
 }
 
-// codex 0.161's features (the fixture), less FAKE_CODEX_FEATURES_DROP's names (an older codex). Like
-// codex, `features list` and `app-server` refuse a `--disable` of a name the list doesn't have.
+// The fixture's features, less FAKE_CODEX_FEATURES_DROP's names (an older codex), plus
+// FAKE_CODEX_FEATURES_EXTRA's rows (a newer one). Like codex, `features list` and `app-server` refuse a
+// `--disable` of a name the list doesn't have.
 const drop = new Set((process.env.FAKE_CODEX_FEATURES_DROP ?? "").split(",").filter(Boolean));
-const rows = FEATURES.trim()
-  .split(/\r?\n/)
-  .filter((row) => !drop.has(row.trim().split(/\s{2,}/)[0]!));
+const rows = [...FEATURES.trim().split(/\r?\n/), ...(process.env.FAKE_CODEX_FEATURES_EXTRA ?? "").split("\n").filter((row) => row.trim())].filter((row) => !drop.has(row.trim().split(/\s{2,}/)[0]!));
 const known = new Set(rows.map((row) => row.trim().split(/\s{2,}/)[0]!));
 const off = new Set(process.argv.flatMap((a, i) => (process.argv[i - 1] === "--disable" ? [a] : [])));
 const unknown = [...off].find((f) => !known.has(f));
@@ -32,16 +34,19 @@ if (unknown) {
   process.exit(1);
 }
 
-// `features list [--disable f]…`: the list with the disables applied (unified_exec stays on, as
-// codex forces it), and FAKE_CODEX_FEATURES_EXTRA rows a newer codex might add.
+// `features list [--disable f]…`: the list with the disables applied, but for FAKE_CODEX_FORCED_ON's
+// names (default unified_exec, which codex forces on).
+const forced = new Set((process.env.FAKE_CODEX_FORCED_ON ?? "unified_exec").split(","));
 if (process.argv[2] === "features" && process.argv[3] === "list") {
   for (const row of rows) {
     const [name, stage, on] = row.trim().split(/\s{2,}/);
-    console.log(`${name!.padEnd(40)} ${stage!.padEnd(18)} ${off.has(name!) && name !== "unified_exec" ? "false" : on}`);
+    console.log(`${name!.padEnd(40)} ${stage!.padEnd(18)} ${off.has(name!) && !forced.has(name!) ? "false" : on}`);
   }
-  if (process.env.FAKE_CODEX_FEATURES_EXTRA) console.log(process.env.FAKE_CODEX_FEATURES_EXTRA);
   process.exit(0);
 }
+
+const baseUrl = process.argv.map((a) => /^model_providers\.[\w-]+=.*\bbase_url\s*=\s*"([^"]+)"/.exec(a)?.[1]).find(Boolean);
+let dynamicTools: { name: string; description?: string }[] = [];
 
 type Step = {
   text?: string;
@@ -119,6 +124,18 @@ async function playTurn(turnId: string, steps: Step[]) {
   notify("turn/completed", { threadId: THREAD, turn: { id: turnId, items: [], status: "completed", error: null } });
 }
 
+/** With a provider's base URL: the model request codex would send, to it (tools inside `input`, as gpt-6-astra gets them). */
+async function modelRequest() {
+  if (!baseUrl) return;
+  const own = (process.env.FAKE_CODEX_EXTRA_TOOLS ?? "").split(",").filter(Boolean);
+  const body = {
+    model: "fake",
+    input: [{ type: "additional_tools", role: "developer", tools: [{ type: "namespace", name: "functions", tools: dynamicTools.map((t) => ({ type: "function", name: t.name, description: t.description ?? "" })) }] }],
+    tools: own.map((name) => ({ type: "function", name })),
+  };
+  await fetch(`${baseUrl}/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+}
+
 function handle(m: { id?: number; method?: string; params?: any; result?: unknown; error?: unknown }) {
   if (log) appendFileSync(log, JSON.stringify(m) + "\n");
   if (m.method === undefined) {
@@ -141,6 +158,7 @@ function handle(m: { id?: number; method?: string; params?: any; result?: unknow
     case "thread/start": {
       if (m.params?.dynamicTools && !experimental) return fail("thread/start.dynamicTools requires experimentalApi capability");
       const config = m.params?.config ?? {};
+      dynamicTools = m.params?.dynamicTools ?? [];
       disabled = new Set((script.mcpServers ?? []).filter((name) => config[`mcp_servers.${name}.enabled`] === false));
       const thread = { id: THREAD, ephemeral: true, turns: [] };
       reply({ thread, model: m.params?.model, modelProvider: "openai", instructionSources: [], approvalPolicy: "never", sandbox: { type: "readOnly" } });
@@ -152,7 +170,8 @@ function handle(m: { id?: number; method?: string; params?: any; result?: unknow
       const turnId = `turn_${++turnCount}`;
       reply({ turn: { id: turnId, items: [], status: "inProgress" } });
       notify("turn/started", { threadId: THREAD, turn: { id: turnId, items: [], status: "inProgress" } });
-      void playTurn(turnId, script.turns.shift() ?? []);
+      const steps = script.turns.shift() ?? [];
+      void modelRequest().then(() => playTurn(turnId, steps));
       return;
     }
     case "turn/interrupt":

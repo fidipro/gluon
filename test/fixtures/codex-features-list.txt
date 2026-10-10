@@ -3,7 +3,7 @@ analytics_plan_history                   experimental       false
 api_key_cyber_access_programs            stable             false
 api_key_model_discovery                  stable             true
 apply_patch_freeform                     removed            false
-apply_patch_preserve_line_endings        under development  false
+apply_patch_preserve_line_endings        removed            false
 apply_patch_streaming_events             under development  false
 apps                                     stable             true
 apps_mcp_path_override                   removed            false
@@ -22,7 +22,9 @@ code_mode_buffered_exec                  removed            false
 code_mode_host                           stable             true
 code_mode_interrupt                      under development  false
 code_mode_only                           under development  false
+code_mode_only_strict_3p_tools           under development  false
 code_mode_prewarm                        under development  false
+code_mode_tool_search                    under development  false
 codex_apps_mcp_2026_07_28                under development  false
 codex_git_commit                         removed            false
 collaboration_modes                      removed            true
@@ -59,6 +61,7 @@ guardian_reuse_parent_compaction         stable             true
 guardian_root_handoff_context            under development  false
 guardianv2                               under development  false
 guardianv2.thread_context                removed            false
+guardianv2_decisions_comparison          under development  false
 hooks                                    stable             true
 image_detail_original                    removed            false
 image_generation                         stable             true
@@ -69,7 +72,8 @@ in_app_dictation                         stable             true
 in_app_local_automation                  stable             true
 in_app_updates                           stable             true
 in_app_voice                             stable             true
-instant_interrupt                        under development  false
+incremental_tools                        under development  false
+instant_interrupt                        under development  true
 item_ids                                 removed            true
 js_repl                                  removed            false
 js_repl_tools_only                       removed            false
@@ -84,6 +88,7 @@ model_catalog_in_context                 under development  false
 multi_agent                              stable             true
 multi_agent_mode                         removed            false
 multi_agent_v2                           stable             false
+multi_agent_v2_dynamic_tools             under development  false
 network_proxy                            experimental       false
 non_prefixed_mcp_tool_names              under development  false
 nonfatal_clock_read_errors               under development  false
@@ -126,6 +131,7 @@ skill_search                             stable             true
 skip_host_skill_discovery                under development  false
 sleep_tool                               stable             true
 sqlite                                   removed            true
+stable_environment_tools                 under development  false
 standalone_web_search                    under development  false
 steer                                    removed            true
 step_model_switching                     under development  false
@@ -139,6 +145,7 @@ tool_search_always_defer_mcp_tools       removed            true
 tool_suggest                             stable             true
 transcript_v2                            deprecated         false
 tui_app_server                           removed            true
+ultrafast_mode                           stable             true
 unavailable_dummy_tools                  removed            false
 unbounded_connection_retries             stable             true
 undo                                     removed            false

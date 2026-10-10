@@ -14,6 +14,9 @@ All notable changes to Gluon are listed here. The format follows
   they don't ask before every command or edit.
 
 ### Changed
+- The intake agent on the ChatGPT plan keeps working when a codex update adds a feature: Gluon turns off every Codex
+  feature it hasn't checked, instead of refusing that codex (codex 0.162 was refused for `ultrafast_mode`). It still
+  refuses a codex that keeps such a feature on; if codex fails to start, the error names the features Gluon turned off.
 - Claude Code's Haiku 5.5 runs at `high` effort by default (was `medium`), like GPT-6 Luna in the same slot.
 - The routing reason names the effort it means: the model's default and what the session gets, e.g. `effort +0 from
   haiku's default (high) → claude-code/haiku@high`; when routing rounds up to a stronger level, it says the steps it
