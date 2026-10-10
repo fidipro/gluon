@@ -6,6 +6,8 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
 ### Added
 - `ctrl+p` in the agent choice sets who approves a build session's commands and edits, for an agent that asks before every
   one: its own behaviour (the default, unchanged), or one of its own levels: accept edits and auto (Claude Code), accept
