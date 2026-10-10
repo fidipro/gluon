@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, foreignItem, knownFeatures, parseLoginStatus, probeChatgptPlan, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
+import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, featuresToDisable, foreignItem, foreignNote, MAX_INTERRUPTS, notAvailableReminder, parseLoginStatus, shown, probeChatgptPlan, uncheckedCatalogFields, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
 import * as codexModule from "../src/agent/codex.ts";
 import { ownPercent, ownWindow } from "../src/cost/context.ts";
 import { FIXTURE_CODEX_WINDOWS as CODEX_WINDOWS } from "./fixtures/fixture-tables.ts";
@@ -317,20 +317,26 @@ describe("hard rules", () => {
   });
 });
 
-describe("the brain's tools: Gluon's five, nothing of Codex's", () => {
+describe("the brain's tools: Gluon's own, nothing of Codex's", () => {
   /** Features left on, and why: none of them gives the model a tool or runs a command. */
   const KEPT = CODEX_FEATURES_KEPT;
 
-  test("CODEX_FEATURES_OFF covers every feature of `codex features list` that isn't kept on purpose", () => {
-    const rows = readFileSync(join(import.meta.dir, "fixtures", "codex-features-list.txt"), "utf8").trim().split("\n").map((l) => l.trim().split(/\s{2,}/));
+  test("every feature of `codex features list` that isn't kept on purpose is turned off, and the ones that give tools always", () => {
+    const list = readFileSync(join(import.meta.dir, "fixtures", "codex-features-list.txt"), "utf8");
+    const rows = list.trim().split("\n").map((l) => l.trim().split(/\s{2,}/));
+    const off = featuresToDisable(list);
     const live = rows.filter(([, stage]) => stage !== "removed" && stage !== "deprecated").map(([name]) => name!);
     expect(live.length).toBeGreaterThan(50);
-    // A feature that is neither off nor kept is one Gluon hasn't looked at: decide, then list it.
-    expect(live.filter((f) => !CODEX_FEATURES_OFF.includes(f) && !(f in KEPT))).toEqual([]);
+    // A feature that is neither kept nor looked at is turned off unchecked.
+    expect(live.filter((f) => !off.includes(f) && !(f in KEPT))).toEqual([]);
     for (const f of ["shell_tool", "unified_exec", "shell_snapshot", "apps", "plugins", "remote_plugin", "browser_use", "in_app_browser", "computer_use", "view_image", "multi_agent", "multi_agent_v2", "code_mode", "code_mode_only", "current_time_reminder", "worktrees", "workspace_dependencies", "write_stdin_approval", "skill_mcp_dependency_install"]) {
       expect(CODEX_FEATURES_OFF).toContain(f);
+      expect(off).toContain(f);
     }
     expect(CODEX_FEATURES_OFF).not.toContain("code_mode_host");
+    expect(off).not.toContain("code_mode_host");
+    // Kept and always off: only what codex forces on today.
+    expect(CODEX_FEATURES_OFF.filter((f) => f in KEPT)).toEqual(["unified_exec"]);
     // Every name is one this codex knows (an older codex gets only the names it lists: BUG-708).
     const known = new Set(rows.map(([name]) => name));
     expect(CODEX_FEATURES_OFF.filter((f) => !known.has(f))).toEqual([]);
@@ -362,32 +368,85 @@ describe("the brain's tools: Gluon's five, nothing of Codex's", () => {
 });
 
 describe("review of PR #1", () => {
-  test("BUG-79/4: a codex with a feature or catalog field Gluon hasn't checked is refused, and the order falls through", async () => {
-    // As checked: the fixture's features after the disables, and the fake catalog, pass.
+  test("BUG-79/4: a codex that keeps on a feature Gluon hasn't checked, or sets a catalog field it hasn't, still runs the brain, and the probe warns what it found", async () => {
+    // As checked: the fixture's features after the disables, and the fake catalog, pass with no warning.
     expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }).spawn })).toEqual({ ok: true });
-    // A new feature, on by default.
-    const feature = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools                       stable             true" });
-    const refused = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: feature.spawn });
-    expect(refused).toEqual({ ok: false, error: expect.stringContaining("this codex version isn't supported for the intake agent on the ChatGPT plan yet") });
-    expect(!refused.ok && refused.error).toContain("hosted_agent_tools");
-    expect(feature.spawned.some((x) => x.argv[1] === "app-server")).toBe(false);
-    // A new catalog field that is set (it may bring tools); the same field unset is fine.
+    // A new feature, on by default, that codex keeps on when Gluon turns it off: the brain runs, with a warning.
+    const feature = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools                       stable             true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
+    const kept = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: feature.spawn });
+    expect(kept).toEqual({ ok: true, warnings: [expect.stringContaining("keeps features on that Gluon hasn't checked (hosted_agent_tools)")] });
+    expect(feature.spawned.some((x) => x.argv[1] === "app-server")).toBe(true);
+    // A new catalog field that is set (it may bring tools): passed to codex as it is, with a warning; the same field unset says nothing.
     const field = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"] }) });
     const out = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: field.spawn });
-    expect(out).toEqual({ ok: false, error: expect.stringContaining("model catalog has fields Gluon hasn't checked (hosted_tools)") });
-    expect(field.spawned.some((x) => x.argv[1] === "app-server")).toBe(false);
+    expect(out).toEqual({ ok: true, warnings: [expect.stringContaining("model catalog has fields Gluon hasn't checked (hosted_tools)")] });
+    const server = field.spawned.find((x) => x.argv[1] === "app-server")!;
+    const catalog = JSON.parse(readFileSync(JSON.parse(server.argv[server.argv.indexOf("-c") + 1]!.slice("model_catalog_json=".length)), "utf8"));
+    for (const m of catalog.models) expect(m.hosted_tools).toEqual(["computer"]);
     const empty = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: [], new_label: null }) });
     expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: empty.spawn })).toEqual({ ok: true });
-    // The session's brain says so too, instead of starting.
-    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true" }).spawn);
+    // The session's brain answers as usual.
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools", FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"] }) }).spawn);
     await s.submit("hello");
-    expect(state().items.at(-1)).toMatchObject({ kind: "notice", tone: "error", text: expect.stringContaining("hosted_agent_tools") });
+    expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
     s.close();
     // Reading the list: removed features do nothing; an unreadable list is refused.
     const rows = (extra: string) => `${Array.from({ length: 10 }, (_, i) => `f${i}  removed  true`).join("\n")}\ncode_mode_host  stable  true\n${extra}`;
     expect(uncheckedFeatures(rows(""))).toEqual([]);
     expect(uncheckedFeatures(rows("new_one  experimental  true\nother  stable  false"))).toEqual(["new_one"]);
     expect(() => uncheckedFeatures("Usage: codex features")).toThrow(/isn't in the shape/);
+  });
+
+  test("BUG-79/new-feature: a feature on by default that Gluon hasn't checked is turned off unchecked, for the app-server and the thread, and the brain works", async () => {
+    const extra = { FAKE_CODEX_FEATURES_EXTRA: "next_new_mode  stable  true" };
+    const f = fake({ turns: [[{ text: "ok" }]] }, extra);
+    expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: f.spawn })).toEqual({ ok: true });
+    const server = f.spawned.find((x) => x.argv[1] === "app-server")!;
+    expect(server.argv[server.argv.indexOf("next_new_mode") - 1]).toBe("--disable");
+    expect(f.received().find((m) => m.method === "thread/start")!.params.config["features.next_new_mode"]).toBe(false);
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, extra).spawn);
+    await s.submit("hello");
+    expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
+    s.close();
+  });
+
+  test("BUG-79/mcp: an MCP server codex keeps on by itself, or one of the user's config that stays on, is a warning and the probe passes", async () => {
+    const own = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_OWN_MCP: "codex_apps" }).spawn });
+    expect(own).toEqual({ ok: true, warnings: [expect.stringContaining("MCP servers on that aren't in your config (codex_apps)")] });
+    // With a server in the config too: the thread turns it off, so only codex's own is warned about.
+    const theirs = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_OWN_MCP: "codex_apps" }).spawn });
+    expect(theirs).toEqual({ ok: true, warnings: [expect.stringContaining("(codex_apps)")] });
+    // A server of the user's config that stays on although Gluon turned it off: a warning too (the brain runs anyway).
+    const stuck = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_MCP_STAYS_ON: "docs" }).spawn });
+    expect(stuck).toEqual({ ok: true, warnings: [expect.stringContaining("Codex kept your MCP servers on although Gluon turned them off for the intake agent (docs)")] });
+    // A codex that can't say which servers are on, even with servers in the config: a warning.
+    const silent = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_MCP_STATUS_FAIL: "1" }).spawn });
+    expect(silent).toEqual({ ok: true, warnings: [expect.stringContaining("Codex didn't say which MCP servers are on")] });
+    // A server with a dot in its name can't be turned off by the thread's config: one warning, the brain runs.
+    const dotted = fake({ turns: [[{ text: "ok" }]], mcpServers: ["my.server", "docs"] });
+    expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: dotted.spawn })).toEqual({ ok: true, warnings: [expect.stringContaining('Gluon can\'t turn off your MCP servers "my.server" for the intake agent')] });
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]], mcpServers: ["my.server"] }).spawn);
+    await s.submit("hello");
+    expect(state().items.map((i) => i.kind)).toEqual(["user", "notice", "assistant"]);
+    s.close();
+  });
+
+  test("BUG-79/start-hint: a codex that fails to start after Gluon turned off features it hasn't checked is told which (codex may need one); one that starts isn't", async () => {
+    const env = { FAKE_CODEX_FEATURES_EXTRA: "next_new_mode  stable  true" };
+    const crash = fake({ turns: [] }, env);
+    // `features list` and `debug models` from the fake; the app-server exits at once, as a codex missing a feature might.
+    const spawn: SpawnCodex = (argv, e) => (argv[1] === "app-server" ? Bun.spawn(["bun", "-e", "console.error('Error: thread needs a feature'); process.exit(1)"], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: e }) : crash.spawn(argv, e));
+    const out = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn });
+    expect(out).toEqual({ ok: false, error: expect.stringContaining("Gluon turned off features of this codex it hasn't checked: ") });
+    expect(!out.ok && out.error).toContain("next_new_mode");
+    // A failure once the thread runs (the plan's own refusal) isn't about features.
+    const later = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ fail: { message: "usage limit", codexErrorInfo: "usageLimitExceeded" } }]] }, env).spawn });
+    expect(later).toEqual({ ok: false, error: expect.not.stringContaining("hasn't checked") });
+    // Nor is one where codex answers but refuses to start the thread (it didn't exit): the hint is for an exit alone.
+    const refusing = fake({ turns: [] }, { ...env, FAKE_CODEX_THREAD_START_ERROR: "model gpt-6-sol does not exist" });
+    const refused = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: refusing.spawn });
+    expect(refused).toEqual({ ok: false, error: expect.stringContaining("does not exist") });
+    expect(!refused.ok && refused.error).not.toContain("hasn't checked");
   });
 
   test("BUG-80/5: `codex login status` that never answers times out like the other status checks", async () => {
@@ -451,11 +510,11 @@ test("BUG-335: a Codex session's window comes from the bundled table (Codex's ow
 // --- QA pass (brain, offline): what a user reads when this codex is newer than Gluon has checked
 
 /** The chat's last notice for a codex that fails closed, as the app shows it (`brainErrorHint` is the hint the session appends). */
-async function refusalNotice(extraEnv: Record<string, string>): Promise<string> {
+async function refusalNotice(spawn: SpawnCodex): Promise<string> {
   const { brainErrorHint } = await import("../src/brain.ts");
   const config = loadConfig();
   const step = { route: "chatgpt-plan", model: "gpt-6-luna" } as const;
-  const s = new Session(chatgptPlanBrain({ model: "gpt-6-luna", cwd: ROOT, spawn: fake({ turns: [[{ text: "Hi." }]] }, extraEnv).spawn }), config, SYSTEM, ROOT, (m) => brainErrorHint(step, m, config));
+  const s = new Session(chatgptPlanBrain({ model: "gpt-6-luna", cwd: ROOT, spawn }), config, SYSTEM, ROOT, (m) => brainErrorHint(step, m, config));
   await s.submit("hello");
   s.close();
   const last = s.snapshot.items.at(-1) as { kind: string; text: string };
@@ -463,21 +522,27 @@ async function refusalNotice(extraEnv: Record<string, string>): Promise<string> 
   return last.text;
 }
 
-test("QA: a codex with an unchecked feature or catalog field is refused in the chat in words a user can act on: what was found, why it matters, what to do; and no app-server is started", async () => {
-  const feature = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true" });
-  expect(feature).toContain("this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.161)");
+test("QA: a codex that keeps an unchecked feature on, or sets an unchecked catalog field, isn't refused: the chat works, and the probe (`gluon doctor`) says what was found, why it matters and what happens", async () => {
+  const env = { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools", FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"], other_new: { a: 1 } }) };
+  const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, env).spawn);
+  await s.submit("hello");
+  expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
+  s.close();
+  const probe = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }, env).spawn });
+  const [feature, field] = (probe.ok && probe.warnings) || [];
   expect(feature).toContain("hosted_agent_tools");
-  expect(feature).toContain("which may give the intake agent tools of Codex's own");
-  expect(feature).toContain("Update Gluon, or use another step of brain.order");
-  const field = await refusalNotice({ FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"], other_new: { a: 1 } }) });
   expect(field).toContain("model catalog has fields Gluon hasn't checked (hosted_tools, other_new)");
-  expect(field).toContain("Update Gluon, or use another step of brain.order");
-  // Said once: the explained message isn't wrapped in a second "Error:" or repeated.
-  for (const text of [feature, field]) expect(text.match(/this codex version isn't supported/g)).toHaveLength(1);
+  for (const text of [feature, field]) {
+    expect(text).toContain("may give the intake agent tools of Codex's own");
+    expect(text).toContain("It runs anyway; a Gluon update will cover them.");
+  }
 });
 
 test("BUG-628/QA-brain-13: the refusal of a codex Gluon hasn't checked isn't followed by 'Send your message again to retry' (a retry can only be refused again; the message itself says to update Gluon or use another step)", async () => {
-  const text = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true" });
+  // The refusal left: a `codex features list` Gluon can't read (its output changed).
+  const garbled: SpawnCodex = (argv, env) => (argv[1] === "features" ? Bun.spawn(["bun", "-e", "console.log('Usage: codex features')"], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env }) : fake({ turns: [[{ text: "Hi." }]] }).spawn(argv, env));
+  const text = await refusalNotice(garbled);
+  expect(text).toContain("this codex version isn't supported");
   expect(text).not.toMatch(/send your message again/i);
 });
 
@@ -495,10 +560,13 @@ test("BUG-628/variants: every refusal of a too-new codex points at `gluon doctor
   expect(brainErrorHint(step, "the brain's turn failed", config)).toMatch(/send your message again/i);
 });
 
-test("QA: unset values of an unknown catalog field (null, false, empty list, empty text, empty object) pass; any set value, even `true` or 0, is refused", () => {
+test("QA: an unknown catalog field goes to codex as it is, and a set value of it (even `true` or 0) is listed as unchecked; unset values (null, false, empty list, empty text, empty object) aren't", () => {
   const models = (extra: Record<string, unknown>) => JSON.stringify({ models: [{ slug: "gpt-6-luna", display_name: "x", ...extra }] });
-  for (const unset of [null, false, [], "", {}]) expect(() => catalogWithoutTools(models({ new_field: unset }))).not.toThrow();
-  for (const set of [true, 0, 1, "x", ["a"], { a: 1 }]) expect(() => catalogWithoutTools(models({ new_field: set }))).toThrow("new_field");
+  for (const unset of [null, false, [], "", {}]) expect(uncheckedCatalogFields(models({ new_field: unset }))).toEqual([]);
+  for (const set of [true, 0, 1, "x", ["a"], { a: 1 }]) {
+    expect(uncheckedCatalogFields(models({ new_field: set }))).toEqual(["new_field"]);
+    expect(JSON.parse(catalogWithoutTools(models({ new_field: set }))).models[0].new_field).toEqual(set);
+  }
   // The known tool fields are cleared whatever they held; a models list that is empty or not a list is refused as too new.
   const out = JSON.parse(catalogWithoutTools(models({ tool_mode: "code_mode_only", apply_patch_tool_type: "freeform", experimental_supported_tools: ["x"], multi_agent_version: "v2" })));
   expect(out.models[0]).toMatchObject({ tool_mode: "direct", apply_patch_tool_type: null, experimental_supported_tools: [], multi_agent_version: null });
@@ -544,49 +612,149 @@ describe("BUG-708: a codex that doesn't know every feature Gluon turns off", () 
     expect(out).toEqual({ ok: false, error: expect.stringContaining("`codex features list` failed (exit code 2): Error: something codex said") });
   });
 
-  test("BUG-708/known: knownFeatures keeps CODEX_FEATURES_OFF's order and drops what the list lacks", () => {
-    const list = ["shell_tool  stable  true", "apps  stable  true", ...Array.from({ length: 10 }, (_, i) => `f${i}  stable  false`)].join("\n");
-    expect(knownFeatures(list)).toEqual(["shell_tool", "apps"]);
-    expect(() => knownFeatures("Usage: codex features")).toThrow(/isn't in the shape/);
+  test("BUG-708/known: featuresToDisable names only what the list has: all but the kept and the removed, and the always-off even when kept", () => {
+    const list = ["shell_tool  stable  true", "apps  stable  true", "unified_exec  stable  true", "code_mode_host  stable  true", "gone_one  removed  true", ...Array.from({ length: 10 }, (_, i) => `f${i}  stable  false`)].join("\n");
+    expect(featuresToDisable(list)).toEqual(["shell_tool", "apps", "unified_exec", ...Array.from({ length: 10 }, (_, i) => `f${i}`)]);
+    expect(() => featuresToDisable("Usage: codex features")).toThrow(/isn't in the shape/);
   });
 });
 
-describe("BUG-709: a tool of Codex's own that gets through stops the brain", () => {
-  test("BUG-709/session: an item outside the brain's types stops the app-server, refuses the turn with what to do, and the next message starts afresh", async () => {
-    for (const item of [{ type: "commandExecution", command: "cat .env" }, { type: "someNewTool" }, { type: "dynamicToolCall", tool: "shell", arguments: {} }]) {
-      const f = fake({ turns: [[{ text: "Let me look." }, { item }, { hang: true }], [{ text: "Fresh." }]] });
-      const { brainErrorHint } = await import("../src/brain.ts");
-      const config = loadConfig();
-      const step = { route: "chatgpt-plan", model: "gpt-6-sol" } as const;
-      const s = new Session(chatgptPlanBrain({ model: "gpt-6-sol", cwd: ROOT, spawn: f.spawn }), config, SYSTEM, ROOT, (m) => brainErrorHint(step, m, config));
+describe("BUG-709: a tool of Codex's own that gets through is interrupted, the model told, and the answer goes on", () => {
+  /** A session on the fake codex, with what the app-server received and the session's items. */
+  const run = (turns: Step[][]) => {
+    const f = fake({ turns });
+    const s = new Session(chatgptPlanBrain({ model: "gpt-6-sol", cwd: ROOT, spawn: f.spawn }), loadConfig(), SYSTEM, ROOT, () => "");
+    const starts = () => f.received().filter((m) => m.method === "turn/start").map((m) => m.params.input[0].text as string);
+    const interrupts = () => f.received().filter((m) => m.method === "turn/interrupt").length;
+    return { f, s, starts, interrupts };
+  };
+
+  test("BUG-709/interrupt: a Codex tool or an item Gluon has never seen is interrupted (no kill), the model is told in a next turn of the same thread, and its answer reaches the developer", async () => {
+    for (const [item, name] of [[{ type: "commandExecution", command: "cat .env" }, "commandExecution"], [{ type: "someNewTool" }, "someNewTool"], [{ type: "dynamicToolCall", tool: "shell", arguments: {} }, "shell"]] as const) {
+      const { f, s, starts, interrupts } = run([[{ text: "Let me look." }, { item }, { hang: true }], [{ text: "Done with Gluon's tools." }]]);
       await s.submit("hello");
-      const notice = s.snapshot.items.at(-1) as { kind: string; tone: string; text: string };
-      expect(notice).toMatchObject({ kind: "notice", tone: "error" });
-      expect(notice.text).toContain("Codex gave the intake agent a tool of its own");
-      expect(notice.text).toContain(item.type === "dynamicToolCall" ? '"shell"' : item.type);
-      expect(notice.text).toContain("brain.order");
-      expect(notice.text).not.toMatch(/send your message again/i);
-      // Stopped, not interrupted: the app-server is gone.
-      expect(f.received().some((m) => m.method === "turn/interrupt")).toBe(false);
-      const first = f.spawned.find((x) => x.argv[1] === "app-server")!;
-      expect(first).toBeDefined();
-      await s.submit("again");
-      expect(f.spawned.filter((x) => x.argv[1] === "app-server")).toHaveLength(2);
+      expect(interrupts()).toBe(1);
+      expect(starts()).toEqual(["hello", foreignNote(name)]);
+      expect(f.spawned.filter((x) => x.argv[1] === "app-server")).toHaveLength(1);
+      // The whole history: the words before the item once, then the notice, then the answer.
+      expect(s.snapshot.items.map((i) => [i.kind, "text" in i ? i.text : ""])).toEqual([
+        ["user", "hello"],
+        ["assistant", "Let me look."],
+        ["notice", expect.stringContaining(`\`${name}\`), which may already have run; Gluon interrupted it and told it to use Gluon's tools`)],
+        ["assistant", "Done with Gluon's tools."],
+      ]);
       s.close();
     }
   });
 
-  test("BUG-709/probe: the probe is refused the same way", async () => {
-    const f = fake({ turns: [[{ item: { type: "webSearch", query: "x" } }, { hang: true }]] });
+  test("BUG-709/explored: tool rows before the interrupt and after it are two groups, none shown twice", async () => {
+    const { s } = run([[{ tool: { name: "list_files", input: {} } }, { item: { type: "webSearch" } }, { hang: true }], [{ tool: { name: "read_file", input: { path: "package.json" } } }, { text: "Done." }]]);
+    await s.submit("hello");
+    const items = s.snapshot.items;
+    expect(items.map((i) => i.kind)).toEqual(["user", "explored", "notice", "explored", "assistant"]);
+    expect(items.filter((i) => i.kind === "explored").map((i) => (i as { rows: unknown[] }).rows.length)).toEqual([1, 1]);
+    s.close();
+  });
+
+  test("BUG-709/question: a foreign item while a question waits on the developer is interrupted only once it's answered; the question and its answer survive", async () => {
+    const question = { question: "Add a test?", options: [{ label: "Yes" }, { label: "No" }] };
+    const { f, s, starts, interrupts } = run([[{ tool: { name: "ask_user", input: question }, parallel: true }, { item: { type: "webSearch" } }, { hang: true }], [{ text: "Thanks." }]]);
+    await s.submit("hello");
+    expect(s.snapshot.pending).toMatchObject({ kind: "question", question: { question: "Add a test?" } });
+    expect(interrupts()).toBe(0);
+    await s.submit("Yes");
+    await until(() => s.snapshot.items.at(-1)?.kind === "assistant");
+    expect(f.toolResults()[0]).toBe("The developer answered: Yes");
+    expect(interrupts()).toBe(1);
+    // The answer reaches codex before the interrupt (an interrupt first would abort the call and drop it)...
+    const log = f.received();
+    const answered = log.findIndex((m) => m.method === undefined && JSON.stringify(m.result ?? "").includes("The developer answered: Yes"));
+    expect(answered).toBeGreaterThanOrEqual(0);
+    expect(answered).toBeLessThan(log.findIndex((m) => m.method === "turn/interrupt"));
+    // ...and the note says it again, should codex have dropped it anyway.
+    expect(starts()).toEqual(["hello", `${foreignNote("webSearch")} What the developer answered in that step still stands: The developer answered: Yes`]);
+    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Thanks." });
+    s.close();
+  });
+
+  test("BUG-709/late-call: a call of Gluon's that codex sends after Gluon's interrupt is answered at once and never shown, so no question is left with nowhere to go", async () => {
+    const question = { question: "Add a test?", options: [{ label: "Yes" }, { label: "No" }] };
+    const { f, s, starts } = run([[{ item: { type: "webSearch" } }, { awaitInterrupt: true }, { tool: { name: "ask_user", input: question } }, { interrupted: true }], [{ text: "Thanks." }]]);
+    await s.submit("hello");
+    expect(f.toolResults()[0]).toBe("Gluon interrupted this step; ask again in the next one.");
+    expect(s.snapshot.pending).toBeNull();
+    expect(s.snapshot.items.some((i) => i.kind === "question")).toBe(false);
+    expect(starts()).toEqual(["hello", foreignNote("webSearch")]);
+    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Thanks." });
+    s.close();
+  });
+
+  test("BUG-709/names: names codex sends are cleaned (backticks, control, invisible and direction characters) and capped; the reminder keeps at most 20", async () => {
+    expect(shown("a`b\u0007c\u009bd\u202ee\u200bf\u2028g")).toBe("abcdefg");
+    expect(shown("x".repeat(200))).toHaveLength(60);
+    expect(shown("`\u0000")).toBe("unnamed");
+    const many = Array.from({ length: 25 }, (_, i) => ({ item: { type: `new_kind_${i}` } }) as Step);
+    const { s, starts } = run([[...many, { hang: true }], [{ text: "ok" }], [{ text: "ok" }]]);
+    await s.submit("first");
+    await s.submit("second");
+    const reminder = starts()[2]!.split("\n\n")[0]!;
+    expect(reminder.match(/`new_kind_\d+`/g)).toHaveLength(20);
+    s.close();
+  });
+
+  test("BUG-709/too-late: a turn that ends before Gluon's interrupt lands isn't followed by a note turn, and the notice says it wasn't interrupted", async () => {
+    const { s, starts } = run([[{ item: { type: "webSearch" } }, { text: "Answer." }]]);
+    await s.submit("hello");
+    expect(starts()).toEqual(["hello"]);
+    expect(s.snapshot.items.slice(-2).map((i) => [i.kind, "text" in i ? i.text : ""])).toEqual([
+      ["assistant", "Answer."],
+      ["notice", expect.stringContaining("(`webSearch`) in this answer before Gluon could interrupt it")],
+    ]);
+    s.close();
+  });
+
+  test("BUG-709/again: the next developer message is reminded what isn't available, and a repeat is interrupted and told again", async () => {
+    const item = { type: "webSearch", query: "x" };
+    const { s, starts, interrupts } = run([[{ item }, { hang: true }], [{ text: "ok" }], [{ item }, { hang: true }], [{ text: "ok again" }]]);
+    await s.submit("first");
+    await s.submit("second");
+    expect(interrupts()).toBe(2);
+    expect(starts()).toEqual(["first", foreignNote("webSearch"), `${notAvailableReminder(["webSearch"])}\n\nsecond`, foreignNote("webSearch")]);
+    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "ok again" });
+    s.close();
+  });
+
+  test("BUG-709/loop-guard: past MAX_INTERRUPTS in one message the answer finishes as it is, with a warning; the next message is interrupted again", async () => {
+    const item = { type: "brandNewStatus" };
+    const stuck = Array.from({ length: MAX_INTERRUPTS }, () => [{ item }, { hang: true }] as Step[]);
+    const { s, starts, interrupts } = run([...stuck, [{ item }, { text: "Finally." }], [{ item }, { hang: true }], [{ text: "Next." }]]);
+    await s.submit("hello");
+    expect(interrupts()).toBe(MAX_INTERRUPTS);
+    expect(starts()).toHaveLength(MAX_INTERRUPTS + 1);
+    // The answer as it is, then the warning (said once the answer has finished).
+    expect(s.snapshot.items.slice(-2).map((i) => [i.kind, "text" in i ? i.text : ""])).toEqual([
+      ["assistant", "Finally."],
+      ["notice", expect.stringContaining("Gluon let this answer finish")],
+    ]);
+    await s.submit("more");
+    expect(interrupts()).toBe(MAX_INTERRUPTS + 1);
+    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Next." });
+    s.close();
+  });
+
+  test("BUG-709/probe: the probe notes it as a warning and passes", async () => {
+    const f = fake({ turns: [[{ item: { type: "webSearch", query: "x" } }, { text: "ok" }]] });
     const out = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: f.spawn, timeoutMs: 10_000 });
-    expect(out).toEqual({ ok: false, error: expect.stringContaining("Codex gave the intake agent a tool of its own (webSearch)") });
+    expect(out).toEqual({ ok: true, warnings: [expect.stringContaining("Codex gave the intake agent a tool of its own (webSearch) during the check")] });
   });
 
   test("BUG-709/types: the brain's own items pass; Gluon's tools by name; every other item is foreign", () => {
     for (const type of BRAIN_ITEMS) if (type !== "dynamicToolCall") expect(foreignItem("item/started", { item: { type } })).toBeNull();
     for (const t of TOOLS) expect(foreignItem("item/completed", { item: { type: "dynamicToolCall", tool: t.name } })).toBeNull();
-    for (const type of [...FOREIGN_ITEMS, "brandNew"]) expect(foreignItem("item/started", { item: { type } })).toContain(`(${type})`);
-    expect(foreignItem("item/started", { item: {} })).toContain("an item without a type");
+    for (const type of FOREIGN_ITEMS) expect(foreignItem("item/started", { item: { type } })).toEqual({ kind: "tool", name: type });
+    expect(foreignItem("item/started", { item: { type: "dynamicToolCall", tool: "shell" } })).toEqual({ kind: "tool", name: "shell" });
+    expect(foreignItem("item/started", { item: { type: "brandNew" } })).toEqual({ kind: "unknown", name: "brandNew" });
+    expect(foreignItem("item/started", { item: {} })).toEqual({ kind: "unknown", name: "an item without a type" });
     expect(foreignItem("turn/started", { item: { type: "commandExecution" } })).toBeNull();
     expect([...BRAIN_ITEMS].filter((t) => FOREIGN_ITEMS.has(t))).toEqual([]);
   });

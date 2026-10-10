@@ -1,7 +1,9 @@
-# Every codex release, checked for what the ChatGPT-plan intake agent hasn't classified (scripts/codex-drift.ts: a new
-# enabled feature, catalog field or thread-item type; src/agent/codex.ts). GitHub can't trigger on another repository's
-# releases, so an hourly run reads npm's latest @openai/codex and checks each version once (an actions-cache key per
-# version, saved when the check ran, marks it checked). On drift `report` opens an issue, or comments on the open one for that version.
+# Every codex release, checked for what it gives the ChatGPT-plan intake agent of its own (scripts/codex-drift.ts: a tool
+# in the model request, sent to a provider on the runner's loopback; a feature it keeps on, a catalog field or thread-item
+# type Gluon hasn't classified; src/agent/codex.ts). New features Gluon turns off unchecked go to the run's summary only.
+# GitHub can't trigger on another repository's releases, so an hourly run reads npm's latest @openai/codex and checks
+# each version once (an actions-cache key per version, saved when the check ran, marks it checked). On drift `report`
+# comments on the open Codex-watch issue, or opens one: one thread for every version until it's fixed.
 #   gh workflow run codex-watch.yml -f version=0.161.0      # one version by hand
 # The only scheduled workflow, and `report` the only job outside Release and Pages that writes (issues alone): it runs
 # no codex and no checkout; `check`, which runs the downloaded codex, can write nothing (test/release.test.ts).
@@ -29,6 +31,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    # Each model's turn has its own limit (60 s, scripts/codex-drift.ts), and a check can run 3 times over ~11 models
+    # (~33 min at worst); this stops one that hangs anyway.
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.version.outputs.version }}
       drift: ${{ steps.drift.outputs.drift }}
@@ -72,6 +77,7 @@ jobs:
           code=0
           bun scripts/codex-drift.ts --binary "$(bun pm bin -g)/codex" > report.md || code=$?
           cat report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
           echo "drift=$code" >> "$GITHUB_OUTPUT"
           { echo "report<<GLUON_REPORT_END"; cat report.md; echo "GLUON_REPORT_END"; } >> "$GITHUB_OUTPUT"
           mkdir -p .codex-watch && echo "$VERSION" > .codex-watch/version
@@ -88,11 +94,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          VERSION: ${{ needs.check.outputs.version }}
           REPORT: ${{ needs.check.outputs.report }}
         run: |
           set -euo pipefail
-          title="codex $VERSION: the intake agent needs a look"
+          title="Codex watch: the intake agent needs a look"
           body="$REPORT
 
           Found by the Codex watch: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

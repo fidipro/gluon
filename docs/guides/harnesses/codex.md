@@ -47,7 +47,7 @@ See [Cost and context](../cost-and-context.md).
 
 - Codex uses `ctrl+]` itself, so don't set that as Gluon's home key for it (the [config reference](../../reference/config.md) has the key and its default).
 - A ChatGPT account may refuse some models. `gluon doctor` shows Codex's refusal and routing moves on.
-- A newer Codex can break the intake agent route on the ChatGPT plan, because that route is fail-closed on features Gluon has not checked. `gluon doctor` shows it.
+- A newer Codex doesn't stop the intake agent on the ChatGPT plan. Gluon turns off every Codex feature it hasn't checked. Anything it can't turn off is a warning in `gluon doctor`, and a Gluon update covers it. If the model still uses a tool of Codex's own, Gluon interrupts the turn and tells it to use Gluon's tools. The tool may already have run by then: Codex runs what needs no approval without asking.
 
 ## Next steps
 

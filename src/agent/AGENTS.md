@@ -54,10 +54,9 @@ The brain: conversation, LLM clients, read-only repo tools.
   (BUG-78). Sessions are ephemeral; a restart fires `restarted` (BUG-85).
 - **`codex app-server` and `dynamicTools` are experimental**; doctor probes, the brain order falls
   through.
-- **Codex tools come from features, the model catalog and the thread** (codex 0.161). The denylist
-  fails closed (BUG-79): only `CODEX_FEATURES_KEPT` may be enabled, only `CATALOG_FIELDS` set, only `BRAIN_ITEMS` in a turn
-  (BUG-709); a new one → decide and list it (`scripts/codex-drift.ts` finds it). `--disable` only names codex lists: it refuses
-  others (`knownFeatures`; BUG-708). `code_mode_host` stays on. After a codex update: the harness-update runbook (private notes).
+- **Never refuse or stop the Codex brain for what Gluon hasn't checked** (owner's rule): turn it off, else warn; a release fixes it
+  (`src/agent/codex.ts` header; BUG-79, BUG-709). Interrupting a Codex tool can't undo it and some tools send no item: turning
+  features off (`featuresToDisable`) is the guard. `scripts/codex-drift.ts` checks each release's model request.
 
 ## Keeping this file fresh
 
