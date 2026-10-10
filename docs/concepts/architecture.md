@@ -116,11 +116,12 @@ if the program stops mid-chat, the next message starts it again without the earl
 and Gluon says so. Gluon's prompt goes to the program unchanged; Gluon never claims to be the
 vendor's product.
 
-On the ChatGPT plan the intake agent gets Gluon's tools and nothing of Codex's own. This fails
-closed: every Codex feature Gluon hasn't checked is turned off, and if one stays on anyway, or the
-model catalog has a field Gluon hasn't checked, the route is refused and the order moves on
-(`src/agent/codex.ts` has the checks). Each new codex release is checked for the tools its model
-request carries (`scripts/codex-drift.ts`). `codex app-server` is
+On the ChatGPT plan the intake agent gets Gluon's tools and nothing of Codex's own. Every Codex
+feature Gluon hasn't checked is turned off. If one stays on anyway, or the model catalog has a
+field Gluon hasn't checked, the intake agent still runs and `gluon doctor` warns; a Gluon release
+covers it. If the model uses a tool of Codex's own, Gluon stops that turn (`src/agent/codex.ts` has
+the checks). Each new codex release is checked for the tools its model request carries
+(`scripts/codex-drift.ts`). `codex app-server` is
 experimental, so a Codex update can break this route; `gluon doctor` shows it.
 
 ## Gluon: the sessions and the frame

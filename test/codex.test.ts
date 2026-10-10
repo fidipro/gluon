@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, featuresToDisable, foreignItem, parseLoginStatus, probeChatgptPlan, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
+import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, codexEnv, codexLoginStatus, FOREIGN_ITEMS, featuresToDisable, foreignItem, parseLoginStatus, probeChatgptPlan, uncheckedCatalogFields, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
 import * as codexModule from "../src/agent/codex.ts";
 import { ownPercent, ownWindow } from "../src/cost/context.ts";
 import { FIXTURE_CODEX_WINDOWS as CODEX_WINDOWS } from "./fixtures/fixture-tables.ts";
@@ -368,26 +368,27 @@ describe("the brain's tools: Gluon's own, nothing of Codex's", () => {
 });
 
 describe("review of PR #1", () => {
-  test("BUG-79/4: a codex that keeps on a feature Gluon hasn't checked, or sets a catalog field it hasn't, is refused, and the order falls through", async () => {
-    // As checked: the fixture's features after the disables, and the fake catalog, pass.
+  test("BUG-79/4: a codex that keeps on a feature Gluon hasn't checked, or sets a catalog field it hasn't, still runs the brain, and the probe warns what it found", async () => {
+    // As checked: the fixture's features after the disables, and the fake catalog, pass with no warning.
     expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }).spawn })).toEqual({ ok: true });
-    // A new feature, on by default, that codex keeps on when Gluon turns it off.
+    // A new feature, on by default, that codex keeps on when Gluon turns it off: the brain runs, with a warning.
     const feature = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools                       stable             true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
-    const refused = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: feature.spawn });
-    expect(refused).toEqual({ ok: false, error: expect.stringContaining("this codex version isn't supported for the intake agent on the ChatGPT plan yet") });
-    expect(!refused.ok && refused.error).toContain("hosted_agent_tools");
-    expect(feature.spawned.some((x) => x.argv[1] === "app-server")).toBe(false);
-    // A new catalog field that is set (it may bring tools); the same field unset is fine.
+    const kept = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: feature.spawn });
+    expect(kept).toEqual({ ok: true, warnings: [expect.stringContaining("keeps features on that Gluon hasn't checked (hosted_agent_tools)")] });
+    expect(feature.spawned.some((x) => x.argv[1] === "app-server")).toBe(true);
+    // A new catalog field that is set (it may bring tools): passed to codex as it is, with a warning; the same field unset says nothing.
     const field = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"] }) });
     const out = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: field.spawn });
-    expect(out).toEqual({ ok: false, error: expect.stringContaining("model catalog has fields Gluon hasn't checked (hosted_tools)") });
-    expect(field.spawned.some((x) => x.argv[1] === "app-server")).toBe(false);
+    expect(out).toEqual({ ok: true, warnings: [expect.stringContaining("model catalog has fields Gluon hasn't checked (hosted_tools)")] });
+    const server = field.spawned.find((x) => x.argv[1] === "app-server")!;
+    const catalog = JSON.parse(readFileSync(JSON.parse(server.argv[server.argv.indexOf("-c") + 1]!.slice("model_catalog_json=".length)), "utf8"));
+    for (const m of catalog.models) expect(m.hosted_tools).toEqual(["computer"]);
     const empty = fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: [], new_label: null }) });
     expect(await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: empty.spawn })).toEqual({ ok: true });
-    // The session's brain says so too, instead of starting.
-    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" }).spawn);
+    // The session's brain answers as usual.
+    const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools", FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"] }) }).spawn);
     await s.submit("hello");
-    expect(state().items.at(-1)).toMatchObject({ kind: "notice", tone: "error", text: expect.stringContaining("hosted_agent_tools") });
+    expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
     s.close();
     // Reading the list: removed features do nothing; an unreadable list is refused.
     const rows = (extra: string) => `${Array.from({ length: 10 }, (_, i) => `f${i}  removed  true`).join("\n")}\ncode_mode_host  stable  true\n${extra}`;
@@ -483,11 +484,11 @@ test("BUG-335: a Codex session's window comes from the bundled table (Codex's ow
 // --- QA pass (brain, offline): what a user reads when this codex is newer than Gluon has checked
 
 /** The chat's last notice for a codex that fails closed, as the app shows it (`brainErrorHint` is the hint the session appends). */
-async function refusalNotice(extraEnv: Record<string, string>): Promise<string> {
+async function refusalNotice(extraEnv: Record<string, string>, turns: Step[][] = [[{ text: "Hi." }]]): Promise<string> {
   const { brainErrorHint } = await import("../src/brain.ts");
   const config = loadConfig();
   const step = { route: "chatgpt-plan", model: "gpt-6-luna" } as const;
-  const s = new Session(chatgptPlanBrain({ model: "gpt-6-luna", cwd: ROOT, spawn: fake({ turns: [[{ text: "Hi." }]] }, extraEnv).spawn }), config, SYSTEM, ROOT, (m) => brainErrorHint(step, m, config));
+  const s = new Session(chatgptPlanBrain({ model: "gpt-6-luna", cwd: ROOT, spawn: fake({ turns }, extraEnv).spawn }), config, SYSTEM, ROOT, (m) => brainErrorHint(step, m, config));
   await s.submit("hello");
   s.close();
   const last = s.snapshot.items.at(-1) as { kind: string; text: string };
@@ -495,21 +496,26 @@ async function refusalNotice(extraEnv: Record<string, string>): Promise<string> 
   return last.text;
 }
 
-test("QA: a codex with an unchecked feature or catalog field is refused in the chat in words a user can act on: what was found, why it matters, what to do; and no app-server is started", async () => {
-  const feature = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
-  expect(feature).toContain("this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.162)");
+test("QA: a codex that keeps an unchecked feature on, or sets an unchecked catalog field, isn't refused: the chat works, and the probe (`gluon doctor`) says what was found, why it matters and what happens", async () => {
+  const env = { FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools", FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"], other_new: { a: 1 } }) };
+  const { s, state } = session(fake({ turns: [[{ text: "Hi." }]] }, env).spawn);
+  await s.submit("hello");
+  expect(state().items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi." });
+  s.close();
+  const probe = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }, env).spawn });
+  const [feature, field] = (probe.ok && probe.warnings) || [];
   expect(feature).toContain("hosted_agent_tools");
-  expect(feature).toContain("which may give the intake agent tools of Codex's own");
-  expect(feature).toContain("Update Gluon, or use another step of brain.order");
-  const field = await refusalNotice({ FAKE_CODEX_CATALOG_EXTRA: JSON.stringify({ hosted_tools: ["computer"], other_new: { a: 1 } }) });
   expect(field).toContain("model catalog has fields Gluon hasn't checked (hosted_tools, other_new)");
-  expect(field).toContain("Update Gluon, or use another step of brain.order");
-  // Said once: the explained message isn't wrapped in a second "Error:" or repeated.
-  for (const text of [feature, field]) expect(text.match(/this codex version isn't supported/g)).toHaveLength(1);
+  for (const text of [feature, field]) {
+    expect(text).toContain("may give the intake agent tools of Codex's own");
+    expect(text).toContain("It runs anyway; a Gluon update will cover them.");
+  }
 });
 
 test("BUG-628/QA-brain-13: the refusal of a codex Gluon hasn't checked isn't followed by 'Send your message again to retry' (a retry can only be refused again; the message itself says to update Gluon or use another step)", async () => {
-  const text = await refusalNotice({ FAKE_CODEX_FEATURES_EXTRA: "hosted_agent_tools  stable  true", FAKE_CODEX_FORCED_ON: "unified_exec,hosted_agent_tools" });
+  // A tool of Codex's own that got through and was used: the turn is stopped with the refusal.
+  const text = await refusalNotice({}, [[{ item: { type: "commandExecution", command: "ls" } }, { hang: true }]]);
+  expect(text).toContain("this codex version isn't supported");
   expect(text).not.toMatch(/send your message again/i);
 });
 
@@ -527,10 +533,13 @@ test("BUG-628/variants: every refusal of a too-new codex points at `gluon doctor
   expect(brainErrorHint(step, "the brain's turn failed", config)).toMatch(/send your message again/i);
 });
 
-test("QA: unset values of an unknown catalog field (null, false, empty list, empty text, empty object) pass; any set value, even `true` or 0, is refused", () => {
+test("QA: an unknown catalog field goes to codex as it is, and a set value of it (even `true` or 0) is listed as unchecked; unset values (null, false, empty list, empty text, empty object) aren't", () => {
   const models = (extra: Record<string, unknown>) => JSON.stringify({ models: [{ slug: "gpt-6-luna", display_name: "x", ...extra }] });
-  for (const unset of [null, false, [], "", {}]) expect(() => catalogWithoutTools(models({ new_field: unset }))).not.toThrow();
-  for (const set of [true, 0, 1, "x", ["a"], { a: 1 }]) expect(() => catalogWithoutTools(models({ new_field: set }))).toThrow("new_field");
+  for (const unset of [null, false, [], "", {}]) expect(uncheckedCatalogFields(models({ new_field: unset }))).toEqual([]);
+  for (const set of [true, 0, 1, "x", ["a"], { a: 1 }]) {
+    expect(uncheckedCatalogFields(models({ new_field: set }))).toEqual(["new_field"]);
+    expect(JSON.parse(catalogWithoutTools(models({ new_field: set }))).models[0].new_field).toEqual(set);
+  }
   // The known tool fields are cleared whatever they held; a models list that is empty or not a list is refused as too new.
   const out = JSON.parse(catalogWithoutTools(models({ tool_mode: "code_mode_only", apply_patch_tool_type: "freeform", experimental_supported_tools: ["x"], multi_agent_version: "v2" })));
   expect(out.models[0]).toMatchObject({ tool_mode: "direct", apply_patch_tool_type: null, experimental_supported_tools: [], multi_agent_version: null });

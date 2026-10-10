@@ -29,23 +29,27 @@ const ITEMS = [...BRAIN_ITEMS, ...FOREIGN_ITEMS];
 
 test("the checked codex (the fixture's list, a known catalog, known item types, Gluon's tools only) has no drift; its new features are noted", () => {
   const d = drift("0.162.1", LIST, withOff(LIST, featuresToDisable(LIST)), CATALOG, ITEMS, [checkTools("gpt-6.1-sol", [body()], null)]);
-  expect(d).toEqual({ version: "0.162.1", features: [], newOff: ["browser_annotation_api", "in_app_voice", "ultrafast_mode"], tools: [], catalog: null, items: [], gone: [] });
+  expect(d).toEqual({ version: "0.162.1", features: [], catalogFields: [], newOff: ["browser_annotation_api", "in_app_voice", "ultrafast_mode"], tools: [], catalog: null, items: [], gone: [] });
   expect(drifted(d)).toBe(false);
   expect(report(d)).toContain("Nothing to do for the intake agent");
   expect(report(d)).toContain("turned off unchecked");
 });
 
-test("a feature codex keeps on, a catalog field or an item type is drift, and the report says where each goes; a new feature turned off isn't", () => {
+test("a catalog Gluon can't read or a new item type is drift; a feature codex keeps on, an unchecked catalog field and a new feature are noted, as the brain runs with them", () => {
   const list = `${LIST.trim()}\nhosted_agent_tools                       stable             true\nnext_new_mode                            stable             true`;
   const catalog = JSON.stringify({ models: [{ slug: "gpt-6-luna", hosted_tools: ["computer"] }] });
-  const d = drift("0.170.0", list, withOff(list, featuresToDisable(list), ["unified_exec", "hosted_agent_tools"]), catalog, [...ITEMS, "remoteShell"]);
-  expect(d.features).toEqual(["hosted_agent_tools"]);
-  expect(d.newOff).toContain("next_new_mode");
-  expect(d.catalog).toContain("hosted_tools");
+  const noted = drift("0.170.0", list, withOff(list, featuresToDisable(list), ["unified_exec", "hosted_agent_tools"]), catalog, ITEMS);
+  expect(noted.features).toEqual(["hosted_agent_tools"]);
+  expect(noted.catalogFields).toEqual(["hosted_tools"]);
+  expect(noted.newOff).toContain("next_new_mode");
+  expect(drifted(noted)).toBe(false);
+  for (const s of ["`hosted_agent_tools`", "CODEX_FEATURES_KEPT", "`hosted_tools`", "CATALOG_FIELDS", "`next_new_mode`"]) expect(report(noted)).toContain(s);
+  const d = drift("0.170.0", list, withOff(list, featuresToDisable(list)), "not json", [...ITEMS, "remoteShell"]);
+  expect(d.catalog).toContain("isn't JSON");
   expect(d.items).toEqual(["remoteShell"]);
   expect(drifted(d)).toBe(true);
   const text = report(d);
-  for (const s of ["## codex 0.170.0", "`hosted_agent_tools`", "CODEX_FEATURES_KEPT", "CATALOG_FIELDS", "`remoteShell`", "FOREIGN_ITEMS", "codex-features-list.txt", "`next_new_mode`"]) expect(text).toContain(s);
+  for (const s of ["## codex 0.170.0", "Model catalog", "`remoteShell`", "FOREIGN_ITEMS", "codex-features-list.txt"]) expect(text).toContain(s);
 });
 
 test("the tools in a model request are read wherever codex puts them: top-level `tools`, inside `input`, in namespaces", () => {
@@ -93,7 +97,7 @@ test("a name of CODEX_FEATURES_OFF the codex no longer lists is noted, not drift
 });
 
 test("names codex printed can't format, link or mention in the issue", () => {
-  const d = { version: "0.170.0", features: ["x`<b>@team"], newOff: [], tools: [{ model: "m@team", extra: ["function:<b>"], missing: [], error: "[x](http://y) @z" }], catalog: "fields (`a`, @b)", items: ["[link](http://x)"], gone: [] };
+  const d = { version: "0.170.0", features: ["x`<b>@team"], catalogFields: ["y@team"], newOff: [], tools: [{ model: "m@team", extra: ["function:<b>"], missing: [], error: "[x](http://y) @z" }], catalog: "fields (`a`, @b)", items: ["[link](http://x)"], gone: [] };
   const text = report(d);
   expect(text).toContain("`x??b??team`");
   expect(text).not.toMatch(/@team|@b|\]\(/);

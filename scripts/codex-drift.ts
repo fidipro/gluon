@@ -4,9 +4,10 @@
  * agent (`src/agent/codex.ts`) anything of its own. Above all, the tools in the model request: the
  * brain runs as it does for a user (`chatgptPlanBrain`: the same features turned off, catalog, thread)
  * and sends one message to a model provider on 127.0.0.1, which records each request and answers with
- * a short reply; every tool in a request must be one of Gluon's. Also: a feature that stays on after
- * Gluon turns it off, a catalog field `catalogWithoutTools` refuses, a thread-item type outside
- * BRAIN_ITEMS and FOREIGN_ITEMS. New features (turned off unchecked) are noted, not drift.
+ * a short reply; every tool in a request must be one of Gluon's. Also: a catalog Gluon can't read, a
+ * thread-item type outside BRAIN_ITEMS and FOREIGN_ITEMS (a turn that has one is stopped). What the
+ * brain runs with anyway is noted, not drift: new features (turned off unchecked), features codex
+ * keeps on and catalog fields Gluon hasn't checked (the tool check says whether they give tools).
  * codex-watch.yml runs it on every new codex release. Prints a Markdown report; exits 0 (nothing to
  * do), 1 (drift: fix codex.ts) or 2 (couldn't check). The tool check is tried twice before it counts.
  *
@@ -17,7 +18,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, CODEX_FEATURES_OFF, featuresToDisable, FOREIGN_ITEMS, newFeatures, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
+import { BRAIN_ITEMS, catalogWithoutTools, chatgptPlanBrain, uncheckedCatalogFields, CODEX_FEATURES_OFF, featuresToDisable, FOREIGN_ITEMS, newFeatures, uncheckedFeatures, type SpawnCodex } from "../src/agent/codex.ts";
 import { TOOLS } from "../src/agent/tools.ts";
 import { DEFAULT_ORDER } from "../src/config.ts";
 
@@ -26,13 +27,15 @@ export type ToolCheck = { model: string; extra: string[]; missing: string[]; err
 
 export type Drift = {
   version: string;
-  /** Still on after every feature outside CODEX_FEATURES_KEPT was turned off, and not kept on purpose. */
+  /** Still on after every feature outside CODEX_FEATURES_KEPT was turned off, and not kept on purpose (noted, not drift). */
   features: string[];
+  /** Catalog fields set on a model that Gluon hasn't checked, passed through to codex (noted, not drift). */
+  catalogFields: string[];
   /** On in this codex, in neither of Gluon's lists: turned off unchecked (noted, not drift). */
   newOff: string[];
   /** What the model was sent, per model. */
   tools: ToolCheck[];
-  /** The catalog's refusal, if any. */
+  /** Why Gluon can't read the catalog, if it can't. */
   catalog: string | null;
   /** Item types neither allowed nor known to be foreign (the brain already refuses them). */
   items: string[];
@@ -91,14 +94,17 @@ export function checkTools(model: string, bodies: unknown[], error: string | nul
 export function drift(version: string, list: string, listOff: string, catalog: string, items: string[], tools: ToolCheck[] = []): Drift {
   const known = new Set(featureNames(list));
   let refusal: string | null = null;
+  let catalogFields: string[] = [];
   try {
     catalogWithoutTools(catalog);
+    catalogFields = uncheckedCatalogFields(catalog);
   } catch (e) {
     refusal = (e as Error).message;
   }
   return {
     version,
     features: uncheckedFeatures(listOff),
+    catalogFields,
     newOff: newFeatures(list),
     tools: tools.filter((t) => t.extra.length || t.missing.length || t.error),
     catalog: refusal,
@@ -107,7 +113,7 @@ export function drift(version: string, list: string, listOff: string, catalog: s
   };
 }
 
-export const drifted = (d: Drift) => d.features.length > 0 || d.tools.length > 0 || d.catalog !== null || d.items.length > 0;
+export const drifted = (d: Drift) => d.tools.length > 0 || d.catalog !== null || d.items.length > 0;
 
 /** The names `features list` shows. */
 function featureNames(list: string): string[] {
@@ -123,7 +129,7 @@ const code = (s: string) => `\`${s.replace(/[^\w.:-]/g, "?")}\``;
 /** The report: what is new and where it goes in `src/agent/codex.ts`. */
 export function report(d: Drift): string {
   const lines = [`## codex ${d.version.replace(/[^\w.+-]/g, "?")}`, ""];
-  if (!drifted(d)) lines.push("Nothing to do for the intake agent: the model is sent Gluon's tools only, and every catalog field and item type is classified.");
+  if (!drifted(d)) lines.push("Nothing to do for the intake agent: the model is sent Gluon's tools only, and every item type is classified.");
   // Models with the same result share a line.
   const byResult = new Map<string, string[]>();
   for (const t of d.tools) {
@@ -133,10 +139,11 @@ export function report(d: Drift): string {
   for (const [what, models] of byResult) {
     lines.push(`- **The model request (${models.map(code).join(", ")})**: ${what}. Find the feature or setting that gives a tool (\`CODEX_FEATURES_OFF\`, the thread's config, \`CATALOG_TOOLS_OFF\`); a failure may be a feature codex needs that Gluon turned off (below). Until then the intake agent may be offered it.`);
   }
-  if (d.features.length) lines.push(`- **Features codex keeps on when Gluon turns them off**: ${d.features.map(code).join(", ")}. Each goes in \`CODEX_FEATURES_KEPT\` with why it gives the model no tool. Until then the intake agent refuses this codex.`);
-  if (d.catalog) lines.push(`- **Model catalog**: ${d.catalog.replace(/[`@<>\[\]\n]/g, "?")}. A field goes in \`CATALOG_FIELDS\`, or in \`CATALOG_TOOLS_OFF\` if it adds tools.`);
+  if (d.catalog) lines.push(`- **Model catalog**: ${d.catalog.replace(/[`@<>\[\]\n]/g, "?")}. Until Gluon reads it again the intake agent can't start on this codex.`);
   if (d.items.length) lines.push(`- **New thread-item types**: ${d.items.map(code).join(", ")}. Each goes in \`BRAIN_ITEMS\` or \`FOREIGN_ITEMS\`; until then a turn that has one is stopped.`);
   if (d.newOff.length) lines.push(`- New features, turned off unchecked (nothing to do unless the intake agent needs one): ${d.newOff.map(code).join(", ")}.`);
+  if (d.features.length) lines.push(`- Features codex keeps on when Gluon turns them off (the brain runs with them, and \`gluon doctor\` warns; the tool check above says whether they give tools): ${d.features.map(code).join(", ")}. Each goes in \`CODEX_FEATURES_KEPT\` with why it gives the model no tool.`);
+  if (d.catalogFields.length) lines.push(`- Catalog fields Gluon hasn't checked, passed to codex as they are (\`gluon doctor\` warns; the tool check above says whether they give tools): ${d.catalogFields.map(code).join(", ")}. Each goes in \`CATALOG_FIELDS\`, or in \`CATALOG_TOOLS_OFF\` if it adds tools.`);
   if (d.gone.length) lines.push(`- Names of \`CODEX_FEATURES_OFF\` this codex doesn't list (harmless; delete them once no supported codex has them): ${d.gone.map(code).join(", ")}.`);
   if (drifted(d)) lines.push("", "Then refresh `test/fixtures/codex-features-list.txt` from `codex features list` and run `bun run test:area brain`.");
   return lines.join("\n");

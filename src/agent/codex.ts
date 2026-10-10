@@ -16,14 +16,15 @@
  * - the thread: an execution environment (`apply_patch`), `agents` (collaboration), the
  *   `request_user_input` tool and the skills list, turned off in `thread/start`.
  *
- * Features fail closed by default: every feature `codex features list` shows is turned off
- * (`--disable`, and `features.<name>=false` on the thread) unless CODEX_FEATURES_KEPT names it, so a
- * newer codex's new feature is off without anyone looking at it first. What stays on after that must
- * be in CODEX_FEATURES_KEPT, or Gluon refuses this codex, with a readable error (a feature codex
- * forces on); every catalog field set on a model must be one Gluon knows (CATALOG_FIELDS). The brain
- * order then falls through. During a turn, an item of a type outside BRAIN_ITEMS (a tool of Codex's
- * own that got through) stops the app-server. `scripts/codex-drift.ts` checks each codex release
- * the way the model sees it: the tools in the request it sends.
+ * The brain always runs; what Gluon hasn't checked is turned off where it can be, and said where
+ * it can't (the fix is a Gluon release, never a refusal). Every feature `codex features list` shows
+ * is turned off (`--disable`, and `features.<name>=false` on the thread) unless CODEX_FEATURES_KEPT
+ * names it, so a newer codex's new feature is off without anyone looking at it first. A feature that
+ * stays on anyway (codex forces it), or a catalog field Gluon doesn't know (CATALOG_FIELDS: passed
+ * through, it may be one codex needs), is a warning (`gluon doctor`). During a turn, an item of a
+ * type outside BRAIN_ITEMS (a tool of Codex's own that got through and was used) stops the
+ * app-server: that turn fails, the next starts afresh. `scripts/codex-drift.ts` checks each codex
+ * release the way the model sees it, the tools in the request it sends, and opens an issue.
  *
  * `dynamicTools` is an experimental app-server API: a Codex update may break it. The probe catches
  * that, and the brain order falls through to the next step. A ChatGPT account may also refuse
@@ -104,7 +105,7 @@ export const CODEX_FEATURES_OFF = [
 
 /**
  * Features left as codex sets them, and why: none gives the model a tool or runs a command. Every
- * other feature is turned off; one that stays on anyway (codex forces it) makes Gluon refuse this codex.
+ * other feature is turned off; one that stays on anyway (codex forces it) is a warning.
  */
 export const CODEX_FEATURES_KEPT: Record<string, string> = {
   // Code mode fails closed without its host; the catalog keeps code mode off (tool_mode: direct).
@@ -117,7 +118,7 @@ export const CODEX_FEATURES_KEPT: Record<string, string> = {
   ),
 };
 
-/** What the refusals say: the user's codex is newer than what Gluon has checked. */
+/** What a refusal or warning says: the user's codex is newer than what Gluon has checked. */
 export const UNSUPPORTED = "this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.162)";
 /** The tail of a refusal of a codex whose catalog Gluon can't read: `brainErrorHint` matches it with `UNSUPPORTED`. */
 export const TOO_NEW = "this codex may be too new for the intake agent";
@@ -191,12 +192,8 @@ const CATALOG_FIELDS = new Set([
 /** A value that sets nothing: null, false, an empty list, string or mapping. */
 const unset = (v: unknown) => v === null || v === undefined || v === false || v === "" || (Array.isArray(v) && !v.length) || (typeof v === "object" && !Array.isArray(v) && !Object.keys(v as object).length);
 
-/**
- * Codex's model catalog (`codex debug models` JSON) with every model's own tools turned off. Throws
- * when it isn't the shape Gluon knows, or a model sets a field Gluon hasn't checked (it may
- * bring tools: fail closed).
- */
-export function catalogWithoutTools(json: string): string {
+/** Codex's model catalog (`codex debug models` JSON), read. Throws when it isn't JSON with a models list. */
+function catalogModels(json: string): { catalog: Record<string, unknown>; models: Record<string, unknown>[] } {
   let catalog: { models?: unknown };
   try {
     catalog = JSON.parse(json);
@@ -204,10 +201,24 @@ export function catalogWithoutTools(json: string): string {
     throw new Error(`codex's model catalog (\`codex debug models\`) isn't JSON; ${TOO_NEW}`);
   }
   if (!Array.isArray(catalog?.models) || !catalog.models.length) throw new Error(`codex's model catalog (\`codex debug models\`) has no models list; ${TOO_NEW}`);
+  return { catalog: catalog as Record<string, unknown>, models: catalog.models as Record<string, unknown>[] };
+}
+
+/**
+ * Codex's model catalog with every model's own tools turned off (CATALOG_TOOLS_OFF); every other
+ * field as codex wrote it, known or not (codex may need it: it refuses a catalog that lacks one).
+ * Throws when it isn't the shape Gluon knows.
+ */
+export function catalogWithoutTools(json: string): string {
+  const { catalog, models } = catalogModels(json);
+  return JSON.stringify({ ...catalog, models: models.map((m) => ({ ...m, ...CATALOG_TOOLS_OFF })) });
+}
+
+/** The fields set on a model of the catalog that Gluon hasn't checked (CATALOG_FIELDS): each may bring tools. */
+export function uncheckedCatalogFields(json: string): string[] {
   const unknown = new Set<string>();
-  for (const m of catalog.models as Record<string, unknown>[]) for (const [k, v] of Object.entries(m ?? {})) if (!CATALOG_FIELDS.has(k) && !unset(v)) unknown.add(k);
-  if (unknown.size) throw new Error(`${UNSUPPORTED}: its model catalog has fields Gluon hasn't checked (${[...unknown].join(", ")}), which may give the intake agent tools of Codex's own. Update Gluon, or use another step of brain.order`);
-  return JSON.stringify({ ...catalog, models: catalog.models.map((m) => ({ ...(m as object), ...CATALOG_TOOLS_OFF })) });
+  for (const m of catalogModels(json).models) for (const [k, v] of Object.entries(m ?? {})) if (!CATALOG_FIELDS.has(k) && !unset(v)) unknown.add(k);
+  return [...unknown];
 }
 
 /**
@@ -251,9 +262,10 @@ async function featuresList(spawn: SpawnCodex, disable: string[]): Promise<strin
 
 /**
  * What the app-server is started with: the tool-free catalog's path and the features to turn off, of
- * which `unchecked` are on in this codex and in neither of Gluon's lists.
+ * which `unchecked` are on in this codex and in neither of Gluon's lists; `warnings`: what Gluon
+ * couldn't turn off and hasn't checked.
  */
-type BrainSetup = { catalog: string; off: string[]; unchecked: string[] };
+type BrainSetup = { catalog: string; off: string[]; unchecked: string[]; warnings: string[] };
 
 const catalogFiles = new WeakMap<SpawnCodex, Promise<BrainSetup>>();
 
@@ -266,8 +278,8 @@ export function codexLevels(): Readonly<Record<string, string[]>> {
 }
 
 /**
- * Checks this codex (once per run): with every feature outside CODEX_FEATURES_KEPT turned off,
- * none stays on. Then writes the tool-free catalog to a private temp file:
+ * Sets up for this codex (once per run): every feature outside CODEX_FEATURES_KEPT turned off, a
+ * warning for any that stays on. Then writes the tool-free catalog to a private temp file:
  * from Codex's own refreshed catalog, else the one bundled with the binary. Returns its path and the
  * features turned off. Never a model call.
  */
@@ -277,8 +289,9 @@ function brainCatalog(spawn: SpawnCodex): Promise<BrainSetup> {
   file = (async () => {
     const list = await featuresList(spawn, []);
     const off = featuresToDisable(list);
+    const warnings: string[] = [];
     const stuck = uncheckedFeatures(await featuresList(spawn, off));
-    if (stuck.length) throw new Error(`${UNSUPPORTED}: it keeps features on that Gluon hasn't checked (${stuck.join(", ")}), which may give the intake agent tools of Codex's own. Update Gluon, or use another step of brain.order`);
+    if (stuck.length) warnings.push(`This codex keeps features on that Gluon hasn't checked (${stuck.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
     let json = "";
     for (const args of [["debug", "models"], ["debug", "models", "--bundled"]]) {
       const r = await codexOutput(spawn, args);
@@ -290,12 +303,14 @@ function brainCatalog(spawn: SpawnCodex): Promise<BrainSetup> {
     const path = join(dir, "catalog.json");
     try {
       writeFileSync(path, catalogWithoutTools(json), { mode: 0o600 });
+      const fields = uncheckedCatalogFields(json);
+      if (fields.length) warnings.push(`This codex's model catalog has fields Gluon hasn't checked (${fields.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
     } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e;
     }
     process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
-    return { catalog: path, off, unchecked: newFeatures(list) };
+    return { catalog: path, off, unchecked: newFeatures(list), warnings };
   })();
   catalogFiles.set(spawn, file);
   file.catch(() => catalogFiles.delete(spawn));
@@ -912,7 +927,7 @@ export async function probeChatgptPlan(
       const res = await server.request("thread/start", threadStartParams(model, cwd, PROBE_SYSTEM, names, setup!.off));
       const threadId = res.thread.id as string;
       starting = false;
-      const warnings = (res.instructionSources ?? []).map((s: string) => `Codex adds instructions from ${s} to the brain's prompt.`);
+      const warnings = [...setup!.warnings, ...(res.instructionSources ?? []).map((s: string) => `Codex adds instructions from ${s} to the brain's prompt.`)];
       // Asked even when the config names none: a server codex adds by itself must be off too.
       const status = await server.request("mcpServerStatus/list", { threadId, detail: "toolsAndAuthOnly" });
       const on = (status?.data ?? []).filter((s: { runtimeStatus?: string | null }) => s.runtimeStatus !== "disabled").map((s: { name: string }) => s.name);
