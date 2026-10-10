@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkTools, drift, drifted, itemTypes, report, requestTools, toolCheck, type ToolCheck } from "../scripts/codex-drift.ts";
-import { BRAIN_ITEMS, CODEX_FEATURES_OFF, featuresToDisable, FOREIGN_ITEMS } from "../src/agent/codex.ts";
+import { BRAIN_ITEMS, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, featuresToDisable, FOREIGN_ITEMS } from "../src/agent/codex.ts";
 import { TOOLS } from "../src/agent/tools.ts";
 
 const LIST = readFileSync(join(import.meta.dir, "fixtures", "codex-features-list.txt"), "utf8");
@@ -29,7 +29,9 @@ const ITEMS = [...BRAIN_ITEMS, ...FOREIGN_ITEMS];
 
 test("the checked codex (the fixture's list, a known catalog, known item types, Gluon's tools only) has no drift; its new features are noted", () => {
   const d = drift("0.162.1", LIST, withOff(LIST, featuresToDisable(LIST)), CATALOG, ITEMS, [checkTools("gpt-6.1-sol", [body()], null)]);
-  expect(d).toEqual({ version: "0.162.1", features: [], catalogFields: [], newOff: ["browser_annotation_api", "in_app_voice", "ultrafast_mode"], tools: [], catalog: null, items: [], gone: [] });
+  // The fixture's features that are on and in neither of Gluon's lists: noted as turned off.
+  const fresh = LIST.trim().split("\n").map((l) => l.trim().split(/\s{2,}/)).filter(([n, stage, on]) => on === "true" && stage !== "removed" && !CODEX_FEATURES_OFF.includes(n!) && !(n! in CODEX_FEATURES_KEPT)).map(([n]) => n!);
+  expect(d).toEqual({ version: "0.162.1", features: [], catalogFields: [], newOff: fresh, tools: [], catalog: null, items: [], gone: [] });
   expect(drifted(d)).toBe(false);
   expect(report(d)).toContain("Nothing to do for the intake agent");
   expect(report(d)).toContain("turned off unchecked");
@@ -81,6 +83,12 @@ test("the tool check runs the brain against a local provider and reads what code
     expect(await toolCheck(["bun", FAKE], ["gpt-6-sol"], dir, home)).toEqual([{ model: "gpt-6-sol", extra: [], missing: [], error: null }]);
     const own = await toolCheck(["bun", FAKE], ["gpt-6-sol"], dir, home, { extraEnv: { FAKE_CODEX_EXTRA_TOOLS: "exec_command" } });
     expect(own).toEqual([{ model: "gpt-6-sol", extra: ["function:exec_command"], missing: [], error: null }]);
+    // A model whose turn never ends is that model's error; the next model is still checked.
+    const hang = await toolCheck(["bun", FAKE], ["gpt-6-sol", "gpt-6-luna"], dir, home, { timeoutMs: 500, extraEnv: { FAKE_CODEX_SCRIPT: JSON.stringify({ turns: [[{ hang: true }]] }) } });
+    expect(hang.map((t) => [t.model, t.error])).toEqual([
+      ["gpt-6-sol", expect.stringContaining("no answer from codex")],
+      ["gpt-6-luna", expect.stringContaining("no answer from codex")],
+    ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

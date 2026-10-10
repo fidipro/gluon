@@ -51,13 +51,18 @@ const out = (s: string) => {
   console.log(maskSecrets(s));
 };
 
+/** A working check's warnings, one `!` line each under it. */
+function warningLines(warnings: string[] | undefined, indent: string): string[] {
+  return (warnings ?? []).map((w) => `${indent}! ${w}`);
+}
+
 /** One step of the order and how its check went; `withEffort`: and the effort it sends (`gluon brain`). */
 export function stepLine(r: StepResult, active: number | null, withEffort = false): string {
   const n = `${r.index + 1}. ${stepLabel(r.step)}`;
   const effort = withEffort ? shownEffort(r.step) : null;
   const tail = effort ? ` · effort ${effort}${r.step.effort ? "" : " (default)"}` : withEffort ? " · no effort setting" : "";
   if (r.result === null) return `  · ${n} · not tried (step ${(active ?? 0) + 1} is in use)${tail}`;
-  if (r.result.ok) return `  ✓ ${n}${r.index === active ? "   ← in use" : ""}${tail}`;
+  if (r.result.ok) return [`  ✓ ${n}${r.index === active ? "   ← in use" : ""}${tail}`, ...warningLines(r.result.warnings, "      ")].join("\n");
   // A step that isn't connected isn't a failure: nothing to fix unless you want it.
   return `  ${/^not connected/.test(r.result.error) ? "·" : "✗"} ${n} · ${r.result.error}${tail}`;
 }
@@ -91,7 +96,7 @@ async function harnessReport(config: Config, h: Harness, cwd: string): Promise<{
       ok = false;
       continue;
     }
-    for (const m of p.models) lines.push(m.result.ok ? `    ✓ ${m.entry.id} · ${m.id}` : `    ✗ ${m.entry.id} · ${m.id} · ${m.result.error}`);
+    for (const m of p.models) lines.push(...(m.result.ok ? [`    ✓ ${m.entry.id} · ${m.id}`, ...warningLines(m.result.warnings, "        ")] : [`    ✗ ${m.entry.id} · ${m.id} · ${m.result.error}`]));
     if (!p.models.some((m) => m.result.ok)) ok = false;
     else lines.push(`    ${summary.replace(/^[✓✗] /, "")}`);
   }

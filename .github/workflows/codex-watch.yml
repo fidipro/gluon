@@ -31,6 +31,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    # Each model's turn has its own limit (scripts/codex-drift.ts); this stops a check that hangs anyway.
+    timeout-minutes: 30
     outputs:
       version: ${{ steps.version.outputs.version }}
       drift: ${{ steps.drift.outputs.drift }}

@@ -410,6 +410,17 @@ describe("review of PR #1", () => {
     s.close();
   });
 
+  test("BUG-79/mcp: an MCP server codex keeps on by itself is a warning and the probe passes; one of the user's config that stays on still fails it", async () => {
+    const own = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_OWN_MCP: "codex_apps" }).spawn });
+    expect(own).toEqual({ ok: true, warnings: [expect.stringContaining("MCP servers on that aren't in your config (codex_apps)")] });
+    // With a server in the config too: the thread turns it off, so only codex's own is warned about.
+    const theirs = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_OWN_MCP: "codex_apps" }).spawn });
+    expect(theirs).toEqual({ ok: true, warnings: [expect.stringContaining("(codex_apps)")] });
+    // A server of the user's config that stays on although Gluon turned it off: turning off is broken, so the probe fails.
+    const stuck = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_MCP_STAYS_ON: "docs" }).spawn });
+    expect(stuck).toEqual({ ok: false, error: expect.stringContaining("Codex's MCP servers docs stayed on") });
+  });
+
   test("BUG-79/start-hint: a codex that fails to start after Gluon turned off features it hasn't checked is told which (codex may need one); one that starts isn't", async () => {
     const env = { FAKE_CODEX_FEATURES_EXTRA: "next_new_mode  stable  true" };
     const crash = fake({ turns: [] }, env);
@@ -421,6 +432,11 @@ describe("review of PR #1", () => {
     // A failure once the thread runs (the plan's own refusal) isn't about features.
     const later = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ fail: { message: "usage limit", codexErrorInfo: "usageLimitExceeded" } }]] }, env).spawn });
     expect(later).toEqual({ ok: false, error: expect.not.stringContaining("hasn't checked") });
+    // Nor is one where codex answers but refuses to start the thread (it didn't exit): the hint is for an exit alone.
+    const refusing = fake({ turns: [] }, { ...env, FAKE_CODEX_THREAD_START_ERROR: "model gpt-6-sol does not exist" });
+    const refused = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: refusing.spawn });
+    expect(refused).toEqual({ ok: false, error: expect.stringContaining("does not exist") });
+    expect(!refused.ok && refused.error).not.toContain("hasn't checked");
   });
 
   test("BUG-80/5: `codex login status` that never answers times out like the other status checks", async () => {

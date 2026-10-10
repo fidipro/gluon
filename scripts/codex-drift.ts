@@ -171,8 +171,8 @@ async function requestBody(req: Request): Promise<unknown> {
 /**
  * The brain's one turn per model, as for a user, against a provider on 127.0.0.1: what each turn's
  * requests carried. `command` runs codex (the binary, or a fake in tests, which may add `extraEnv` to
- * its bare environment). Throws when the check itself can't run (a timeout, an unreadable request):
- * exit 2, not drift.
+ * its bare environment). A model's turn that times out or sends a request the check can't read is
+ * that model's `error`; the others are still checked. Throws only when the check itself can't run.
  */
 export async function toolCheck(command: string[], models: string[], dir: string, home: string, opts: { timeoutMs?: number; extraEnv?: Record<string, string> } = {}): Promise<ToolCheck[]> {
   const timeoutMs = opts.timeoutMs ?? 60_000;
@@ -197,25 +197,29 @@ export async function toolCheck(command: string[], models: string[], dir: string
     "-c",
     `model_providers.gluon_drift={name="gluon-drift",base_url="http://127.0.0.1:${server.port}/v1",env_key="GLUON_DRIFT_KEY",wire_api="responses",request_max_retries=0,stream_max_retries=0}`,
   ];
-  const env = { PATH: process.env.PATH, HOME: dir, TMPDIR: process.env.TMPDIR, CODEX_HOME: home, GLUON_DRIFT_KEY: "none", NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", ...opts.extraEnv };
+  // Windows needs its system variables to start a process or open a socket at all.
+  const system = process.platform === "win32" ? Object.fromEntries(["SystemRoot", "windir", "ComSpec", "PATHEXT", "TEMP", "TMP", "SystemDrive"].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : []))) : {};
+  const env = { ...system, PATH: process.env.PATH, HOME: dir, TMPDIR: process.env.TMPDIR, CODEX_HOME: home, GLUON_DRIFT_KEY: "none", NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", ...opts.extraEnv };
   const spawn: SpawnCodex = (argv) => Bun.spawn([...command, ...argv.slice(1), ...(argv[1] === "app-server" ? provider : [])], { cwd: dir, env, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
   const hooks = { begin() {}, text() {}, end() {}, tool: async () => ({ content: "Not available in this check.", error: true }) };
   const out: ToolCheck[] = [];
   try {
     for (const model of models) {
       bodies = [];
+      unreadable = null;
       const brain = chatgptPlanBrain({ model, cwd: dir, spawn });
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error(`no answer from codex for ${model} in ${timeoutMs / 1000} s`)), timeoutMs)));
       let error: string | null = null;
       try {
         await Promise.race([brain.send("Reply with the single word: ok", "You are a check. Reply with the single word: ok", hooks, new AbortController().signal).catch((e: Error) => (error = e.message)), timeout]);
+      } catch (e) {
+        error = (e as Error).message;
       } finally {
         clearTimeout(timer);
         brain.close?.();
       }
-      if (unreadable) throw unreadable;
-      out.push(checkTools(model, bodies, error));
+      out.push(checkTools(model, bodies, (unreadable as Error | null)?.message ?? error));
     }
   } finally {
     server.stop(true);

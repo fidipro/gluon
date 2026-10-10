@@ -101,6 +101,9 @@ export const CODEX_FEATURES_OFF = [
   "token_budget",
   "memories",
   "chronicle",
+  // Browser annotations and voice in Codex's own app: tools or input Gluon never asks for.
+  "browser_annotation_api",
+  "in_app_voice",
 ];
 
 /**
@@ -118,7 +121,7 @@ export const CODEX_FEATURES_KEPT: Record<string, string> = {
   ),
 };
 
-/** What a refusal or warning says: the user's codex is newer than what Gluon has checked. */
+/** What a refusal says: the user's codex is newer than what Gluon has checked. */
 export const UNSUPPORTED = "this codex version isn't supported for the intake agent on the ChatGPT plan yet (checked against codex 0.162)";
 /** The tail of a refusal of a codex whose catalog Gluon can't read: `brainErrorHint` matches it with `UNSUPPORTED`. */
 export const TOO_NEW = "this codex may be too new for the intake agent";
@@ -174,7 +177,7 @@ export function uncheckedFeatures(list: string): string[] {
 const CATALOG_TOOLS_OFF = { tool_mode: "direct", apply_patch_tool_type: null, experimental_supported_tools: [], multi_agent_version: null };
 
 /**
- * The other catalog fields Gluon knows (codex 0.161), none of which gives the thread a tool:
+ * The other catalog fields Gluon knows (codex 0.162), none of which gives the thread a tool:
  * descriptions, reasoning and context settings, prompts, access programs. `shell_type` and
  * `web_search_tool_type` / `supports_search_tool` only shape tools that are off (shell_tool,
  * web_search, no environment).
@@ -291,7 +294,10 @@ function brainCatalog(spawn: SpawnCodex): Promise<BrainSetup> {
     const off = featuresToDisable(list);
     const warnings: string[] = [];
     const stuck = uncheckedFeatures(await featuresList(spawn, off));
-    if (stuck.length) warnings.push(`This codex keeps features on that Gluon hasn't checked (${stuck.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
+    const unsafe = stuck.filter((f) => CODEX_FEATURES_OFF.includes(f));
+    const unchecked = stuck.filter((f) => !CODEX_FEATURES_OFF.includes(f));
+    if (unsafe.length) warnings.push(`This codex keeps features on that Gluon turns off for safety (${unsafe.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
+    if (unchecked.length) warnings.push(`This codex keeps features on that Gluon hasn't checked (${unchecked.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
     let json = "";
     for (const args of [["debug", "models"], ["debug", "models", "--bundled"]]) {
       const r = await codexOutput(spawn, args);
@@ -317,13 +323,17 @@ function brainCatalog(spawn: SpawnCodex): Promise<BrainSetup> {
   return file;
 }
 
+/** The app-server process ended (its exit code and last words), as opposed to a request it refused. */
+class AppServerExit extends Error {}
+
 /**
- * A failure to start the brain, with the new features Gluon turned off unchecked: codex may need one
- * (then Gluon needs an update). As it was when there are none.
+ * A codex that exited while the brain started, with the new features Gluon turned off unchecked:
+ * codex may need one (then Gluon needs an update). Any other failure (sign-in, limits, a timeout)
+ * as it was, and so is an exit when there are none.
  */
-function withUnchecked(e: Error, setup: BrainSetup | undefined): Error {
-  if (!setup?.unchecked.length) return e;
-  return new Error(`${e.message} (Gluon turned off features of this codex it hasn't checked: ${setup.unchecked.join(", ")}; if codex needs one, update Gluon, or use another step of brain.order)`);
+function withUnchecked(e: Error, setup: BrainSetup | undefined, message = e.message): Error {
+  if (!(e instanceof AppServerExit) || !setup?.unchecked.length) return message === e.message ? e : new Error(message);
+  return new Error(`${message} (Gluon turned off features of this codex it hasn't checked: ${setup.unchecked.join(", ")}; if codex needs one, update Gluon, or use another step of brain.order)`);
 }
 
 /** What a spawned `codex app-server` must offer; `Bun.spawn` with piped stdio fits. */
@@ -412,7 +422,7 @@ class AppServer {
   constructor(private child: ChildLike) {
     void this.read();
     void this.readErrors();
-    void child.exited.then((code) => this.fail(new Error(this.exitReason(code))));
+    void child.exited.then((code) => this.fail(new AppServerExit(this.exitReason(code))));
   }
 
   private async read() {
@@ -540,13 +550,13 @@ async function startThread(server: AppServer, model: string, cwd: string, system
 }
 
 /**
- * The thread items a brain's turn may hold (codex 0.161's `ThreadItem` types): the developer's
+ * The thread items a brain's turn may hold (codex 0.162's `ThreadItem` types): the developer's
  * message, the model's text, reasoning and plan text, Gluon's own tool calls, and Codex's context compaction.
  */
 export const BRAIN_ITEMS = new Set(["userMessage", "agentMessage", "reasoning", "plan", "dynamicToolCall", "contextCompaction"]);
 
 /**
- * The other item types of codex 0.161: a tool of Codex's own, or work Gluon never asks for. A type
+ * The other item types of codex 0.162: a tool of Codex's own, or work Gluon never asks for. A type
  * in neither set is new: `scripts/codex-drift.ts` reports it, and the brain refuses it like these.
  */
 export const FOREIGN_ITEMS = new Set([
@@ -928,10 +938,19 @@ export async function probeChatgptPlan(
       const threadId = res.thread.id as string;
       starting = false;
       const warnings = [...setup!.warnings, ...(res.instructionSources ?? []).map((s: string) => `Codex adds instructions from ${s} to the brain's prompt.`)];
-      // Asked even when the config names none: a server codex adds by itself must be off too.
-      const status = await server.request("mcpServerStatus/list", { threadId, detail: "toolsAndAuthOnly" });
-      const on = (status?.data ?? []).filter((s: { runtimeStatus?: string | null }) => s.runtimeStatus !== "disabled").map((s: { name: string }) => s.name);
-      if (on.length) throw new Error(`Codex's MCP servers ${on.join(", ")} stayed on; the intake agent must see its own tools only.`);
+      // A server of the user's config that stays on: Gluon's own turning off failed. Asked even when the config names
+      // none: one codex adds by itself (or a codex that can't say) is a warning, as the brain runs anyway.
+      try {
+        const status = await server.request("mcpServerStatus/list", { threadId, detail: "toolsAndAuthOnly" });
+        const on: string[] = (status?.data ?? []).filter((s: { runtimeStatus?: string | null }) => s.runtimeStatus !== "disabled").map((s: { name: string }) => s.name);
+        const theirs = on.filter((n) => names.includes(n));
+        if (theirs.length) throw new Error(`Codex's MCP servers ${theirs.join(", ")} stayed on; the intake agent must see its own tools only.`);
+        const own = on.filter((n) => !names.includes(n));
+        if (own.length) warnings.push(`Codex keeps MCP servers on that aren't in your config (${own.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
+      } catch (e) {
+        if (names.length) throw e;
+        warnings.push(`Codex didn't say which MCP servers are on (${(e as Error).message}); the intake agent runs anyway.`);
+      }
       const done = new Promise<void>((resolve, reject) => {
         let error: string | null = null;
         server.onNotification = (method, p) => {
@@ -961,8 +980,8 @@ export async function probeChatgptPlan(
     const warnings = await Promise.race([run(), timeout]);
     return warnings.length ? { ok: true, warnings } : { ok: true };
   } catch (e) {
-    const error = new Error(explain((e as Error).message, model));
-    return { ok: false, error: maskSecrets((starting ? withUnchecked(error, setup) : error).message) };
+    const message = explain((e as Error).message, model);
+    return { ok: false, error: maskSecrets(starting ? withUnchecked(e as Error, setup, message).message : message) };
   } finally {
     clearTimeout(timer);
     server.close();

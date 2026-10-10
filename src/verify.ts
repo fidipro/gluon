@@ -21,7 +21,8 @@ import { maskSecrets, secret } from "./secrets.ts";
 import { claudePing, isTransient, loginStatus, type LoginStatus } from "./status.ts";
 
 /** A failed probe is `transient` when it says nothing about access (a timeout, the network, a rate limit, a server error). */
-export type Probe = { ok: true; usage?: { input: number; output: number } } | { ok: false; error: string; transient?: boolean };
+/** A check of a model or step; `warnings`: it works, but with something the user should know (e.g. what Gluon hasn't checked in this codex). */
+export type Probe = { ok: true; usage?: { input: number; output: number }; warnings?: string[] } | { ok: false; error: string; transient?: boolean };
 
 export interface ModelProbe {
   entry: ModelEntry;
@@ -166,7 +167,7 @@ async function probePlan(harness: Harness, entries: [ModelEntry, string][], cwd:
       result = error ? { ok: false, error, ...(isTransient(error) ? { transient: true } : {}) } : { ok: true };
     } else if (harness === "codex") {
       const r = await probeChatgptPlan(id, cwd);
-      result = r.ok ? { ok: true } : { ok: false, error: r.error, ...(isTransient(r.error) ? { transient: true } : {}) };
+      result = r.ok ? { ok: true, ...(r.warnings?.length ? { warnings: r.warnings } : {}) } : { ok: false, error: r.error, ...(isTransient(r.error) ? { transient: true } : {}) };
     } else if (harness === "kimi-code") {
       // Kimi lists no models for the plan and a call would spend the plan's quota: the sign-in is all Gluon asks (`kimiPlanStatus`).
       result = { ok: true };

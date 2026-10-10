@@ -130,6 +130,16 @@ describe.skipIf(!POSIX)("doctor", () => {
   });
 });
 
+test("BUG-79/doctor-warnings: a ChatGPT-plan step that works with something Gluon hasn't checked shows ✓ and the warning under it in `gluon brain`", async () => {
+  const d = setup("connections: { codex: { auth: subscription } }\nbrain: { order: [{ route: chatgpt-plan, model: gpt-6-sol }] }\n", {});
+  process.env.FAKE_CODEX_FEATURES_EXTRA = "hosted_agent_tools  stable  true";
+  process.env.FAKE_CODEX_FORCED_ON = "unified_exec,hosted_agent_tools";
+  const { code, text } = await printed(() => showBrain(loadConfig(), d));
+  expect(code).toBe(0);
+  expect(text).toMatch(/✓ 1\. .*ChatGPT plan/);
+  expect(text).toMatch(/\n {6}! This codex keeps features on that Gluon hasn't checked \(hosted_agent_tools\)/);
+});
+
 describe("stepLine and awsLabel", () => {
   const step = (route: string, model: string) => ({ route, model }) as StepResult["step"];
   const at = (i: number, result: StepResult["result"]): StepResult => ({ index: i, step: step("openai-api", "gpt-6-sol"), result }) as StepResult;

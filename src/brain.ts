@@ -117,7 +117,7 @@ export async function probeStep(config: Config, step: BrainStep, cwd: string): P
         if (!s.loggedIn) return { ok: false, error: s.transient && s.error ? s.error : "not connected: `codex login status` says you're not signed in" };
         if (s.wrongMethod) return { ok: false, error: s.wrongMethod };
         const r = await probeChatgptPlan(model, cwd);
-        return r.ok ? { ok: true } : { ok: false, error: r.error };
+        return r.ok ? { ok: true, ...(r.warnings?.length ? { warnings: r.warnings } : {}) } : { ok: false, error: r.error };
       }
       case "anthropic-api":
         return fakeProbe(step.route, model) ?? (await anthropicProbe(secret("ANTHROPIC_API_KEY")!, model));

@@ -157,15 +157,20 @@ function handle(m: { id?: number; method?: string; params?: any; result?: unknow
       return reply({ config: { mcp_servers: Object.fromEntries((script.mcpServers ?? []).map((name) => [name, { command: "true", enabled: true }])) } });
     case "thread/start": {
       if (m.params?.dynamicTools && !experimental) return fail("thread/start.dynamicTools requires experimentalApi capability");
+      // FAKE_CODEX_THREAD_START_ERROR: codex refuses the thread (and keeps running).
+      if (process.env.FAKE_CODEX_THREAD_START_ERROR) return fail(process.env.FAKE_CODEX_THREAD_START_ERROR);
       const config = m.params?.config ?? {};
       dynamicTools = m.params?.dynamicTools ?? [];
-      disabled = new Set((script.mcpServers ?? []).filter((name) => config[`mcp_servers.${name}.enabled`] === false));
+      // FAKE_CODEX_MCP_STAYS_ON: config servers codex keeps on whatever the thread says.
+      const stays = (process.env.FAKE_CODEX_MCP_STAYS_ON ?? "").split(",");
+      disabled = new Set((script.mcpServers ?? []).filter((name) => config[`mcp_servers.${name}.enabled`] === false && !stays.includes(name)));
       const thread = { id: THREAD, ephemeral: true, turns: [] };
       reply({ thread, model: m.params?.model, modelProvider: "openai", instructionSources: [], approvalPolicy: "never", sandbox: { type: "readOnly" } });
       return notify("thread/started", { thread });
     }
     case "mcpServerStatus/list":
-      return reply({ data: (script.mcpServers ?? []).map((name) => ({ name, runtimeStatus: disabled.has(name) ? "disabled" : "ready" })), nextCursor: null });
+      // FAKE_CODEX_OWN_MCP: servers codex adds by itself (not in config/read), on.
+      return reply({ data: [...(script.mcpServers ?? []).map((name) => ({ name, runtimeStatus: disabled.has(name) ? "disabled" : "ready" })), ...(process.env.FAKE_CODEX_OWN_MCP ?? "").split(",").filter(Boolean).map((name) => ({ name, runtimeStatus: "ready" }))], nextCursor: null });
     case "turn/start": {
       const turnId = `turn_${++turnCount}`;
       reply({ turn: { id: turnId, items: [], status: "inProgress" } });
