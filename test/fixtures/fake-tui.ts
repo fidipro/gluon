@@ -138,9 +138,9 @@ export function runTui(name = process.env.FAKE_AGENT_NAME ?? ""): void {
   let at = 0;
   /**
    * The prompt block (`at`: the line with the cursor, `col`: its column). The fake `claude` looks
-   * like Claude Code (what its screen reader expects): the menu above a `────` border, `❯ <input>`,
-   * a border below; the highlighted item in an accent colour, the others grey with the typed letters
-   * bold. The fake `codex` looks like Codex 0.159 (`test/fixtures/screens/codex/`): the menu above,
+   * like Claude Code 2.1.296 (`test/fixtures/screens/claude-code/`): the menu above a `────` border, `❯ <input>`,
+   * a border below; the highlighted item marked `❯ ` in an accent colour, the others indented four cells, grey with the typed
+   * letters bold. The fake `codex` looks like Codex 0.159 (`test/fixtures/screens/codex/`): the menu above,
    * items `  /name  description`, the highlighted one `› ` bold on a coloured background; the
    * composer `› <input>` (a faint placeholder when empty) on a shaded background with a shaded blank
    * row above and below; a footer. The fake `opencode` looks like OpenCode 2.0
@@ -176,7 +176,8 @@ export function runTui(name = process.env.FAKE_AGENT_NAME ?? ""): void {
     }
     if (claude) {
       const border = "─".repeat(Math.min(40, cols - 1));
-      const items = m.map((c, i) => (i === sel ? `  \x1b[38;5;153m${c}\x1b[0m` : `  \x1b[1m${input}\x1b[22m\x1b[38;5;246m${c.slice(input.length)}\x1b[0m`));
+      // Claude Code 2.1.296: the items indented four cells, the highlighted one marked `❯ `.
+      const items = m.map((c, i) => (i === sel ? `  ❯ \x1b[38;5;153m${c}\x1b[0m` : `    \x1b[1m${input}\x1b[22m\x1b[38;5;246m${c.slice(input.length)}\x1b[0m`));
       return { lines: [...items, border, `❯ ${input}`, border], at: items.length + 1, col: 2 + before().length };
     }
     if (opencode) {

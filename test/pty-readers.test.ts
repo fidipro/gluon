@@ -243,6 +243,59 @@ test("BUG-244/GLUON-40: Claude Code's own dialog waiting for a pick (the first r
   }
 });
 
+// Claude Code 2.1.296 indents the menu's items four spaces and marks the highlighted one `  ❯ /name`.
+test("BUG-718/menu-mark: Claude Code's highlighted menu item is read from its `❯` mark (2.1.296), and from its colour alone in 2.1.286's layout", async () => {
+  const r = READERS["claude-code"];
+  const f = fixture("claude-code");
+  for (const [name, item] of [["c-down2", "/clear"], ["slash", "/add-dir"], ["help", "/help"]] as const) {
+    const screen = await screenOf(f, name);
+    expect(r.selectedCommand(screen)).toBe(item);
+    screen.dispose();
+  }
+  const rule = "─".repeat(40);
+  const grey = (s: string) => `\x1b[38;2;153;153;153m${s}\x1b[0m`;
+  const accent = (s: string) => `\x1b[38;2;177;185;249m${s}\x1b[0m`;
+  const box = (typed: string) => `${rule}\r\n❯ ${typed}\r\n${rule}\r\n  ⏵⏵ auto mode on`;
+  for (const [drawn, item] of [
+    // 2.1.296 without colours (NO_COLOR): the mark alone.
+    [`    /copy      Copy the reply\r\n  ❯ /clear     Start a new session\r\n    /color     Set the colour\r\n${box("/c")}`, "/clear"],
+    // 2.1.286: no mark, the highlighted item in the accent colour, the others grey.
+    [`  ${grey("/copy      Copy the reply")}\r\n  ${accent("/clear     Start a new session")}\r\n  ${grey("/color     Set the colour")}\r\n${box("/c")}`, "/clear"],
+    // Two marks: unsure.
+    [`  ❯ /copy      Copy the reply\r\n  ❯ /clear     Start a new session\r\n${box("/c")}`, null],
+  ] as const) {
+    const s = createScreen(60, 8);
+    await s.write(drawn);
+    // The cursor after the typed `/c`, on the box's `❯` row.
+    const y = Array.from({ length: 8 }, (_, i) => s.line(i).text).findIndex((t) => t.startsWith("❯ /c"));
+    await s.write(`\x1b[${y + 1};5H`);
+    expect(r.selectedCommand(s)).toBe(item);
+    s.dispose();
+  }
+});
+
+// Claude Code 2.1.296 shows a faint `Try "…"` in the empty box, starting under the cursor.
+test("BUG-719/placeholder: Claude Code's faint placeholder in the empty input box is not input; typed text before the cursor is", async () => {
+  const r = READERS["claude-code"];
+  const idle = await screenOf(fixture("claude-code"), "idle");
+  // Claude draws a no-break space after the `❯`.
+  expect(idle.line(idle.cursor().y).text).toStartWith('❯\u00a0Try "');
+  expect(r.inputLine(idle)).toBe("");
+  idle.dispose();
+  const rule = "─".repeat(40);
+  for (const [row, col, input] of [
+    ['❯\u00a0\x1b[2mTry "fix lint errors"\x1b[0m', 3, ""],
+    ["❯ fix it", 9, "fix it"],
+    // The cursor moved back into typed text: the rest of the line is still input.
+    ["❯ fix it", 5, "fix it"],
+  ] as const) {
+    const s = createScreen(60, 5);
+    await s.write(`${rule}\r\n${row}\r\n${rule}\x1b[2;${col}H`);
+    expect(r.inputLine(s)).toBe(input);
+    s.dispose();
+  }
+});
+
 // QA-live-01 / F10: Claude Code sends no hook when Esc cuts a turn off; its own row says so (`interrupted`, display only).
 test("BUG-609/QA-live-01: Claude Code's `Interrupted · What should Claude do instead?` as the last transcript row above the idle input box is read; no other captured screen is", async () => {
   const r = READERS["claude-code"];

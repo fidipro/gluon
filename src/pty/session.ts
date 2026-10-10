@@ -72,6 +72,12 @@ export const SCROLLBACK = 5000;
 export const QUIET_AWAIT_MS = 3000;
 /** Output this soon after a key is its echo, not work. */
 export const ECHO_GRACE_MS = 300;
+/**
+ * Output that only sets terminal modes (DEC private modes `CSI ? … h/l`, xterm's key modifiers `CSI > … m`) draws
+ * nothing: not work, and the quiet goes on. Antigravity 1.3.3 under tmux re-sends bracketed paste and
+ * modifyOtherKeys every 2 s while idle (BUG-721).
+ */
+const MODES_ONLY = /^(?:\x1b\[\?[\d;]*[hl]|\x1b\[>[\d;]*m)+$/;
 /** A hook's status this recent wins over what the output suggests. */
 export const HOOK_TRUST_MS = 30_000;
 /**
@@ -456,12 +462,13 @@ export class AgentSession implements RunHandle {
 
   private output(data: Uint8Array) {
     const at = this.now();
-    this.lastOutput = at;
-    this.interruptHandled = false;
     const text = this.outText.decode(data, { stream: true });
     try {
       this.screenDone = this.screen.write(text).catch(() => {});
     } catch {}
+    if (MODES_ONLY.test(text)) return;
+    this.lastOutput = at;
+    this.interruptHandled = false;
     // Output that isn't the echo of a key nor a redraw Gluon caused: the agent is at work (unless
     // its hooks said otherwise lately; and with hooks only until the output goes quiet: `fallback`).
     if (at - this.lastForward <= ECHO_GRACE_MS || this.isRedraw(at)) return;

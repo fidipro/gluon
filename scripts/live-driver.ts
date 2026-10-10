@@ -705,11 +705,13 @@ const API_KEY = /\bapi[ -]?key\b/i;
 
 /** Gluon's own agent list (`○  codex  sign-in needed · not connected`, `ready · api key`): a status, not a prompt. */
 const READINESS = /\b(sign-in needed|not connected|not installed|key missing|checking…)|ready · /i;
+/** Antigravity's start banner names how it signed in, a row of its own beside the logo (`▀▀▀▀▀▀   Gemini API key`): a status. */
+const AGY_BANNER = /^[\s│▀▄█]*Gemini API key[\s│]*$/;
 
 /** The first line of a screen that looks like a sign-in, login or API-key prompt, or null. */
 export function loginLine(lines: string[]): string | null {
   for (const l of lines) {
-    if (READINESS.test(l)) continue;
+    if (READINESS.test(l) || AGY_BANNER.test(l)) continue;
     if (LOGIN.test(l) || API_KEY.test(l)) return l.trim();
   }
   return null;

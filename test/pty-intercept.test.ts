@@ -290,10 +290,15 @@ describe("NO_COLOR screens", () => {
         if (sel) expect(`${h} ${s.name}: ${sel}`).toBe(`${h} ${s.name}: ${READERS[h].selectedCommand(coloured)}`);
       }
     }
-    // Claude Code's menu can't be read at all without its colours: unsure, so nothing is held for `/cl`.
+    // Claude Code 2.1.296 marks the highlighted item `❯`: its menu reads the same without colours (BUG-718).
     const cc = fixture("claude-code");
     const cl = await screenOf(cc, { ...state(cc, "cl"), ansi: noColor(state(cc, "cl").ansi) });
-    expect(READERS["claude-code"].selectedCommand(cl)).toBeNull();
+    expect(READERS["claude-code"].selectedCommand(cl)).toBe("/clear");
+    // 2.1.286's menu, the highlight in colour only, can't be read without its colours: unsure, so nothing is held for `/cl`.
+    const old = createScreen(60, 6);
+    await old.write(`  /clear     Start a new session\r\n  /claude-api  The API\r\n${"─".repeat(40)}\r\n❯ /cl\r\n${"─".repeat(40)}\x1b[4;6H`);
+    expect(READERS["claude-code"].selectedCommand(old)).toBeNull();
+    old.dispose();
     // OpenCode outside a session: Enter on "/compact" runs the fuzzy "/review"; without the colours, nothing is held.
     const oc = fixture("opencode");
     const compact = await screenOf(oc, { ...state(oc, "compact"), ansi: noColor(state(oc, "compact").ansi) });

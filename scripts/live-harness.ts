@@ -334,6 +334,14 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   } catch {}
   // Bedrock's credentials come from the user's AWS files: the one directory linked in, nothing else of HOME.
   if (o.home === "scratch" && conn === "bedrock" && existsSync(join(homedir(), ".aws"))) symlinkSync(join(homedir(), ".aws"), join(scratch, "home", ".aws"));
+  // Antigravity takes GEMINI_API_KEY only once its own settings say so (`keyNote`; Gluon never writes them): the scratch HOME is
+  // a user who did, past agy's first-run screens. Without it agy shows its sign-in and the check is skipped.
+  if (o.home === "scratch" && h === "antigravity" && conn === "gemini") {
+    const agy = join(scratch, "home", ".gemini", "antigravity-cli");
+    mkdirSync(join(agy, "cache"), { recursive: true });
+    writeFileSync(join(agy, "settings.json"), JSON.stringify({ modelProvider: "gemini", theme: "terminal" }));
+    writeFileSync(join(agy, "cache", "onboarding.json"), JSON.stringify({ consumerOnboardingComplete: true, enterpriseOnboardingComplete: false, onboardingComplete: true }));
+  }
   const repo = makeRepo(scratch);
   const cfgDir = join(scratch, "cfg");
   mkdirSync(cfgDir, { mode: 0o700 });
@@ -623,11 +631,13 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
       add("return to Gluon (home key) and back (Enter)", home1 && back ? "PASS" : "FAIL", home1 ? (back ? "home view, then the session again" : "home view, but Enter didn't return to the session") : "no home view after the home key twice");
 
       // ——— the cost figure ———
-      for (const end = Date.now() + 60_000; Date.now() < end && !figure; ) {
+      // Gluon shows no cost for Antigravity: agy reports none, and its status line is no source for one (`src/cost/antigravity.ts`).
+      if (h === "antigravity") add("the cost figure is shown", "SKIP", "Gluon shows no cost for Antigravity (src/cost/antigravity.ts)");
+      for (const end = Date.now() + 60_000; h !== "antigravity" && Date.now() < end && !figure; ) {
         figure = costFigure(infoRow(await lines()));
         if (!figure) await d.wait(1000);
       }
-      add("the cost figure is shown", figure ? "PASS" : "FAIL", figure ? `${figure.approx ? "~" : ""}$${figure.usd} on the info row` : `none on the info row: ${infoRow(await lines()).slice(0, 110)}`);
+      if (h !== "antigravity") add("the cost figure is shown", figure ? "PASS" : "FAIL", figure ? `${figure.approx ? "~" : ""}$${figure.usd} on the info row` : `none on the info row: ${infoRow(await lines()).slice(0, 110)}`);
       if (figure) add("the spend is within the check's token budget", figure.usd <= plan.worst ? "PASS" : "FAIL", `$${figure.usd} against a budget of $${plan.worst.toFixed(4)} (${HARNESS_TOKENS.input} in / ${HARNESS_TOKENS.output} out)`);
       await saveScreen("final");
       if (o.screens) await printFixtureDiff(h, version, (await lines()), say);

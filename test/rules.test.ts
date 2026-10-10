@@ -61,7 +61,7 @@ describe("the old name", () => {
     expect(out.split("\n").filter(Boolean).sort()).toEqual([
       "src/AGENTS.md", // the legacy names, as a rule
       "src/adapters/permanent.ts", // legacy paths written by old versions: removed, never written
-      "test/fixtures/screens/claude-code/2.1.286.json", // a captured screen
+      "test/fixtures/screens/claude-code/2.1.296.json", // a captured screen
       "test/permanent.test.ts",
       "test/rules.test.ts",
     ]);

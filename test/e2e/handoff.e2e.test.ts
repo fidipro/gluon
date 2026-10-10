@@ -553,7 +553,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
 
   test("BUG-147/F32: Esc that closes the slash menu keeps the typed / line @full", async () => {
     const app = await tui();
-    const menu = () => app.lines().some((l) => /^│ {2}\/clear +│$/.test(l));
+    const menu = () => app.lines().some((l) => /^│ {2}❯ \/clear +│$/.test(l));
     await app.type("/clear");
     await app.waitFor(menu);
     await app.press(KEY.esc);
