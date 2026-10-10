@@ -598,6 +598,11 @@ export function foreignItem(method: string, p: any): Foreign | null {
 /** How often Gluon interrupts one developer message for a foreign item before it lets the answer finish (a loop guard). */
 export const MAX_INTERRUPTS = 3;
 
+/** A name Codex sent, safe to show and to say back to the model: no backticks or control characters, at most 60 characters. */
+function shown(name: string): string {
+  return name.replace(/[`\u0000-\u001f\u007f]/g, "").slice(0, 60) || "unnamed";
+}
+
 /** What the model is told after Gluon interrupted it: Gluon's own words, as the next turn's input. */
 export function foreignNote(name: string): string {
   return `Gluon interrupted your last step: \`${name}\` isn't available in this session. Use only these tools: ${TOOLS.map((t) => t.name).join(", ")}. Continue the task.`;
@@ -629,8 +634,11 @@ type Turn = {
   texts: Map<string, Anthropic.TextBlock>;
   inflight: number;
   error: string | null;
-  /** Gluon interrupted Codex for a foreign item: what to tell the model in the next turn. */
+  /** Gluon interrupts Codex for a foreign item: what to tell the model in the next turn, and what it was (for the notice). */
   note: string | null;
+  what: string | null;
+  /** Past MAX_INTERRUPTS: the warning said once the answer has finished. */
+  kept: string | null;
   /** Gluon's interrupts in this developer message (≤ MAX_INTERRUPTS); `letRun`: past it, the answer finishes. */
   interrupts: number;
   letRun: boolean;
@@ -691,19 +699,21 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
    * guard: an item codex sends by itself would otherwise interrupt every turn).
    */
   const onForeign = (f: Foreign) => {
-    notAvailable.add(f.name);
+    const name = shown(f.name);
+    if (notAvailable.size < 20) notAvailable.add(name);
     const t = turn;
     if (!t || t.letRun || t.note || t.interrupted) return;
-    const what = f.kind === "tool" ? `a tool of its own (\`${f.name}\`)` : `something Gluon doesn't know (\`${f.name}\`)`;
+    const what = f.kind === "tool" ? `a tool of its own (\`${name}\`)` : `something Gluon doesn't know (\`${name}\`)`;
     if (t.interrupts >= MAX_INTERRUPTS) {
       t.letRun = true;
-      t.hooks.notice?.(`Codex kept using ${what}; Gluon let this answer finish. A Gluon update will cover it.`);
+      t.kept = `Codex kept using ${what}; Gluon let this answer finish. A Gluon update will cover it.`;
       return;
     }
     t.interrupts++;
-    t.note = foreignNote(f.name);
-    t.hooks.notice?.(`Codex gave the intake agent ${what}; Gluon interrupted it and told it to use Gluon's tools.`);
-    interruptTurn(t);
+    t.note = foreignNote(name);
+    t.what = what;
+    // Not while one of Gluon's own tools is answering (a question waiting on the developer): once it has.
+    if (t.inflight === 0) interruptTurn(t);
   };
 
   /** Starts a turn on the thread (the developer's message, or Gluon's note after an interrupt). */
@@ -712,7 +722,7 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
       .then((threadId) => session.server!.request("turn/start", { threadId, input: [{ type: "text", text, text_elements: [] }], ...(session.effort ? { effort: session.effort } : {}) }))
       .then((res) => {
         t.id ??= res?.turn?.id ?? null;
-        if (t.interrupted || t.note) interruptTurn(t);
+        if (t.interrupted || (t.note && t.inflight === 0)) interruptTurn(t);
       })
       .catch((e: Error) => t.reject(e));
   };
@@ -726,7 +736,7 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
     switch (method) {
       case "turn/started":
         t.id ??= p.turn?.id ?? null;
-        if (t.interrupted || t.note) interruptTurn(t);
+        if (t.interrupted || (t.note && t.inflight === 0)) interruptTurn(t);
         break;
       case "item/started":
         if (p.item?.type === "agentMessage") textBlock(t, p.item.id);
@@ -755,14 +765,19 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
         if (t.id && p.turn?.id && p.turn.id !== t.id) return;
         endCall(t);
         const status = p.turn?.status;
-        const note = t.note;
-        t.note = null;
+        const { note, what } = t;
+        t.note = t.what = null;
         // Gluon's own interrupt (not the developer's Esc): the same message goes on in a next turn, told why.
+        // Said now, between model calls, so the notice never splits a reply.
         if (note && status === "interrupted" && !t.interrupted && live) {
+          t.hooks.notice?.(`Codex gave the intake agent ${what}, which may already have run; Gluon interrupted it and told it to use Gluon's tools.`);
           t.id = null;
           t.error = null;
           return startTurn(t, live, note);
         }
+        if (note && status === "completed") t.hooks.notice?.(`Codex used ${what} in this answer before Gluon could interrupt it. A Gluon update will cover it.`);
+        if (t.kept) t.hooks.notice?.(t.kept);
+        t.kept = null;
         if (status === "completed") t.resolve();
         else if (status === "interrupted") t.reject(new Error("Interrupted"));
         else t.reject(new Error(turnError(p.turn?.error, opts.model) ?? t.error ?? "the brain's turn failed"));
@@ -791,6 +806,8 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
         out = await t.hooks.tool(String(p.tool), input);
       } finally {
         t.inflight--;
+        // A foreign item came while this tool answered: interrupt now that it has.
+        if (t.note && t.inflight === 0) interruptTurn(t);
       }
     }
     return { contentItems: [{ type: "inputText", text: out.content }], success: !out.error };
@@ -855,6 +872,8 @@ export function chatgptPlanBrain(opts: { model: string; cwd: string; spawn?: Spa
           inflight: 0,
           error: null,
           note: null,
+          what: null,
+          kept: null,
           interrupts: 0,
           letRun: false,
           interruptedTurn: null,
@@ -999,17 +1018,16 @@ export async function probeChatgptPlan(
       const threadId = res.thread.id as string;
       starting = false;
       const warnings = [...setup!.warnings, ...(res.instructionSources ?? []).map((s: string) => `Codex adds instructions from ${s} to the brain's prompt.`)];
-      // A server of the user's config that stays on: Gluon's own turning off failed. Asked even when the config names
-      // none: one codex adds by itself (or a codex that can't say) is a warning, as the brain runs anyway.
+      // Every MCP server Gluon turned off should be off, and codex should add none. Anything else is a warning:
+      // the brain runs anyway (the owner's rule), with what such a server may offer turned off where Gluon can.
       try {
         const status = await server.request("mcpServerStatus/list", { threadId, detail: "toolsAndAuthOnly" });
         const on: string[] = (status?.data ?? []).filter((s: { runtimeStatus?: string | null }) => s.runtimeStatus !== "disabled").map((s: { name: string }) => s.name);
         const theirs = on.filter((n) => names.includes(n));
-        if (theirs.length) throw new Error(`Codex's MCP servers ${theirs.join(", ")} stayed on; the intake agent must see its own tools only.`);
+        if (theirs.length) warnings.push(`Codex kept your MCP servers on although Gluon turned them off for the intake agent (${theirs.join(", ")}); their tools may reach it. It runs anyway; a Gluon update will cover this.`);
         const own = on.filter((n) => !names.includes(n));
         if (own.length) warnings.push(`Codex keeps MCP servers on that aren't in your config (${own.join(", ")}); they may give the intake agent tools of Codex's own. It runs anyway; a Gluon update will cover them.`);
       } catch (e) {
-        if (names.length) throw e;
         warnings.push(`Codex didn't say which MCP servers are on (${(e as Error).message}); the intake agent runs anyway.`);
       }
       const done = new Promise<void>((resolve, reject) => {

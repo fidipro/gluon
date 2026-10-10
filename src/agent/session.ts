@@ -557,7 +557,9 @@ export class Session {
         this.notice("The intake agent restarted; it doesn't remember this conversation — repeat what matters.", "info");
       },
       notice: (text) => {
+        // Between model calls: what is live goes into the history, and the next tool rows start a new Explored group.
         this.flushLive();
+        this.explored = null;
         this.notice(text, "info");
       },
       tool: async (name, input) => {

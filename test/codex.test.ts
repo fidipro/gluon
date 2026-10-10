@@ -410,15 +410,15 @@ describe("review of PR #1", () => {
     s.close();
   });
 
-  test("BUG-79/mcp: an MCP server codex keeps on by itself is a warning and the probe passes; one of the user's config that stays on still fails it", async () => {
+  test("BUG-79/mcp: an MCP server codex keeps on by itself, or one of the user's config that stays on, is a warning and the probe passes", async () => {
     const own = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]] }, { FAKE_CODEX_OWN_MCP: "codex_apps" }).spawn });
     expect(own).toEqual({ ok: true, warnings: [expect.stringContaining("MCP servers on that aren't in your config (codex_apps)")] });
     // With a server in the config too: the thread turns it off, so only codex's own is warned about.
     const theirs = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_OWN_MCP: "codex_apps" }).spawn });
     expect(theirs).toEqual({ ok: true, warnings: [expect.stringContaining("(codex_apps)")] });
-    // A server of the user's config that stays on although Gluon turned it off: turning off is broken, so the probe fails.
+    // A server of the user's config that stays on although Gluon turned it off: a warning too (the brain runs anyway).
     const stuck = await probeChatgptPlan("gpt-6-sol", ROOT, { spawn: fake({ turns: [[{ text: "ok" }]], mcpServers: ["docs"] }, { FAKE_CODEX_MCP_STAYS_ON: "docs" }).spawn });
-    expect(stuck).toEqual({ ok: false, error: expect.stringContaining("Codex's MCP servers docs stayed on") });
+    expect(stuck).toEqual({ ok: true, warnings: [expect.stringContaining("Codex kept your MCP servers on although Gluon turned them off for the intake agent (docs)")] });
   });
 
   test("BUG-79/start-hint: a codex that fails to start after Gluon turned off features it hasn't checked is told which (codex may need one); one that starts isn't", async () => {
@@ -626,11 +626,50 @@ describe("BUG-709: a tool of Codex's own that gets through is interrupted, the m
       expect(interrupts()).toBe(1);
       expect(starts()).toEqual(["hello", foreignNote(name)]);
       expect(f.spawned.filter((x) => x.argv[1] === "app-server")).toHaveLength(1);
-      const items = s.snapshot.items;
-      expect(items.filter((i) => i.kind === "notice")).toEqual([expect.objectContaining({ tone: "info", text: expect.stringContaining(`\`${name}\`); Gluon interrupted it and told it to use Gluon's tools`) })]);
-      expect(items.at(-1)).toMatchObject({ kind: "assistant", text: "Done with Gluon's tools." });
+      // The whole history: the words before the item once, then the notice, then the answer.
+      expect(s.snapshot.items.map((i) => [i.kind, "text" in i ? i.text : ""])).toEqual([
+        ["user", "hello"],
+        ["assistant", "Let me look."],
+        ["notice", expect.stringContaining(`\`${name}\`), which may already have run; Gluon interrupted it and told it to use Gluon's tools`)],
+        ["assistant", "Done with Gluon's tools."],
+      ]);
       s.close();
     }
+  });
+
+  test("BUG-709/explored: tool rows before the interrupt and after it are two groups, none shown twice", async () => {
+    const { s } = run([[{ tool: { name: "list_files", input: {} } }, { item: { type: "webSearch" } }, { hang: true }], [{ tool: { name: "read_file", input: { path: "package.json" } } }, { text: "Done." }]]);
+    await s.submit("hello");
+    const items = s.snapshot.items;
+    expect(items.map((i) => i.kind)).toEqual(["user", "explored", "notice", "explored", "assistant"]);
+    expect(items.filter((i) => i.kind === "explored").map((i) => (i as { rows: unknown[] }).rows.length)).toEqual([1, 1]);
+    s.close();
+  });
+
+  test("BUG-709/question: a foreign item while a question waits on the developer is interrupted only once it's answered; the question and its answer survive", async () => {
+    const question = { question: "Add a test?", options: [{ label: "Yes" }, { label: "No" }] };
+    const { f, s, starts, interrupts } = run([[{ tool: { name: "ask_user", input: question }, parallel: true }, { item: { type: "webSearch" } }, { hang: true }], [{ text: "Thanks." }]]);
+    await s.submit("hello");
+    expect(s.snapshot.pending).toMatchObject({ kind: "question", question: { question: "Add a test?" } });
+    expect(interrupts()).toBe(0);
+    await s.submit("Yes");
+    await until(() => s.snapshot.items.at(-1)?.kind === "assistant");
+    expect(f.toolResults()[0]).toBe("The developer answered: Yes");
+    expect(interrupts()).toBe(1);
+    expect(starts()).toEqual(["hello", foreignNote("webSearch")]);
+    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Thanks." });
+    s.close();
+  });
+
+  test("BUG-709/too-late: a turn that ends before Gluon's interrupt lands isn't followed by a note turn, and the notice says it wasn't interrupted", async () => {
+    const { s, starts } = run([[{ item: { type: "webSearch" } }, { text: "Answer." }]]);
+    await s.submit("hello");
+    expect(starts()).toEqual(["hello"]);
+    expect(s.snapshot.items.slice(-2).map((i) => [i.kind, "text" in i ? i.text : ""])).toEqual([
+      ["assistant", "Answer."],
+      ["notice", expect.stringContaining("(`webSearch`) in this answer before Gluon could interrupt it")],
+    ]);
+    s.close();
   });
 
   test("BUG-709/again: the next developer message is reminded what isn't available, and a repeat is interrupted and told again", async () => {
@@ -651,8 +690,11 @@ describe("BUG-709: a tool of Codex's own that gets through is interrupted, the m
     await s.submit("hello");
     expect(interrupts()).toBe(MAX_INTERRUPTS);
     expect(starts()).toHaveLength(MAX_INTERRUPTS + 1);
-    expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Finally." });
-    expect(s.snapshot.items.some((i) => i.kind === "notice" && i.text.includes("Gluon let this answer finish"))).toBe(true);
+    // The answer as it is, then the warning (said once the answer has finished).
+    expect(s.snapshot.items.slice(-2).map((i) => [i.kind, "text" in i ? i.text : ""])).toEqual([
+      ["assistant", "Finally."],
+      ["notice", expect.stringContaining("Gluon let this answer finish")],
+    ]);
     await s.submit("more");
     expect(interrupts()).toBe(MAX_INTERRUPTS + 1);
     expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Next." });

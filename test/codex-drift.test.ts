@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { checkTools, drift, drifted, itemTypes, report, requestTools, toolCheck, type ToolCheck } from "../scripts/codex-drift.ts";
 import { BRAIN_ITEMS, CODEX_FEATURES_KEPT, CODEX_FEATURES_OFF, featuresToDisable, FOREIGN_ITEMS } from "../src/agent/codex.ts";
 import { TOOLS } from "../src/agent/tools.ts";
+import { SLOW } from "./fixtures/slow.ts";
 
 const LIST = readFileSync(join(import.meta.dir, "fixtures", "codex-features-list.txt"), "utf8");
 /** The list as codex prints it with these names turned off, but for `forced` (codex forces unified_exec on). */
@@ -83,11 +84,11 @@ test("the tool check runs the brain against a local provider and reads what code
     expect(await toolCheck(["bun", FAKE], ["gpt-6-sol"], dir, home)).toEqual([{ model: "gpt-6-sol", extra: [], missing: [], error: null }]);
     const own = await toolCheck(["bun", FAKE], ["gpt-6-sol"], dir, home, { extraEnv: { FAKE_CODEX_EXTRA_TOOLS: "exec_command" } });
     expect(own).toEqual([{ model: "gpt-6-sol", extra: ["function:exec_command"], missing: [], error: null }]);
-    // A model whose turn never ends is that model's error; the next model is still checked.
-    const hang = await toolCheck(["bun", FAKE], ["gpt-6-sol", "gpt-6-luna"], dir, home, { timeoutMs: 500, extraEnv: { FAKE_CODEX_SCRIPT: JSON.stringify({ turns: [[{ hang: true }]] }) } });
-    expect(hang.map((t) => [t.model, t.error])).toEqual([
-      ["gpt-6-sol", expect.stringContaining("no answer from codex")],
-      ["gpt-6-luna", expect.stringContaining("no answer from codex")],
+    // A model whose turn never ends is that model's error; the next model is still checked, and passes.
+    const hang = await toolCheck(["bun", FAKE], ["gpt-6-sol", "gpt-6-luna"], dir, home, { timeoutMs: 1500 * SLOW, extraEnv: { FAKE_CODEX_HANG_MODEL: "gpt-6-sol" } });
+    expect(hang).toEqual([
+      { model: "gpt-6-sol", extra: [], missing: [], error: expect.stringContaining("no answer from codex") },
+      { model: "gpt-6-luna", extra: [], missing: [], error: null },
     ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });

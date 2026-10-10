@@ -18,8 +18,8 @@ All notable changes to Gluon are listed here. The format follows
   0.162 was refused for `ultrafast_mode`): Gluon turns off every Codex feature it hasn't checked, and runs with a
   feature codex keeps on or a new model-catalog field, which `gluon doctor` warns about, instead of refusing that codex.
   If codex fails to start, the error names the features Gluon turned off. When the model uses a tool of Codex's own,
-  Gluon interrupts it and tells the model to use Gluon's tools, and the answer goes on, instead of stopping the intake
-  agent and failing the message.
+  Gluon interrupts the turn and tells the model to use Gluon's tools, and the answer goes on, instead of stopping the
+  intake agent and failing the message (the tool may already have run). `gluon doctor` shows these warnings.
 - Claude Code's Haiku 5.5 runs at `high` effort by default (was `medium`), like GPT-6 Luna in the same slot.
 - The routing reason names the effort it means: the model's default and what the session gets, e.g. `effort +0 from
   haiku's default (high) → claude-code/haiku@high`; when routing rounds up to a stronger level, it says the steps it

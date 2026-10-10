@@ -47,12 +47,16 @@ if (process.argv[2] === "features" && process.argv[3] === "list") {
 
 const baseUrl = process.argv.map((a) => /^model_providers\.[\w-]+=.*\bbase_url\s*=\s*"([^"]+)"/.exec(a)?.[1]).find(Boolean);
 let dynamicTools: { name: string; description?: string }[] = [];
+/** The thread's model; FAKE_CODEX_HANG_MODEL: a model whose turns never end (the check's timeout). */
+let threadModel: string | undefined;
 
 type Step = {
   text?: string;
   /** The message arrives whole in item/completed, with no deltas. */
   whole?: boolean;
   tool?: { name: string; input: Record<string, unknown> };
+  /** The tool call goes out and the turn goes on without waiting for its answer (codex's parallel calls). */
+  parallel?: boolean;
   /** A server request the client must answer (an approval). */
   approval?: string;
   /** An item/started of any item (say, a tool of Codex's own that got through). */
@@ -99,8 +103,10 @@ async function playTurn(turnId: string, steps: Step[]) {
     if (step.tool) {
       const item = { type: "dynamicToolCall", id: itemId, tool: step.tool.name, arguments: step.tool.input, status: "inProgress" };
       notify("item/started", { threadId: THREAD, turnId, startedAtMs: 0, item });
-      const res = await request("item/tool/call", { threadId: THREAD, turnId, callId: `call_${n}`, tool: step.tool.name, arguments: step.tool.input });
-      notify("item/completed", { threadId: THREAD, turnId, completedAtMs: 0, item: { ...item, status: "completed", ...res } });
+      const answered = request("item/tool/call", { threadId: THREAD, turnId, callId: `call_${n}`, tool: step.tool.name, arguments: step.tool.input }).then((res) =>
+        notify("item/completed", { threadId: THREAD, turnId, completedAtMs: 0, item: { ...item, status: "completed", ...res } }),
+      );
+      if (!step.parallel) await answered;
     }
     if (step.approval) await request(step.approval, { threadId: THREAD, turnId, itemId, command: "rm -rf /" });
     if (step.item) notify("item/started", { threadId: THREAD, turnId, startedAtMs: 0, item: { id: itemId, ...step.item } });
@@ -161,6 +167,7 @@ function handle(m: { id?: number; method?: string; params?: any; result?: unknow
       if (process.env.FAKE_CODEX_THREAD_START_ERROR) return fail(process.env.FAKE_CODEX_THREAD_START_ERROR);
       const config = m.params?.config ?? {};
       dynamicTools = m.params?.dynamicTools ?? [];
+      threadModel = m.params?.model;
       // FAKE_CODEX_MCP_STAYS_ON: config servers codex keeps on whatever the thread says.
       const stays = (process.env.FAKE_CODEX_MCP_STAYS_ON ?? "").split(",");
       disabled = new Set((script.mcpServers ?? []).filter((name) => config[`mcp_servers.${name}.enabled`] === false && !stays.includes(name)));
@@ -176,6 +183,7 @@ function handle(m: { id?: number; method?: string; params?: any; result?: unknow
       reply({ turn: { id: turnId, items: [], status: "inProgress" } });
       notify("turn/started", { threadId: THREAD, turn: { id: turnId, items: [], status: "inProgress" } });
       const steps = script.turns.shift() ?? [];
+      if (threadModel && threadModel === process.env.FAKE_CODEX_HANG_MODEL) return;
       void modelRequest().then(() => playTurn(turnId, steps));
       return;
     }
