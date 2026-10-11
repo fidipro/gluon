@@ -76,7 +76,7 @@ describe("--changed: files to areas", () => {
 
   test("a changed test file is included itself, and its area's other tests are not", () => {
     const s = selectChanged(["test/stats.test.ts"]);
-    expect(s.kind === "areas" && s.unit).toEqual(["test/stats.test.ts"]);
+    expect(s.kind === "areas" && s.unit).toEqual(["test/stats.test.ts", "test/catalog.test.ts", "test/test-style.test.ts"]);
     expect(s.kind === "areas" && s.areas).toEqual([]);
     expect(selectChanged(["test/brand-new.test.ts"]).kind).toBe("fast");
   });
@@ -86,6 +86,11 @@ describe("--changed: files to areas", () => {
     expect(d.kind === "areas" && d.areas).toEqual(["docs"]);
     const v = selectChanged(["test/visual/scenes.visual.test.ts"]);
     expect(v.kind === "areas" && v.hooks.map((h) => h.name)).toContain("visual");
+  });
+
+  test("a changed test file brings the checks every test is held to: its entry and seams, its style", () => {
+    const s = selectChanged(["test/e2e/resume.e2e.test.ts"]);
+    expect(s.kind === "areas" && [s.e2e, s.unit]).toEqual([["test/e2e/resume.e2e.test.ts"], ["test/catalog.test.ts", "test/test-style.test.ts"]]);
   });
 
   test("nothing a test reads means nothing runs", () => {

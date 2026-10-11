@@ -52,7 +52,7 @@ function setup(name: string, { offPath = false, extra = {} as Record<string, str
 }
 
 describe("gluon install <agent>", () => {
-  test("the offer shows the exact command, its host and docs; Skip is the default and runs nothing", async () => {
+  test("install/verbatim-no-sudo: the offer shows the exact command, its host and docs; Skip is the default and runs nothing", async () => {
     const s = setup("skip");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -68,7 +68,7 @@ describe("gluon install <agent>", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("a digit only moves the selection; Esc skips: nothing runs", async () => {
+  test("install/run-it-enter-only: a digit only moves the selection; Esc skips: nothing runs", async () => {
     const s = setup("digit");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -90,7 +90,7 @@ describe("gluon install <agent>", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("Run it: runs the command in an empty directory (not the repository), then finds the agent on PATH", async () => {
+  test("repo/neutral-cwd: Run it: runs the command in an empty directory (not the repository), then finds the agent on PATH", async () => {
     const s = setup("run");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -125,7 +125,7 @@ describe("gluon install <agent>", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("without a terminal: prints the command, never runs it", async () => {
+  test("install/run-it-enter-only: without a terminal: prints the command, never runs it", async () => {
     const s = setup("notty");
     const r = await cli(["install", "opencode"], { env: s.env });
     expect(r.code).toBe(1);
@@ -290,7 +290,7 @@ describe("review of phase 4", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("QA-sec: a bracketed paste of `3` + Enter, a paste of `Run it` + Enter and a held Enter (several \\r in one read) never run the installer; the offer stays up and Esc skips @full", async () => {
+  test("install/run-it-enter-only: QA-sec: a bracketed paste of `3` + Enter, a paste of `Run it` + Enter and a held Enter (several \\r in one read) never run the installer; the offer stays up and Esc skips @full", async () => {
     const s = setup("qa-paste");
     const app = s.app(["install", "opencode"]);
     await offer(app);

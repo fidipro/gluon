@@ -3,7 +3,8 @@
  * `bun scripts/test-guard.ts [base]` (CI's `test-guard` on a pull request): what the branch did to weaken the tests since the
  * merge-base with `base`: tests gone (a title no longer in `test/`), assertions removed (an `expect(` line removed and not
  * re-added), and tests switched off or out of the blocking run (`.skip`, `.todo`, `skipIf`, `test.failing`, `@full`,
- * `@quarantine` added). Any of these fails the check until a person agrees: the pull request's `tests-reviewed` label
+ * `@quarantine` added), and any change to what the tests promise (`test/catalog.ts`, `test/seams.ts`). Any of these fails the
+ * check until a person agrees: the pull request's `tests-reviewed` label
  * (CI passes it as TESTS_REVIEWED=true). An agent never weakens a test to get green (test/AGENTS.md).
  */
 import { resolve } from "node:path";
@@ -16,7 +17,13 @@ const OFF: [string, RegExp][] = [[".skip", /\.skip\(/g], [".todo", /\.todo\(/g],
 /** The tests of these checks: their samples weaken tests on purpose. */
 const SAMPLES = ["test/test-guards.test.ts", "test/test-style.test.ts", "test/test-health.test.ts"];
 
-export type Finding = { kind: "test gone" | "assertion removed" | "switched off or out"; file: string; text: string };
+export type Finding = { kind: "test gone" | "assertion removed" | "switched off or out" | "catalog changed"; file: string; text: string };
+
+/** What the tests promise: the catalog's entries and the seams. Adding, changing or removing one is a person's decision. */
+const PROMISES = ["test/catalog.ts", "test/seams.ts"];
+
+/** A title without its catalog entry, its bug ids and their old `BUG-nn/case:` prefix: a test renamed into the catalog's form keeps it. */
+export const bare = (t: string) => t.replace(/^[a-z][a-z0-9-]*\/[a-z0-9-]+: /, "").replace(/^BUG-\d+(?:\/[^:]*)?: /, "").replace(/\s*#BUG-\d+/g, "").trim();
 
 /** Every test / describe title in a set of files' text, by file. */
 export function titles(files: Record<string, string>): Map<string, string> {
@@ -33,6 +40,7 @@ export function weakened(diff: string, before: Map<string, string>, after: Map<s
   const addedExpects: { file: string; line: string }[] = [];
   // Per file and marker: how many the diff adds and removes (an edited line that keeps its `@full` adds none net).
   const off = new Map<string, { n: number; example: string }>();
+  const promised = new Map<string, number>();
   const count = (file: string, body: string, d: number) => {
     // A comment, or a sample inside an assertion (a test of these rules), switches nothing off.
     if (/^\s*(\/\/|\*)/.test(body) || /\bexpect\(/.test(body)) return;
@@ -54,6 +62,10 @@ export function weakened(diff: string, before: Map<string, string>, after: Map<s
     }
     if (!TEST.test(file) || SAMPLES.includes(file)) continue;
     const body = line.slice(1).trim();
+    if (PROMISES.includes(file) && /^[+-]/.test(line) && body && !/^(\/\/|\*|\/\*)/.test(body)) {
+      promised.set(file, (promised.get(file) ?? 0) + 1);
+      continue;
+    }
     if (line.startsWith("-")) {
       if (/\bexpect\(/.test(body)) removed.push({ file, line: body });
       count(file, body, -1);
@@ -64,6 +76,7 @@ export function weakened(diff: string, before: Map<string, string>, after: Map<s
       count(file, body, 1);
     }
   }
+  for (const [f, n] of promised) out.push({ kind: "catalog changed", file: f, text: `${n} line(s) of what the tests promise added or removed` });
   for (const [k, e] of off) if (e.n > 0) out.push({ kind: "switched off or out", file: k.split("\0")[0]!, text: `${k.split("\0")[1]} ×${e.n} (${e.example})` });
   // An assertion is kept when the same line comes back, or the same file still checks the same subject with the same matcher
   // (`expect(x).toBeLessThan(1500)` → `expect(x).toBeLessThan(1500 * SLOW)` is an edit the diff shows; a matcher swapped isn't).
@@ -85,10 +98,12 @@ export function weakened(diff: string, before: Map<string, string>, after: Map<s
     if (m && (m.get(k) ?? 0) > 0) m.set(k, m.get(k)! - 1);
     else out.push({ kind: "assertion removed", file: r.file, text: r.line });
   }
-  // A test is gone when its title is, unless the same file still tests the same bug (a test renamed, or split into variants).
-  const bug = (t: string) => /^BUG-\d+/.exec(t)?.[0];
+  // A test is gone when its title is, unless the same file still tests the same bug (a test renamed, or split into variants), or
+  // still has the same title once entry and bug ids are set aside (a test renamed into the catalog's form).
+  const bug = (t: string) => /(?:^|#)(BUG-\d+)/.exec(t)?.[1];
   const afterBugs = new Set([...after].map(([t, f]) => `${f}\0${bug(t)}`).filter((k) => !k.endsWith("\0undefined")));
-  for (const [t, f] of before) if (!after.has(t) && !(bug(t) && afterBugs.has(`${f}\0${bug(t)}`))) out.push({ kind: "test gone", file: f, text: t });
+  const afterBare = new Set([...after].map(([t, f]) => `${f}\0${bare(t)}`));
+  for (const [t, f] of before) if (!after.has(t) && !(bug(t) && afterBugs.has(`${f}\0${bug(t)}`)) && !afterBare.has(`${f}\0${bare(t)}`)) out.push({ kind: "test gone", file: f, text: t });
   return out;
 }
 

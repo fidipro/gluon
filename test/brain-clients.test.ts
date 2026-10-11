@@ -323,7 +323,7 @@ describe("bedrockClaudeBrain (the Anthropic Bedrock SDK on a local server)", () 
     expect(error).toBeInstanceOf(Error);
   });
 
-  test("the configured AWS profile goes to the SDK's credential chain, never into the environment (launched agents keep their own AWS setup)", async () => {
+  test("keys/never-in-process-env: the configured AWS profile goes to the SDK's credential chain, never into the environment (launched agents keep their own AWS setup)", async () => {
     const { url, requests } = serve(() => eventStreamResponse([START, ...text(0, "ok"), ...END("end_turn")]));
     await brain(url, null, "a-profile-that-does-not-exist")(ask(), () => {});
     expect(requests).toHaveLength(1); // the environment's keys came first in the chain, so the missing profile was never needed

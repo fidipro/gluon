@@ -107,7 +107,7 @@ describe.skipIf(!POSIX)("doctor", () => {
     expect(text).toContain("install: curl -fsSL https://claude.ai/install.sh | bash (or `gluon install claude-code`)");
   });
 
-  test("a key in a probe's error text is masked, by shape and by value (a key of no known shape saved in Gluon's own .env)", async () => {
+  test("keys/masked-when-printed: a key in a probe's error text is masked, by shape and by value (a key of no known shape saved in Gluon's own .env)", async () => {
     const d = setup(OPENAI, { "openai/gpt-6-luna": `Incorrect API key provided: ${KEY}`, "openai/gpt-6.1-sol": "bad key plainshapelesskeyvalue99", "openai/gpt-6-astra": "ok?" });
     writeFileSync(join(d, ".env"), "OPENAI_API_KEY=plainshapelesskeyvalue99\n");
     loadSecrets();

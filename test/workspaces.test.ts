@@ -706,7 +706,7 @@ describe("BUG-642/resume: a pid reused by another process is not the Gluon", () 
     expect(processStart(4242, { platform: "linux", read: (p) => (p.endsWith("/stat") ? stat("bun") : enoent()) })).toBe("123456");
   });
 
-  test("an unreadable, gone or odd /proc entry has no start; macOS has none (no ps is spawned); Windows takes PowerShell's FILETIME and nothing else", () => {
+  test("repo/no-posix-tools: an unreadable, gone or odd /proc entry has no start; macOS has none (no ps is spawned); Windows takes PowerShell's FILETIME and nothing else", () => {
     expect(processStart(4242, { platform: "linux", read: enoent })).toBeUndefined();
     expect(processStart(4242, { platform: "linux", read: () => "garbage" })).toBeUndefined();
     expect(processStart(4242, { platform: "linux", read: files("bun", "12x") })).toBeUndefined();

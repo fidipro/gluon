@@ -23,7 +23,7 @@ const COUNTS = (QUICK ? [1, 3] : [1, 5, 10, 20, 40]).filter((n) => n <= MAX);
 const rssCeiling = (n: number) => 250 + 10 * n;
 
 describe.skipIf(!PERF)("perf: sessions", () => {
-  test("1, 5, 10, 20 and 40 sessions", async () => {
+  test("perf/sessions: 1, 5, 10, 20 and 40 sessions", async () => {
     const p = await perfApp();
     for (const n of COUNTS) {
       let open = 0;
@@ -70,7 +70,7 @@ describe.skipIf(!PERF)("perf: sessions", () => {
     p.app.kill();
   }, 900_000);
 
-  test("every session's scrollback full: 5000 rows of 200 cells", async () => {
+  test("perf/sessions: every session's scrollback full: 5000 rows of 200 cells", async () => {
     const N = QUICK ? 3 : 10;
     const p = await perfApp(200, 40);
     for (let i = 0; i < N; i++) await openSession(p);

@@ -22,7 +22,7 @@ const ARROW_RIGHT = KEY.right;
 const DONE = /FLOOD-DONE (\d+)/;
 
 describe.skipIf(!PERF)("perf: throughput", () => {
-  test("a flood in the shown session", async () => {
+  test("perf/flood: a flood in the shown session", async () => {
     const p = await perfApp();
     await openSession(p);
     const times: number[] = [];
@@ -45,7 +45,7 @@ describe.skipIf(!PERF)("perf: throughput", () => {
     p.app.kill();
   }, 300_000);
 
-  test("a flood in a background session: keys meanwhile, and the tab after", async () => {
+  test("perf/flood: a flood in a background session: keys meanwhile, and the tab after", async () => {
     const p = await perfApp();
     await openSession(p);
     await tell(p.app, "ID-1");
@@ -82,7 +82,7 @@ describe.skipIf(!PERF)("perf: throughput", () => {
     p.app.kill();
   }, 300_000);
 
-  test("tab switch latency", async () => {
+  test("perf/flood: tab switch latency", async () => {
     const p = await perfApp();
     await openSession(p);
     await tell(p.app, "ID-1");

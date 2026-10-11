@@ -28,7 +28,7 @@ async function startup(cwd: string, env: Record<string, string>): Promise<{ ms: 
 }
 
 describe.skipIf(!PERF)("perf: startup and latency", () => {
-  test("startup to the home view, first run and after; the idle home view", async () => {
+  test("perf/startup: startup to the home view, first run and after; the idle home view", async () => {
     const cwd = freshRepo();
     // Bun's transpiler cache: empty for the first run (a fresh install), filled after it.
     const cache = mkdtempSync(join(tmpdir(), "gluon-perf-cache-"));
@@ -56,7 +56,7 @@ describe.skipIf(!PERF)("perf: startup and latency", () => {
     expect(warm.length).toBeGreaterThan(0);
   }, 120_000);
 
-  test("key to frame at the home composer", async () => {
+  test("perf/key-home: key to frame at the home composer", async () => {
     const p = await perfApp();
     // Gluon's share: the measured latency minus the floor (`measureFloor`). Recorded, not held to the perception
     // limit here: that is the BUG-615 test below (the same measurement).
@@ -74,7 +74,7 @@ describe.skipIf(!PERF)("perf: startup and latency", () => {
   // `patches/string-width@8.3.0.patch`). Its own measurement. On Linux the empty home composer was under the limit
   // even before (p95 added about 29 ms; the breach started at about 5 sessions: `typing.perf.test.ts`), so this cell is
   // Windows's alone (48.5 / 64.6 ms p50 / p95 added before the fix); skipped in quick mode (15 pairs would flip it by chance).
-  (QUICK || !WIN ? test.skip : test)("BUG-615/QA-perf-01: key to frame at the home composer stays under the noticeable limit", async () => {
+  (QUICK || !WIN ? test.skip : test)("perf/key-home: key to frame at the home composer stays under the noticeable limit #BUG-615", async () => {
     const p = await perfApp();
     const floor = (await measureFloor()).p50;
     const s = await keyLatencies(p.app, "home", 60);
@@ -83,7 +83,7 @@ describe.skipIf(!PERF)("perf: startup and latency", () => {
     expect(pct(s, 0.95) - floor, "Gluon's added latency at the home composer, p95").toBeLessThan(PLATFORM_ADDED_P95_MS);
   }, 120_000);
 
-  test("key to agent to frame inside a session", async () => {
+  test("perf/key-session: key to agent to frame inside a session", async () => {
     const p = await perfApp();
     await openSession(p);
     const floor = (await measureFloor()).p50;

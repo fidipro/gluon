@@ -131,7 +131,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
       }
     });
 
-    test("BUG-102: a git / rg planted in the repository never runs (Windows looks in the cwd first; POSIX with . on PATH)", async () => {
+    test("repo/spawn-via-binpath: a git / rg planted in the repository never runs (Windows looks in the cwd first; POSIX with . on PATH) #BUG-102", async () => {
       const planted = join(outer, "planted");
       mkdirSync(planted);
       writeFileSync(join(planted, "notes.txt"), "a test note\n");
@@ -161,7 +161,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
       expect(existsSync(marker)).toBe(false);
     });
 
-    test("BUG-101: the grep worker is the embedded one (it was missing on Windows), never a copy in the cwd", async () => {
+    test("dist/no-external: the grep worker is the embedded one (it was missing on Windows), never a copy in the cwd #BUG-101", async () => {
       const app = await start({ cwd: dir, rows: 50, env: { GLUON_CONFIG: cfg, PATH: fakeAgents(["claude", "opencode"]) } });
       await toQuestion(app);
       const h = app.screen();
@@ -170,7 +170,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
       expect(existsSync(workerMarker)).toBe(false);
     });
 
-    test("BUG-99: DEV=true never loads react-devtools-core from the cwd's node_modules", async () => {
+    test("dist/no-external: DEV=true never loads react-devtools-core from the cwd's node_modules #BUG-99", async () => {
       for (const args of [["--version"], ["doctor"]]) expect((await cli(args, { cwd: dir, env: { GLUON_CONFIG: cfg, DEV: "true" } })).code).toBe(0);
       const app = await start({ cwd: dir, env: { GLUON_CONFIG: cfg, DEV: "true" } });
       app.kill();
@@ -178,7 +178,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
       expect(existsSync(devtoolsMarker)).toBe(false);
     });
 
-    test("doctor, a dry run and a launch: no preload, no key from .env", async () => {
+    test("dist/no-autoload: doctor, a dry run and a launch: no preload, no key from .env", async () => {
       const doc = await cli(["doctor"], { cwd: dir, env: { GLUON_CONFIG: cfg } });
       expect(doc.code).toBe(0);
       // The Claude-plan warning would name ANTHROPIC_API_KEY had the .env reached process.env.
@@ -195,14 +195,14 @@ describe.skipIf(!BIN)("compiled binary", () => {
       expect(existsSync(marker)).toBe(false);
     });
 
-    test.skipIf(!RELEASE)("the release binary too", async () => {
+    test.skipIf(!RELEASE)("dist/no-autoload: the release binary too", async () => {
       const r = Bun.spawnSync([RELEASE!, "--launch", "claude-code", "--model", "sonnet", "--dry-run", "--", "x"], { cwd: dir, env: { ...SYSTEM_ENV, PATH: fakeAgents(["claude"]), HOME, USERPROFILE: HOME, GLUON_CONFIG: cfg } });
       expect(r.exitCode).toBe(0);
       expect(JSON.parse(r.stdout.toString()).env).toEqual({});
       expect(existsSync(marker)).toBe(false);
     });
 
-    test("control: a binary compiled with Bun's defaults does load them", async () => {
+    test("dist/no-autoload: control: a binary compiled with Bun's defaults does load them", async () => {
       const src = join(outer, "control.ts");
       const exe = `${src}.bin${process.platform === "win32" ? ".exe" : ""}`;
       writeFileSync(src, "console.log(process.env.ANTHROPIC_API_KEY ?? 'none');\n");

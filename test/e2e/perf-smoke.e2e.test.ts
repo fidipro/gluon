@@ -28,7 +28,7 @@ function within(name: string, samples: number[], floor: number, allow: number) {
   return `${name} +${Math.round(p50)}/${Math.round(p95)}`;
 }
 
-test("PERF-SMOKE: startup, three sessions, keys and tab switches stay under the noticeable limit @full", async () => {
+test("perf/smoke: startup, three sessions, keys and tab switches stay under the noticeable limit @full", async () => {
   const allow = loadAllowance();
   const t0 = performance.now();
   const p = await perfApp();
@@ -57,7 +57,7 @@ test("PERF-SMOKE: startup, three sessions, keys and tab switches stay under the 
 // that case); with none or one a quiet machine was under the limit (p95 added about 26 ms), so this cell asserts it on
 // Windows alone, where the empty home composer added 48.5 / 64.6 ms (p50 / p95) before the fix. The strict limit (the
 // p95, no allowance, no `SLOW`). Its own measurement, not the passing test's. `@full`: a slow machine would turn it red in the fast tier.
-(WIN ? test : test.skip)("BUG-615/QA-perf-01: the home composer stays under the noticeable limit, with no sessions and with one @full", async () => {
+(WIN ? test : test.skip)("perf/key-home: the home composer stays under the noticeable limit, with no sessions and with one #BUG-615 @full", async () => {
   const p = await perfApp();
   const floor = (await measureFloor(15)).p50;
   const none = await keyLatencies(p.app, "home", 15);

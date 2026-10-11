@@ -757,7 +757,7 @@ describe("bracketed paste", () => {
   });
 });
 
-test("every byte of a mixed stream comes out again, in order, however it is split", () => {
+test("pty/only-user-bytes-into-agent: every byte of a mixed stream comes out again, in order, however it is split", () => {
   const bytes =
     "a\x1b[A\x1b[92;5u\x1b]11;rgb:1/2/3\x07é\x1b[<0;1;2M\x1b[65;30;97;1;0;1_\x1b[200~p\x1b[201~\r\x1bOB" +
     "\x1b[1;3C\x1b\x1b[5~\x1b[5;2:1~\x1b[M !!\x1b[32;4;5M\x1b[I\x1b[?62;22c\x1b[12;40R\x1b[37;75;0;1;258;1_\x1b[6;3~\x1c";

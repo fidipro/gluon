@@ -103,7 +103,7 @@ describe("phase 1 review", () => {
     expect(resolveBin("claude", { ...opts, wsl: false })).toBeUndefined();
     expect(resolveBin("grok", opts)).toBeUndefined();
   });
-  test("BUG-95/D2: a relative PATH entry (., empty) never finds a binary in the current directory", () => {
+  test("repo/spawn-via-binpath: a relative PATH entry (., empty) never finds a binary in the current directory #BUG-95", () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-detect-"));
     bin(dir, "claude");
     process.chdir(dir);
@@ -115,7 +115,7 @@ describe("phase 1 review", () => {
   });
 });
 
-test("every binary lookup goes through detect.ts, and no POSIX tool is spawned", () => {
+test("repo/never-bun-which: every binary lookup goes through detect.ts, and no POSIX tool is spawned", () => {
   const src = join(import.meta.dir, "..", "src");
   const all = (dir: string): string[] => readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? all(join(dir, f)) : /\.tsx?$/.test(f) ? [join(dir, f)] : []));
   for (const file of all(src)) {

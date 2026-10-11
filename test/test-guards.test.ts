@@ -1,7 +1,7 @@
 /** The pure parts of CI's `red-check` (scripts/red-check.ts) and `test-guard` (scripts/test-guard.ts). */
 import { describe, expect, test } from "bun:test";
 import { addedBugTests, passedTitles, titlePattern } from "../scripts/red-check.ts";
-import { titles, weakened } from "../scripts/test-guard.ts";
+import { bare, titles, weakened } from "../scripts/test-guard.ts";
 
 const diff = (file: string, lines: string[]) => [`--- a/${file}`, `+++ b/${file}`, "@@ -1 +1 @@", ...lines].join("\n");
 
@@ -15,6 +15,11 @@ describe("red-check: a new bug's test must fail without its fix", () => {
       { file: "test/a.test.ts", title: "BUG-12/case: it works" },
       { file: "test/a.test.ts", title: "BUG-13: another" },
     ]);
+  });
+
+  test("a catalog entry's test tagged with a bug is a bug test, a conditional test too; an untagged entry test is not", () => {
+    const d = diff("test/a.test.ts", ['+test("keys/x: it holds #BUG-20", () => {});', '+(WIN ? test.skip : test)("keys/y: also #BUG-21", () => {});', '+test("keys/z: no bug", () => {});']);
+    expect(addedBugTests(d).map((a) => a.title)).toEqual(["keys/x: it holds #BUG-20", "keys/y: also #BUG-21"]);
   });
 
   test("the -t pattern selects exactly those titles, their regex characters escaped", () => {
@@ -45,5 +50,17 @@ describe("test-guard: weakening a test needs a person's review", () => {
     const was = before({ "test/a.test.ts": 'test("BUG-1: a", () => {}); test("plain one", () => {});' });
     const now = before({ "test/a.test.ts": 'test("BUG-1/x: a, split", () => {});' });
     expect(weakened("", was, now)).toEqual([{ kind: "test gone", file: "test/a.test.ts", text: "plain one" }]);
+  });
+
+  test("a test renamed into the catalog's form (its entry first, its bug as a tag) is not gone; one renamed otherwise is", () => {
+    const was = before({ "test/a.test.ts": 'test("BUG-3/case: keys stay out", () => {}); test("masks tokens", () => {}); test("old words", () => {});' });
+    const now = before({ "test/a.test.ts": 'test("keys/out: keys stay out #BUG-3", () => {}); test("keys/mask: masks tokens", () => {}); test("keys/new: new words", () => {});' });
+    expect(weakened("", was, now)).toEqual([{ kind: "test gone", file: "test/a.test.ts", text: "old words" }]);
+    expect(bare("perf/x: a thing #BUG-9 @full")).toBe("a thing @full");
+  });
+
+  test("any change to what the tests promise (the catalog, the seams) is found, comments aside", () => {
+    const d = [diff("test/catalog.ts", ['+      x: perf("a new promise"),', "-      y: perf(\"an old one\"),", "+  // a comment"]), diff("test/seams.ts", ['+  modules: ["src/x.ts"],'])].join("\n");
+    expect(weakened(d, new Map(), new Map()).map((f) => `${f.kind}: ${f.file}: ${f.text}`)).toEqual(["catalog changed: test/catalog.ts: 2 line(s) of what the tests promise added or removed", "catalog changed: test/seams.ts: 1 line(s) of what the tests promise added or removed"]);
   });
 });

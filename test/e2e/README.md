@@ -284,7 +284,7 @@ every millisecond (`perf-kit.ts`: `timed`, `keyLatencies`), never from `press()`
 - `typing` — burst typing at the clock's pace (12 keys a second for 5 s, 25 a second for 4 s) at the home
   composer with no sessions, inside a session with 1, 10 and 40 open, and in a session while another
   floods 64 MB: per-key p50, p95, max, drift (do the keys queue?), lost keys;
-  the home composer with 0, 10 and 40 sessions is `BUG-615/QA-perf-01` (fixed by the string-width patch in `patches/`);
+  the home composer with 0, 10 and 40 sessions is `perf/key-home` (BUG-615) (fixed by the string-width patch in `patches/`);
 - `throughput` — a `!flood` (`fake-tui.ts`) into the shown session, into a background one while keys are typed
   in the shown one, and tab switches;
 - `scale` — 1, 5, 10, 20 and 40 sessions: Gluon's and the agents' RSS (`/proc`, `ps` on macOS), idle CPU over
@@ -317,7 +317,7 @@ and their derivation are in `perf-kit.ts` (`NOTICEABLE_ADDED_MS`, `GOOD_ADDED_MS
   [Nielsen](https://www.nngroup.com/articles/response-times-3-important-limits/).
 
 Latencies move with the machine's load: the table prints each burst's CPU pressure (`cpuPressure()`: the share
-of the last 10 s a task waited for a core), and a run above ~5 % says little. `PERF-SMOKE` holds the
+of the last 10 s a task waited for a core), and a run above ~5 % says little. `perf/smoke` holds the
 median of Gluon's added latency to the limit and the p95 to twice it, times `loadAllowance()` (1 under 5 % CPU
 pressure, 1 more per 10 points, at most 4); the perf suite holds the p95 to the limit itself. A `BUG-CANDIDATE` perf test
 is `test.failing` with its own measurement (not shared with a passing test, or a missing measurement would
@@ -337,7 +337,7 @@ The time is the frame itself (Ink's render of the home view, about 6 ms with a f
 
 Each file prints its metrics table. A metric fails above 1.5x its baseline (and above baseline plus a
 small slack per unit) or above its absolute ceiling in the test (× `SLOW`, except the perception limits); quick mode and
-`PERF-SMOKE` (`test/e2e/perf-smoke.e2e.test.ts`, in the fast tier: startup, three sessions, keys, switches)
+`perf/smoke` (`test/e2e/perf-smoke.e2e.test.ts`, in the fast tier: startup, three sessions, keys, switches)
 check ceilings only (the added-latency rows hold the perception limits; a raw latency row is held to its baseline). `GLUON_PERF_MAX_SESSIONS=20` leaves out the larger session counts. On Windows run `bun run test:windows perf` from WSL (it passes the
 `GLUON_PERF_*` variables on, and a `GLUON_PERF_UPDATE` baseline comes back to the checkout): process figures and the soak are skipped there. `baseline.json` holds one entry per platform; after an intended change, or on a
 new platform, run `GLUON_PERF_UPDATE=1 bun run test:perf` on an idle machine and review the diff.

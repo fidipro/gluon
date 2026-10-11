@@ -75,7 +75,7 @@ describe("what a key is, and where it came from", () => {
     loadSecrets();
     expect(secretSource("XAI_API_KEY")).toBe(env());
   });
-  test("loading a .env never touches process.env", () => {
+  test("keys/never-in-process-env: loading a .env never touches process.env", () => {
     writeFileSync(env(), "OPENAI_API_KEY=sk-proj-fromfilefromfilefromfile\n");
     delete process.env.OPENAI_API_KEY;
     loadSecrets();
@@ -108,7 +108,7 @@ describe("saveSecrets", () => {
       process.umask(old);
     }
   });
-  test("a rename that fails leaves no directory and no copy of the key, and the old file as it was", () => {
+  test("keys/private-files-directory-first: a rename that fails leaves no directory and no copy of the key, and the old file as it was", () => {
     writeFileSync(env(), "KEEP=1\n");
     const before = readdirSync(TMP).sort();
     expect(() =>
@@ -137,7 +137,7 @@ describe("saveSecrets", () => {
 });
 
 describe("private files", () => {
-  test.skipIf(!POSIX)("privateDir is 0700 under an umask of 0, its name is random, and a parent that doesn't exist throws (nothing is made)", () => {
+  test.skipIf(!POSIX)("keys/private-files-directory-first: privateDir is 0700 under an umask of 0, its name is random, and a parent that doesn't exist throws (nothing is made)", () => {
     const old = process.umask(0);
     try {
       const a = privateDir(TMP, "p-");
@@ -157,7 +157,7 @@ describe("private files", () => {
     expect(restrictToUser(dir, true)).toBe(`could not limit ${dir} to your account (icacls); check who can read it`);
     expect(privateDir(TMP, "w-", true).warning).toContain("could not limit");
   });
-  test("writePrivate creates the parent directories, replaces an existing file, and leaves no .gluon- directory behind, even when the rename fails", () => {
+  test("keys/private-files-directory-first: writePrivate creates the parent directories, replaces an existing file, and leaves no .gluon- directory behind, even when the rename fails", () => {
     const path = join(TMP, "a", "b", "file.json");
     expect(writePrivate(path, "one\n")).toBeUndefined();
     writePrivate(path, "two\n");

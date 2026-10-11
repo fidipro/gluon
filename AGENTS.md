@@ -42,8 +42,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 
 - **Done means `bun run regression --changed` passes** (it runs the whole fast tier itself when a core file
   changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
-- **Every fixed bug gets a regression test that fails before the fix**, named `BUG-nn/<plan case>: …`, at the
-  product's surface, below it only at a typed seam (`docs/contributing/testing.md` rule 3); never weaken a test to get green (rules: `test/AGENTS.md`).
+- **Every fixed bug makes its catalog entry's test fail before the fix**, tagged `#BUG-nn` (`test/catalog.ts`), at the
+  product's surface, below it only at a seam (`test/seams.ts`); never weaken a test to get green (rules: `test/AGENTS.md`).
 - **The tests are offline and free; regression's last stage is not.** No test calls a real brain, agent, API or
   installer. After them, `regression` runs the live checks the change needs (`scripts/live-stage.ts`): pre-approved
   within its cap in code, local only, never in CI; `--no-live` leaves it out.

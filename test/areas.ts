@@ -255,8 +255,8 @@ export const AREAS: Record<string, Area> = {
     doc: "Markdown, the generated reference, the docs site, README, AGENTS.md files; the area manifest's own test",
     platforms: "linux",
     src: ["src/**/AGENTS.md"],
-    files: ["**/*.md", "**/*.mdx", "docs/**", "site/**", "scripts/docs/**", "scripts/test-health.ts", "scripts/test-value.ts", "test/test-style.ts", "test/test-style.baseline.json", "scripts/red-check.ts", "scripts/test-guard.ts", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"],
-    unit: ["test/areas.test.ts", "test/test-health.test.ts", "test/test-style.test.ts", "test/test-guards.test.ts", "test/test-value.test.ts", "test/markdown.test.ts", "test/contributor-docs.test.ts", "test/docs-gen.test.ts", "test/docs-links.test.ts", "test/docs-no-copies.test.ts", "test/docs-site.test.ts", "test/readme.test.ts"],
+    files: ["**/*.md", "**/*.mdx", "docs/**", "site/**", "scripts/docs/**", "scripts/test-health.ts", "scripts/test-value.ts", "test/test-style.ts", "test/test-style.baseline.json", "test/catalog.ts", "test/seams.ts", "test/catalog.baseline.json", "scripts/red-check.ts", "scripts/test-guard.ts", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"],
+    unit: ["test/areas.test.ts", "test/catalog.test.ts", "test/test-health.test.ts", "test/test-style.test.ts", "test/test-guards.test.ts", "test/test-value.test.ts", "test/markdown.test.ts", "test/contributor-docs.test.ts", "test/docs-gen.test.ts", "test/docs-links.test.ts", "test/docs-no-copies.test.ts", "test/docs-site.test.ts", "test/readme.test.ts"],
     e2e: [],
   },
   perf: {
@@ -430,8 +430,12 @@ export function platformsOf(sel: Selection): "all" | "linux" {
 
 /**
  * From the files a change touches to what runs. A core or unknown file means the fast tier; a source
- * file means its area; a changed test file is included itself; docs alone mean the docs tests.
+ * file means its area; a changed test file is included itself, with the checks every test is held to; docs alone mean the docs
+ * tests.
  */
+/** The checks every test file is held to (its entry, its seams, its style): they run whenever a test changes. */
+export const TEST_RULES = ["test/catalog.test.ts", "test/test-style.test.ts"];
+
 export function selectChanged(changed: string[]): Selection {
   const areas = new Set<string>();
   const unit: string[] = [];
@@ -450,6 +454,7 @@ export function selectChanged(changed: string[]): Selection {
       } else if (AREAS[owner]!.unit.includes(f)) unit.push(f);
       else hookAreas.push(owner);
       why.push(`${f}: test file (area ${owner})`);
+      for (const r of TEST_RULES) if (!unit.includes(r)) unit.push(r);
       continue;
     }
     if (f.startsWith("src/")) {

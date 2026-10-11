@@ -149,7 +149,7 @@ test("every turn/start carries the step's effort, clamped to the model's support
   expect(await run([])).toEqual({ turns: [undefined, undefined], heard: [null] });
 });
 
-test("the thread runs on Gluon's prompt and tools only: read-only, never asking, ephemeral, Codex's tools off", async () => {
+test("subscriptions/no-impersonation: the thread runs on Gluon's prompt and tools only: read-only, never asking, ephemeral, Codex's tools off", async () => {
   const f = fake({ turns: [[{ text: "Hi." }], [{ text: "Again." }]], mcpServers: ["github"] });
   const { s, state } = session(f.spawn);
   await s.submit("hello");
@@ -282,7 +282,7 @@ describe("probe", () => {
 });
 
 describe("hard rules", () => {
-  test("codexEnv is the user's own environment: nothing added, no base URL, no token", () => {
+  test("subscriptions/no-token-forwarding: codexEnv is the user's own environment: nothing added, no base URL, no token", () => {
     const env = codexEnv();
     expect(env).toEqual({ ...process.env });
     expect("OPENAI_BASE_URL" in env).toBe(false);
@@ -298,7 +298,7 @@ describe("hard rules", () => {
     expect(parseLoginStatus("something else")).toBeNull();
   });
 
-  test("no source reads Codex's credentials; the codex brain has no HTTP client of its own", () => {
+  test("subscriptions/plan-brain-official-only: no source reads Codex's credentials; the codex brain has no HTTP client of its own", () => {
     const sources = (dir: string): [string, string][] =>
       readdirSync(dir).flatMap((f) => {
         const p = join(dir, f);
