@@ -2,13 +2,16 @@
  * What must hold on Gluon's screen after every step, whatever the step was: the frame's chrome
  * where `layout` (`src/pty/chrome.ts`) puts it, whole and unwrapped; the home view one frame
  * rows − 1 tall with no session's terminal modes left on (its own SGR clicks only: BUG-269); the cursor where the user types; the
- * agent given exactly the user's bytes. `checkInvariants` lists what doesn't hold (empty: all
- * good); `assertInvariants` throws with that list and the screen.
+ * agent given exactly the user's bytes; and every screen lint (`screen-lint.ts`: whole boxes, no wrapped chrome, no cut
+ * wide character, cut text ends in `…`, the home view's ground painted, one selection, readable contrast). `checkInvariants`
+ * lists what doesn't hold (empty: all good); `assertInvariants` throws with that list and the screen.
  */
 import { keyLabel } from "../../src/ui/layout.ts";
 import { layout, MIN_COLS, MIN_ROWS } from "../../src/pty/chrome.ts";
 import { WIN } from "./fixtures.ts";
+import { grab } from "./frame.ts";
 import { type App, HOME_VIEW } from "./harness.ts";
+import { lint } from "./screen-lint.ts";
 
 /** Which view is up, as the screen shows it. */
 export type View = "home" | "session" | "tooSmall";
@@ -146,6 +149,25 @@ function homeProblems(app: App, capture: boolean): string[] {
   return out;
 }
 
+/**
+ * Screen lints known to fail: real UI bugs the lints found when they joined the invariants (BUG-CANDIDATE, not fixed here),
+ * left out only where each shows, so the invariants stay a regression check. Delete an entry with its fix.
+ */
+const KNOWN_LINT: { what: string; shows(app: App, problem: string): boolean }[] = [
+  {
+    what: "below the minimum size (the matrix's h.tooSmall, typing at 19 columns), the home view's text reaches its right margin",
+    shows: (app, p) => p.startsWith("cut:") && (app.term.cols < MIN_COLS || app.term.rows < MIN_ROWS),
+  },
+  {
+    // `usePaste` in src/ui/Home.tsx inserts the text as it is; typed input drops control characters (the matrix's paste "a\x1cb").
+    what: "a pasted control character stays in the home composer's draft, and its row's last cell keeps the terminal's background",
+    shows: (app, p) => {
+      const m = /^ground: row (\d+) has 1 cell\(s\) on the terminal's default background \(from column (\d+)\)/.exec(p);
+      return !!m && Number(m[2]) === app.term.cols - 1 && /^\s*›/.test(app.lines()[Number(m[1])] ?? "");
+    },
+  },
+];
+
 /** Everything that doesn't hold on the screen now (empty: all good). */
 export function checkInvariants(app: App, e: Expect = {}): string[] {
   const out: string[] = [];
@@ -163,6 +185,8 @@ export function checkInvariants(app: App, e: Expect = {}): string[] {
   } else if (!small) out.push("view: neither the home view nor a session's frame");
   if (e.inputLog !== undefined && app.inputLog() !== e.inputLog) out.push(`input: the agents got ${JSON.stringify(app.inputLog())}, not ${JSON.stringify(e.inputLog)}`);
   if (e.clears !== undefined && app.clears().screen > e.clears) out.push(`clears: ${app.clears().screen} full-screen clears since the mark, more than ${e.clears}`);
+  // The screen lints, golden-free (the screens tests run them on every scene too). The harness's xterm answers as a dark terminal.
+  if (view) out.push(...lint(grab(app, "invariants", "dark")).filter((p) => !KNOWN_LINT.some((k) => k.shows(app, p))).map((p) => `lint ${p}`));
   return out;
 }
 

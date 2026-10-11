@@ -1,5 +1,6 @@
 /**
- * Checks every frame of the visual suite, whatever the scene: what no golden should ever show.
+ * Checks a frame of Gluon's screen, whatever it shows: what no screen should ever show. Golden-free: every invariant
+ * check of the e2e scenarios runs it (`gluon-invariants.ts`), and so does every scene of the visual suite.
  * `lint(frame)` lists the problems (empty: clean), each `<rule>: <where>: <what>`.
  *
  * - `border`: boxes whole: the session frame where `layout` puts it; at home every box (the spec

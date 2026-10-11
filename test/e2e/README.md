@@ -219,56 +219,42 @@ title and register the `GM-…` id in `test/fixtures/gluon-matrix.ts`.
 Each pattern has a `test.failing("BUG-CANDIDATE/GM-…")` repro in the monkey's file. When the bug
 is fixed, clear its flag and turn the repro into a passing test.
 
-## Visual suite
+## Screens and the visual goldens
 
-`test/visual/` checks how Gluon looks, locally only: regression, `test` and `test:unit` skip it
-(`--path-ignore-patterns='test/visual/**'`). Two batches: `test:visual` (all) and
-`test:visual-must` (`GLUON_VISUAL=must`: each chain once at 80×24 dark, tiny chains at their
-sizes, the home and session chains light at 120×40, the resize checks marked `must`). The must
-batch compares with the stored goldens and never writes them: update goldens with the full
-`bun run test:visual -u` only.
+What can be checked without a golden is in the standard tests:
+
+- **Lints** (`screen-lint.ts`) on every invariant check of the e2e scenarios, the coverage matrix and the monkey
+  (`gluon-invariants.ts`): whole borders, no wrapped chrome, no half-cut wide characters, cuts ending in `…`, the home
+  view's ground painted, one highlight at home, contrast ≥ 3:1. A lint a real Gluon bug breaks goes in `KNOWN_LINT`
+  there, narrowed to where it shows (a BUG-CANDIDATE): delete it with the fix.
+- **Screens** (`screens.e2e.test.ts`, `@full`): every scene through the lints at 50×20 and 80×24 dark and 120×40 light,
+  the same text cut alike across widths, and `RESIZE_CHECKS`: a scene reached at one size and resized to another
+  equals a fresh start there (a session's interior is the agent's: chrome only).
+
+`test/visual/` pins how Gluon looks, cell by cell, and runs only by hand, for a redesign: regression, `test` and
+`test:unit` skip it (`--path-ignore-patterns='test/visual/**'`).
 
 ```bash
-bun run test:visual                    # every scene against its golden, lints, resize checks (~6 min)
+bun run test:visual                    # every scene against its golden (~2 min)
 bun run test:visual -u                 # accept the new frames as goldens (review the .snap diff first)
-bun run test:visual-must               # the short batch (~2 min): every chain at 80×24 dark, a light check, read-only
 GLUON_REVIEW=1 bun run test:visual     # also PNGs, contact sheets, test/visual/out/index.html, the checklist
 ```
 
-- **Scenes** (`scenes.ts`): chains of states walked on the demo brain with the TUI fakes, each
-  `shot` a scene, every chain fresh at 50×20, 80×24, 120×40 and 160×50 in the dark theme and at
-  50×20 and 120×40 in the light one (the harness's `osc11`); the tiny ones at 30×8 and 19×5.
-  Shots wait for idle states (a session's `awaiting your input`, the header's git state, the
-  redraw after a resize: `redrawn`), never a fixed pause. `RESIZE_CHECKS` reach a scene, resize,
-  and compare with a fresh start at that size (a session's interior is the agent's: chrome only).
-- **Goldens** (`frame.ts`, `__snapshots__/`): the text grid with row numbers (`↩` a wrapped
-  row), a style table (`s3 fg=#… bg=#… b d i u inv`), the base style, each row's runs
-  `[from,to,s#]` by column, the cursor. Snapshot matchers can't run in concurrent tests: the tests
-  are serial and the apps run in a pool ahead of them (`GLUON_VISUAL_CONCURRENCY`, default 8).
-- **Masks** (`mask.ts`): width-preserving `#` over the version, the intake agent's elapsed time
-  and blinking ◆/◇, a session's age, `$` figures, temp paths, pids and the branch. Prefer a wait
-  to a new mask.
-- **Lints** (`lint.ts`) on every frame: whole borders, no wrapped chrome, no half-cut wide
-  characters, cuts ending in `…`, the home view's ground painted, one highlight at home, contrast
-  ≥ 3:1. A lint a real Gluon bug breaks is listed in `KNOWN_BUGS` (`scenes.visual.test.ts`) as a
-  `BUG-CANDIDATE/V-…` `test.failing`: drop the scene once the bug is fixed.
-- **Goldens known to fail** on a clean checkout (the test reports them as failures; read the diff
-  before you take it as your regression):
-  - `home-groups`, every size: the golden holds styled runs on blank cells at the right of the
-    header's first row. The text is the same, and the screen looks the same. The golden recorded
-    paint left on blank cells, so it fails even at the commit that recorded it. Re-record it, or
-    have `frame.ts` ignore the style of blank cells.
-  - `session-claude` and `session-grok` at 160×50: the fake agent's argv shows the session id
-    Gluon mints for each launch (`crypto.randomUUID()` in `src/gluon.ts`), and `mask.ts` has no
-    UUID mask, so these fail on every run.
-
-  Remove an entry when its fix lands.
-- **PNGs** (`render.py`, PIL and the DejaVu fonts; without them, one note and no PNGs):
-  `python3 test/visual/render.py --cells <cells.json> <out.png>` (a frame as `cellsJson` writes
-  it; the shape is atop `render.py`), `--ansi <ansi.txt> <cols> <out.png>` (escape sequences,
-  `tmux capture-pane -e -N -p`), `--sheet <dir>` (all frames: PNGs, a contact sheet per scene, the
-  index). A screen with a secret-looking string is refused. Output stays in `test/visual/out/`
-  (gitignored). What to look for on the sheets: `checklist.ts`.
+- **Scenes** (`scenes.ts`): chains of states walked on the demo brain with the TUI fakes, each `shot` a scene; the
+  tiny chains at 30×8 and 19×5. Shots wait for idle states (a session's `awaiting your input`, the header's git
+  state, the redraw after a resize: `redrawn`), never a fixed pause. Walking them: `scene-runs.ts`.
+- **Goldens** (`frame.ts`, `test/visual/__snapshots__/`) at 80×24 dark, and 120×40 light for the home and session
+  chains (`goldenSizes`): the text grid with row numbers (`↩` a wrapped row), a style table
+  (`s3 fg=#… bg=#… b d i u inv`), the base style, each row's runs `[from,to,s#]` by column, the cursor. Snapshot
+  matchers can't run in concurrent tests: the tests are serial and the apps run in a pool ahead of them
+  (`GLUON_VISUAL_CONCURRENCY`, default 8).
+- **Masks** (`mask.ts`): width-preserving `#` over the version, the intake agent's elapsed time and blinking ◆/◇, a
+  session's age, `$` figures, temp paths, pids and the branch. Prefer a wait to a new mask.
+- **PNGs** (`test/visual/render.py`, PIL and the DejaVu fonts; without them, one note and no PNGs):
+  `python3 test/visual/render.py --cells <cells.json> <out.png>` (a frame as `cellsJson` writes it; the shape is atop
+  `render.py`), `--ansi <ansi.txt> <cols> <out.png>` (escape sequences, `tmux capture-pane -e -N -p`), `--sheet <dir>`
+  (all frames: PNGs, a contact sheet per scene, the index). A screen with a secret-looking string is refused. Output
+  stays in `test/visual/out/` (gitignored). What to look for on the sheets: `test/visual/checklist.ts`.
 
 The runners check the cells. `test/pty-route-matrix.test.ts` checks every `unit` cell against
 `route()` (the state as a `RouteContext`, the input through the real key decoder), plus seeded
@@ -379,5 +365,5 @@ perf suite (`test/perf/`: its metrics, ceilings, variables, `!flood`), the
 coverage matrix's shape, its runners' variables (`GLUON_FULL`, `GLUON_MATRIX_ONLY`,
 `GLUON_MATRIX_TIMES`, `GLUON_FUZZ_SEED`) or the `BUG-CANDIDATE` / `KNOWN_FAILING` convention, the
 monkey's knobs, checks or `KNOWN` list (`gluon-monkey.ts`), how CI load is reproduced, or the visual
-suite's sizes, themes, masks, lints, known-failing goldens or `render.py` CLIs (`test/visual/`).
+suite's sizes, themes, masks, lints or `render.py` CLIs (`test/e2e/scenes.ts`, `scene-runs.ts`, `screen-lint.ts`, `test/visual/`).
 How-to only; the rules for tests are in `test/AGENTS.md`.

@@ -1,7 +1,7 @@
 /**
- * The visual suite's scenes: every visually distinct state of Gluon, reached offline on the demo
- * brain with the TUI fakes. A chain is one app walked through several states; each `shot` is a
- * scene (a golden per size and theme). Shots wait for idle states (a session `awaiting your
+ * Every visually distinct state of Gluon, reached offline on the demo brain with the TUI fakes: the screens tests lint
+ * each (`screens.e2e.test.ts`) and the visual goldens pin a few (test/visual/). A chain is one app walked through several
+ * states; each `shot` is a scene. Shots wait for idle states (a session `awaiting your
  * input`, the intake agent done) so frames are the same every run; `mask.ts` covers the rest.
  *
  * Every chain runs fresh at each of its sizes (`SIZES`, dark; `LIGHT_SIZES`, light), except the
@@ -10,11 +10,11 @@
  * with the fresh frame at the other.
  */
 import { join } from "node:path";
-import { KEYS, wheelUp } from "../e2e/actions.ts";
+import { KEYS, wheelUp } from "./actions.ts";
 import { GLUON_HEX } from "../../src/ui/theme.ts";
-import { freshConfig, repo, type FakeAgent } from "../e2e/fixtures.ts";
-import { ASK_YAML, EVENT_HOOK, FAKES, HARNESS_OF, home, LABEL, optionOf, say } from "../e2e/gluon-kit.ts";
-import { App, FULL_PACE, HOME_VIEW, QUESTION, SLOW } from "../e2e/harness.ts";
+import { freshConfig, repo, type FakeAgent } from "./fixtures.ts";
+import { ASK_YAML, EVENT_HOOK, FAKES, HARNESS_OF, home, LABEL, optionOf, say } from "./gluon-kit.ts";
+import { App, FULL_PACE, HOME_VIEW, QUESTION, SLOW } from "./harness.ts";
 import { grab, serialize, type Theme } from "./frame.ts";
 import { mask } from "./mask.ts";
 
@@ -434,8 +434,6 @@ export interface ResizeCheck {
   from: Size;
   to: Size;
   bug?: string;
-  /** In the must batch too (`test:visual-must`): it guards a fixed bug. */
-  must?: boolean;
 }
 
 export const RESIZE_CHECKS: ResizeCheck[] = [
@@ -443,7 +441,7 @@ export const RESIZE_CHECKS: ResizeCheck[] = [
   { chain: "home-chat", scene: "home.question", from: SIZES[2]!, to: SIZES[1]! },
   { chain: "home-chat", scene: "home.proposal", from: SIZES[0]!, to: SIZES[3]! },
   // After the resize the last row keeps the ground a fresh start paints (BUG-245).
-  { chain: "home-sessions", scene: "home.sessions", from: SIZES[2]!, to: SIZES[1]!, must: true },
+  { chain: "home-sessions", scene: "home.sessions", from: SIZES[2]!, to: SIZES[1]! },
   { chain: "home-sessions", scene: "home.keys", from: SIZES[0]!, to: SIZES[2]! },
   { chain: "session-claude", scene: "s.claude.idle", from: SIZES[2]!, to: SIZES[1]! },
   { chain: "session-codex", scene: "s.codex.idle", from: SIZES[0]!, to: SIZES[3]! },
@@ -454,4 +452,4 @@ export const RESIZE_CHECKS: ResizeCheck[] = [
 export const CHAIN_TIMEOUT_MS = 180_000 * SLOW;
 
 /** Where PNGs, sheets and the review index go (gitignored). */
-export const OUT = join(import.meta.dir, "out");
+export const OUT = join(import.meta.dir, "..", "visual", "out");
