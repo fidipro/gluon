@@ -174,14 +174,6 @@ const KNOWN_LINT: { what: string; shows(app: App, problem: string): boolean }[] 
     what: "below the minimum size (the matrix's h.tooSmall, typing at 19 columns), the home view's text reaches its right margin",
     shows: (app, p) => p.startsWith("cut:") && (app.term.cols < MIN_COLS || app.term.rows < MIN_ROWS),
   },
-  {
-    // `usePaste` in src/ui/Home.tsx inserts the text as it is; typed input drops control characters (the matrix's paste "a\x1cb").
-    what: "a pasted control character stays in the home composer's draft, and its row's last cell keeps the terminal's background",
-    shows: (app, p) => {
-      const m = /^ground: row (\d+) has 1 cell\(s\) on the terminal's default background \(from column (\d+)\)/.exec(p);
-      return !!m && Number(m[2]) === app.term.cols - 1 && /^\s*›/.test(app.lines()[Number(m[1])] ?? "");
-    },
-  },
 ];
 
 /** Everything that doesn't hold on the screen now (empty: all good). */

@@ -1627,6 +1627,17 @@ describe("home view", () => {
     t.unmount();
   });
 
+  test("BUG-722/paste: a paste drops escape sequences and control characters as typing does, and keeps its line breaks (CRLF and CR too) and tabs", async () => {
+    const paste = (text: string) => `\x1b[200~${text}\x1b[201~`;
+    const { t, s } = await home();
+    await t.keys(paste("a\x1cb\x00\x7f\x1b[Ac"));
+    await t.keys(KEY.enter);
+    await t.keys(paste("one\r\n\ttwo\rthree\nfour\x1c"));
+    await t.keys(KEY.enter);
+    expect(s.sent).toEqual(["abc", "one\n\ttwo\nthree\nfour"]);
+    t.unmount();
+  });
+
   test("while the intake agent works: a working line, Esc interrupts, Enter doesn't send", async () => {
     const { t, s } = await home();
     s.set({ pending: null, workingSince: Date.now(), status: "Exploring" });
