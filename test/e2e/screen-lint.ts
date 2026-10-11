@@ -9,7 +9,7 @@
  *   home: every row).
  * - `wide`: no half-cut wide character (a right half without its left), no U+FFFD.
  * - `cut`: text cut at an edge ends with `…`: the frame's title stops short of its corner or ends
- *   in `…`; the home view keeps its 2-column right margin; across sizes (`lintAcross`), a strip,
+ *   in `…`; the home view keeps its right margin (2 columns, none below 24); across sizes (`lintAcross`), a strip,
  *   info line or bar that is a prefix of the wider frame's ends in `…` / `›`.
  * - `ground`: the home view (and `too small`) paints every cell's background: no hole of the
  *   terminal's default (`src/ui/AGENTS.md`: it paints its own ground); `ground-last` the last
@@ -20,6 +20,7 @@
  *   own and isn't checked).
  */
 import { layout, MIN_COLS, MIN_ROWS } from "../../src/pty/chrome.ts";
+import { homePadX } from "../../src/ui/layout.ts";
 import { GLUON_HEX } from "../../src/ui/theme.ts";
 import { type Cell, type Color, DEFAULTS, type Frame, rowText, type Theme } from "./frame.ts";
 
@@ -173,9 +174,9 @@ function cuts(f: Frame, view: View): string[] {
   } else if (view === "home") {
     f.cells.forEach((row, y) => {
       const x = lastCol(row);
-      // The home view keeps two columns of margin on the right (rules alone may span a tiny
-      // terminal); a question on the last row runs to the edge.
-      if (x >= f.cols - 2 && y !== f.rows - 1 && row[x]!.ch !== "…" && row.some((c) => isText(c.ch))) out.push(`cut: row ${y} runs into the right margin (column ${x}): ${JSON.stringify(rowText(row))}`);
+      // The home view keeps its side margin on the right (`homePadX`: none below 24 columns, where the
+      // rules and the composer span the terminal); a question on the last row runs to the edge.
+      if (x >= f.cols - homePadX(f.cols) && y !== f.rows - 1 && row[x]!.ch !== "…" && row.some((c) => isText(c.ch))) out.push(`cut: row ${y} runs into the right margin (column ${x}): ${JSON.stringify(rowText(row))}`);
     });
   }
   return out;

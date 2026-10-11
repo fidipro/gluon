@@ -18,6 +18,9 @@ export interface Seg {
 
 export const sw = (s: string) => Bun.stringWidth(s);
 
+/** The home view's side margin: gone on a tiny terminal, where the rules and the composer need the columns (BUG-181); the screen lints' `cut` rule expects the same (BUG-723). */
+export const homePadX = (columns: number) => (columns >= 24 ? 2 : 0);
+
 /**
  * Two clicks this close together are a double-click: on one row of the home list they open it,
  * selected or not (`Home.tsx`); the second one, after the first opened a session, is still

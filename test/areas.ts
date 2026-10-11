@@ -135,6 +135,7 @@ export const AREAS: Record<string, Area> = {
       "test/pty-route-matrix.test.ts",
       "test/pty-selection-qa.test.ts",
       "test/gluon-qa-frame.test.ts",
+      "test/screen-lint.test.ts",
       "test/run-sweep.test.ts",
     ],
     e2e: ["test/e2e/gluon.e2e.test.ts", "test/e2e/gluon-more.e2e.test.ts", "test/e2e/gluon-qa-frame.e2e.test.ts", "test/e2e/gluon-matrix.e2e.test.ts", "test/e2e/gluon-monkey.e2e.test.ts", "test/e2e/scoped.e2e.test.ts", "test/e2e/screens.e2e.test.ts"],

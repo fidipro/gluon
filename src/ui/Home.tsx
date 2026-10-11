@@ -50,7 +50,7 @@ import * as ed from "./editor.ts";
 import { Header, type HeaderInfo } from "./header.tsx";
 import { markdownRows } from "./markdown.tsx";
 import { pressedTwice, splitKeys, useLateOscFilter } from "./keys.ts";
-import { DOUBLE_CLICK_MS, groupKey, keyGroups, keysPanel, lineKey, listLines, rowKey, selectable, selectedKey, selectionAfter, type ListTop, type Readiness } from "./layout.ts";
+import { DOUBLE_CLICK_MS, groupKey, homePadX, keyGroups, keysPanel, lineKey, listLines, rowKey, selectable, selectedKey, selectionAfter, type ListTop, type Readiness } from "./layout.ts";
 import { AgentsAvailable, Hint, homeHint, KeysPanel, SessionList, sessionListLines, type HintFor, type HomeQuestion } from "./list.tsx";
 import type { MouseReport } from "../pty/types.ts";
 import type { Theme } from "./theme.ts";
@@ -683,7 +683,7 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
   // available), then the hint line, then the header: the composer always stays (BUG-162, BUG-228).
   const frame = Math.max(1, rows - 1);
   // The side margins go on a tiny terminal: the rules and the composer must fit in what is left (BUG-181).
-  const padX = columns >= 24 ? 2 : 0;
+  const padX = homePadX(columns);
   const width = Math.max(1, columns - 2 * padX);
   const composerRows = Math.max(1, Math.min(6, Math.floor(frame / 4)));
   const bottom = composerHeight(draft, width, composerRows) + (nudge ? 1 : 0) + (queued ? 1 : 0);
