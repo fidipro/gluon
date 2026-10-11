@@ -1,5 +1,5 @@
 /**
- * scripts/codex-drift.ts: what a codex release gives the ChatGPT-plan intake agent of its own (codex-watch.yml).
+ * scripts/codex-drift.ts: what a codex release gives the ChatGPT-plan intake agent of its own (harness-watch.yml).
  * Logic on fixtures, and the tool check against the fake codex (never a real one).
  */
 import { expect, test } from "bun:test";

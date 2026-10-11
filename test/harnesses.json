@@ -1,0 +1,172 @@
+{
+  "//": "Written by `bun scripts/harness-pin.ts --bump`, never by hand (scripts/harness-cache.ts).",
+  "claude-code": {
+    "version": "2.1.296",
+    "files": {
+      "linux-x64": {
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.296.tgz",
+        "sha512": "fa6d35bab81e96723e549c4f68a3c42b4c22c60ab8dae67c3de09a524e6d5fff18a0306f4a60bf4445501b68d07c902bf1dc6e9e98c9eb4d05bcbadc8f55964f",
+        "bin": "package/claude"
+      },
+      "linux-arm64": {
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.296.tgz",
+        "sha512": "43a421eaa166c2e046f6b40588347a6d8dd79059f04cdf4000fae79c3801bebf6c6e0d50979c2b7f495fa020e2577ebd1141cecf12388b939d1d6f557f6fe878",
+        "bin": "package/claude"
+      },
+      "darwin-x64": {
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.296.tgz",
+        "sha512": "c8225ed6fa7b8ee1e0df15729344ecf1bfa6704ca50a8e9a20d83bc82eebd5e23c04a7e6d434f5e61b71975ae2cf7cbe075155db97a620af7477bac7fb31632c",
+        "bin": "package/claude"
+      },
+      "darwin-arm64": {
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.296.tgz",
+        "sha512": "beab71de44b7af584d2cc93e37c24c1b927891c2c721b237b7f35221d705419ad1542140e8db5cc49ca7fc1f927f71b125a14938211fa01417b05a35d3e3a3f4",
+        "bin": "package/claude"
+      },
+      "win32-x64": {
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.296.tgz",
+        "sha512": "83669807360ce584c38a8d2e940a0620682d19131ad3c58079c7abe30b8e52b28fc153d17f245d9a8648d3504d4bc8c5f72ba90e643270132e05c56e8bf54637",
+        "bin": "package/claude.exe"
+      }
+    }
+  },
+  "codex": {
+    "version": "0.162.1",
+    "files": {
+      "linux-x64": {
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.162.1-linux-x64.tgz",
+        "sha512": "7232b699d1c87c47a9675950d4c5f7693402fbc9dc22cbe769c97feaf23674821c7cff3f32b853436faa46591714d0f32528f5777eaab88b333fedffe0250959",
+        "bin": "package/vendor/x86_64-unknown-linux-musl/bin/codex"
+      },
+      "linux-arm64": {
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.162.1-linux-arm64.tgz",
+        "sha512": "4aced6fd2acab5014d68cb52a233688b2909817fa20c2f1d68cf98adcbe0989003b503e4d1c777c3a0e76b80981f6098bdff6742b6a78faf5fa5c4f3677b1021",
+        "bin": "package/vendor/aarch64-unknown-linux-musl/bin/codex"
+      },
+      "darwin-x64": {
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.162.1-darwin-x64.tgz",
+        "sha512": "d3f5874616d49ccd700237f208ee7843cb38bd04712d505ba96e97b907fbad94c431360f29121053d68f7918231bae776424a3b41aec95643e1bdbab63d0a4b1",
+        "bin": "package/vendor/x86_64-apple-darwin/bin/codex"
+      },
+      "darwin-arm64": {
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.162.1-darwin-arm64.tgz",
+        "sha512": "6155e9839ee2b41b90c63a1f6b2dca0c5e546e7645e18d5998d173502cf465089037e0e77713a337957ceeb9d7bcf682e2a08f3b6125ef80f37b0a013fc2723d",
+        "bin": "package/vendor/aarch64-apple-darwin/bin/codex"
+      },
+      "win32-x64": {
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.162.1-win32-x64.tgz",
+        "sha512": "75f9783211ee122d0044ac8d9ab4f193e4509ac58d09002854b52dad8abecab5b50bc3f6b20e738b08075140021e360b2ae00257b0111f936ae699c2cf71a569",
+        "bin": "package/vendor/x86_64-pc-windows-msvc/bin/codex.exe"
+      }
+    }
+  },
+  "antigravity": {
+    "version": "1.3.3",
+    "files": {
+      "linux-x64": {
+        "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.3-5524738307653632/linux-x64/cli_linux_x64.tar.gz",
+        "sha512": "abe3ddf5cf30d3adaa586acf505221aa19702f5ca71af3c8b1f9b1a5976bd8e5c151c41ea33b39c41675d25843462a3e8c382c054f580e9d7e1688919d3b5110",
+        "bin": "antigravity"
+      },
+      "linux-arm64": {
+        "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.3-5524738307653632/linux-arm/cli_linux_arm64.tar.gz",
+        "sha512": "1bfd3503576219a102176c13579665a2f39e84ac86a904b117d3b33f3dd751f194a862496bad6ffe914ad46d2c877ba12b6c07e6db07128b706d238262fe430c",
+        "bin": "antigravity"
+      },
+      "darwin-x64": {
+        "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.3-5524738307653632/darwin-x64/cli_mac_x64.tar.gz",
+        "sha512": "97075ac7ed080928f58ec3e0be83b38057f980d40927a3d0dadc54850ca99a884f38c90bf5c4f6ecb3c6101f31d7560500450390c468208ac7de2560af2df76b",
+        "bin": "antigravity"
+      },
+      "darwin-arm64": {
+        "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.3-5524738307653632/darwin-arm/cli_mac_arm64.tar.gz",
+        "sha512": "05ebb472149ca461e99f7870ce81fbdd48e3844f43b96a778c981d983421627c5bd02596dc8211ccd30b4cee0df8ca4d17b681f587ef22948ea4c703e9c7fcbd",
+        "bin": "antigravity"
+      },
+      "win32-x64": {
+        "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.3-5524738307653632/windows-x64/cli_windows_x64.exe",
+        "sha512": "ec15855bd5de768232c0aee31d11eac636a9e7d8bc4ad3dbe3887a9797f7fd821cafabba61482cd5515674a05246be2b7f96ca3f17e38c6a3f7431a2a3aff81f"
+      }
+    }
+  },
+  "grok-build": {
+    "version": "1.0.50",
+    "files": {
+      "linux-x64": {
+        "url": "https://x.ai/cli/grok-1.0.50-linux-x86_64",
+        "sha256": "c80de0155706ff2d995623887b102f2d0abd2c62b2643dea3a0cebaf7dd724d5"
+      },
+      "linux-arm64": {
+        "url": "https://x.ai/cli/grok-1.0.50-linux-aarch64",
+        "sha256": "947eea63e52393e00778d651d22e0dad22d30e9ee5b2af7944efc3fd4438ecc0"
+      },
+      "darwin-x64": {
+        "url": "https://x.ai/cli/grok-1.0.50-macos-x86_64",
+        "sha256": "5ff2b912da2d85cdc627595d819423751bab67fcb65870f90a0783cccba5c62a"
+      },
+      "darwin-arm64": {
+        "url": "https://x.ai/cli/grok-1.0.50-macos-aarch64",
+        "sha256": "af41b1d65d4116ff649a689ad9d070d4c2abe255737d46ba0b3e8161345696e6"
+      },
+      "win32-x64": {
+        "url": "https://x.ai/cli/grok-1.0.50-windows-x86_64.exe",
+        "sha256": "591675b998575204e41c59765b7dcb7496aa6b21bfccb3e98d2cd6fed9f7925a"
+      }
+    }
+  },
+  "opencode": {
+    "version": "2.0.26",
+    "files": {
+      "linux-x64": {
+        "url": "https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.0.26.tgz",
+        "sha512": "508036ff5224f0768de780b8c69ec7f8e1e045fabdf795d48b1ad7fa42e616cf043e7d5f01c9a7dcea2237eddcdd57378c457f2c79a3d02cb548bea75b8c1d1b",
+        "bin": "package/bin/opencode"
+      },
+      "linux-arm64": {
+        "url": "https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-2.0.26.tgz",
+        "sha512": "206df5e88f3056a9dda21cc502858d787f3778c03cb0a40546d31eba4d967e0e0353585a092833009cf7fe06f2b63c21e9b5dd591ed5dc5092adf8e8ada28383",
+        "bin": "package/bin/opencode"
+      },
+      "darwin-x64": {
+        "url": "https://registry.npmjs.org/@opencode/cli-darwin-x64/-/cli-darwin-x64-2.0.26.tgz",
+        "sha512": "d39d5f22bc931f814ae0c97add31fe20fdececc8be8d87d5c845d2061f5a1832544b65597c3f80c0d27d130f6704f4c1298be130686a1dcb9d1da8112fc4816d",
+        "bin": "package/bin/opencode"
+      },
+      "darwin-arm64": {
+        "url": "https://registry.npmjs.org/@opencode/cli-darwin-arm64/-/cli-darwin-arm64-2.0.26.tgz",
+        "sha512": "5e496575e3ba796806f2f90f34b71d9413c49b563efedca1117199bd76e4f2ecada4f3fb484555d91f6867df0d31248f1fd90100effe5e8e2c29fbc3e821c0b3",
+        "bin": "package/bin/opencode"
+      },
+      "win32-x64": {
+        "url": "https://registry.npmjs.org/@opencode/cli-windows-x64/-/cli-windows-x64-2.0.26.tgz",
+        "sha512": "4a73341f15ebf94075c95ffb25c2f1da4a4590c92d4e6b840b2ca5c64c2d914cd6444d8a73d179f3efc1ac947256b63a71283866ddee3d9154c1968b8b1eb9db",
+        "bin": "package/bin/opencode.exe"
+      }
+    }
+  },
+  "kimi-code": {
+    "version": "2.1.1",
+    "files": {
+      "linux-x64": {
+        "url": "https://code.kimi.com/kimi-code/binaries/2.1.1/kimi-code-linux-x64",
+        "sha256": "66f47536e40b02bb1d577cdd324768f73d39b8b9472e0ca140e73d8e225cd7de"
+      },
+      "linux-arm64": {
+        "url": "https://code.kimi.com/kimi-code/binaries/2.1.1/kimi-code-linux-arm64",
+        "sha256": "8bcc0a2267a0ecb1ff48cad284f7e364528a01598f38d696ec1baa6b069a88c8"
+      },
+      "darwin-x64": {
+        "url": "https://code.kimi.com/kimi-code/binaries/2.1.1/kimi-code-darwin-x64",
+        "sha256": "ed3215af6eeb8979c99dbe0761484ed8f08198ef0f6ca1785637f60b1463ca95"
+      },
+      "darwin-arm64": {
+        "url": "https://code.kimi.com/kimi-code/binaries/2.1.1/kimi-code-darwin-arm64",
+        "sha256": "4bab6f96c2c289368b7f05a04f66737c53a59ce740f932d8f149240584758efb"
+      },
+      "win32-x64": {
+        "url": "https://code.kimi.com/kimi-code/binaries/2.1.1/kimi-code-win32-x64.exe",
+        "sha256": "28096756410623f0413607b10872dc16fe8c037c87b005821030daba569a32d4"
+      }
+    }
+  }
+}

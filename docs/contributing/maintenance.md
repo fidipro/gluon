@@ -9,6 +9,10 @@ What to do when something Gluon builds on changes, and which files to update. Se
 ## When a harness or provider changes
 
 Harnesses (Claude Code, Codex, Antigravity, Grok Build, OpenCode, Kimi Code) change their flags, screens and hooks between releases.
+The tests run on the versions in `test/harnesses.json`: the fakes report them, and the live checks run those release binaries,
+downloaded and hash-checked into a cache outside the repository (`bun scripts/harness-pin.ts --install`). The Harness watch
+workflow finds a new release within the hour and opens the `harness-update` pull request that moves the pin;
+`bun scripts/harness-pin.ts` shows how far the pin is behind, and a release waits until it isn't (`--check`).
 After an update, with the new version installed:
 
 1. Run `gluon doctor` to catch drift in login and status checks.
@@ -68,7 +72,7 @@ exits 1 only for something definitely broken. Run it before a release.
 | When | Do |
 |---|---|
 | a new `src/` or test file | add it to an area in `test/areas.ts` (`test/areas.test.ts` fails until you do) |
-| a harness update | re-capture `test/fixtures/screens/` and check the readers (above) |
+| a harness update (the `harness-update` pull request) | re-capture `test/fixtures/screens/` and check the readers (above) |
 | a UI or frame change | review the visual goldens (`bun run test:visual-must`; for an intended change `bun run test:visual -u`) |
 | a change in `src/pty/`, `src/gluon.ts`, `src/ui/` or `src/sessions.ts` | `GLUON_PERF_QUICK=1 bun run test:perf` |
 | a price source or table builder changes | refresh `test/fixtures/tables/` |

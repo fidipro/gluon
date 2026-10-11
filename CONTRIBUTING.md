@@ -70,7 +70,7 @@ end-to-end harness; [Writing tests](docs/contributing/testing.md), the rules CI 
   and `test:dist` run nightly (a failure opens an issue) and before a release (`gh workflow run ci.yml --ref main -f suite=full`). A maintainer can start
   one off with `gh workflow run ci.yml --ref <branch>` (`workflow_dispatch`). A fork's pull request runs
   with read-only permissions and no secrets, and a first-time contributor's needs a maintainer's approval
-  before Actions run. A test that fails and then passes on CI's one retry is flaky: a warning, not a failure. macOS is tested only in CI. `codex-watch.yml` runs `scripts/codex-drift.ts` on each new codex release.
+  before Actions run. A test that fails and then passes on CI's one retry is flaky: a warning, not a failure. macOS is tested only in CI. `harness-watch.yml` checks every harness for a new release within the hour, runs `scripts/codex-drift.ts` on a new codex, and opens the `harness-update` pull request that moves `test/harnesses.json` (the versions the tests run on) to it.
 
 ## Hard rules
 

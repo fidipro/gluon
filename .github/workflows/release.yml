@@ -82,6 +82,11 @@ jobs:
           pkg=$(bun -e 'console.log(require("./package.json").version)')
           [ "$pkg" = "$VERSION" ] || { echo "package.json is $pkg, not $VERSION"; exit 1; }
       - run: bun install --frozen-lockfile
+      # The tests ran on the harness versions in test/harnesses.json: a release waits until each is its harness's newest
+      # (merge the Harness watch's `harness-update` pull request first).
+      - name: The pinned harnesses are the newest
+        if: matrix.pack
+        run: bun --no-env-file --config=scripts/empty-bunfig.toml scripts/harness-pin.ts --check
       - name: Build
         run: |
           args=()

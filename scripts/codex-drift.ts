@@ -8,7 +8,7 @@
  * thread-item type outside BRAIN_ITEMS and FOREIGN_ITEMS (a turn that has one is interrupted). What the
  * brain runs with anyway is noted, not drift: new features (turned off unchecked), features codex
  * keeps on and catalog fields Gluon hasn't checked (the tool check says whether they give tools).
- * codex-watch.yml runs it on every new codex release. Prints a Markdown report; exits 0 (nothing to
+ * harness-watch.yml runs it on every new codex release. Prints a Markdown report; exits 0 (nothing to
  * do), 1 (drift: fix codex.ts) or 2 (couldn't check). The tool check is tried twice before it counts.
  *
  * Only the given binary runs, never one from PATH, in a temp directory with an empty CODEX_HOME and a

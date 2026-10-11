@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { DEFAULT_MODELS } from "../src/harnesses.ts";
 import { brainAsks, brainBusy, brainProposes, checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
 import { loginLine } from "../scripts/live-driver.ts";
+import { hostOf, install, readPin } from "../scripts/harness-cache.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
   JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, price, runCapOf, sectionsOf, Spend, usd, type Available,
@@ -140,6 +141,11 @@ describe("flags and tiers", () => {
     expect(() => parseArgs(["--ledger", "--dry-run"])).toThrow(/needs a value/);
     expect(() => parseArgs(["--bogus"])).toThrow(/unknown option/);
     expect(() => parseArgs(["--harness=codex"])).toThrow(/goes with --tier/);
+    expect(() => parseArgs(["--tier=regression", "--newest", "--harness-from-path"])).toThrow(/use one/);
+  });
+  test("the binary a harness check runs: the pinned release by default, --newest or --harness-from-path instead", () => {
+    expect(parseArgs(["--tier=harness", "--harness=codex", "--newest"])).toMatchObject({ newest: true });
+    expect(parseArgs(["--tier=harness", "--harness=codex", "--harness-from-path"])).toMatchObject({ fromPath: true });
   });
   test("each tier's sections and whole-run cap; the plain run and --only are unchanged", () => {
     expect(sectionsOf({ tier: "regression" })).toEqual(["probes", "brain-chat", "git-tools", "nested-instructions", "real-harness"]);
@@ -258,6 +264,24 @@ describe("which connection and model a harness check uses", () => {
     expect(p.worst).toBeGreaterThan(0);
     expect(planHarness("opencode", config, have(["OPENROUTER_API_KEY"], false), { campaign: false }).bucket).toBe("other");
     expect(planHarness("grok-build", config, have([], true)).pick.ok).toBe(false);
+  });
+  test("a check plans the pinned binary from the harness cache, never PATH's: none cached, none planned (its SKIP says how to install it)", async () => {
+    const config = { models: DEFAULT_MODELS } as never;
+    const was = process.env.GLUON_HARNESS_CACHE;
+    process.env.GLUON_HARNESS_CACHE = tmp();
+    try {
+      expect(planHarness("opencode", config, have(["OPENROUTER_API_KEY"], false)).binary).toBeNull();
+      const entry = readPin().opencode;
+      const host = hostOf();
+      if (!host) return;
+      const bytes = await new Bun.Archive({ [entry.files[host]!.bin!]: "#!/bin/sh\n" }, { compress: "gzip" }).bytes();
+      const file = { ...entry.files[host]!, sha512: new Bun.CryptoHasher("sha512").update(bytes).digest("hex"), sha256: undefined };
+      const bin = await install("opencode", { version: entry.version, files: { [host]: file } }, { get: async () => new Response(bytes) });
+      expect(planHarness("opencode", config, have(["OPENROUTER_API_KEY"], false))).toMatchObject({ binary: bin, version: entry.version });
+    } finally {
+      if (was === undefined) delete process.env.GLUON_HARNESS_CACHE;
+      else process.env.GLUON_HARNESS_CACHE = was;
+    }
   });
   test("each check's Gluon config: the harness on one API-key connection, /clear asks first", () => {
     expect(checkConfig("claude-code", "bedrock", { region: "us-east-2" })).toContain("provider: bedrock");
