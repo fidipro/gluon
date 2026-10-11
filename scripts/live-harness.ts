@@ -182,7 +182,7 @@ function binaryOf(h: Harness): { path: string; version: string } | null {
 export const noBinary = (h: Harness) => `no ${BINARY[h]} binary: bun scripts/harness-pin.ts --install --harness ${h} (or --harness-from-path)`;
 
 /** What a check of `h` would do (free: reads the catalog, the keys and the harness cache). */
-export function planHarness(h: Harness, config: Config, have: Available, want: { conn?: string; model?: string; campaign?: boolean } = {}): HarnessPlan {
+export function planHarness(h: Harness, config: Config, have: Available, want: { conn?: string; model?: string; campaign?: boolean; stage?: boolean } = {}): HarnessPlan {
   const b = binaryOf(h);
   const binary = b?.path ?? null;
   const pick = pickConn(h, have, want.conn);
@@ -190,7 +190,7 @@ export function planHarness(h: Harness, config: Config, have: Available, want: {
   if (!pick.ok) return base;
   const m = cheapestModel(config.models[h], pick.conn, want.model);
   if (!m) return { ...base, pick: { ok: false, why: `no model${want.model ? ` "${want.model}"` : ""} on ${pick.conn}` } };
-  return { ...base, model: { id: m.id, label: m.entry.label }, bucket: bucketOf(pick.conn, !!want.campaign), worst: pick.conn === "plan" ? 0 : harnessWorstCase(m.id, pick.conn) };
+  return { ...base, model: { id: m.id, label: m.entry.label }, bucket: bucketOf(pick.conn, !!want.campaign, !!want.stage), worst: pick.conn === "plan" ? 0 : harnessWorstCase(m.id, pick.conn) };
 }
 
 // ——— the screen, as Gluon draws it ———
@@ -243,6 +243,8 @@ export interface HarnessRunOptions {
   screens: boolean;
   /** `--caps` was given: OpenRouter is its own sub-bucket. */
   campaign?: boolean;
+  /** `bun run regression`'s live stage: OpenRouter is its own bucket (its caps are per bucket). */
+  stage?: boolean;
   /** How long an agent may take to answer (a launch, a turn). */
   turnMs?: number;
   /** Extra environment for Gluon (only `FAKE_*` and the allowlist get through `scrubEnv`): a test's fake agent. */
@@ -378,7 +380,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   }
   const conn = plan.pick.conn;
   const what = `${o.brain ? "journey" : "real-harness"} ${h} (${conn})`;
-  if (!o.spend.allowUsd(plan.bucket, what, plan.model.id, plan.worst)) {
+  if (!o.spend.allowUsd(plan.bucket, what, plan.model.id, plan.worst, plan.bucket === "subscription" ? HARNESS_TOKENS.input + HARNESS_TOKENS.output : 0)) {
     add("launch", "SKIP", `refused, over a cap: ${o.spend.run.refused.at(-1)}`);
     return { asserts, charged: 0, refused: true };
   }
@@ -768,7 +770,9 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   let charged = 0;
   if (sentPrompt) {
     charged = chargedOverride ?? (figure ? figure.usd : plan.worst) + scenarioSpend;
-    o.spend.chargeUsd(plan.bucket, what, plan.model.id, charged, 0, 0, true);
+    // On a plan nothing is paid, but its usage counts against the stage's plan cap: the check's token budget (an upper estimate).
+    const onPlanTokens = plan.bucket === "subscription" ? HARNESS_TOKENS : { input: 0, output: 0 };
+    o.spend.chargeUsd(plan.bucket, what, plan.model.id, charged, onPlanTokens.input, onPlanTokens.output, true);
     say(`  spend $${charged.toFixed(4)} (${figure ? "Gluon's figure" : "no figure: the worst case"}) → ${plan.bucket}`);
   }
   return { asserts, charged, refused: false };
@@ -816,7 +820,7 @@ export async function runHarnessSection(o: HarnessRunOptions & { harness?: strin
   let refused = false;
   if (!o.harness) o.say("grok-build: SKIP · Grok Build has no API-key route (its xAI plan needs a sign-in)");
   for (const h of harnessesFor(o.harness)) {
-    const plan = planHarness(h, config, have, { conn: o.conn, model: o.model, campaign: o.campaign });
+    const plan = planHarness(h, config, have, { conn: o.conn, model: o.model, campaign: o.campaign, stage: o.stage });
     const r = await checkHarness(plan, config, o);
     asserts.push(...r.asserts);
     refused ||= r.refused;

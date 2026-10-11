@@ -101,8 +101,9 @@ harness's newest release, so a harness release that breaks Gluon is found before
 
 The tests themselves are offline and free. After them, `bun run regression` runs the live checks the change needs
 (`scripts/live-stage.ts`): the real brain and the real harnesses, on the versions in `test/harnesses.json`, with your
-own credentials (a plan you're signed in to first, then an AWS setup for Bedrock, then an API key). They have a hard
-budget per run in code, a check that passed isn't run again until `src/` or the harness changes, and without
+own credentials (an AWS setup for Bedrock first, then a plan you're signed in to, then an API key). Each run is capped
+per bucket in code (`REGRESSION_LIVE_CAPS` in `scripts/live-lib.ts`: your plans in tokens; Bedrock, OpenRouter and other API
+keys in dollars); a check over a cap is skipped and says so, and `--live-caps` raises a cap for one run. A check that passed isn't run again until `src/` or the harness changes, and without
 credentials or a network each one is skipped, never failed. They never run in CI. `--no-live` leaves them out;
 `--newest` runs them on each harness's newest release. Wider checks (`bun run test:live`) run only when a person asks.
 

@@ -1,5 +1,5 @@
 /**
- * `bun run regression`'s live stage (scripts/live-stage.ts, issue #31): the $0.50 a run, what each check is told it may spend, the
+ * `bun run regression`'s live stage (scripts/live-stage.ts, issue #31): the caps per run and per bucket, what each check is told is left, the
  * cache that keeps a pass until the code or the harness changes, and when the stage never runs (CI, offline). Offline: each check's
  * run is a function here that writes the ledger the way `scripts/live.ts --regression-stage` does.
  */
@@ -24,8 +24,8 @@ function root(): string {
   return r;
 }
 
-/** Each check's run: spends `usd[i]` into the ledger and answers `codes[i]` with a verdict line; records the args it got. */
-function runner(r: string, plan: { usd: number; code: number; verdict?: string }[]) {
+/** Each check's run: spends `usd[i]` (in `bucket[i]`, API keys by default) into the ledger and answers `codes[i]` with a verdict line; records the args it got. */
+function runner(r: string, plan: { usd: number; code: number; verdict?: string; bucket?: string; tokens?: number }[]) {
   const calls: string[][] = [];
   const run: StageOptions["run"] = async (args) => {
     const p = plan[calls.length] ?? { usd: 0, code: 0, verdict: "PASS 1 · FAIL 0 · SKIP 0" };
@@ -36,7 +36,7 @@ function runner(r: string, plan: { usd: number; code: number; verdict?: string }
     try {
       f = JSON.parse(readFileSync(ledger, "utf8"));
     } catch {}
-    f.runs.push({ at: new Date().toISOString(), calls: [{ bucket: "other", what: "x", model: "m", input: 0, output: 0, usd: p.usd }], refused: [] });
+    f.runs.push({ at: new Date().toISOString(), calls: [{ bucket: p.bucket ?? "other", what: "x", model: "m", input: p.tokens ?? 0, output: 0, usd: p.usd }], refused: [] });
     writeFileSync(ledger, JSON.stringify(f));
     return { code: p.code, out: `PASS ${p.code === 1 ? "harness · launch" : "x"}\n${p.verdict ?? (p.code === 1 ? "PASS 0 · FAIL 1 · SKIP 0" : "PASS 1 · FAIL 0 · SKIP 0")}` };
   };
@@ -58,23 +58,38 @@ describe("the live stage", () => {
     const r = root();
     const { run, calls } = runner(r, []);
     const lines: string[] = [];
-    expect(await liveStage([J], opts(r, run, { env: { CI: "true" }, say: (l) => lines.push(l) }))).toEqual({ failed: false, spent: 0 });
-    expect(await liveStage([J], opts(r, run, { online: async () => false, say: (l) => lines.push(l) }))).toEqual({ failed: false, spent: 0 });
+    expect(await liveStage([J], opts(r, run, { env: { CI: "true" }, say: (l) => lines.push(l) }))).toEqual({ failed: false, spent: 0, planTokens: 0 });
+    expect(await liveStage([J], opts(r, run, { online: async () => false, say: (l) => lines.push(l) }))).toEqual({ failed: false, spent: 0, planTokens: 0 });
     expect(calls).toEqual([]);
     expect(lines.join("\n")).toContain("not in CI");
     expect(lines.join("\n")).toContain("SKIP (offline)");
   });
 
-  test("each check is told what the run's $0.50 has left; once it's spent, the rest SKIP without running", async () => {
+  test("each check is told what each bucket has left; a check over a cap is a SKIP that says to ask the user", async () => {
     const r = root();
-    const { run, calls } = runner(r, [{ usd: 0.3, code: 0 }, { usd: 0.2, code: 0 }]);
+    const { run, calls } = runner(r, [
+      { usd: 0.2, code: 0, bucket: "bedrock" },
+      { usd: 0, code: 0, bucket: "subscription", tokens: 43_000 },
+      { usd: 0, code: 2, verdict: "PASS 0 · FAIL 0 · SKIP 1" },
+    ]);
     const lines: string[] = [];
     const out = await liveStage([J, H("codex"), H("opencode")], opts(r, run, { say: (l) => lines.push(l) }));
-    expect(calls.map((a) => a.find((x) => x.startsWith("--run-cap="))).slice(0, 2)).toEqual(["--run-cap=0.5000", "--run-cap=0.2000"]);
-    expect(calls[0]).toEqual(["--regression-stage", "--run-cap=0.5000", "--tier=journey", "--harness=claude-code"]);
-    expect(calls).toHaveLength(2);
-    expect(out.spent).toBeCloseTo(0.5, 6);
-    expect(lines.join("\n")).toContain("live harness opencode 1.0.0: SKIP (this run's $0.50 is spent)");
+    expect(calls.map((a) => a.find((x) => x.startsWith("--stage-left=")))).toEqual([
+      "--stage-left=plans=200000,bedrock=0.3000,openrouter=0.1000,keys=0.1000",
+      "--stage-left=plans=200000,bedrock=0.1000,openrouter=0.1000,keys=0.1000",
+      "--stage-left=plans=157000,bedrock=0.1000,openrouter=0.1000,keys=0.1000",
+    ]);
+    expect(calls[0]).toEqual(["--regression-stage", "--stage-left=plans=200000,bedrock=0.3000,openrouter=0.1000,keys=0.1000", "--tier=journey", "--harness=claude-code"]);
+    expect(out).toMatchObject({ failed: false, planTokens: 43_000 });
+    expect(out.spent).toBeCloseTo(0.2, 6);
+    expect(lines.join("\n")).toContain("live harness opencode 1.0.0: SKIP (over this run's cap: ask the user before raising it with --live-caps)");
+  });
+
+  test("--live-caps (after the user agreed) raises a cap for this run", async () => {
+    const r = root();
+    const { run, calls } = runner(r, []);
+    await liveStage([H("codex")], opts(r, run, { caps: { plans: 200_000, bedrock: 1, openrouter: 0.1, keys: 0.1 } }));
+    expect(calls[0]).toContain("--stage-left=plans=200000,bedrock=1.0000,openrouter=0.1000,keys=0.1000");
   });
 
   test("a pass is kept: the same code and harness version cost nothing the next run; a change to src/ or the version runs it again", async () => {
@@ -102,7 +117,7 @@ describe("the live stage", () => {
     const lines: string[] = [];
     expect((await liveStage([H("codex"), H("opencode"), H("kimi-code")], opts(r, run, { say: (l) => lines.push(l) }))).failed).toBe(true);
     expect(lines.join("\n")).toContain("live harness codex 1.0.0: FAILED");
-    expect(lines.join("\n")).toContain("live harness opencode 1.0.0: SKIP (the cap stopped it)");
+    expect(lines.join("\n")).toContain("live harness opencode 1.0.0: SKIP (over this run's cap: ask the user before raising it with --live-caps)");
     expect(lines.join("\n")).toContain("live harness kimi-code 1.0.0: SKIP (nothing could run here)");
     expect(JSON.parse(readFileSync(join(r, LIVE_CACHE), "utf8"))).toEqual({});
     expect(calls).toHaveLength(3);

@@ -27,10 +27,43 @@ export const REGRESSION_RUN_CAP = 3;
 /** `--tier=harness`: one harness's check, all buckets together (USD). */
 export const HARNESS_RUN_CAP = 1;
 /**
- * `bun run regression`'s live stage (`--regression-stage`, always on locally, never in CI): the whole stage, every check together
- * (USD). Its own ledger, with no bucket cap and no monthly cap: this per-run cap is the only limit (the owner's decision, issue #31).
+ * The live stage's buckets: `plans`, a harness or the brain on the user's own plan (no money: counted in tokens, each call's
+ * worst case); `bedrock`; `openrouter`; `keys`, any other API key (Anthropic, OpenAI, Gemini).
  */
-export const REGRESSION_LIVE_RUN_CAP = 0.5;
+export type StageBucket = "plans" | "bedrock" | "openrouter" | "keys";
+export type StageCaps = Record<StageBucket, number>;
+export const STAGE_BUCKETS: readonly StageBucket[] = ["plans", "bedrock", "openrouter", "keys"];
+/**
+ * `bun run regression`'s live stage (`--regression-stage`, always on locally, never in CI), per run and per bucket: plans in
+ * tokens, the rest in USD. Its own ledger, no monthly cap (the owner's decision, 2026-10-11). A run that needs more stops at the
+ * cap, and the user is asked; with their OK, `bun run regression --live-caps <bucket>=<n>` raises it for that run.
+ */
+export const REGRESSION_LIVE_CAPS: Readonly<StageCaps> = { plans: 200_000, bedrock: 0.3, openrouter: 0.1, keys: 0.1 };
+export const stageBucketOf = (b: Bucket): StageBucket => (b === "subscription" ? "plans" : b === "other" ? "keys" : b);
+/** What calls used, per stage bucket: plans in tokens (input + output), the rest in dollars. */
+export function stageUse(calls: Pick<Call, "bucket" | "usd" | "input" | "output">[]): StageCaps {
+  const u: StageCaps = { plans: 0, bedrock: 0, openrouter: 0, keys: 0 };
+  for (const c of calls) {
+    const b = stageBucketOf(c.bucket);
+    u[b] += b === "plans" ? c.input + c.output : c.usd;
+  }
+  return u;
+}
+/** `plans=300000,bedrock=0.2` → the caps, the buckets left out at `base`'s. Throws on an unknown bucket or a number that isn't ≥ 0. */
+export function parseStageCaps(text: string, base: Readonly<StageCaps> = REGRESSION_LIVE_CAPS): StageCaps {
+  const caps = { ...base };
+  for (const part of text.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const [name, v] = part.split("=");
+    if (!STAGE_BUCKETS.includes(name as StageBucket)) throw new Error(`live caps: unknown bucket "${name}" (known: ${STAGE_BUCKETS.join(", ")})`);
+    const n = Number(v);
+    if (v === undefined || v.trim() === "" || !Number.isFinite(n) || n < 0) throw new Error(`live caps: ${name}: not an amount ≥ 0`);
+    caps[name as StageBucket] = n;
+  }
+  return caps;
+}
+export const formatStageCaps = (c: Readonly<StageCaps>): string => STAGE_BUCKETS.map((b) => `${b}=${b === "plans" ? Math.max(0, Math.floor(c[b])) : Math.max(0, c[b]).toFixed(4)}`).join(",");
+/** For a person: `plans 200k tokens · Bedrock $0.10 · OpenRouter $0.10 · API keys $0.10`. */
+export const describeStageCaps = (c: Readonly<StageCaps>): string => `plans ${Math.round(c.plans / 1000)}k tokens · Bedrock $${c.bedrock.toFixed(2)} · OpenRouter $${c.openrouter.toFixed(2)} · API keys $${c.keys.toFixed(2)}`;
 export const REGRESSION_LIVE_LEDGER = "qa/logs/live-regression-spend.json";
 /** The caps of the regression stage's ledger: none per bucket. */
 export const NO_BUCKET_CAPS: Readonly<Caps> = { bedrock: Infinity, other: Infinity };
@@ -118,13 +151,14 @@ export const planEstimate = (model: string, input: number, output: number): numb
 /**
  * The bucket a route (a brain step's route, or a harness connection: `anthropic`, `openai`, `gemini`, `bedrock`, `openrouter`) is charged to.
  * `campaign` (`--caps` was given): OpenRouter is its own sub-bucket (counted inside `other` too) and the Claude plan is charged at
- * API-equivalent to `other`; without it, OpenRouter is plain `other` and every plan is `subscription`, as before.
+ * API-equivalent to `other`; without it, OpenRouter is plain `other` and every plan is `subscription`, as before. `stage` (the
+ * regression stage, whose caps are per bucket): OpenRouter is its own sub-bucket too, the plans stay `subscription`.
  */
-export function bucketOf(route: string, campaign: boolean): Bucket {
+export function bucketOf(route: string, campaign: boolean, stage = false): Bucket {
   if (route === "bedrock") return "bedrock";
   // A harness on its own plan (`pickConn`'s "plan"): no API money, campaign or not.
   if (route === "plan") return "subscription";
-  if (route === "openrouter") return campaign ? "openrouter" : "other";
+  if (route === "openrouter") return campaign || stage ? "openrouter" : "other";
   if (route === "claude-plan") return campaign ? "other" : "subscription";
   return route.endsWith("-plan") ? "subscription" : "other";
 }
@@ -184,6 +218,8 @@ export class Spend {
     readonly campaign: boolean,
     /** false: the file is read, never written (a dry run). */
     readonly write = true,
+    /** The regression stage: what each of its buckets has left for this check (`--stage-left`). */
+    readonly stageLeft?: Readonly<StageCaps>,
   ) {
     const old: Partial<LedgerFile> | null = path && existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
     this.file = { caps, spent: { bedrock: old?.spent?.bedrock ?? 0, other: old?.spent?.other ?? 0, ...(old?.spent?.openrouter !== undefined || caps.openrouter !== undefined ? { openrouter: old?.spent?.openrouter ?? 0 } : {}) }, runs: old?.runs ?? [] };
@@ -211,14 +247,22 @@ export class Spend {
     return this.file.spent[bucket] ?? 0;
   }
 
-  /** Whether a call whose worst case is `worst` dollars fits; a refusal is logged (and saved). */
-  allowUsd(bucket: Bucket, what: string, model: string, worst: number): boolean {
-    if (bucket === "subscription") return true;
+  /**
+   * Whether a call whose worst case is `worst` dollars (and `tokens` tokens, on a plan) fits; a refusal is logged (and saved).
+   * In the regression stage, a call is also held to its bucket's share of the stage's caps (`stageLeft`).
+   */
+  allowUsd(bucket: Bucket, what: string, model: string, worst: number, tokens = 0): boolean {
     const refuse = (why: string) => {
-      this.run.refused.push(`${what} (${model}): worst case $${worst.toFixed(4)} would take ${why}`);
+      this.run.refused.push(`${what} (${model}): worst case ${bucket === "subscription" ? `${tokens} plan tokens` : `$${worst.toFixed(4)}`} would take ${why}`);
       this.save();
       return false;
     };
+    if (this.stageLeft) {
+      const b = stageBucketOf(bucket);
+      const need = b === "plans" ? tokens : worst;
+      if (stageUse(this.run.calls)[b] + need > this.stageLeft[b]) return refuse(`this run's ${b} over what is left of its cap (${b === "plans" ? `${Math.floor(this.stageLeft[b])} tokens` : `$${this.stageLeft[b].toFixed(4)}`}): ask the user, then bun run regression --live-caps ${b}=<more>`);
+    }
+    if (bucket === "subscription") return true;
     if (this.runTotal() + worst > this.runCap) return refuse(`this run over $${this.runCap}`);
     if (this.spent(bucket === "openrouter" ? "other" : bucket) + worst > this.caps[bucket === "openrouter" ? "other" : bucket]) return refuse(`${bucket === "openrouter" ? "other" : bucket} over $${this.caps[bucket === "openrouter" ? "other" : bucket]}`);
     if (bucket === "openrouter" && this.caps.openrouter !== undefined && this.spent("openrouter") + worst > this.caps.openrouter) return refuse(`openrouter over $${this.caps.openrouter}`);
@@ -267,10 +311,10 @@ export interface Args {
   newest?: boolean;
   /** `--harness-from-path`: they run the binary on PATH instead. */
   fromPath?: boolean;
-  /** `--regression-stage`: run as `bun run regression`'s live stage (its ledger, no bucket or monthly cap; `REGRESSION_LIVE_RUN_CAP`). */
+  /** `--regression-stage`: run as `bun run regression`'s live stage (its ledger, no monthly cap; `REGRESSION_LIVE_CAPS`). */
   stage?: boolean;
-  /** `--run-cap <usd>`: this run's cap instead of its tier's (the regression stage passes what its budget has left). */
-  runCap?: number;
+  /** `--stage-left plans=…,bedrock=…`: what the stage's caps have left, per bucket (the stage passes it to each check). */
+  stageLeft?: StageCaps;
 }
 
 /** Flags take `--name=value` or `--name value`. Throws on an unknown or contradictory flag. */
@@ -308,16 +352,12 @@ export function parseArgs(argv: string[]): Args {
       case "--newest": a.newest = true; break;
       case "--harness-from-path": a.fromPath = true; break;
       case "--regression-stage": a.stage = true; break;
-      case "--run-cap": {
-        const v = Number(value());
-        if (!Number.isFinite(v) || v < 0) throw new Error(`--run-cap: not an amount`);
-        a.runCap = v;
-        break;
-      }
+      case "--stage-left": a.stageLeft = parseStageCaps(value()); break;
       default: throw new Error(`unknown option ${arg}`);
     }
   }
   if (a.stage && (a.ledger || a.caps)) throw new Error("--regression-stage keeps its own ledger and caps: no --ledger or --caps");
+  if (a.stageLeft && !a.stage) throw new Error("--stage-left goes with --regression-stage");
   if (a.newest && a.fromPath) throw new Error("--newest and --harness-from-path are two ways to pick a binary: use one");
   if (a.only && a.tier) throw new Error("--only and --tier are two ways to pick a run: use one");
   if (a.tier === "harness" && !a.harness) throw new Error("--tier=harness needs --harness=<id> (claude-code, codex, antigravity, opencode, kimi-code)");
@@ -327,9 +367,9 @@ export function parseArgs(argv: string[]): Args {
 }
 
 /** A run's whole-run cap in dollars: a targeted check's own, the tier's, or none (the buckets' caps alone). */
-export function runCapOf(a: Pick<Args, "only" | "tier" | "harness" | "stage" | "runCap">): number {
-  if (a.stage) return Math.min(a.runCap ?? REGRESSION_LIVE_RUN_CAP, REGRESSION_LIVE_RUN_CAP);
-  if (a.runCap !== undefined) return a.runCap;
+export function runCapOf(a: Pick<Args, "only" | "tier" | "harness" | "stage">): number {
+  // The regression stage is held per bucket (`REGRESSION_LIVE_CAPS`, `Spend.stageLeft`), not by one total.
+  if (a.stage) return Infinity;
   if (a.tier === "regression") return REGRESSION_RUN_CAP;
   if (a.tier === "harness") return HARNESS_RUN_CAP;
   if (a.tier === "journey") return a.harness ? JOURNEY_HARNESS_CAP : JOURNEY_RUN_CAP;
@@ -417,12 +457,15 @@ export interface Available {
 
 export type ConnPick = { ok: true; conn: ConnOption["conn"]; key?: string } | { ok: false; why: string };
 
-/** The connection a harness check uses: `want` when given (and usable), else the first usable one in `HARNESS_CONNS`. */
+/**
+ * The connection a harness check uses: `want` when given (and usable), else Bedrock, then the harness's plan, then the first usable
+ * API key in `HARNESS_CONNS`. Bedrock first keeps the user's plan for their own work (the owner's decision, 2026-10-11).
+ */
 export function pickConn(h: Harness, have: Available, want?: string): ConnPick {
-  // The plan first: it costs no API money.
+  const options = HARNESS_CONNS[h];
+  if (!want && have.bedrock && options.some((o) => o.conn === "bedrock")) return { ok: true, conn: "bedrock" };
   if ((!want || want === "plan") && PLAN_HARNESSES.includes(h) && have.plan?.(h)) return { ok: true, conn: "plan" };
   if (want === "plan") return { ok: false, why: PLAN_HARNESSES.includes(h) ? `${h} is not signed in to its plan (or GLUON_LIVE_PLANS=0)` : `${h} has no plan check` };
-  const options = HARNESS_CONNS[h];
   if (!options.length) return { ok: false, why: h === "grok-build" ? "Grok Build has no API-key route (its xAI plan needs a sign-in)" : "no API-key connection" };
   const usable = (o: ConnOption) => (o.conn === "bedrock" ? have.bedrock : !!o.key && have.hasKey(o.key));
   const why = (o: ConnOption) => (o.conn === "bedrock" ? "no AWS region or profile (AWS_REGION, AWS_PROFILE or the AWS config)" : `${o.key} is not set`);

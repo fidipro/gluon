@@ -46,7 +46,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
   product's surface, below it only at a seam (`test/seams.ts`); never weaken a test to get green (rules: `test/AGENTS.md`).
 - **The tests are offline and free; regression's last stage is not.** No test calls a real brain, agent, API or
   installer. After them, `regression` runs the live checks the change needs (`scripts/live-stage.ts`): pre-approved
-  within its cap in code, local only, never in CI; `--no-live` leaves it out.
+  within its caps in code, local only, never in CI; `--no-live` leaves it out. A check over a cap: ask the user before
+  `--live-caps`.
 - **Any other paid run only when the user asked for one; if a change needs one, ask first and wait** — this
   includes `gluon doctor`, `bun run start`, a real `--launch` and `test:live`. `test:live` enforces its own budgets
   and ledger (gitignored; budgets: the maintainers' private notes); log any manual paid call there.
