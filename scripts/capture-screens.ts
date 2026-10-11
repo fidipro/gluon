@@ -31,6 +31,7 @@ import { fakeModelApi } from "../test/fixtures/fake-model-api.ts";
 import { firstRunDone, KEY_VALUE, KEYS, QUIET, REAL_HARNESSES, type RealHarness } from "../test/fixtures/real-harness.ts";
 import { fixture, recordRow, type ScreenFixture, type ScreenState } from "../test/fixtures/screens.ts";
 import { seedTables } from "../test/fixtures/seed-tables.ts";
+import { SLOW } from "../test/fixtures/slow.ts";
 import { tablesDir } from "../src/cost/tables-store.ts";
 import { harnessBin } from "./harness-cache.ts";
 import { checkConfig, DialogAnswerer } from "./live-harness.ts";
@@ -51,10 +52,20 @@ const FAKE_NAME: Record<RealHarness, "claude" | "codex" | "opencode" | "kimi"> =
 /** The states this tool takes: the ones captured from the harness alone at the fixture's size and version. */
 export const capturable = (f: ScreenFixture): ScreenState[] => f.states.filter((s) => !s.size && !s.version);
 
-/** Resolves once the screen has stayed the same for `quietMs` (and `minMs` has passed), or at `maxMs`. */
-async function settle(serialize: () => string, quietMs: number, minMs: number, maxMs: number): Promise<void> {
+/**
+ * Resolves once the screen has stayed the same for `quietMs` (and `minMs` has passed), or at `maxMs`. `from`: the screen before a
+ * key; the quiet only counts once the screen has moved off it (a key's redraw can come late on a loaded machine), or after `minMs`
+ * … `maxMs` when the key changes nothing. Every bound × `SLOW` (CI's slow runners).
+ */
+async function settle(serialize: () => string, quietMs: number, minMs: number, maxMs: number, from?: string): Promise<void> {
+  [quietMs, minMs, maxMs] = [quietMs * SLOW, minMs * SLOW, maxMs * SLOW];
   const start = Date.now();
   let last = serialize();
+  // A key not drawn yet: wait for its redraw (up to a second, scaled), then for the quiet after it.
+  if (from !== undefined) while (last === from && Date.now() - start < 1000 * SLOW) {
+    await Bun.sleep(20);
+    last = serialize();
+  }
   let since = Date.now();
   while (Date.now() - start < maxMs) {
     await Bun.sleep(50);
@@ -146,8 +157,9 @@ export async function capture(o: CaptureOptions): Promise<ScreenState[]> {
         await settle(ser, o.binary ? 2000 : 300, 0, 10_000);
         const text = typed(s.keys);
         for (const [i, k] of s.keys.entries()) {
+          const before = ser();
           session.passthrough(keyBytes(k));
-          await settle(ser, o.binary ? 300 : 80, o.binary ? 150 : 30, 5000);
+          await settle(ser, o.binary ? 300 : 80, o.binary ? 150 : 30, 5000, before);
           if (i === text.length - 1 && !force && !arrived(reader.inputLine(session.screen), text)) return null;
         }
         const lines = Array.from({ length: rows }, (_, y) => session.screen.viewLine(y));
