@@ -5,7 +5,7 @@
  * process spawn: `test/live-script.test.ts` runs all of it offline. The ledger writes a file only
  * when it is given a path.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Harness, ModelEntry } from "../src/harnesses.ts";
 
@@ -61,8 +61,96 @@ export function parseStageCaps(text: string, base: Readonly<StageCaps> = REGRESS
   }
   return caps;
 }
-export const formatStageCaps = (c: Readonly<StageCaps>): string => STAGE_BUCKETS.map((b) => `${b}=${b === "plans" ? Math.max(0, Math.floor(c[b])) : Math.max(0, c[b]).toFixed(4)}`).join(",");
 /** For a person: `plans 200k tokens · Bedrock $0.10 · OpenRouter $0.10 · API keys $0.10`. */
+/**
+ * The regression stage's budget, shared by its checks while they run at once: a file holding what each bucket has left. A check
+ * reserves a call's worst case before the call (under a lock: two checks never take the same money) and, when it charges, gives back
+ * what the call didn't use; `settle` gives back what was reserved and never charged (a refused or aborted call).
+ */
+export class StageBudget {
+  private held: { b: StageBucket; n: number }[] = [];
+  constructor(readonly path: string) {}
+
+  static create(path: string, caps: Readonly<StageCaps>): StageBudget {
+    writeFileSync(path, JSON.stringify({ left: caps }));
+    return new StageBudget(path);
+  }
+
+  left(): StageCaps {
+    return (JSON.parse(readFileSync(this.path, "utf8")) as { left: StageCaps }).left;
+  }
+
+  /** `fn` on what is left, under the file's lock (a lock older than 30 s is a dead check's: taken over). */
+  private locked<T>(fn: (left: StageCaps) => T): T {
+    const lock = `${this.path}.lock`;
+    for (let i = 0; ; i++) {
+      try {
+        mkdirSync(lock);
+        break;
+      } catch {
+        try {
+          if (Date.now() - statSync(lock).mtimeMs > 30_000) rmdirSync(lock);
+        } catch {}
+        if (i > 2000) throw new Error(`the live stage's budget stays locked: ${lock}`);
+        Bun.sleepSync(5);
+      }
+    }
+    try {
+      const left = this.left();
+      const out = fn(left);
+      writeFileSync(this.path, JSON.stringify({ left }));
+      return out;
+    } finally {
+      rmdirSync(lock);
+    }
+  }
+
+  /** Takes `n` from bucket `b`: null when it fits, else what the bucket had left (nothing taken). */
+  reserve(b: StageBucket, n: number): number | null {
+    return this.locked((left) => {
+      if (n > left[b] + 1e-9) return left[b];
+      left[b] -= n;
+      this.held.push({ b, n });
+      return null;
+    });
+  }
+
+  /** A call in `b` used `n`: its reservation (the oldest open one in `b`) gives back the rest, or takes what went over. */
+  charged(b: StageBucket, n: number): void {
+    const i = this.held.findIndex((h) => h.b === b);
+    const was = i < 0 ? 0 : this.held.splice(i, 1)[0]!.n;
+    if (was !== n) this.locked((left) => void (left[b] += was - n));
+  }
+
+  /** Gives back every reservation never charged. */
+  settle(): void {
+    const open = this.held.splice(0);
+    if (open.length) this.locked((left) => void open.forEach((h) => (left[h.b] += h.n)));
+  }
+}
+
+/** A stage check's own ledger in the stage's directory (checks run at once: one shared file would lose runs). */
+export const stageLedgerName = (tier: string | undefined, harness: string | undefined): string => `ledger-${tier ?? "all"}-${harness ?? "all"}.json`;
+
+/** Appends the runs of `from` (the stage's checks' ledgers) to the ledger at `into`, and adds what they spent. One writer: the stage. */
+export function mergeLedgers(into: string, from: string[]): void {
+  const base: LedgerFile = existsSync(into) ? JSON.parse(readFileSync(into, "utf8")) : { caps: { ...NO_BUCKET_CAPS }, spent: { bedrock: 0, other: 0 }, runs: [] };
+  for (const f of from.filter((x) => existsSync(x))) {
+    const l = JSON.parse(readFileSync(f, "utf8")) as LedgerFile;
+    for (const r of l.runs) {
+      base.runs.push(r);
+      for (const c of r.calls) {
+        if (c.bucket === "subscription") continue;
+        const home = c.bucket === "openrouter" ? "other" : c.bucket;
+        base.spent[home] = round6(base.spent[home] + c.usd);
+        if (c.bucket === "openrouter") base.spent.openrouter = round6((base.spent.openrouter ?? 0) + c.usd);
+      }
+    }
+  }
+  mkdirSync(dirname(into), { recursive: true });
+  writeFileSync(into, `${JSON.stringify(base, null, 2)}\n`);
+}
+
 export const describeStageCaps = (c: Readonly<StageCaps>): string => `plans ${Math.round(c.plans / 1000)}k tokens · Bedrock $${c.bedrock.toFixed(2)} · OpenRouter $${c.openrouter.toFixed(2)} · API keys $${c.keys.toFixed(2)}`;
 export const REGRESSION_LIVE_LEDGER = "qa/logs/live-regression-spend.json";
 /** The caps of the regression stage's ledger: none per bucket. */
@@ -218,8 +306,8 @@ export class Spend {
     readonly campaign: boolean,
     /** false: the file is read, never written (a dry run). */
     readonly write = true,
-    /** The regression stage: what each of its buckets has left for this check (`--stage-left`). */
-    readonly stageLeft?: Readonly<StageCaps>,
+    /** The regression stage: the budget its checks share (`--stage-dir`). */
+    readonly stage?: StageBudget,
   ) {
     const old: Partial<LedgerFile> | null = path && existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
     this.file = { caps, spent: { bedrock: old?.spent?.bedrock ?? 0, other: old?.spent?.other ?? 0, ...(old?.spent?.openrouter !== undefined || caps.openrouter !== undefined ? { openrouter: old?.spent?.openrouter ?? 0 } : {}) }, runs: old?.runs ?? [] };
@@ -249,7 +337,7 @@ export class Spend {
 
   /**
    * Whether a call whose worst case is `worst` dollars (and `tokens` tokens, on a plan) fits; a refusal is logged (and saved).
-   * In the regression stage, a call is also held to its bucket's share of the stage's caps (`stageLeft`).
+   * In the regression stage, the call's worst case is also reserved from the stage's budget, which its checks share (`stage`).
    */
   allowUsd(bucket: Bucket, what: string, model: string, worst: number, tokens = 0): boolean {
     const refuse = (why: string) => {
@@ -257,15 +345,16 @@ export class Spend {
       this.save();
       return false;
     };
-    if (this.stageLeft) {
-      const b = stageBucketOf(bucket);
-      const need = b === "plans" ? tokens : worst;
-      if (stageUse(this.run.calls)[b] + need > this.stageLeft[b]) return refuse(`this run's ${b} over what is left of its cap (${b === "plans" ? `${Math.floor(this.stageLeft[b])} tokens` : `$${this.stageLeft[b].toFixed(4)}`}): ask the user, then bun run regression --live-caps ${b}=<more>`);
+    if (bucket !== "subscription") {
+      if (this.runTotal() + worst > this.runCap) return refuse(`this run over $${this.runCap}`);
+      if (this.spent(bucket === "openrouter" ? "other" : bucket) + worst > this.caps[bucket === "openrouter" ? "other" : bucket]) return refuse(`${bucket === "openrouter" ? "other" : bucket} over $${this.caps[bucket === "openrouter" ? "other" : bucket]}`);
+      if (bucket === "openrouter" && this.caps.openrouter !== undefined && this.spent("openrouter") + worst > this.caps.openrouter) return refuse(`openrouter over $${this.caps.openrouter}`);
     }
-    if (bucket === "subscription") return true;
-    if (this.runTotal() + worst > this.runCap) return refuse(`this run over $${this.runCap}`);
-    if (this.spent(bucket === "openrouter" ? "other" : bucket) + worst > this.caps[bucket === "openrouter" ? "other" : bucket]) return refuse(`${bucket === "openrouter" ? "other" : bucket} over $${this.caps[bucket === "openrouter" ? "other" : bucket]}`);
-    if (bucket === "openrouter" && this.caps.openrouter !== undefined && this.spent("openrouter") + worst > this.caps.openrouter) return refuse(`openrouter over $${this.caps.openrouter}`);
+    if (this.stage) {
+      const b = stageBucketOf(bucket);
+      const had = this.stage.reserve(b, b === "plans" ? tokens : worst);
+      if (had !== null) return refuse(`this run's ${b} over what is left of its cap (${b === "plans" ? `${Math.floor(had)} tokens` : `$${had.toFixed(4)}`}): ask the user, then bun run regression --live-caps ${b}=<more>`);
+    }
     return true;
   }
 
@@ -283,7 +372,13 @@ export class Spend {
       this.file.spent[home] = round6(this.file.spent[home] + c);
       if (bucket === "openrouter") this.file.spent.openrouter = round6((this.file.spent.openrouter ?? 0) + c);
     }
+    this.stage?.charged(stageBucketOf(bucket), bucket === "subscription" ? input + output : c);
     this.save();
+  }
+
+  /** The run is over: what the stage's budget still holds for calls never made goes back. */
+  settle(): void {
+    this.stage?.settle();
   }
 
   /** Charges a call by its tokens × the price table. */
@@ -313,8 +408,8 @@ export interface Args {
   fromPath?: boolean;
   /** `--regression-stage`: run as `bun run regression`'s live stage (its ledger, no monthly cap; `REGRESSION_LIVE_CAPS`). */
   stage?: boolean;
-  /** `--stage-left plans=…,bedrock=…`: what the stage's caps have left, per bucket (the stage passes it to each check). */
-  stageLeft?: StageCaps;
+  /** `--stage-dir <dir>`: the stage's run: its shared budget (`budget.json`) and this check's ledger, which the stage merges. */
+  stageDir?: string;
 }
 
 /** Flags take `--name=value` or `--name value`. Throws on an unknown or contradictory flag. */
@@ -352,12 +447,12 @@ export function parseArgs(argv: string[]): Args {
       case "--newest": a.newest = true; break;
       case "--harness-from-path": a.fromPath = true; break;
       case "--regression-stage": a.stage = true; break;
-      case "--stage-left": a.stageLeft = parseStageCaps(value()); break;
+      case "--stage-dir": a.stageDir = value(); break;
       default: throw new Error(`unknown option ${arg}`);
     }
   }
   if (a.stage && (a.ledger || a.caps)) throw new Error("--regression-stage keeps its own ledger and caps: no --ledger or --caps");
-  if (a.stageLeft && !a.stage) throw new Error("--stage-left goes with --regression-stage");
+  if (a.stageDir && !a.stage) throw new Error("--stage-dir goes with --regression-stage");
   if (a.newest && a.fromPath) throw new Error("--newest and --harness-from-path are two ways to pick a binary: use one");
   if (a.only && a.tier) throw new Error("--only and --tier are two ways to pick a run: use one");
   if (a.tier === "harness" && !a.harness) throw new Error("--tier=harness needs --harness=<id> (claude-code, codex, antigravity, opencode, kimi-code)");
@@ -368,7 +463,7 @@ export function parseArgs(argv: string[]): Args {
 
 /** A run's whole-run cap in dollars: a targeted check's own, the tier's, or none (the buckets' caps alone). */
 export function runCapOf(a: Pick<Args, "only" | "tier" | "harness" | "stage">): number {
-  // The regression stage is held per bucket (`REGRESSION_LIVE_CAPS`, `Spend.stageLeft`), not by one total.
+  // The regression stage is held per bucket (`REGRESSION_LIVE_CAPS`, its shared `StageBudget`), not by one total.
   if (a.stage) return Infinity;
   if (a.tier === "regression") return REGRESSION_RUN_CAP;
   if (a.tier === "harness") return HARNESS_RUN_CAP;

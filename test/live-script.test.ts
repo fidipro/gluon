@@ -13,7 +13,7 @@ import { loginLine } from "../scripts/live-driver.ts";
 import { hostOf, install, readPin } from "../scripts/harness-cache.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
-  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, plansAllowed, price, formatStageCaps, NO_BUCKET_CAPS, parseStageCaps, REGRESSION_LIVE_CAPS, runCapOf, stageUse, sectionsOf, Spend, usd, type Available,
+  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, plansAllowed, price, NO_BUCKET_CAPS, parseStageCaps, StageBudget, REGRESSION_LIVE_CAPS, runCapOf, stageUse, sectionsOf, Spend, usd, type Available,
 } from "../scripts/live-lib.ts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -143,14 +143,14 @@ describe("flags and tiers", () => {
     expect(() => parseArgs(["--harness=codex"])).toThrow(/goes with --tier/);
     expect(() => parseArgs(["--tier=regression", "--newest", "--harness-from-path"])).toThrow(/use one/);
     expect(() => parseArgs(["--tier=journey", "--regression-stage", "--ledger", "x.json"])).toThrow(/own ledger/);
-    expect(() => parseArgs(["--tier=journey", "--regression-stage", "--stage-left", "plans=lots"])).toThrow(/not an amount/);
-    expect(() => parseArgs(["--tier=journey", "--stage-left", "plans=1"])).toThrow(/goes with --regression-stage/);
+    expect(() => parseStageCaps("plans=lots")).toThrow(/not an amount/);
+    expect(() => parseArgs(["--tier=journey", "--stage-dir", "/tmp/x"])).toThrow(/goes with --regression-stage/);
   });
   test("regression's live stage: capped per run and per bucket (plans 200k tokens, Bedrock $0.30, OpenRouter and API keys $0.10), no total", () => {
     expect(REGRESSION_LIVE_CAPS).toEqual({ plans: 200_000, bedrock: 0.3, openrouter: 0.1, keys: 0.1 });
     expect(runCapOf({ tier: "journey", stage: true })).toBe(Infinity);
-    expect(parseArgs(["--tier=journey", "--harness=codex", "--regression-stage", "--stage-left=plans=1000,bedrock=0.2"])).toMatchObject({ stage: true, stageLeft: { plans: 1000, bedrock: 0.2, openrouter: 0.1, keys: 0.1 } });
-    expect(parseStageCaps(formatStageCaps({ plans: 1234.5, bedrock: 0.12345, openrouter: 0, keys: 0.1 }))).toEqual({ plans: 1234, bedrock: 0.1235, openrouter: 0, keys: 0.1 });
+    expect(parseArgs(["--tier=journey", "--harness=codex", "--regression-stage", "--stage-dir=/tmp/x"])).toMatchObject({ stage: true, stageDir: "/tmp/x" });
+    expect(parseStageCaps("bedrock=1,plans=300000")).toEqual({ plans: 300_000, bedrock: 1, openrouter: 0.1, keys: 0.1 });
     expect(() => parseStageCaps("money=1")).toThrow(/unknown bucket/);
     // OpenRouter is its own bucket in the stage; plans stay plans.
     expect(bucketOf("openrouter", false, true)).toBe("openrouter");
@@ -158,7 +158,7 @@ describe("flags and tiers", () => {
     expect(stageUse([{ bucket: "subscription", usd: 0, input: 40_000, output: 3_000 }, { bucket: "bedrock", usd: 0.02, input: 0, output: 0 }, { bucket: "other", usd: 0.03, input: 0, output: 0 }, { bucket: "openrouter", usd: 0.01, input: 0, output: 0 }])).toEqual({ plans: 43_000, bedrock: 0.02, openrouter: 0.01, keys: 0.03 });
   });
   test("the stage holds each call to what its bucket has left: plan tokens, then dollars; the refusal says to ask the user", () => {
-    const s = new Spend(null, NO_BUCKET_CAPS, Infinity, false, false, { plans: 50_000, bedrock: 0.05, openrouter: 0.1, keys: 0.1 });
+    const s = new Spend(null, NO_BUCKET_CAPS, Infinity, false, false, StageBudget.create(join(tmp(), "budget.json"), { plans: 50_000, bedrock: 0.05, openrouter: 0.1, keys: 0.1 }));
     expect(s.allowUsd("subscription", "harness claude-code", "haiku", 0, 43_000)).toBe(true);
     s.chargeUsd("subscription", "harness claude-code", "haiku", 0, 40_000, 3_000, true);
     expect(s.allowUsd("subscription", "harness codex", "gpt-6-luna", 0, 43_000)).toBe(false);
@@ -167,9 +167,22 @@ describe("flags and tiers", () => {
     expect(s.allowUsd("bedrock", "harness codex", "gpt-6-luna", 0.014)).toBe(false);
     expect(s.allowUsd("openrouter", "harness opencode", "deepseek", 0.01)).toBe(true);
     expect(s.run.refused).toEqual([
-      expect.stringContaining("this run's plans over what is left of its cap (50000 tokens): ask the user, then bun run regression --live-caps plans=<more>"),
-      expect.stringContaining("this run's bedrock over what is left of its cap ($0.0500)"),
+      expect.stringContaining("this run's plans over what is left of its cap (7000 tokens): ask the user, then bun run regression --live-caps plans=<more>"),
+      expect.stringContaining("this run's bedrock over what is left of its cap ($0.0100)"),
     ]);
+  });
+  test("checks running at once share the stage's budget: a reservation is the worst case, a charge gives back the rest, settle the unused", () => {
+    const path = join(tmp(), "budget.json");
+    StageBudget.create(path, { plans: 0, bedrock: 0.3, openrouter: 0.1, keys: 0.1 });
+    const a = new Spend(null, NO_BUCKET_CAPS, Infinity, false, false, new StageBudget(path));
+    const b = new Spend(null, NO_BUCKET_CAPS, Infinity, false, false, new StageBudget(path));
+    expect(a.allowUsd("bedrock", "journey brain", "sonnet", 0.2)).toBe(true);
+    expect(b.allowUsd("bedrock", "harness codex", "luna", 0.2)).toBe(false); // 0.1 left while a's call runs
+    a.chargeUsd("bedrock", "journey brain", "sonnet", 0.05);
+    expect(new StageBudget(path).left().bedrock).toBeCloseTo(0.25, 6);
+    expect(b.allowUsd("bedrock", "harness codex", "luna", 0.2)).toBe(true);
+    b.settle(); // never charged: the call didn't happen
+    expect(new StageBudget(path).left().bedrock).toBeCloseTo(0.25, 6);
   });
   test("the binary a harness check runs: the pinned release by default, --newest or --harness-from-path instead", () => {
     expect(parseArgs(["--tier=harness", "--harness=codex", "--newest"])).toMatchObject({ newest: true });

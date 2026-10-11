@@ -73,6 +73,7 @@
     "docs:gen": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/docs/gen.ts",
     "regression": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts",
     "regression:full": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts --full",
+    "verify": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts --verify",
     "test:area": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/regression.ts --area",
     "test:health": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/test-health.ts",
     "test:coverage": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/coverage.ts",

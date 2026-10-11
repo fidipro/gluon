@@ -30,7 +30,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
-import { AREAS, e2eTestFiles, liveChecks, platformsOf, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
+import { AREAS, e2eTestFiles, liveChecks, platformsOf, ROOT, selectAreas, selectChanged, selectVerify, unitTestFiles, type Selection } from "../test/areas.ts";
+import { testsReaching } from "./import-graph.ts";
 import { describeStageCaps, parseStageCaps, REGRESSION_LIVE_CAPS, type StageCaps } from "./live-lib.ts";
 import { liveStage, online } from "./live-stage.ts";
 import { onPath } from "./live-driver.ts";
@@ -38,11 +39,13 @@ import { REAL_TEST, realHarnesses, realStage } from "./real-stage.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
-const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--no-live] [--live-caps b=n,…] [--newest] [--list [--json]]
+const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref] | --verify [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--no-live] [--live-caps b=n,…] [--newest] [--list [--json]]
   (none)           the fast tier: typecheck + unit + e2e without the tests titled @full or @quarantine
   --full           also the @full and @quarantine tests (bun run regression:full)
   --area a,b       only those areas' unit and e2e tests (bun run test:area a,b); areas: ${Object.keys(AREAS).join(", ")}
-  --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too
+  --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too, and the
+                   unit tests that import a changed src/ file
+  --verify [ref]   the inner loop (bun run verify): the tests that import what changed, its areas' e2e; no real or live stage
   --stages a,b     only those stages (typecheck, unit, e2e, real, live), to time or meter one of them
   --retry-failed   run a stage's failed tests once more; passing then, they are flaky (qa/logs/flaky.json), not failures
   --no-live        leave out the live stage (the real checks the change needs: paid, capped per bucket, local only, never in CI)
@@ -51,6 +54,7 @@ const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] 
   --keep-going     run every stage even after one fails
   --list           print what would run, then stop (--json: as JSON, with the OSes the change needs)
 env: GLUON_UNIT_SHARDS (unit processes), GLUON_E2E_SHARDS (e2e processes; fast tier: half the apps, full: 1), GLUON_E2E_CONCURRENCY (apps at once, all e2e processes together),
+  GLUON_LIVE_PARALLEL (live checks at once; default: up to 4, as the free memory holds),
   GLUON_TEST_CASES (a file: every test run, as JSON)`;
 
 const argv = process.argv.slice(2);
@@ -77,12 +81,14 @@ if (liveCapsAt >= 0) {
 }
 let areaArg: string | undefined;
 let changedArg: string | true | undefined;
+let verifyArg: string | true | undefined;
 let stagesArg: string | undefined;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]!;
   const next = argv[i + 1];
   if (["--full", "--list", "--json", "--retry-failed", "--keep-going", "--no-live", "--newest", "--"].includes(a)) continue;
-  if (a === "--live-caps") i++;
+  if (a === "--verify") verifyArg = next && !next.startsWith("--") ? (i++, next) : true;
+  else if (a === "--live-caps") i++;
   else if (a === "--area") areaArg = next && !next.startsWith("--") ? (i++, next) : "";
   else if (a.startsWith("--area=")) areaArg = a.slice(7);
   else if (a === "--changed") changedArg = next && !next.startsWith("--") ? (i++, next) : true;
@@ -94,13 +100,14 @@ for (let i = 0; i < argv.length; i++) {
     process.exit(2);
   }
 }
-if (areaArg !== undefined && changedArg !== undefined) {
-  console.error("--area and --changed don't combine\n" + HELP);
+if ([areaArg, changedArg, verifyArg].filter((x) => x !== undefined).length > 1) {
+  console.error("--area, --changed and --verify don't combine\n" + HELP);
   process.exit(2);
 }
+const verify = verifyArg !== undefined;
 
 const STAGES = ["typecheck", "unit", "e2e", "real", "live"];
-const stages = stagesArg === undefined ? STAGES : stagesArg.split(",").map((x) => x.trim()).filter(Boolean);
+const stages = stagesArg === undefined ? (verify ? STAGES.slice(0, 3) : STAGES) : stagesArg.split(",").map((x) => x.trim()).filter(Boolean);
 if (!stages.length || stages.some((x) => !STAGES.includes(x))) {
   console.error(`--stages takes some of: ${STAGES.join(", ")}\n${HELP}`);
   process.exit(2);
@@ -153,12 +160,22 @@ if (areaArg !== undefined) {
   }
   sel = selectAreas(names);
   title = `${tier} tier, area ${names.join(", ")}`;
+} else if (verify) {
+  const c = changedFiles(verifyArg === true ? undefined : verifyArg);
+  if ("error" in c) {
+    console.error(`--verify: ${c.error}`);
+    process.exit(2);
+  }
+  const v = selectVerify(c.files, (src) => testsReaching(src, unitTestFiles(), ROOT));
+  sel = v;
+  notes = v.why;
+  title = `verify, changed since ${c.base} (${c.files.length} files)`;
 } else if (changedArg !== undefined) {
   const c = changedFiles(changedArg === true ? undefined : changedArg);
   if ("error" in c) {
     title = `${tier} tier (--changed: ${c.error}, so everything)`;
   } else {
-    const s = selectChanged(c.files);
+    const s = selectChanged(c.files, (src) => testsReaching(src, unitTestFiles(), ROOT));
     picked = s;
     changedList = c.files;
     notes = s.why;
@@ -176,7 +193,7 @@ if (areaArg !== undefined) {
 
 const unitAll = sel ? sel.unit : unitTestFiles();
 /** The live checks this run needs: by the change (`--changed`, `--area`); the journey and every harness for a whole tier. */
-const checks = liveChecks(picked ?? sel, changedList, full && !sel);
+const checks = verify ? [] : liveChecks(picked ?? sel, changedList, full && !sel);
 /** The real stage's harnesses: those of the change's harness checks that can run on a loopback model API. */
 const reals = realHarnesses(checks);
 const realNewest = newest || !!process.env.CI;
@@ -469,6 +486,7 @@ async function main(): Promise<number> {
     );
     if (r.failed) failed = true;
   }
+  if (verify && !failed) console.log("── verify: ok. Done means `bun run regression --changed` (the whole areas, the real and live stages).");
   return failed ? 1 : 0;
 }
 const code = await main();

@@ -158,6 +158,20 @@ export function scanQuarantines(files: { path: string; text: string }[], now: Da
 
 /** A fast-tier test this many times over `FULL_OVER_S` is broken, not just slow. */
 export const BROKEN_OVER = 3;
+/**
+ * The fast tier's budget: its tests' seconds summed (unit + e2e; 381 s measured on 2026-10-11, and a fifth more), so the tier
+ * can't creep up a test at a time. Agents verify with it many times a day (docs/contributing/testing.md, rule 7): over it, make
+ * tests faster or move the slow ones to `@full` before adding more; raising it is a maintainer's decision.
+ */
+export const FAST_TIER_BUDGET_S = 460;
+/** The fast tier's tests' seconds summed, unit and e2e apart. */
+export function tierSeconds(t: TimesFile, tier = "fast"): { unit: number; e2e: number } {
+  const files = (t.tiers[tier] as { files?: Record<string, number> } | undefined)?.files ?? {};
+  let unit = 0;
+  let e2e = 0;
+  for (const [f, s] of Object.entries(files)) f.includes("/e2e/") ? (e2e += s) : (unit += s);
+  return { unit, e2e };
+}
 
 /** The tests of a times file over `over` seconds whose title lacks `@full` (the slowest reading of either tier). */
 export function slowTests(times: TimesFile, over: number): { file: string; name: string; s: number }[] {
@@ -332,6 +346,10 @@ function times(): Section {
     for (const s of slow.slice(0, 10)) lines.push({ level: "info", text: `  ${s.s.toFixed(1)} s  ${s.file} :: ${s.name.length > 100 ? `${s.name.slice(0, 99)}…` : s.name}` });
     if (slow.length > 10) lines.push({ level: "info", text: `  … and ${slow.length - 10} more` });
   } else lines.push({ level: "ok", text: `no test over ${FULL_OVER_S} s lacks @full` });
+  const sum = tierSeconds(t);
+  const total = sum.unit + sum.e2e;
+  const text = `the fast tier: ${total.toFixed(0)} s of tests (unit ${sum.unit.toFixed(0)} s, e2e ${sum.e2e.toFixed(0)} s), budget ${FAST_TIER_BUDGET_S} s`;
+  lines.push(total > FAST_TIER_BUDGET_S ? { level: "BROKEN", text, action: "make the slowest faster (the list above), or move them to @full, before adding more" } : { level: "ok", text });
   return { title, lines };
 }
 

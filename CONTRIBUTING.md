@@ -51,7 +51,7 @@ probes. Never make a test call a real model, agent or API.
 
 | Situation | Run |
 |---|---|
-| Editing one area | `bun run test:area <area>` (areas: `test/areas.ts`; several: `a,b`) |
+| While editing | `bun run verify`: the tests that import what you changed and its areas' end-to-end scenarios, in seconds; nothing paid. One area's tests: `bun run test:area <area>` (`test/areas.ts`) |
 | Done | `bun run regression --changed`: the areas of what you changed since `origin/main` (the whole fast tier when a core file changed), then the live checks they need, with your own credentials (skipped without them; `--no-live` leaves them out) |
 | A change across areas | `bun run regression`: typecheck + unit + end-to-end, without tests titled `@full` (~2.5 min) |
 | A big change | `bun run regression:full`: everything (~12 min) |

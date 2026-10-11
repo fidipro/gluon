@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./areas.ts";
-import { ageDays, ago, baselineGaps, compareVersions, fixtureStatus, groupCandidates, ledgerSummary, parseVersion, render, scanCandidates, scanQuarantines, slowTests } from "../scripts/test-health.ts";
+import { ageDays, ago, baselineGaps, compareVersions, fixtureStatus, groupCandidates, ledgerSummary, parseVersion, render, scanCandidates, scanQuarantines, slowTests, tierSeconds } from "../scripts/test-health.ts";
 import { FULL_OVER_S, type TimesFile } from "../scripts/test-times.ts";
 
 const scan = (text: string, path = "test/x.test.ts") => scanCandidates([{ path, text }]);
@@ -125,6 +125,12 @@ describe("quarantined tests", () => {
 });
 
 describe("the other checks", () => {
+  test("the fast tier's seconds, unit and e2e apart (its budget's measure)", () => {
+    const t = { version: 1, updated: "", cores: 1, tiers: { fast: { files: { "test/a.test.ts": 2, "test/e2e/b.e2e.test.ts": 5, "test/c.test.tsx": 1 }, tests: {} } } };
+    expect(tierSeconds(t as never)).toEqual({ unit: 3, e2e: 5 });
+    expect(tierSeconds({ version: 1, updated: "", cores: 1, tiers: {} })).toEqual({ unit: 0, e2e: 0 });
+  });
+
   test("slowTests lists non-@full tests over the threshold, slowest first, once per test across tiers", () => {
     const times: TimesFile = {
       version: 1, updated: "", cores: 1,
