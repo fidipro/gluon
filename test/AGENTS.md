@@ -14,6 +14,8 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
 - **Never reach the real `claude` / `codex`** or any real installer: use the fakes and
   `fakeInstaller()`; real installers only in a throwaway container. Probes come from
   `GLUON_TEST_PROBES`.
+- **A harness version in a test comes from `test/fixtures/harness-versions.ts`**, never a literal: the
+  fakes report `test/harnesses.json`, which the Harness watch moves with every release.
 - **`Bun.which` and `Bun.spawn` without `env` see the startup PATH**: spawn `git`/`rg` with
   `env: process.env`.
 - **Wait for states, don't sleep**: `press`, `type`, `waitFor`, `exitCode()` handle half-drawn

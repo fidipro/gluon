@@ -17,7 +17,7 @@ const ROOT = join(import.meta.dir, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const WORKFLOWS = readdirSync(join(ROOT, ".github/workflows")).filter((f) => f.endsWith(".yml")).map((f) => `.github/workflows/${f}`);
 
-type Step = { uses?: string; run?: string; if?: string; with?: Record<string, unknown>; env?: Record<string, unknown> };
+type Step = { name?: string; uses?: string; run?: string; if?: string; with?: Record<string, unknown>; env?: Record<string, unknown> };
 type Job = { permissions?: Record<string, string>; steps: Step[]; if?: string; needs?: string | string[] };
 const release = parse(read(".github/workflows/release.yml")) as { on: Record<string, unknown>; permissions: Record<string, string>; jobs: Record<string, Job> };
 
@@ -36,6 +36,12 @@ describe("BUG-121: the Release workflow's permissions", () => {
     }
     expect(release.jobs.sign!.if).toContain("inputs.sign");
     expect(release.jobs.sign!.permissions).toEqual({ "id-token": "write" });
+  });
+
+  test("a release waits until the pinned harnesses (test/harnesses.json, what the tests ran on) are each harness's newest", () => {
+    const step = release.jobs.build!.steps.find((s) => s.run?.includes("scripts/harness-pin.ts"));
+    expect(step?.run).toContain("scripts/harness-pin.ts --check");
+    expect(release.jobs.build!.steps.indexOf(step!)).toBeLessThan(release.jobs.build!.steps.findIndex((s) => s.name === "Build"));
   });
 
   test("signing is on by default", () => {
@@ -275,12 +281,12 @@ describe("what triggers and what writes: every workflow", () => {
   const all = WORKFLOWS.map((w) => [w, parse(read(w)) as { on: Record<string, unknown>; permissions?: Record<string, string>; jobs: Record<string, Job> }] as const);
   const wf = (name: string) => all.find(([w]) => w.endsWith(`/${name}`))![1];
 
-  test("there are exactly the workflows these rules know: ci, codex-watch, pages, release", () => {
-    expect(WORKFLOWS.map((w) => w.replace(".github/workflows/", "")).sort()).toEqual(["ci.yml", "codex-watch.yml", "pages.yml", "release.yml"]);
+  test("there are exactly the workflows these rules know: ci, harness-watch, pages, release", () => {
+    expect(WORKFLOWS.map((w) => w.replace(".github/workflows/", "")).sort()).toEqual(["ci.yml", "harness-watch.yml", "pages.yml", "release.yml"]);
   });
 
-  test("only the Codex watch and CI's nightly run are scheduled; none is chained or runs a pull request's code with the base repository's token", () => {
-    const scheduled = (w: string) => w.endsWith("/codex-watch.yml") || w.endsWith("/ci.yml");
+  test("only the Harness watch and CI's nightly run are scheduled; none is chained or runs a pull request's code with the base repository's token", () => {
+    const scheduled = (w: string) => w.endsWith("/harness-watch.yml") || w.endsWith("/ci.yml");
     for (const [w, y] of all) {
       const on = Object.keys(y.on);
       const banned = scheduled(w) ? ["pull_request_target", "workflow_run"] : ["schedule", "pull_request_target", "workflow_run"];
@@ -300,19 +306,30 @@ describe("what triggers and what writes: every workflow", () => {
     }
   });
 
-  test("codex-watch.yml runs hourly and by hand; nothing else", () => {
-    const { on } = wf("codex-watch.yml");
+  test("harness-watch.yml runs hourly and by hand; nothing else", () => {
+    const { on } = wf("harness-watch.yml");
     expect(Object.keys(on).sort()).toEqual(["schedule", "workflow_dispatch"]);
     expect(on.schedule).toEqual([{ cron: "17 * * * *" }]);
   });
 
-  test("the Codex watch: `check`, which runs the downloaded codex, writes nothing; `report` writes issues alone and runs no action, checkout or codex", () => {
-    const { jobs } = wf("codex-watch.yml");
-    expect(Object.keys(jobs).sort()).toEqual(["check", "report"]);
+  test("the Harness watch: `check`, which downloads and runs harness binaries, writes nothing; `report` writes issues alone and runs no action, checkout or harness", () => {
+    const { jobs } = wf("harness-watch.yml");
+    expect(Object.keys(jobs).sort()).toEqual(["check", "propose", "report"]);
     expect(jobs.check!.permissions).toBeUndefined();
     expect(jobs.report!.permissions).toEqual({ issues: "write" });
     expect(jobs.report!.steps.filter((s) => s.uses)).toEqual([]);
-    expect(JSON.stringify(jobs.report!.steps)).not.toMatch(/codex-drift|bun |npm |@openai\/codex/);
+    expect(JSON.stringify(jobs.report!.steps)).not.toMatch(/codex-drift|harness-pin|bun |npm |@openai\/codex/);
+  });
+
+  test("the Harness watch's `propose` writes the branch, its pull request and the CI run, from the pin `check` made; it runs no harness, no bun and no code of the repository's", () => {
+    const { jobs } = wf("harness-watch.yml");
+    expect(jobs.propose!.permissions).toEqual({ contents: "write", "pull-requests": "write", actions: "write" });
+    expect(jobs.propose!.needs).toBe("check");
+    expect(jobs.propose!.steps.map((s) => s.uses?.replace(/@.*/, ""))).toEqual(["actions/checkout", "actions/download-artifact", undefined]);
+    const run = jobs.propose!.steps.map((s) => s.run ?? "").join("\n");
+    expect(run).not.toMatch(/\bbun\b|\bnpm\b|scripts\/|codex-drift|harness-pin/);
+    expect(run).toContain("git add test/harnesses.json");
+    expect(run).toContain("gh workflow run ci.yml --ref harness-update");
   });
 
   test("every workflow's top-level permissions are `contents: read`", () => {
@@ -351,11 +368,11 @@ describe("what triggers and what writes: every workflow", () => {
     expect(JSON.stringify(jobs.deploy)).toContain("github-pages");
   });
 
-  test("no workflow but Release, Pages' `deploy`, the Codex watch's `report` and CI's `nightly-report` has a job that writes anything", () => {
+  test("no workflow but Release, Pages' `deploy`, the Harness watch's `report` and `propose` and CI's `nightly-report` has a job that writes anything", () => {
     for (const [w, y] of all)
       for (const [name, job] of Object.entries(y.jobs)) {
         const writes = Object.entries(job.permissions ?? {}).filter(([, v]) => v === "write").map(([k]) => k);
-        if (w.endsWith("/release.yml") || (w.endsWith("/pages.yml") && name === "deploy") || (w.endsWith("/codex-watch.yml") && name === "report") || (w.endsWith("/ci.yml") && name === "nightly-report")) continue;
+        if (w.endsWith("/release.yml") || (w.endsWith("/pages.yml") && name === "deploy") || (w.endsWith("/harness-watch.yml") && (name === "report" || name === "propose")) || (w.endsWith("/ci.yml") && name === "nightly-report")) continue;
         expect([w, name, writes]).toEqual([w, name, []]);
       }
   });

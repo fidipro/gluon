@@ -1,13 +1,13 @@
 // Launch one harness from Gluon's demo brain in a scratch world, then PARK: the operator drives the tmux session by hand
 // (tmux -L <socket> send-keys -t gluon:0.0 … / capture-pane -p -t gluon:0.0) until <scratch>/STOP exists (its content: the USD spent).
 //   bun --no-env-file scripts/live-park.ts --harness opencode [--conn openrouter] [--model "DeepSeek Flash"] [--mode explore] [--task "..."] [--std] [--prompts 6]
-//        [--opencode-recent provider/model] [--claude-settings '<json>'] [--codex-toml 'key = v\\nkey2 = v2']
+//        [--newest | --harness-from-path] [--opencode-recent provider/model] [--claude-settings '<json>'] [--codex-toml 'key = v\\nkey2 = v2']
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { defaults, loadConfig, saveConfig } from "../src/config.ts";
 import { BINARY } from "./live-lib.ts";
-import { awsSetupFromHost, availableHere, checkHarness, loadDevKeys, planHarness } from "./live-harness.ts";
+import { awsSetupFromHost, availableHere, checkHarness, loadDevKeys, planHarness, prepareHarnesses } from "./live-harness.ts";
 import { parseCaps, Spend } from "./live-lib.ts";
 import type { Harness } from "../src/harnesses.ts";
 
@@ -24,6 +24,7 @@ if (aws.region || aws.profile) saveConfig([[["bedrock"], { ...(aws.region ? { re
 const config = loadConfig();
 const ledger = process.env.GLUON_CAMPAIGN_LEDGER ?? join(ROOT, "qa/logs/live-park-spend.json");
 const spend = new Spend(ledger, parseCaps("bedrock=30,other=10,openrouter=0.5"), 3, true, true);
+await prepareHarnesses([h], { newest: argv.includes("--newest"), fromPath: argv.includes("--harness-from-path"), say: (s) => console.log(s) });
 const plan = planHarness(h, config, availableHere(config), { conn: flag("--conn"), model: flag("--model"), campaign: true });
 console.log(JSON.stringify({ harness: h, conn: plan.pick.ok ? plan.pick.conn : plan.pick, model: plan.model?.label, worst: plan.worst }));
 const r = await checkHarness(plan, config, {

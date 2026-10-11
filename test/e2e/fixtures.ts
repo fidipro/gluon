@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { outsideProfile, parseSid, windowsTool } from "../../src/secrets.ts";
 import { FIXTURE_CLAUDE_CATALOG } from "../fixtures/fixture-tables.ts";
 import { claudeBinaryText } from "../fixtures/pricing-sources.ts";
+import { FAKE_VERSIONS } from "../fixtures/harness-versions.ts";
 
 export const WIN = process.platform === "win32";
 
@@ -280,7 +281,7 @@ if [ "$1" = export ]; then
 fi
 `;
 
-const VERSIONS: Record<FakeAgent, string> = { claude: "2.1.284 (Claude Code)", codex: "codex-cli 0.158.0", agy: "1.2.13", grok: "grok 1.0.44 (fake) [stable]", opencode: "opencode v2.0.21", kimi: "2.1.1" };
+const VERSIONS: Record<FakeAgent, string> = FAKE_VERSIONS;
 
 /**
  * What a real Claude Code binary holds that Gluon reads (its baked-in model catalog and its price function), as a here-document the script never runs: Claude's

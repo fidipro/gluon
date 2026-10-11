@@ -9,6 +9,7 @@ import { parse } from "yaml";
 import { installHint } from "../../src/harnesses.ts";
 import { GUARD_MS } from "../../src/ui/signin.tsx";
 import { freshConfig, isPrivate, probes, repo, type FakeAgent } from "./fixtures.ts";
+import { PINNED } from "../fixtures/harness-versions.ts";
 import { App, cli, HOME, HOME_VIEW, KEY, SLOW, stopAll } from "./harness.ts";
 
 setDefaultTimeout(40_000 * SLOW);
@@ -528,12 +529,12 @@ describe("doctor", () => {
       }),
     };
     const r = await cli(["doctor"], { env, agents: ["claude", "codex"] });
-    expect(r.stdout).toContain("✗ Claude Code (claude 2.1.284) · Amazon Bedrock · AWS default credentials, us-east-1");
+    expect(r.stdout).toContain(`✗ Claude Code (claude ${PINNED.claude}) · Amazon Bedrock · AWS default credentials, us-east-1`);
     expect(r.stdout).not.toContain("Amazon Bedrock key");
     expect(r.stdout).toContain("✗ sonnet · global.anthropic.claude-sonnet-5-5 · access denied");
     expect(r.stdout).toContain("✓ haiku · global.anthropic.claude-haiku-5-5");
     expect(r.stdout).toContain("Claude Code · Amazon Bedrock · sonnet, opus, fable unavailable (using haiku)");
-    expect(r.stdout).toContain("✗ Codex (codex 0.158.0) · Amazon Bedrock");
+    expect(r.stdout).toContain(`✗ Codex (codex ${PINNED.codex}) · Amazon Bedrock`);
     for (const m of ["gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"]) expect(r.stdout).toContain(`✗ ${m} · global.openai.${m} · access denied`);
     expect(r.stdout).not.toMatch(/fallback|gpt-oss/);
     expect(r.stdout).toContain("✓ 9. Sonnet 4.6 on Bedrock   ← in use");
@@ -552,7 +553,7 @@ describe("doctor", () => {
     const log = join(dirname(cfg), "claude.log");
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: cfg, FAKE_PING_FAIL: "1", FAKE_CLAUDE_LOG: log } });
     expect(r.code).toBe(1);
-    expect(r.stdout).toContain("✗ Claude Code (claude 2.1.284) · Claude plan (personal) · signed in: Claude Max plan");
+    expect(r.stdout).toContain(`✗ Claude Code (claude ${PINNED.claude}) · Claude plan (personal) · signed in: Claude Max plan`);
     expect(r.stdout).toContain("✗ sonnet · sonnet · Invalid token sk-ant-•••• · Please run /login");
     expect(r.stdout).toContain("✗ 1. Sonnet 5.5 on your Claude plan (personal) · Invalid token sk-ant-••••");
     expect(r.stdout).not.toContain("abcdefghijklmnop");
@@ -574,11 +575,11 @@ describe("doctor", () => {
       "notices: { claude: 2026-01-01, google: 2026-01-01, xai: 2026-01-01 }\nconnections:\n  claude-code: { auth: subscription }\n  codex: { auth: subscription }\n  antigravity: { auth: subscription }\n  grok-build: { auth: subscription }\n  opencode: { providers: [openrouter] }\n",
     );
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: cfg, FAKE_CODEX_LOGGED_OUT: "1", OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef0123", FAKE_CLAUDE_BAD_MODELS: "fable" }, agents: ["claude", "codex", "agy", "grok"] });
-    expect(r.stdout).toContain("✗ Claude Code (claude 2.1.284) · Claude plan (personal) · signed in: Claude Max plan");
+    expect(r.stdout).toContain(`✗ Claude Code (claude ${PINNED.claude}) · Claude plan (personal) · signed in: Claude Max plan`);
     expect(r.stdout).toContain("✗ fable · fable · There's an issue with the selected model (fable)");
-    expect(r.stdout).toContain("Codex (codex 0.158.0) · ChatGPT plan (personal) · not signed in");
-    expect(r.stdout).toContain("✓ Antigravity (agy 1.2.13) · Google account (personal) · signed in: Google account");
-    expect(r.stdout).toContain("Grok Build (grok 1.0.44) · SuperGrok / X account (personal) · signed in: grok.com account");
+    expect(r.stdout).toContain(`Codex (codex ${PINNED.codex}) · ChatGPT plan (personal) · not signed in`);
+    expect(r.stdout).toContain(`✓ Antigravity (agy ${PINNED.agy}) · Google account (personal) · signed in: Google account`);
+    expect(r.stdout).toContain(`Grok Build (grok ${PINNED.grok}) · SuperGrok / X account (personal) · signed in: grok.com account`);
     expect(r.stdout).toContain(`✗ OpenCode (opencode) · not installed · install: ${installHint("opencode")} (or \`gluon install opencode\`)`);
     expect(r.stdout).toContain("✓ 1. Sonnet 5.5 on your Claude plan (personal)   ← in use");
     expect(r.stdout).toContain("· 2. GPT-6.1 Sol on your ChatGPT plan (personal) · not connected");

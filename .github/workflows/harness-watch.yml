@@ -1,0 +1,156 @@
+# Every harness release, within the hour (issue #31). GitHub can't trigger on another vendor's release, so an hourly run
+# asks each vendor for its newest release (`bun scripts/harness-pin.ts --bump`: npm, Antigravity's and Kimi Code's
+# manifests, Grok Build's channel; scripts/harness-cache.ts) and, when that moves test/harnesses.json:
+#   - a new codex is checked for what it gives the ChatGPT-plan intake agent (scripts/codex-drift.ts: a tool in the model
+#     request, sent to a provider on the runner's loopback; a feature it keeps on, a catalog field or thread-item type Gluon
+#     hasn't classified; src/agent/codex.ts). On drift `report` comments on the open watch issue, or opens one.
+#   - `propose` puts the new pin on the `harness-update` branch, opens (or retitles) its pull request and starts CI on it
+#     (a pull request opened with the workflow's token starts no workflow by itself); merging it moves every test, fake
+#     and live check to the new versions.
+# Each new pin is handled once: an actions-cache key per pin, saved when `check` succeeded.
+#   gh workflow run harness-watch.yml        # now, by hand
+# `check`, which downloads and runs harness binaries, can write nothing; `report` writes issues alone; `propose` writes the
+# branch, the pull request and the CI run, and runs no harness and none of the repository's code (test/release.test.ts).
+# `propose` needs "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General).
+# Limits: GitHub may delay a scheduled run, and turns schedules off after 60 days without repository activity.
+name: Harness watch
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    # Each model's turn has its own limit (60 s, scripts/codex-drift.ts), and a check can run 3 times over ~11 models
+    # (~33 min at worst); this stops one that hangs anyway.
+    timeout-minutes: 45
+    outputs:
+      fresh: ${{ steps.bump.outputs.changed == 'true' && steps.seen.outputs.cache-hit != 'true' }}
+      summary: ${{ steps.bump.outputs.summary }}
+      drift: ${{ steps.drift.outputs.drift }}
+      report: ${{ steps.drift.outputs.report }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - id: bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          old_codex=$(jq -r .codex.version test/harnesses.json)
+          bun scripts/harness-pin.ts --bump | tee bump.txt
+          if git diff --quiet -- test/harnesses.json; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "key=harness-watch-$(sha256sum test/harnesses.json | cut -c1-32)" >> "$GITHUB_OUTPUT"
+          echo "summary=$(paste -sd ';' bump.txt | sed 's/;/; /g')" >> "$GITHUB_OUTPUT"
+          new_codex=$(jq -r .codex.version test/harnesses.json)
+          if [ "$old_codex" != "$new_codex" ]; then echo "codex=$new_codex" >> "$GITHUB_OUTPUT"; fi
+      # Restores nothing (lookup-only); on a miss its post step saves the key when the job succeeds: this pin is handled.
+      - id: seen
+        if: steps.bump.outputs.changed == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .harness-watch
+          key: ${{ steps.bump.outputs.key }}
+          lookup-only: true
+      # 0: nothing new, 1: drift (report), 2: couldn't check (the job fails and the next run tries again).
+      - id: drift
+        if: steps.bump.outputs.codex != '' && steps.seen.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          bin=$(bun scripts/harness-pin.ts --install --harness codex --path)
+          code=0
+          bun scripts/codex-drift.ts --binary "$bin" > report.md || code=$?
+          cat report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "drift=$code" >> "$GITHUB_OUTPUT"
+          { echo "report<<GLUON_REPORT_END"; cat report.md; echo "GLUON_REPORT_END"; } >> "$GITHUB_OUTPUT"
+          [ "$code" -le 1 ]
+      - if: steps.bump.outputs.changed == 'true' && steps.seen.outputs.cache-hit != 'true'
+        shell: bash
+        run: mkdir -p .harness-watch && cp test/harnesses.json .harness-watch/
+      - if: steps.bump.outputs.changed == 'true' && steps.seen.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harness-pin
+          path: test/harnesses.json
+          retention-days: 7
+
+  report:
+    needs: check
+    if: needs.check.outputs.drift == '1'
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPORT: ${{ needs.check.outputs.report }}
+        run: |
+          set -euo pipefail
+          title="Harness watch: the Codex intake agent needs a look"
+          body="$REPORT
+
+          Found by the Harness watch: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --state open --limit 100 --json number,title | jq -r --arg t "$title" 'map(select(.title == $t))[0].number // empty')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
+
+  propose:
+    needs: check
+    if: needs.check.outputs.fresh == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: harness-pin
+          path: pin
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SUMMARY: ${{ needs.check.outputs.summary }}
+        run: |
+          set -euo pipefail
+          # The pin is data: it must name every harness with a version, and nothing else changes.
+          jq -e '[.["claude-code"], .codex, .antigravity, .["grok-build"], .opencode, .["kimi-code"]] | all(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+"))' pin/harnesses.json > /dev/null
+          cp pin/harnesses.json test/harnesses.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
+          git switch -C harness-update
+          git add test/harnesses.json
+          git commit -m "Harness update: $SUMMARY" -m "Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          git push --force origin harness-update
+          title="Harness update: $SUMMARY"
+          body="The newest harness releases, from the Harness watch: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          $SUMMARY
+
+          Merging moves the fakes, the live checks and the release preflight to these versions. Before merging, run the live checks of each changed harness on your machine (the harness update runbook)."
+          n=$(gh pr list --head harness-update --state open --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then gh pr edit "$n" --title "$title" --body "$body"; else gh pr create --head harness-update --base main --title "$title" --body "$body"; fi
+          gh workflow run ci.yml --ref harness-update -f suite=quick

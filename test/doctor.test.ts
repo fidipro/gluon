@@ -13,6 +13,7 @@ import { defaults, loadConfig } from "../src/config.ts";
 import { awsLabel, doctor, showBrain, stepLine } from "../src/doctor.ts";
 import { loadSecrets } from "../src/secrets.ts";
 import { fakeAgents } from "./e2e/fixtures.ts";
+import { PINNED } from "./fixtures/harness-versions.ts";
 
 const POSIX = process.platform !== "win32";
 const TMP = mkdtempSync(join(tmpdir(), "gluon-doctor-"));
@@ -66,7 +67,7 @@ describe.skipIf(!POSIX)("doctor", () => {
     const { code, text } = await printed(() => doctor(loadConfig(), d));
     expect(code).toBe(0);
     expect(text).not.toMatch(/^\s*✗/m);
-    expect(text).toContain("✓ Codex (codex 0.158.0) · OpenAI key (from your environment)");
+    expect(text).toContain(`✓ Codex (codex ${PINNED.codex}) · OpenAI key (from your environment)`);
     expect(text).toContain("✓ gpt-6-luna · gpt-6-luna");
     expect(text).toMatch(/✓ 4\. GPT-6 Sol · OpenAI API {3}← in use/);
     expect(text).not.toContain(KEY);

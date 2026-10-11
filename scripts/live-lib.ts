@@ -253,6 +253,10 @@ export interface Args {
   ledger?: string;
   caps?: Caps;
   dryRun: boolean;
+  /** `--newest`: the harness checks run each harness's newest release, not the pinned one (test/harnesses.json). */
+  newest?: boolean;
+  /** `--harness-from-path`: they run the binary on PATH instead. */
+  fromPath?: boolean;
 }
 
 /** Flags take `--name=value` or `--name value`. Throws on an unknown or contradictory flag. */
@@ -287,9 +291,12 @@ export function parseArgs(argv: string[]): Args {
       case "--ledger": a.ledger = value(); break;
       case "--caps": a.caps = parseCaps(value()); break;
       case "--dry-run": a.dryRun = true; break;
+      case "--newest": a.newest = true; break;
+      case "--harness-from-path": a.fromPath = true; break;
       default: throw new Error(`unknown option ${arg}`);
     }
   }
+  if (a.newest && a.fromPath) throw new Error("--newest and --harness-from-path are two ways to pick a binary: use one");
   if (a.only && a.tier) throw new Error("--only and --tier are two ways to pick a run: use one");
   if (a.tier === "harness" && !a.harness) throw new Error("--tier=harness needs --harness=<id> (claude-code, codex, antigravity, opencode, kimi-code)");
   if (a.harness && !a.tier) throw new Error("--harness goes with --tier=harness, --tier=journey (or --tier=regression, to run one harness's section only)");

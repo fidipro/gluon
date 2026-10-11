@@ -14,6 +14,7 @@ import { MIGRATIONS } from "../src/analytics.ts";
 import { STRING_WIDTH_PATCHED } from "../scripts/build.ts";
 import { config, fakeAgents, repo } from "./e2e/fixtures.ts";
 import { fakeRelease } from "./fixtures/fake-release.ts";
+import { PINNED } from "./fixtures/harness-versions.ts";
 import { App, cli, HOME, HOME_VIEW, KEY, SLOW, start, stopAll, SYSTEM_ENV, SYSTEM_PATH, toLaunch, toQuestion } from "./e2e/harness.ts";
 
 const BIN = process.env.GLUON_TEST_BINARY;
@@ -33,7 +34,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
 
   test("doctor with a temp config and fake agents", async () => {
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: config("dist-doctor", "connections: { claude-code: { auth: subscription } }\n") } });
-    expect(r.stdout).toContain("✓ Claude Code (claude 2.1.284)");
+    expect(r.stdout).toContain(`✓ Claude Code (claude ${PINNED.claude})`);
     expect(r.stdout).toContain("✓ 1. Sonnet 5.5 on your Claude plan (personal)   ← in use");
     expect(r.code).toBe(0);
   });

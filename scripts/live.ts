@@ -47,7 +47,7 @@ import { offeredAgents } from "../src/models.ts";
 import { maskSecrets } from "../src/secrets.ts";
 import { claudePing, loginStatus, versionOf } from "../src/status.ts";
 import { probeConnection, recordProbes, summaryLine, type ConnectionProbe, type ModelProbe, type Probe } from "../src/verify.ts";
-import { availableHere, awsSetupFromHost, checkHarness, harnessesFor, loadDevKeys, planHarness, runHarnessSection, verdict, type Assertion } from "./live-harness.ts";
+import { availableHere, awsSetupFromHost, checkHarness, harnessesFor, loadDevKeys, noBinary, planHarness, prepareHarnesses, runHarnessSection, verdict, type Assertion } from "./live-harness.ts";
 import {
   bucketOf, chatStep, DEFAULT_CAPS, DEFAULT_LEDGER, JOURNEY_AGENT_CAP, JOURNEY_BRAIN, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, journeyMonthSpend, parseArgs, PROBE,
   planCharged, planLines, planRouteBlock, regressionSubset, runCapOf, sectionsOf, SESSION, Spend, usd,
@@ -456,7 +456,7 @@ async function journey() {
       asserts.push({ status: "SKIP" });
     };
     if (!plan.pick.ok || !plan.binary || !plan.model || !plan.bucket) {
-      skip(!plan.pick.ok ? plan.pick.why : !plan.binary ? `${HARNESS_INFO[h].binary} is not on PATH` : "no model");
+      skip(!plan.pick.ok ? plan.pick.why : !plan.binary ? noBinary(h) : "no model");
       continue;
     }
     if (plan.worst > JOURNEY_AGENT_CAP) {
@@ -540,7 +540,7 @@ function planOf(): PlanItem[] {
       for (const h of harnessesFor(args.harness)) {
         const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
         if (!p.pick.ok) add("journey", `${h}`, 0, "other", `skipped: ${p.pick.why}`);
-        else if (!p.binary) add("journey", `${h}`, 0, p.bucket ?? "other", `skipped: ${HARNESS_INFO[h].binary} is not on PATH`);
+        else if (!p.binary) add("journey", `${h}`, 0, p.bucket ?? "other", `skipped: ${noBinary(h)}`);
         else add("journey", `${h}: the brain asks and proposes → ${p.pick.conn} · ${p.model?.label} (${p.model?.id}) launched, replies once`, brain.worst + p.worst, p.bucket!, brain.worst + p.worst > JOURNEY_HARNESS_CAP ? `skipped: over a journey's cap of $${JOURNEY_HARNESS_CAP}` : undefined);
       }
     }
@@ -550,7 +550,7 @@ function planOf(): PlanItem[] {
     for (const h of harnessesFor(args.harness)) {
       const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
       if (!p.pick.ok) add("real-harness", `${h}`, 0, "other", `skipped: ${p.pick.why}`);
-      else if (!p.binary) add("real-harness", `${h}`, 0, p.bucket ?? "other", `skipped: ${HARNESS_INFO[h].binary} is not on PATH`);
+      else if (!p.binary) add("real-harness", `${h}`, 0, p.bucket ?? "other", `skipped: ${noBinary(h)}`);
       else add("real-harness", `${h}: Gluon (demo brain, free) → ${p.pick.conn} · ${p.model?.label} (${p.model?.id}), one prompt "Reply with just OK"${args.tier === "harness" ? ", screens saved" : ""}`, p.worst, p.bucket!);
     }
   }
@@ -570,6 +570,8 @@ function dryRun() {
 }
 
 try {
+  // The harness checks run the pinned releases (test/harnesses.json), installed into the cache first; never in a dry run.
+  if (!args.dryRun && (args.tier || !args.only)) await prepareHarnesses(harnessesFor(args.harness), { newest: args.newest, fromPath: args.fromPath, say: out });
   if (args.dryRun) dryRun();
   else if (args.tier === "regression") await regression();
   else if (args.tier === "journey") {

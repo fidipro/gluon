@@ -2,7 +2,7 @@
 /**
  * The real-harness section of `bun run test:live` (`--tier=regression`, and `--tier=harness --harness=<id>` alone).
  *
- * For each harness binary on PATH: Gluon on the demo brain (free: no brain call) in a private tmux server, on a throwaway
+ * For each harness (the pinned release from test/harnesses.json, `--newest` the newest, `--harness-from-path` PATH's): Gluon on the demo brain (free: no brain call) in a private tmux server, on a throwaway
  * config and a temp git repo, launches that harness on its cheapest model over an API-key connection (never a sign-in: a
  * harness that would need one is skipped, and the guard aborts on any sign-in screen). The one prompt is the launch's spec,
  * "Reply with just OK". Checks, each PASS / FAIL / SKIP:
@@ -31,6 +31,7 @@ import { HARNESS_INFO, HARNESSES, type Harness } from "../src/harnesses.ts";
 import { loadSecrets, maskSecrets, parseEnv, secret, useSecrets } from "../src/secrets.ts";
 import { HARNESS_WORD } from "../src/sessions.ts";
 import { versionOf } from "../src/status.ts";
+import { cachedBin, harnessBin, readPin } from "./harness-cache.ts";
 import { GuardedDriver, inputHolds, LoginScreenError, onPath, PromptCapError, scrubEnv, TmuxDriver, type Launch } from "./live-driver.ts";
 import {
   awsRegion, BINARY, CHECKED_HARNESSES, bucketOf, cheapestModel, costFigure, DEFAULT_CAPS, DEFAULT_LEDGER, harnessWorstCase, HARNESS_RUN_CAP, HARNESS_TOKENS, parseArgs, pickConn,
@@ -114,6 +115,8 @@ export function availableHere(config: Config): Available {
 export interface HarnessPlan {
   harness: Harness;
   binary: string | null;
+  /** The binary's version (the pin's, the newest release's, or PATH's). */
+  version?: string;
   pick: ConnPick;
   /** The model id on the connection, and its label. */
   model?: { id: string; label: string };
@@ -121,11 +124,49 @@ export interface HarnessPlan {
   worst: number;
 }
 
-/** What a check of `h` would do (free: reads the catalog, the keys and PATH). */
+/** The binaries `prepareHarnesses` installed (or found on PATH with `fromPath`), by harness. */
+const prepared = new Map<Harness, { path: string; version: string }>();
+
+/**
+ * Puts the binaries a run needs in place: the pinned release of each harness (test/harnesses.json), downloaded and verified into
+ * the cache when missing (scripts/harness-cache.ts); with `newest`, the newest release instead; with `fromPath`, the one on PATH
+ * (the old way). A harness that can't be had is left out (its check SKIPs, saying why). Never in a dry run: it downloads.
+ */
+export async function prepareHarnesses(hs: readonly Harness[], o: { newest?: boolean; fromPath?: boolean; say: (s: string) => void }): Promise<void> {
+  for (const h of hs) {
+    if (o.fromPath) {
+      const p = onPath(BINARY[h]);
+      if (p) prepared.set(h, { path: p, version: (await versionOf(h)) ?? "unknown" });
+      continue;
+    }
+    try {
+      const b = await harnessBin(h, { newest: o.newest, log: (s) => o.say(`  ${s}`) });
+      prepared.set(h, b);
+      o.say(`${h}: ${o.newest ? "newest" : "pinned"} ${b.version}`);
+    } catch (e) {
+      o.say(`${h}: no binary (${e instanceof Error ? e.message : e})`);
+    }
+  }
+}
+
+/** The binary a check of `h` runs, and its version: what `prepareHarnesses` put in place, else the pinned one if it's cached. */
+function binaryOf(h: Harness): { path: string; version: string } | null {
+  const p = prepared.get(h);
+  if (p) return p;
+  const entry = readPin()[h];
+  const path = cachedBin(h, entry);
+  return path ? { path, version: entry.version } : null;
+}
+
+/** Why a plan has no binary, in a SKIP line. */
+export const noBinary = (h: Harness) => `no ${BINARY[h]} binary: bun scripts/harness-pin.ts --install --harness ${h} (or --harness-from-path)`;
+
+/** What a check of `h` would do (free: reads the catalog, the keys and the harness cache). */
 export function planHarness(h: Harness, config: Config, have: Available, want: { conn?: string; model?: string; campaign?: boolean } = {}): HarnessPlan {
-  const binary = onPath(BINARY[h]);
+  const b = binaryOf(h);
+  const binary = b?.path ?? null;
   const pick = pickConn(h, have, want.conn);
-  const base = { harness: h, binary, pick, worst: 0 };
+  const base = { harness: h, binary, ...(b ? { version: b.version } : {}), pick, worst: 0 };
   if (!pick.ok) return base;
   const m = cheapestModel(config.models[h], pick.conn, want.model);
   if (!m) return { ...base, pick: { ok: false, why: `no model${want.model ? ` "${want.model}"` : ""} on ${pick.conn}` } };
@@ -304,7 +345,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     return { asserts, charged: 0, refused: false };
   }
   if (!plan.binary || !plan.model || !plan.bucket) {
-    add("launch", "SKIP", plan.binary ? "no model" : `${BINARY[h]} is not on PATH`);
+    add("launch", "SKIP", plan.binary ? "no model" : noBinary(h));
     return { asserts, charged: 0, refused: false };
   }
   const conn = plan.pick.conn;
@@ -375,7 +416,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     homeKeyLabel: "ctrl+\\",
     userConfig: false,
   };
-  const version = (await versionOf(h)) ?? "unknown";
+  const version = plan.version ?? "unknown";
   say(`${h} ${version} · ${conn} · ${plan.model.label} (${plan.model.id}) · worst case $${plan.worst.toFixed(4)} · HOME ${o.home}`);
 
   let tmux: TmuxDriver;
@@ -769,8 +810,9 @@ if (import.meta.main) {
   try {
     if (a.dryRun) {
       const p = planHarness(a.harness as Harness, config, availableHere(config), { conn: a.conn, model: a.model, campaign });
-      console.log(p.pick.ok ? `${p.harness}: ${p.pick.conn} · ${p.model?.label ?? "no model"} · worst case $${p.worst.toFixed(4)}${p.binary ? "" : ` · ${BINARY[p.harness]} is not on PATH`}` : `${p.harness}: skipped · ${p.pick.why}`);
+      console.log(p.pick.ok ? `${p.harness}: ${p.pick.conn} · ${p.model?.label ?? "no model"} · worst case $${p.worst.toFixed(4)}${p.binary ? ` · ${p.harness} ${p.version}` : ` · ${noBinary(p.harness)}`}` : `${p.harness}: skipped · ${p.pick.why}`);
     } else {
+      await prepareHarnesses([a.harness as Harness], { newest: a.newest, fromPath: a.fromPath, say: (s) => console.log(s) });
       const r = await runHarnessSection({ spend, campaign, ...(a.conn ? { conn: a.conn } : {}), ...(a.model ? { model: a.model } : {}), home, screens: true, harness: a.harness, say: (s) => console.log(s) }, config);
       const v = verdict(r.asserts, r.refused);
       console.log(`\n${v.line}`);

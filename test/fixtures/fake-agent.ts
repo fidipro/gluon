@@ -7,6 +7,7 @@
 import { appendFileSync, copyFileSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { runHook, runTui } from "./fake-tui.ts";
+import { FAKE_VERSIONS } from "./harness-versions.ts";
 
 const name = (process.env.FAKE_AGENT_NAME ?? basename(process.execPath).replace(/\.exe$/i, "")) as "claude" | "codex" | "agy" | "grok" | "opencode" | "kimi";
 const NAME = name.toUpperCase();
@@ -15,7 +16,7 @@ const env = process.env;
 const out = (s: string) => process.stdout.write(s);
 const say = (s = "") => out(`${s}\n`);
 
-const VERSIONS = { claude: "2.1.284 (Claude Code)", codex: "codex-cli 0.158.0", agy: "1.2.13", grok: "grok 1.0.44 (fake) [stable]", opencode: "opencode v2.0.21", kimi: "2.1.1" };
+const VERSIONS = FAKE_VERSIONS;
 
 // One reader for every line: a new `for await` per line would lose what the last one buffered.
 const lines = console[Symbol.asyncIterator]();

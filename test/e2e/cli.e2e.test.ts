@@ -6,6 +6,7 @@ import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { readEvents } from "../../src/events.ts";
 import { DEFAULT_ROUTING_YAML } from "../../src/routing-config.ts";
 import { config, fakeAgents, repo, WIN } from "./fixtures.ts";
+import { PINNED } from "../fixtures/harness-versions.ts";
 import { App, baseEnv, BUN_FLAGS, cli, GLUON, QUESTION, SLOW, start, stopAll, SYSTEM_PATH, tracked } from "./harness.ts";
 
 setDefaultTimeout(30_000 * SLOW);
@@ -148,7 +149,7 @@ describe("doctor (BUG-24)", () => {
   test("reports a brain problem with ✗, a hint and exit 1, without the aws CLI", async () => {
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: config("anthropic", "connections: { claude-code: { auth: api, provider: anthropic } }\n"), ANTHROPIC_API_KEY: undefined, PATH: [fakeAgents(["claude", "opencode"]), ...SYSTEM_PATH].join(delimiter) } });
     expect(r.code).toBe(1);
-    expect(r.stdout).toContain("✗ Claude Code (claude 2.1.284) · Anthropic key");
+    expect(r.stdout).toContain(`✗ Claude Code (claude ${PINNED.claude}) · Anthropic key`);
     expect(r.stdout).toContain("ANTHROPIC_API_KEY isn't set");
     expect(r.stdout).toContain("· 3. Sonnet 5.5 · Anthropic API · not connected (ANTHROPIC_API_KEY isn't set)");
     expect(r.stdout).toContain("No step works");
