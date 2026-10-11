@@ -312,10 +312,11 @@ describe("what triggers and what writes: every workflow", () => {
     expect(on.schedule).toEqual([{ cron: "17 * * * *" }]);
   });
 
-  test("the Harness watch: `check`, which downloads and runs harness binaries, writes nothing; `report` writes issues alone and runs no action, checkout or harness", () => {
+  test("the Harness watch: `check` and `capture`, which download and run harness binaries, write nothing; `report` writes issues alone and runs no action, checkout or harness", () => {
     const { jobs } = wf("harness-watch.yml");
-    expect(Object.keys(jobs).sort()).toEqual(["check", "propose", "report"]);
+    expect(Object.keys(jobs).sort()).toEqual(["capture", "check", "propose", "report"]);
     expect(jobs.check!.permissions).toBeUndefined();
+    expect(jobs.capture!.permissions).toBeUndefined();
     expect(jobs.report!.permissions).toEqual({ issues: "write" });
     expect(jobs.report!.steps.filter((s) => s.uses)).toEqual([]);
     expect(JSON.stringify(jobs.report!.steps)).not.toMatch(/codex-drift|harness-pin|bun |npm |@openai\/codex/);
@@ -324,11 +325,13 @@ describe("what triggers and what writes: every workflow", () => {
   test("the Harness watch's `propose` writes the branch, its pull request and the CI run, from the pin `check` made; it runs no harness, no bun and no code of the repository's", () => {
     const { jobs } = wf("harness-watch.yml");
     expect(jobs.propose!.permissions).toEqual({ contents: "write", "pull-requests": "write", actions: "write" });
-    expect(jobs.propose!.needs).toBe("check");
-    expect(jobs.propose!.steps.map((s) => s.uses?.replace(/@.*/, ""))).toEqual(["actions/checkout", "actions/download-artifact", undefined]);
+    expect(jobs.propose!.needs).toEqual(["check", "capture"]);
+    expect(jobs.propose!.steps.map((s) => s.uses?.replace(/@.*/, ""))).toEqual(["actions/checkout", "actions/download-artifact", undefined, "actions/download-artifact", undefined]);
     const run = jobs.propose!.steps.map((s) => s.run ?? "").join("\n");
     expect(run).not.toMatch(/\bbun\b|\bnpm\b|scripts\/|codex-drift|harness-pin/);
-    expect(run).toContain("git add test/harnesses.json");
+    expect(run).toContain("git add test/harnesses.json test/fixtures/screens");
+    // What `capture` made (it ran the vendors' binaries) is checked as data before it is committed: fixture JSON alone.
+    expect(run).toContain("find test/fixtures/screens -type f ! -name '*.json'");
     expect(run).toContain("gh workflow run ci.yml --ref harness-update");
   });
 

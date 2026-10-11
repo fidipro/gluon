@@ -296,7 +296,7 @@ async function screens(): Promise<Section> {
       lines.push({
         level: "stale",
         text: `${p.harness}: installed ${v}, fixtures ${fixtures.join(", ") || "none"}${st === "installed-older" ? " (the installed one is older: update it, or capture from the one you ship)" : ""}`,
-        action: `bun run test:live --tier=harness --harness=${p.harness} (a paid run: it saves the screens and diffs the input line), then re-capture as the Harness update runbook says (in the maintainers' private notes)`,
+        action: `bun scripts/capture-screens.ts --harness ${p.harness} --pinned --update (free; the Harness watch does it for a release), or for Antigravity and Grok Build the Harness update runbook (in the maintainers' private notes)`,
       });
     }
   }

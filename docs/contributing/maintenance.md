@@ -20,8 +20,10 @@ After an update, with the new version installed:
 2. Compare the harness's `--help` with its entry in `src/harnesses.ts` (argv, `modes`, `instructionFiles`, `resume`) and the checks
    in `src/status.ts`. Explore mode must stay strictly read-only: writes fail and nothing asks to escalate.
 3. Start a session from Gluon, quit, and `gluon resume <id>`: the conversation must come back.
-4. Run `bun run test:area adapters,pty,cost-pricing`. A failing screen test usually means the harness's screen changed: update the
-   reader in `src/pty/readers/` and the captured screen in `test/fixtures/screens/`.
+4. Run `bun run test:area adapters,pty,cost-pricing`. The `harness-update` pull request re-captures the screens in
+   `test/fixtures/screens/` from the new releases (`bun scripts/capture-screens.ts --harness <id> --pinned --update`; Antigravity and
+   Grok Build by hand). A failing screen test means the harness's screen changed: update the reader in `src/pty/readers/`; a
+   failing `test/real/fidelity.real.test.ts`, that a fake no longer reads like its harness: update `test/fixtures/fake-tui.ts`.
 5. Update the guide in `docs/guides/harnesses/` if a flag, connection or limit changed.
 
 The same applies when a provider changes a model, route or limit: update what Gluon offers (`DEFAULT_MODELS`, the catalog sources
@@ -73,7 +75,7 @@ exits 1 only for something definitely broken. Run it before a release.
 | When | Do |
 |---|---|
 | a new `src/` or test file | add it to an area in `test/areas.ts` (`test/areas.test.ts` fails until you do) |
-| a harness update (the `harness-update` pull request) | re-capture `test/fixtures/screens/` and check the readers (above) |
+| a harness update (the `harness-update` pull request) | review the re-captured `test/fixtures/screens/` and fix what CI says no longer reads them (above) |
 | a redesign (an intended change to how Gluon looks) | `bun run test:visual -u`, then review the goldens' diff (`GLUON_REVIEW=1` renders PNGs); a UI change otherwise needs nothing extra: the screen lints run in the standard tests |
 | a change in `src/pty/`, `src/gluon.ts`, `src/ui/` or `src/sessions.ts` | `GLUON_PERF_QUICK=1 bun run test:perf` |
 | a price source or table builder changes | refresh `test/fixtures/tables/` |

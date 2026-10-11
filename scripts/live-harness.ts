@@ -201,8 +201,53 @@ const infoRow = (l: string[]) => (l[1] ?? "").trim();
 const shownLabel = (l: string[]) => (isSession(l) ? infoRow(l).split(" × ")[0]! : null);
 const awaiting = (l: string[]) => infoRow(l).includes("awaiting your input");
 const bar = (l: string[]) => l.at(-1) ?? "";
+/** A step of an answer to a harness's question: keys, text typed, or a pause. */
+export type DialogStep = { keys: ("esc" | "enter" | "up" | "down")[] } | { type: string } | { wait: number };
+
+/**
+ * Answers a harness's first-run questions on a throwaway HOME and repo (folder trust, its hooks, an update offer, the theme), one
+ * screen at a time: `next(lines)` is what to send for what the screen shows, or null. Shared by the live checks and the screen
+ * capture (scripts/capture-screens.ts); it remembers what it answered, so a question still drawn isn't answered twice.
+ */
+export class DialogAnswerer {
+  private answered = new Set<string>();
+  private escs = 0;
+  private trustAll = 0;
+
+  next(l: string[]): { steps: DialogStep[]; say: string; viaDriver?: boolean } | null {
+    const update = l.find((x) => /update available/i.test(x));
+    if (update && l.some((x) => /esc skip/i.test(x)) && !this.answered.has(update.trim())) {
+      this.answered.add(update.trim());
+      return { steps: [{ keys: ["esc"] }], say: "", viaDriver: true };
+    }
+    // Codex's "Hooks need review" (Gluon's own hooks, new to a fresh HOME): straight to "Trust all and continue".
+    const all = l.findIndex((x) => /\d\.\s*Trust all and continue/.test(x));
+    const at = l.findIndex((x) => /^\s*›\s*\d\./.test(x));
+    if (all >= 0 && at >= 0 && this.trustAll++ < 3) return { steps: [{ keys: [...Array<"up" | "down">(Math.abs(all - at)).fill(all > at ? "down" : "up"), "enter"] }], say: "hooks need review → trust all and continue" };
+    // Codex's hook list: `t` trusts them all, esc closes it.
+    if (l.some((x) => /t trust all · enter review · esc close/.test(x)) && this.trustAll++ < 3) return { steps: [{ type: "t" }, { wait: 500 }, { keys: ["esc"] }], say: "hooks list → t, esc" };
+    // Codex's per-hook review (it comes up mid-turn on a fresh HOME; one-time per hook): `t` trusts it.
+    const hook = l.find((x) => /^\W*›?\s*\[!\]\s*Hook \d+/.test(x.replace(/^[│\s]+/, "")));
+    if (hook && l.some((x) => /t trust · esc back/.test(x)) && !this.answered.has(`hook:${hook.trim()}`)) {
+      this.answered.add(`hook:${hook.trim()}`);
+      return { steps: [{ type: "t" }], say: `${hook.replace(/[│\s]+/g, " ").trim().slice(0, 60)} → t` };
+    }
+    if (l.some((x) => /space\/enter toggle · esc back/.test(x)) && this.escs++ < 5) return { steps: [{ keys: ["esc"] }], say: "hook trusted → esc" };
+    const dialog = l.find((x) => DIALOGS.test(x));
+    if (!dialog || this.answered.has(dialog.trim())) return null;
+    this.answered.add(dialog.trim());
+    // Claude Code's first-run theme chooser and security notes (a scratch HOME is always a first run): Enter takes the default.
+    if (/choose the text style|security notes/i.test(dialog)) return { steps: [{ keys: ["enter"] }], say: `${dialog.trim().slice(0, 90)} → enter` };
+    const selected = l.findIndex((x) => /❯/.test(x));
+    const yes = l.findIndex((x) => /\byes\b.*trust|trust.*\byes\b/i.test(x));
+    const moves: ("up" | "down")[] = selected >= 0 && yes >= 0 && /no,? exit/i.test(l[selected]!) ? Array(Math.abs(yes - selected)).fill(yes > selected ? "down" : "up") : [];
+    return { steps: [{ keys: [...moves, "enter"] }], say: `${dialog.trim().slice(0, 90)} → ${[...moves, "enter"].join(" ")}` };
+  }
+}
+
 /** A line that is just OK (after a border, a bullet or a mark): the agent's reply, whatever it draws before it. */
 export const saysOK = (lines: string[]) => lines.some((l) => /^[^\p{L}\p{N}]*OK[^\p{L}\p{N}]*$/u.test(l));
+/** A harness's first-run questions (folder trust, hooks, theme), which a check answers to reach the composer. */
 const DIALOGS = /do you trust the files|trust this folder|allow codex to work in this folder|hooks need review|trust the contents|workspace trust|choose the text style|security notes/i;
 
 /**
@@ -496,53 +541,19 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     const ansi = tmux.tmux(["capture-pane", "-p", "-e", "-N", "-t", `${tmux.session}:0.0`]);
     if (ansi.code === 0) writeFileSync(join(screensOut, `${name}.ansi`), maskSecrets(ansi.out));
   };
-  const answered = new Set<string>();
-  let escs = 0;
-  let trustAll = 0;
+  const dialogs = new DialogAnswerer();
   /** Answers a first-run trust dialog (the repo and HOME are throwaway) with its yes option; true when it did. */
   const answerDialog = async (l: string[]) => {
-    const update = l.find((x) => /update available/i.test(x));
-    if (update && l.some((x) => /esc skip/i.test(x)) && !answered.has(update.trim())) {
-      answered.add(update.trim());
-      await d.keys(["esc"]);
-      return true;
+    const a = dialogs.next(l);
+    if (!a) return false;
+    if (a.say) say(`  dialog: ${a.say}`);
+    // Straight to tmux (but an update's esc): an arrow in a session would make the guard's model of the line dirty, and a dialog's Enter is not a prompt.
+    for (const step of a.steps) {
+      if ("wait" in step) await d.wait(step.wait);
+      else if ("type" in step) await tmux.type(step.type);
+      else if (a.viaDriver) await d.keys(step.keys);
+      else await tmux.keys(step.keys);
     }
-    // Codex's hook list: `t` trusts them all, esc closes it.
-    if (l.some((x) => /t trust all · enter review · esc close/.test(x)) && trustAll++ < 3) {
-      say("  dialog: hooks list → t, esc");
-      await tmux.type("t");
-      await d.wait(500);
-      await tmux.keys(["esc"]);
-      return true;
-    }
-    // Codex's per-hook review (it comes up mid-turn on a fresh HOME; one-time per hook): `t` trusts it.
-    const hook = l.find((x) => /^\W*›?\s*\[!\]\s*Hook \d+/.test(x.replace(/^[│\s]+/, "")));
-    if (hook && l.some((x) => /t trust · esc back/.test(x)) && !answered.has(`hook:${hook.trim()}`)) {
-      answered.add(`hook:${hook.trim()}`);
-      say(`  dialog: ${hook.replace(/[│\s]+/g, " ").trim().slice(0, 60)} → t`);
-      await tmux.type("t");
-      return true;
-    }
-    if (l.some((x) => /space\/enter toggle · esc back/.test(x)) && escs++ < 5) {
-      say("  dialog: hook trusted → esc");
-      await tmux.keys(["esc"]);
-      return true;
-    }
-    const dialog = l.find((x) => DIALOGS.test(x));
-    if (!dialog || answered.has(dialog.trim())) return false;
-    answered.add(dialog.trim());
-    // Claude Code's first-run theme chooser and security notes (a scratch HOME is always a first run): Enter takes the default.
-    if (/choose the text style|security notes/i.test(dialog)) {
-      say(`  dialog: ${dialog.trim().slice(0, 90)} → enter`);
-      await tmux.keys(["enter"]);
-      return true;
-    }
-    const selected = l.findIndex((x) => /❯/.test(x));
-    const yes = l.findIndex((x) => /\byes\b.*trust|trust.*\byes\b/i.test(x));
-    const moves: ("up" | "down")[] = selected >= 0 && yes >= 0 && /no,? exit/i.test(l[selected]!) ? Array(Math.abs(yes - selected)).fill(yes > selected ? "down" : "up") : [];
-    say(`  dialog: ${dialog.trim().slice(0, 90)} → ${[...moves, "enter"].join(" ")}`);
-    // Straight to tmux: an arrow in a session would make the guard's model of the line dirty, and a dialog's Enter is not a prompt.
-    await tmux.keys([...moves, "enter"]);
     return true;
   };
 

@@ -14,7 +14,7 @@
  * `code` (`test/*.test.ts`, a check that reads the source: a rule no run could show).
  */
 export type Layer = "e2e" | "real" | "perf" | "seam" | "code";
-export type Kind = "behaviour" | "invariant" | "perf";
+export type Kind = "behaviour" | "invariant" | "perf" | "fidelity";
 export type Entry = {
   kind: Kind;
   /** Given …, when …, then …: what holds, as a user (or a reviewer of a rule) would check it. */
@@ -29,6 +29,12 @@ const rule = (says: string, at: Layer[] = ["code", "seam"]): Entry => ({ kind: "
 const perf = (says: string, at: Layer[] = ["perf"], platforms?: Entry["platforms"]): Entry => ({ kind: "perf", says, at, ...(platforms ? { platforms } : {}) });
 
 export const CATALOG: Record<string, Feature> = {
+  fidelity: {
+    says: "the fakes the tests run on behave like the real harnesses, as Gluon reads them (test/real/fidelity.real.test.ts)",
+    entries: {
+      screens: { kind: "fidelity", says: "given a harness's states (its screen fixture, re-captured on each release), when its fake is driven through them, then Gluon's readers read the fake as they read the real harness", at: ["real"] },
+    },
+  },
   subscriptions: {
     says: "a user's own plan stays theirs: official binaries only, nothing of another tool's read or forwarded (AGENTS.md, src/AGENTS.md)",
     entries: {

@@ -68,6 +68,7 @@ export const SUPPORT = ["src/harnesses.ts", "src/xdg.ts"];
  */
 export const REPO_TESTS = [
   "test/areas.test.ts",
+  "test/capture-screens.test.ts",
   "test/catalog.test.ts",
   "test/codex-drift.test.ts",
   "test/contributor-docs.test.ts",

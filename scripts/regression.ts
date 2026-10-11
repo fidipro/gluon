@@ -35,7 +35,7 @@ import { testsReaching } from "./import-graph.ts";
 import { describeStageCaps, parseStageCaps, REGRESSION_LIVE_CAPS, type StageCaps } from "./live-lib.ts";
 import { liveStage, online } from "./live-stage.ts";
 import { onPath } from "./live-driver.ts";
-import { REAL_TEST, realHarnesses, realStage } from "./real-stage.ts";
+import { REAL_TESTS, realHarnesses, realStage } from "./real-stage.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
@@ -452,13 +452,17 @@ async function main(): Promise<number> {
           newest: realNewest,
           tmux,
           say: (l) => console.log(l),
+          // Its files at once (Bun runs one process's files one after another).
           run: async (env) => {
-            const p = Bun.spawn([bun, "test", "--concurrent", REAL_TEST], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ...env } });
-            children.add(p);
-            const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-            const code = await p.exited;
-            children.delete(p);
-            return { code, out: o + e };
+            const rs = await Promise.all(REAL_TESTS.map(async (file) => {
+              const p = Bun.spawn([bun, "test", "--concurrent", file], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ...env } });
+              children.add(p);
+              const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+              const code = await p.exited;
+              children.delete(p);
+              return { code, out: o + e };
+            }));
+            return { code: Math.max(...rs.map((r) => r.code)), out: rs.map((r) => r.out).join("\n") };
           },
         }),
       );
