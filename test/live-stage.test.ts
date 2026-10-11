@@ -7,8 +7,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { REGRESSION_LIVE_LEDGER } from "../scripts/live-lib.ts";
-import { LIVE_CACHE, liveKey, liveStage, parseVerdict, type StageOptions } from "../scripts/live-stage.ts";
+import { NO_BUCKET_CAPS, REGRESSION_LIVE_LEDGER, Spend, StageBudget, stageLedgerName, type Bucket, type LedgerFile, type StageCaps } from "../scripts/live-lib.ts";
+import { LIVE_CACHE, liveKey, liveParallel, liveStage, parseVerdict, type StageOptions } from "../scripts/live-stage.ts";
 import type { LiveCheck } from "./areas.ts";
 
 const J: LiveCheck = { kind: "journey", harness: "claude-code" };
@@ -24,23 +24,30 @@ function root(): string {
   return r;
 }
 
-/** Each check's run: spends `usd[i]` (in `bucket[i]`, API keys by default) into the ledger and answers `codes[i]` with a verdict line; records the args it got. */
-function runner(r: string, plan: { usd: number; code: number; verdict?: string; bucket?: string; tokens?: number }[]) {
+/**
+ * Each check's run, as `scripts/live.ts --regression-stage --stage-dir` does it: reserves `worst[i]` (default: what it spends) of
+ * `bucket[i]` (API keys by default) from the shared budget, charges `usd[i]` (or `tokens[i]` on a plan) into its own ledger, and
+ * answers `codes[i]` with a verdict line (a refused reservation: exit 2 and the refusal); records the args and the budget it saw.
+ */
+function runner(plan: { usd: number; code: number; verdict?: string; bucket?: Bucket; tokens?: number; worst?: number }[]) {
   const calls: string[][] = [];
+  const lefts: StageCaps[] = [];
   const run: StageOptions["run"] = async (args) => {
     const p = plan[calls.length] ?? { usd: 0, code: 0, verdict: "PASS 1 · FAIL 0 · SKIP 0" };
     calls.push(args);
-    const ledger = join(r, REGRESSION_LIVE_LEDGER);
-    mkdirSync(dirname(ledger), { recursive: true });
-    let f = { caps: {}, spent: { bedrock: 0, other: 0 }, runs: [] as unknown[] };
-    try {
-      f = JSON.parse(readFileSync(ledger, "utf8"));
-    } catch {}
-    f.runs.push({ at: new Date().toISOString(), calls: [{ bucket: p.bucket ?? "other", what: "x", model: "m", input: p.tokens ?? 0, output: 0, usd: p.usd }], refused: [] });
-    writeFileSync(ledger, JSON.stringify(f));
+    const dir = args.find((a) => a.startsWith("--stage-dir="))!.slice("--stage-dir=".length);
+    const flag = (n: string) => args.find((a) => a.startsWith(`--${n}=`))!.split("=")[1];
+    const budget = new StageBudget(join(dir, "budget.json"));
+    lefts.push(budget.left());
+    const spend = new Spend(join(dir, stageLedgerName(flag("tier"), flag("harness"))), NO_BUCKET_CAPS, Infinity, false, true, budget);
+    const bucket = p.bucket ?? "other";
+    const ok = spend.allowUsd(bucket, "x", "m", p.worst ?? p.usd, p.tokens ?? 0);
+    if (ok) spend.chargeUsd(bucket, "x", "m", p.usd, p.tokens ?? 0, 0, true);
+    spend.settle();
+    if (!ok) return { code: 2, out: `SKIP x · refused, over a cap: ${spend.run.refused[0]}\nPASS 0 · FAIL 0 · SKIP 1` };
     return { code: p.code, out: `PASS ${p.code === 1 ? "harness · launch" : "x"}\n${p.verdict ?? (p.code === 1 ? "PASS 0 · FAIL 1 · SKIP 0" : "PASS 1 · FAIL 0 · SKIP 0")}` };
   };
-  return { run, calls };
+  return { run, calls, lefts };
 }
 
 const opts = (r: string, run: StageOptions["run"], extra: Partial<StageOptions> = {}): StageOptions => ({
@@ -56,7 +63,7 @@ const opts = (r: string, run: StageOptions["run"], extra: Partial<StageOptions> 
 describe("the live stage", () => {
   test("never in CI, never offline: nothing runs, nothing fails", async () => {
     const r = root();
-    const { run, calls } = runner(r, []);
+    const { run, calls } = runner([]);
     const lines: string[] = [];
     expect(await liveStage([J], opts(r, run, { env: { CI: "true" }, say: (l) => lines.push(l) }))).toEqual({ failed: false, spent: 0, planTokens: 0 });
     expect(await liveStage([J], opts(r, run, { online: async () => false, say: (l) => lines.push(l) }))).toEqual({ failed: false, spent: 0, planTokens: 0 });
@@ -65,38 +72,52 @@ describe("the live stage", () => {
     expect(lines.join("\n")).toContain("SKIP (offline)");
   });
 
-  test("each check is told what each bucket has left; a check over a cap is a SKIP that says to ask the user", async () => {
+  test("the checks share one budget per bucket: each reserves its worst case and pays what it used; over a cap is a SKIP that says to ask the user", async () => {
     const r = root();
-    const { run, calls } = runner(r, [
-      { usd: 0.2, code: 0, bucket: "bedrock" },
+    const { run, calls, lefts } = runner([
+      { usd: 0.2, worst: 0.25, code: 0, bucket: "bedrock" },
       { usd: 0, code: 0, bucket: "subscription", tokens: 43_000 },
-      { usd: 0, code: 2, verdict: "PASS 0 · FAIL 0 · SKIP 1" },
+      { usd: 0.05, worst: 0.2, code: 0 },
     ]);
     const lines: string[] = [];
-    const out = await liveStage([J, H("codex"), H("opencode")], opts(r, run, { say: (l) => lines.push(l) }));
-    expect(calls.map((a) => a.find((x) => x.startsWith("--stage-left=")))).toEqual([
-      "--stage-left=plans=200000,bedrock=0.3000,openrouter=0.1000,keys=0.1000",
-      "--stage-left=plans=200000,bedrock=0.1000,openrouter=0.1000,keys=0.1000",
-      "--stage-left=plans=157000,bedrock=0.1000,openrouter=0.1000,keys=0.1000",
-    ]);
-    expect(calls[0]).toEqual(["--regression-stage", "--stage-left=plans=200000,bedrock=0.3000,openrouter=0.1000,keys=0.1000", "--tier=journey", "--harness=claude-code"]);
+    const out = await liveStage([J, H("codex"), H("opencode")], opts(r, run, { parallel: 1, say: (l) => lines.push(l) }));
+    expect(calls[0]).toEqual(["--regression-stage", expect.stringMatching(/^--stage-dir=/), "--tier=journey", "--harness=claude-code"]);
+    expect(lefts.map((l) => [l.plans, Number(l.bedrock.toFixed(4)), l.keys])).toEqual([[200_000, 0.3, 0.1], [200_000, 0.1, 0.1], [157_000, 0.1, 0.1]]);
     expect(out).toMatchObject({ failed: false, planTokens: 43_000 });
     expect(out.spent).toBeCloseTo(0.2, 6);
     expect(lines.join("\n")).toContain("live harness opencode 1.0.0: SKIP (over this run's cap: ask the user before raising it with --live-caps)");
+    // The checks' own ledgers end up in the stage's.
+    expect((JSON.parse(readFileSync(join(r, REGRESSION_LIVE_LEDGER), "utf8")) as LedgerFile).runs.flatMap((x) => x.calls).map((c) => c.bucket)).toEqual(["bedrock", "subscription"]);
+  });
+
+  test("they run at once, up to the stage's limit", async () => {
+    const r = root();
+    let now = 0;
+    let most = 0;
+    const run: StageOptions["run"] = async () => {
+      most = Math.max(most, ++now);
+      await Bun.sleep(30); // sleep-ok: the window in which the others must start
+      now--;
+      return { code: 0, out: "PASS 1 · FAIL 0 · SKIP 0" };
+    };
+    await liveStage([J, H("codex"), H("opencode"), H("kimi-code"), H("antigravity")], opts(r, run, { parallel: 3 }));
+    expect(most).toBe(3);
+    // By default: at most 4, as many as the free memory holds (~1.5 GB each), at least 1; GLUON_LIVE_PARALLEL overrides it.
+    expect([liveParallel({}, 9), liveParallel({}, 3.2), liveParallel({}, 0.5), liveParallel({ GLUON_LIVE_PARALLEL: "6" }, 1)]).toEqual([4, 2, 1, 6]);
   });
 
   test("--live-caps (after the user agreed) raises a cap for this run", async () => {
     const r = root();
-    const { run, calls } = runner(r, []);
+    const { run, lefts } = runner([]);
     await liveStage([H("codex")], opts(r, run, { caps: { plans: 200_000, bedrock: 1, openrouter: 0.1, keys: 0.1 } }));
-    expect(calls[0]).toContain("--stage-left=plans=200000,bedrock=1.0000,openrouter=0.1000,keys=0.1000");
+    expect(lefts[0]!.bedrock).toBe(1);
   });
 
   test("a pass is kept: the same code and harness version cost nothing the next run; a change to src/ or the version runs it again", async () => {
     const r = root();
-    const first = runner(r, [{ usd: 0.02, code: 0 }]);
+    const first = runner([{ usd: 0.02, code: 0 }]);
     await liveStage([H("codex")], opts(r, first.run));
-    const again = runner(r, []);
+    const again = runner([]);
     const lines: string[] = [];
     expect((await liveStage([H("codex")], opts(r, again.run, { say: (l) => lines.push(l) }))).spent).toBe(0);
     expect(again.calls).toEqual([]);
@@ -109,7 +130,7 @@ describe("the live stage", () => {
 
   test("a FAIL fails the run and is never kept; a cap that stopped it, or nothing that could run here, is a SKIP, not kept either", async () => {
     const r = root();
-    const { run, calls } = runner(r, [
+    const { run, calls } = runner([
       { usd: 0.01, code: 1 },
       { usd: 0, code: 2, verdict: "PASS 0 · FAIL 0 · SKIP 1" },
       { usd: 0, code: 0, verdict: "PASS 0 · FAIL 0 · SKIP 1" },
@@ -125,7 +146,7 @@ describe("the live stage", () => {
 
   test("--newest reaches each check", async () => {
     const r = root();
-    const { run, calls } = runner(r, []);
+    const { run, calls } = runner([]);
     await liveStage([H("codex")], opts(r, run, { newest: true }));
     expect(calls[0]).toContain("--newest");
   });

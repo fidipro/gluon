@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, liveChecks, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
+import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, liveChecks, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles, selectVerify } from "./areas.ts";
 
 const names = Object.keys(AREAS);
 
@@ -86,6 +86,19 @@ describe("--changed: files to areas", () => {
     expect(d.kind === "areas" && d.areas).toEqual(["docs"]);
     const v = selectChanged(["test/visual/scenes.visual.test.ts"]);
     expect(v.kind === "areas" && v.hooks.map((h) => h.name)).toContain("visual");
+  });
+
+  test("a changed src/ file brings the unit tests of any area that import it, beside its own area's", () => {
+    const s = selectChanged(["src/routing.ts"], (src) => (src.includes("src/routing.ts") ? ["test/route.test.ts", "test/stats.test.ts"] : []));
+    expect(s.kind === "areas" && s.areas).toEqual(["routing"]);
+    expect(s.kind === "areas" && s.unit).toContain("test/stats.test.ts");
+  });
+
+  test("verify: a core src/ file brings only the tests that import it (no whole tier), and its area's e2e", () => {
+    const s = selectVerify(["src/config.ts", "src/pty/readers/codex.ts", "test/e2e/resume.e2e.test.ts"], (src) => src.flatMap((f) => (f === "src/config.ts" ? ["test/secrets.test.ts"] : ["test/pty-readers.test.ts"])));
+    expect(s.unit).toEqual(["test/catalog.test.ts", "test/test-style.test.ts", "test/secrets.test.ts", "test/pty-readers.test.ts"]);
+    expect(s.e2e).toContain("test/e2e/resume.e2e.test.ts");
+    expect(s.e2e).toEqual(expect.arrayContaining(AREAS.pty!.e2e));
   });
 
   test("a changed test file brings the checks every test is held to: its entry and seams, its style", () => {

@@ -4,19 +4,22 @@
  * Bedrock first, then a plan its harness is signed in to, then an API key (scripts/live-lib.ts `pickConn`).
  *
  * - The stage is capped per run and per bucket (`REGRESSION_LIVE_CAPS`: plans in tokens; Bedrock, OpenRouter and API keys in
- *   dollars; no monthly cap): each check is told what each bucket has left (`--stage-left`), and what it used is read back from
- *   the stage's ledger. A check over a cap is a SKIP that says so: the user is asked, and `--live-caps` raises a cap for one run.
+ *   dollars; no monthly cap). The checks run at once (`LIVE_PARALLEL`) and share one budget (`StageBudget`, in the run's
+ *   `--stage-dir`): each reserves a call's worst case before it. A check over a cap is a SKIP that says so: the user is asked, and
+ *   `--live-caps` raises a cap for one run. Each check keeps its own ledger there; the stage merges them into its ledger.
  * - A check that passed is not paid for again while nothing it depends on changed: its result is kept in qa/logs/live-cache.json
  *   under a hash of src/, the live scripts and the harness version. Only a pass is kept.
  * - Never in CI (`CI` set), never offline, never after a failed stage; without credentials each check SKIPs. A SKIP never fails
  *   the run; a FAIL does. Checks never retry (a retry costs money).
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Harness } from "../src/harnesses.ts";
 import type { LiveCheck } from "../test/areas.ts";
+import { availableGB } from "./e2e-concurrency.ts";
 import { readPin, resolveNewest } from "./harness-cache.ts";
-import { describeStageCaps, formatStageCaps, REGRESSION_LIVE_CAPS, REGRESSION_LIVE_LEDGER, STAGE_BUCKETS, stageUse, type LedgerFile, type StageCaps } from "./live-lib.ts";
+import { describeStageCaps, mergeLedgers, REGRESSION_LIVE_CAPS, REGRESSION_LIVE_LEDGER, STAGE_BUCKETS, StageBudget, stageLedgerName, stageUse, type LedgerFile, type StageCaps } from "./live-lib.ts";
 
 export const LIVE_CACHE = "qa/logs/live-cache.json";
 
@@ -36,14 +39,22 @@ export function parseVerdict(out: string): { pass: number; fail: number; skip: n
   return m ? { pass: Number(m[1]), fail: Number(m[2]), skip: Number(m[3]) } : null;
 }
 
-/** What the runs a check appended to the ledger used, per bucket (the ledger's runs after the first `from`). */
-export function usedSince(ledger: string, from: number): StageCaps {
+/** What a check's own ledger (the stage's directory) says it used, per bucket. */
+export function usedBy(ledger: string): StageCaps {
   if (!existsSync(ledger)) return stageUse([]);
-  const f = JSON.parse(readFileSync(ledger, "utf8")) as LedgerFile;
-  return stageUse(f.runs.slice(from).flatMap((r) => r.calls));
+  return stageUse((JSON.parse(readFileSync(ledger, "utf8")) as LedgerFile).runs.flatMap((r) => r.calls));
 }
 const dollars = (u: StageCaps) => u.bedrock + u.openrouter + u.keys;
-const ledgerRuns = (ledger: string) => (existsSync(ledger) ? (JSON.parse(readFileSync(ledger, "utf8")) as LedgerFile).runs.length : 0);
+/** Checks at once, at most: each is a Gluon and a harness in a tmux of its own, waiting on a model most of the time. */
+export const LIVE_PARALLEL = 4;
+/** What one check in flight costs: Gluon, the real harness, tmux and the driver, ~1.4 GB of RSS measured (5.7 GB for 4). */
+export const GB_PER_LIVE_CHECK = 1.5;
+/** `GLUON_LIVE_PARALLEL` when set, else `LIVE_PARALLEL` or what the free memory holds, at least 1. */
+export function liveParallel(env: Record<string, string | undefined> = process.env, freeGB = availableGB()): number {
+  const set = Math.floor(Number(env.GLUON_LIVE_PARALLEL));
+  if (set >= 1) return set;
+  return Math.max(1, Math.min(LIVE_PARALLEL, Math.floor(freeGB / GB_PER_LIVE_CHECK)));
+}
 
 export interface StageOptions {
   root: string;
@@ -57,6 +68,8 @@ export interface StageOptions {
   online(): Promise<boolean>;
   /** The harness's version a check runs (the pin's, or the newest release's). */
   version?(h: Harness, newest: boolean): Promise<string>;
+  /** Checks at once (default: `liveParallel`). */
+  parallel?: number;
   say(line: string): void;
 }
 
@@ -73,44 +86,53 @@ export async function liveStage(checks: LiveCheck[], o: StageOptions): Promise<{
     return { failed: false, spent: 0, planTokens: 0 };
   }
   const cachePath = join(o.root, LIVE_CACHE);
-  const ledger = join(o.root, REGRESSION_LIVE_LEDGER);
   const cache: CacheFile = existsSync(cachePath) ? JSON.parse(readFileSync(cachePath, "utf8")) : {};
   const version = o.version ?? (async (h: Harness, newest: boolean) => (newest ? (await resolveNewest([h], undefined, []))[h]!.version : readPin()[h].version));
   const caps = o.caps ?? REGRESSION_LIVE_CAPS;
-  const left = { ...caps };
+  const parallel = Math.max(1, o.parallel ?? liveParallel(env));
+  // The run's directory: the budget its checks share (each reserves a call's worst case under a lock) and each check's own ledger.
+  const dir = mkdtempSync(join(tmpdir(), "gluon-live-stage-"));
+  StageBudget.create(join(dir, "budget.json"), caps);
   let failed = false;
-  o.say(`── live: ${names} (caps this run: ${describeStageCaps(caps)}; a pass is kept until src/ or the harness changes)`);
-  for (const c of checks) {
+  const total = stageUse([]);
+  o.say(`── live: ${names} (caps this run: ${describeStageCaps(caps)}; ${parallel} at once; a pass is kept until src/ or the harness changes)`);
+  const one = async (c: LiveCheck) => {
     const label = `live ${c.kind} ${c.harness}`;
     const v = await version(c.harness as Harness, !!o.newest).catch(() => "unknown");
     const key = liveKey(c, v, o.root);
     const hit = cache[key];
     if (hit) {
       o.say(`── ${label} ${v}: ok (passed ${hit.at.slice(0, 16).replace("T", " ")} on this code; $0 now)`);
-      continue;
+      return;
     }
-    const from = ledgerRuns(ledger);
-    const args = ["--regression-stage", `--stage-left=${formatStageCaps(left)}`, `--tier=${c.kind}`, `--harness=${c.harness}`, ...(o.newest ? ["--newest"] : [])];
-    const r = await o.run(args);
-    const used = usedSince(ledger, from);
-    for (const b of STAGE_BUCKETS) left[b] -= used[b];
+    const r = await o.run(["--regression-stage", `--stage-dir=${dir}`, `--tier=${c.kind}`, `--harness=${c.harness}`, ...(o.newest ? ["--newest"] : [])]);
+    const used = usedBy(join(dir, stageLedgerName(c.kind, c.harness)));
+    for (const b of STAGE_BUCKETS) total[b] += used[b];
     const spent = dollars(used);
     const verdict = parseVerdict(r.out);
     const passed = r.code === 0 && !!verdict && verdict.pass > 0 && verdict.fail === 0;
     const capped = r.code === 2 || /over what is left of its cap/.test(r.out);
     const status = r.code === 1 ? "FAILED" : capped ? "SKIP (over this run's cap: ask the user before raising it with --live-caps)" : passed ? "ok" : "SKIP (nothing could run here)";
-    o.say(`── ${label} ${v}: ${status} · $${spent.toFixed(4)}${used.plans ? ` · ${used.plans} plan tokens` : ""}${verdict ? ` · PASS ${verdict.pass} · FAIL ${verdict.fail} · SKIP ${verdict.skip}` : ""}`);
+    // One block per check, printed whole as it ends (they run at once).
     const lines = r.out.split("\n").filter((l) => (r.code === 1 ? l.trim() : /^(PASS|FAIL|SKIP) /.test(l)));
-    for (const l of lines) o.say(`   ${l}`);
+    o.say([`── ${label} ${v}: ${status} · $${spent.toFixed(4)}${used.plans ? ` · ${used.plans} plan tokens` : ""}${verdict ? ` · PASS ${verdict.pass} · FAIL ${verdict.fail} · SKIP ${verdict.skip}` : ""}`, ...lines.map((l) => `   ${l}`)].join("\n"));
     if (r.code === 1) failed = true;
     if (passed) cache[key] = { at: new Date().toISOString(), check: `${c.kind} ${c.harness}`, version: v, usd: spent };
+  };
+  const queue = [...checks];
+  try {
+    await Promise.all(Array.from({ length: Math.min(parallel, queue.length) }, async () => {
+      for (let c = queue.shift(); c; c = queue.shift()) await one(c);
+    }));
+  } finally {
+    mergeLedgers(join(o.root, REGRESSION_LIVE_LEDGER), checks.map((c) => join(dir, stageLedgerName(c.kind, c.harness))));
+    rmSync(dir, { recursive: true, force: true });
   }
   mkdirSync(dirname(cachePath), { recursive: true });
   writeFileSync(cachePath, `${JSON.stringify(cache, null, 1)}\n`);
-  const used = Object.fromEntries(STAGE_BUCKETS.map((b) => [b, caps[b] - left[b]])) as StageCaps;
-  const spent = dollars(used);
-  o.say(`── live: $${spent.toFixed(4)} spent this run (Bedrock $${used.bedrock.toFixed(4)} · OpenRouter $${used.openrouter.toFixed(4)} · API keys $${used.keys.toFixed(4)}) · ${used.plans} plan tokens (ledger ${REGRESSION_LIVE_LEDGER})`);
-  return { failed, spent, planTokens: used.plans };
+  const spent = dollars(total);
+  o.say(`── live: $${spent.toFixed(4)} spent this run (Bedrock $${total.bedrock.toFixed(4)} · OpenRouter $${total.openrouter.toFixed(4)} · API keys $${total.keys.toFixed(4)}) · ${total.plans} plan tokens (ledger ${REGRESSION_LIVE_LEDGER})`);
+  return { failed, spent, planTokens: total.plans };
 }
 
 /** Whether the network is there: one small GET, 3 s at most. */

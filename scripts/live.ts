@@ -51,7 +51,7 @@ import { availableHere, awsSetupFromHost, checkHarness, harnessesFor, loadDevKey
 import {
   bucketOf, chatStep, DEFAULT_CAPS, DEFAULT_LEDGER, JOURNEY_AGENT_CAP, JOURNEY_BRAIN, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, journeyMonthSpend, parseArgs, PROBE,
   planCharged, planLines, planRouteBlock, regressionSubset, runCapOf, sectionsOf, SESSION, Spend, usd,
-  NO_BUCKET_CAPS, REGRESSION_LIVE_CAPS, REGRESSION_LIVE_LEDGER,
+  NO_BUCKET_CAPS, REGRESSION_LIVE_CAPS, REGRESSION_LIVE_LEDGER, StageBudget, stageLedgerName,
   type Args, type Bucket, type PlanItem, type Section,
 } from "./live-lib.ts";
 
@@ -64,12 +64,14 @@ try {
   process.exit(2);
 }
 const campaign = !!args.caps;
-// `bun run regression`'s live stage: its own ledger, no bucket cap (the run cap, what the stage has left, is the limit).
-const LEDGER = args.ledger ? resolve(args.ledger) : join(ROOT, args.stage ? REGRESSION_LIVE_LEDGER : DEFAULT_LEDGER);
+// `bun run regression`'s live stage: no bucket cap of the ledger's; the stage's budget, which its checks share, is the limit. With
+// `--stage-dir` (the stage runs its checks at once), this check's own ledger there, which the stage merges into its ledger.
+const LEDGER = args.ledger ? resolve(args.ledger) : args.stageDir ? join(resolve(args.stageDir), stageLedgerName(args.tier, args.harness)) : join(ROOT, args.stage ? REGRESSION_LIVE_LEDGER : DEFAULT_LEDGER);
 const CAPS = args.caps ?? (args.stage ? NO_BUCKET_CAPS : DEFAULT_CAPS);
 /** A targeted run's own cap, on top of the buckets' (all paid buckets together). */
 const RUN_CAP = runCapOf(args);
-const spend = new Spend(LEDGER, CAPS, RUN_CAP, campaign, !args.dryRun, args.stage ? (args.stageLeft ?? REGRESSION_LIVE_CAPS) : undefined);
+const STAGE = !args.stage ? undefined : args.stageDir ? new StageBudget(join(resolve(args.stageDir), "budget.json")) : StageBudget.create(join(mkdtempSync(join(tmpdir(), "gluon-live-budget-")), "budget.json"), REGRESSION_LIVE_CAPS);
+const spend = new Spend(LEDGER, CAPS, RUN_CAP, campaign, !args.dryRun, STAGE);
 const sections = sectionsOf(args);
 const out = (s: string) => console.log(maskSecrets(s));
 
@@ -601,6 +603,7 @@ try {
   else if (args.only === "git-tools") await gitTools();
   else await everything();
 } finally {
+  spend.settle();
   spend.save();
   rmSync(TMP, { recursive: true, force: true });
   if (!args.dryRun) {

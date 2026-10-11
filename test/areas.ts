@@ -392,6 +392,42 @@ export function selectAreas(areas: string[], extra: { unit?: string[]; e2e?: str
   };
 }
 
+/**
+ * `bun run verify`'s pick, the inner loop (seconds, while editing): the unit tests that import a changed `src/` file (the import
+ * graph, `importers`; a core file too, without escalating to the whole tier), the changed tests themselves with the checks every
+ * test is held to, the e2e scenarios of the changed files' areas, and the unit tests of an area whose other files changed.
+ * Nothing real or live: `regression --changed` is the gate.
+ */
+export function selectVerify(changed: string[], importers: (src: string[]) => string[]): Selection & { kind: "areas" } {
+  const unit: string[] = [];
+  const e2e: string[] = [];
+  const src: string[] = [];
+  const why: string[] = [];
+  const add = (list: string[], fs: string[]) => {
+    for (const f of fs) if (!list.includes(f)) list.push(f);
+  };
+  for (const raw of changed) {
+    const f = raw.replaceAll("\\", "/");
+    if (matches(IGNORED, f)) continue;
+    if (testFile(f)) {
+      add(/\.e2e\.test\.ts$/.test(f) ? e2e : unit, [f]);
+      add(unit, TEST_RULES);
+      continue;
+    }
+    if (f.startsWith("src/")) {
+      src.push(f);
+      const owner = srcOwner(f);
+      if (owner) add(e2e, AREAS[owner]!.e2e);
+      continue;
+    }
+    for (const a of Object.keys(AREAS).filter((a) => matches(AREAS[a]!.files ?? [], f))) add(unit, AREAS[a]!.unit);
+  }
+  const reach = importers(src);
+  add(unit, reach);
+  if (src.length) why.push(`${src.length} src/ file(s): ${reach.length} unit test file(s) import them`);
+  return { kind: "areas", areas: [], unit, e2e, hooks: [], why };
+}
+
 /** The harness a change's live checks use when nothing names one: the cheapest. */
 export const LIVE_DEFAULT_HARNESS = "claude-code";
 /** The harnesses with a real-harness check (Grok Build has no API-key route; `CHECKED_HARNESSES` in scripts/live-lib.ts). */
@@ -430,18 +466,19 @@ export function platformsOf(sel: Selection): "all" | "linux" {
 
 /**
  * From the files a change touches to what runs. A core or unknown file means the fast tier; a source
- * file means its area; a changed test file is included itself, with the checks every test is held to; docs alone mean the docs
- * tests.
+ * file means its area, and the unit tests of any area that import it (`importers`, the import graph); a changed test file is
+ * included itself, with the checks every test is held to; docs alone mean the docs tests.
  */
 /** The checks every test file is held to (its entry, its seams, its style): they run whenever a test changes. */
 export const TEST_RULES = ["test/catalog.test.ts", "test/test-style.test.ts"];
 
-export function selectChanged(changed: string[]): Selection {
+export function selectChanged(changed: string[], importers?: (src: string[]) => string[]): Selection {
   const areas = new Set<string>();
   const unit: string[] = [];
   const e2e: string[] = [];
   const hookAreas: string[] = [];
   const why: string[] = [];
+  const src: string[] = [];
   for (const raw of changed) {
     const f = raw.replaceAll("\\", "/");
     if (matches(IGNORED, f)) continue;
@@ -461,6 +498,7 @@ export function selectChanged(changed: string[]): Selection {
       const owner = srcOwner(f);
       if (!owner) return { kind: "fast", why: [`src file in no area: ${f}`] };
       areas.add(owner);
+      src.push(f);
       why.push(`${f}: ${owner}`);
       continue;
     }
@@ -468,6 +506,11 @@ export function selectChanged(changed: string[]): Selection {
     if (!owners.length) return { kind: "fast", why: [`unclassified file: ${f}`] };
     for (const o of owners) areas.add(o);
     why.push(`${f}: ${owners.join(", ")}`);
+  }
+  const reach = (importers?.(src) ?? []).filter((t) => !unit.includes(t) && !!testOwner(t));
+  if (reach.length) {
+    unit.push(...reach);
+    why.push(`${reach.length} unit test file(s) of any area import a changed src/ file`);
   }
   if (!areas.size && !unit.length && !e2e.length && !hookAreas.length) return { kind: "none", why: ["no change that a test reads"] };
   const sel = selectAreas([...areas], { unit, e2e, hookAreas });

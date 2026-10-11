@@ -18,15 +18,20 @@ export const GB_PER_APP = 0.25;
  */
 export const MAX_APPS = 4;
 
-export function defaultApps(): number {
-  const set = Number(process.env.GLUON_E2E_CONCURRENCY);
-  if (set >= 1) return Math.floor(set);
+/** The memory free for new processes, in GB (Linux: MemAvailable, which counts the cache; elsewhere what the OS says is free). */
+export function availableGB(): number {
   let avail = freemem();
   try {
     const m = /MemAvailable:\s+(\d+) kB/.exec(readFileSync("/proc/meminfo", "utf8"));
     if (m) avail = Number(m[1]) * 1024;
   } catch {}
-  return Math.max(1, Math.min(MAX_APPS, Math.floor(availableParallelism() / 3), Math.floor(avail / 2 ** 30 / GB_PER_APP)));
+  return avail / 2 ** 30;
+}
+
+export function defaultApps(): number {
+  const set = Number(process.env.GLUON_E2E_CONCURRENCY);
+  if (set >= 1) return Math.floor(set);
+  return Math.max(1, Math.min(MAX_APPS, Math.floor(availableParallelism() / 3), Math.floor(availableGB() / GB_PER_APP)));
 }
 
 if (import.meta.main) console.log(defaultApps());

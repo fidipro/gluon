@@ -13,6 +13,7 @@ Editing any `AGENTS.md`: follow "Keeping AGENTS.md files fresh" at the end of th
 
 ```bash
 bun run regression    # fast tier: typecheck + unit + e2e minus `@full` tests (~2.5 min); `regression:full` is all (~12 min)
+bun run verify        # while editing (seconds): the tests that import what you changed, its areas' e2e; nothing paid
 bun run test:area <a,b>  # one area's tests (test/areas.ts; `regression --changed|--list`); `test:coverage`: unit coverage
 bun run test:health   # what in the tests is stale + the action (offline, seconds; docs/contributing/maintenance.md)
 bun run test:value <area>  # what an area's tests are worth: mutation gaps, deletion candidates (local, minutes)
@@ -40,8 +41,8 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 
 ## Workflow
 
-- **Done means `bun run regression --changed` passes** (it runs the whole fast tier itself when a core file
-  changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
+- **Verify as you go with `bun run verify`; done means `bun run regression --changed` passes** (it runs the whole fast
+  tier itself when a core file changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
 - **Every fixed bug makes its catalog entry's test fail before the fix**, tagged `#BUG-nn` (`test/catalog.ts`), at the
   product's surface, below it only at a seam (`test/seams.ts`); never weaken a test to get green (rules: `test/AGENTS.md`).
 - **The tests are offline and free; regression's last stage is not.** No test calls a real brain, agent, API or

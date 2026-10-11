@@ -43,9 +43,10 @@ A whole-screen snapshot gets re-recorded without being read; screen goldens live
 and loopback servers (`test/fixtures/`). Mocking a module couples the test to how the code is split today.
 *Checked:* module mocks only go down.
 
-**7. Fast by default.** A test in the fast tier takes under ~3 s; a slower one is made faster (wait for a state; one
-test per variant, so they run at once) or tagged `@full`. *Checked:* `bun run test:health` lists the slow ones and
-breaks on any far over the threshold.
+**7. Fast by default.** Agents verify many times a day: `bun run verify` runs the tests that import what changed, in
+seconds, and `bun run regression --changed` is the gate. A test in the fast tier takes under ~3 s; a slower one is made
+faster (wait for a state; one test per variant, so they run at once) or tagged `@full`. *Checked:* `bun run test:health`
+lists the slow ones, breaks on any far over the threshold, and on the fast tier as a whole over its budget.
 
 **8. Every test names what it promises; a bug strengthens that test.** A test's title starts with the id of its entry in
 the catalog (`test/catalog.ts`): `feature/entry: <what holds>`. A bug fix makes the test of the entry that should have
