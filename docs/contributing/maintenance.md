@@ -80,7 +80,7 @@ exits 1 only for something definitely broken. Run it before a release.
 | a test slower than the fast tier's threshold | put `@full` in its title |
 | deciding whether an area's tests are worth their time | `bun run test:value <area>`: gaps (changes no test notices) and deletion candidates ([Writing tests](testing.md)) |
 | a test CI reports as flaky (failed, then passed on retry) | fix it, or quarantine it while you do: `@quarantine <bug> until:<date>` in its title, at most 30 days |
-| a Bun upgrade | `bun run test:windows` and `bun run test:dist` |
+| a Bun upgrade | `bun run test:dist`, then a CI run on every OS (`gh workflow run ci.yml --ref <branch>`) |
 | a change in `.github/workflows/` | one targeted run of that workflow, not a full one |
 
 ## After an installer changes

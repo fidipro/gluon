@@ -7,7 +7,8 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
 - **A new bug's test fails before its fix** (`scripts/red-check.ts` runs it against the base's `src/`).
 - **Never weaken a test to get green**: no deleted test or `expect`, no new skip, `@full` or `@quarantine`
   without a person's `tests-reviewed` label (`scripts/test-guard.ts`). Fix the code, or stop and say what fails.
-- **One layer per bug, the cheapest that catches it**: unit unless the bug lives in terminal I/O; never both.
+- **Test at the product's surface** (an e2e scenario; `test/real/` when it hangs on a harness's screens); below it only
+  at a seam whose contract is a type (`docs/contributing/testing.md` rule 3), never an internal helper; one layer per bug.
 - **Assert meaning, not copy**: the state or region that matters; no snapshot outside `test/visual/`; fakes at the
   process or network boundary, not `mock.module`. Search for the bug's id before adding a test.
 

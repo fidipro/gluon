@@ -1,6 +1,6 @@
 ---
 title: "Writing tests"
-description: "How to write a test for Gluon that is worth keeping: the cheapest layer that catches the bug, waits for states, assertions on meaning, and the checks that hold every change to it."
+description: "How to write a test for Gluon that is worth keeping: tested at the product's surface, waits for states, assertions on meaning, and the checks that hold every change to it."
 ---
 
 Most of Gluon's code, and of its tests, is written by coding agents. A test suite written that way grows fast and
@@ -19,9 +19,14 @@ against the base's `src/`; it must fail there. A fix with no `src/` change (a sc
 skipping one, tagging it `@full` or `@quarantine`, or loosening a matcher is a decision for a person.
 *Checked:* CI's `test-guard` lists every such change; it passes only with a maintainer's `tests-reviewed` label.
 
-**3. The cheapest layer that can catch the bug, and only one.** A pure function: a unit test. Files, processes, git: a
-unit test with a temporary directory. The terminal (what the screen shows, which bytes reach the agent): an end-to-end
-scenario. The same bug tested in a unit file and in an end-to-end file costs twice and catches once.
+**3. Test at the product's surface; below it only at a typed seam; one layer.** Test a behaviour the way a user meets it:
+an end-to-end scenario through Gluon's terminal with the fake agents; the real-harness tier when it depends on a harness's
+screens, flags or hooks; a live check when only a real model, or a harness with no loopback, shows it. A test below the
+surface is right only at a seam whose contract is a type, such as `route` (`src/routing.ts`), the screen readers
+(`src/pty/readers/index.ts`), the adapters (`src/adapters/index.ts`), the agent session (`src/agent/session.ts`) or the
+cost functions (`src/cost/types.ts`), never at an internal helper. The agent that writes the code writes the test: a test
+of a helper restates the code and breaks with every refactor. The same bug tested at two layers costs twice and catches
+once.
 *Checked:* `test/test-style.test.ts` fails on a new bug tested at both layers (the ones that already are can only go).
 
 **4. Wait for a state, never for a time.** Wait for what the step should produce (`waitFor`, `until`, `exitCode()`);

@@ -56,14 +56,14 @@ probes. Never make a test call a real model, agent or API.
 | A change across areas | `bun run regression`: typecheck + unit + end-to-end, without tests titled `@full` (~2.5 min) |
 | A big change | `bun run regression:full`: everything (~12 min) |
 | `src/pty/`, the frame, `src/gluon.ts` | `bun run test:area pty,gluon-frame`, then `bun run test:gluon` |
-| Platform-specific code | `bun run test:dist` (builds and tests the executable); `bun run test:windows` (from WSL, on the machine's Windows); `bun run docker-test` (Linux in Docker) |
+| Platform-specific code | `bun run test:dist` (builds and tests the executable); Windows and macOS are tested in CI only (`gh workflow run ci.yml --ref <branch> -f os=…`). To debug what CI found: `bun run test:windows` (from WSL, on the machine's Windows), `bun run docker-test` (Linux in Docker) |
 
 `bun run test:unit` and `bun run test:e2e` run one half each, `bun test -t "<title>"` one test, and
 `bun run test:health` lists what in the tests has gone stale. `test/e2e/README.md` explains the
 end-to-end harness; [Writing tests](docs/contributing/testing.md), the rules CI holds a test to.
 
-- **A fixed bug gets a regression test** in `test/` (a unit test if it needs no terminal, otherwise an
-  end-to-end scenario in the `test/e2e/` file for its area). A maintainer gives it its bug number.
+- **A fixed bug gets a regression test** in `test/`: an end-to-end scenario in the `test/e2e/` file for its
+  area, or a test of a typed seam when the bug lives behind one ([Writing tests](docs/contributing/testing.md), rule 3). A maintainer gives it its bug number.
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request the changed areas' tests (`bun run regression --changed`)
   on Ubuntu 24.04, plus macOS 15 and Windows 2025 unless every area is Linux-only (`platforms`, `test/areas.ts`), gitleaks
   and the docs build; a push to main, on Ubuntu; `gate` is the required check. The full suite, `docker-test`, `build:all`

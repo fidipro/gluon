@@ -32,8 +32,8 @@ the platform:
 | Command | What it does |
 |---|---|
 | `bun run regression` | the fast tier, offline; on Windows the end-to-end scenarios run through ConPTY |
-| `bun run test:windows` | from WSL, CI's Windows job on the same machine's Windows; `-t <pattern>` runs only matching tests, `-f <file>` named files, `perf` the perf stage. Read `test/AGENTS.md` ("Windows traps") first |
-| `bun run docker-test` | the regression on Debian and Alpine, the npm tarball and `install.sh`, offline |
+| `bun run test:windows` | debugging only (Windows is tested in CI): from WSL, CI's Windows job on the same machine's Windows; `-t <pattern>` runs only matching tests, `-f <file>` named files, `perf` the perf stage. Read `test/AGENTS.md` ("Windows traps") first |
+| `bun run docker-test` | debugging only (CI runs it nightly): the regression on Debian and Alpine, the npm tarball and `install.sh`, offline |
 | `bun run test:dist` | the compiled binary, on the platform you built it on |
 | `gh workflow run ci.yml --ref <branch> -f os=macos -f extras=false` | macOS has no local route: open a pull request, or run it through CI by hand |
 | [windows-manual-qa.md](../../test/windows-manual-qa.md) | by hand on a real Windows machine: key events, themes, paste, shims, login handoff |
