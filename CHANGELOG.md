@@ -6,6 +6,10 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- `gluon --demo`'s intake agent shows more of the UI when the task asks for it: a task with the word `questions` gets three
+  questions asked together (`(1/3)` …), and one about the repository's `history` or `git` reads its recent commits.
+
 ### Fixed
 - A paste into the home view's composer drops escape sequences and control characters, as typing does, instead of keeping them in the draft (a pasted control character left the composer row's last cell on the terminal's own background). Line breaks (CR and CRLF too) and tabs are kept.
 

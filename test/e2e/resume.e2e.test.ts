@@ -457,6 +457,8 @@ describe("BUG-298/resume: the review's findings", () => {
     seed(s, workspace(repo.tiny(), { sessions: [agy()] }));
     const app = await resumeApp(s, ["abcdef"]);
     await app.waitFor(asked);
+    // The hint line names the question's keys (BUG-224).
+    expect(app.screen()).toContain("enter starts it again · esc drops it · ctrl+c keeps it");
     await app.type("hello");
     await app.waitFor((x) => !x.includes("can't be resumed") && x.includes("hello"));
     // Not re-asked over the draft, however long it stays.

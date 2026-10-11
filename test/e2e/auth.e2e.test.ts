@@ -903,12 +903,14 @@ describe("menus: late OSC replies (QA pass 2)", () => {
     expect(read(join(dirname(cfg), ".env")).trim()).toBe("ANTHROPIC_API_KEY=sk-ant-api03-lightlightlight");
   });
 
-  test("BUG-54/3.2: … nor into the composer, whole or split @full", async () => {
+  test("composer/terminal-noise: a light terminal's late reply (ESC \\ terminator) is never typed into the composer, whole or split #BUG-54/3.2 @full", async () => {
     for (const splitMs of [undefined, 30]) {
       const app = new App({ cwd: repo.tiny(), cols: 80, rows: 24, osc11: { delayMs: 300, splitMs, light: true } });
       await app.waitFor(HOME_VIEW);
       await app.oscReplied();
       await app.type("x");
+      // A loaded machine redraws late: wait for the line, then check it holds only the x.
+      await app.waitFor(() => /^ {3}› x$/.test(app.lines().at(-2) ?? ""), 3000).catch(() => {});
       expect(app.lines().at(-2)).toMatch(/^ {3}› x$/);
     }
   });

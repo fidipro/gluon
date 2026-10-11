@@ -44,7 +44,6 @@ export function saveTimes(times: TimesFile, tier: string, cases: { file: string;
 
 /** Rough seconds per unit file when no run has measured it: a few known heavy ones, then by size. */
 const SECONDS: Record<string, number> = {
-  "home.test.tsx": 40,
   "pty-session.test.ts": 18,
   "pty-compositor.test.ts": 12,
   "tools.test.ts": 11,

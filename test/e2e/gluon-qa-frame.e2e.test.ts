@@ -209,7 +209,7 @@ describe("pastes", () => {
   }, 400_000 * SLOW);
 
   // Not on Windows either, for the same reason: Gluon's own home reads through the ConPTY at about 1.5 KB/s too (CI: the test ran 124 s and failed).
-  test.skipIf(WIN)("QA-frame/paste-1mb-home: a 1 MB paste into the home composer is taken, and the composer answers the next key within seconds @full", async () => {
+  test.skipIf(WIN)("composer/paste: a 1 MB paste into the home composer is taken, and the composer answers the next key within seconds (QA-frame/paste-1mb-home) @full", async () => {
     const app = await gluon(100, 30, {}, YAML);
     const body = Array.from({ length: 20_000 }, (_, i) => `word${i} ${"y".repeat(40)}`).join(" ").slice(0, 1_000_000);
     const t0 = performance.now();
@@ -298,7 +298,7 @@ describe("resize", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/resize-tiny-home: the home view at 19×5 and 1×1 and back is whole, and its draft survives @full", async () => {
+  test("home/fits-terminal: the home view at 19×5 and 1×1 and back is whole, and its draft survives (QA-frame/resize-tiny-home) @full", async () => {
     const app = await gluon(100, 30, {}, YAML);
     await app.type("draft text");
     for (const [c, r] of [[19, 5], [1, 1], [5, 40], [100, 30]] as const) {
@@ -535,7 +535,7 @@ describe.skipIf(WIN)("the home key's prefix", () => {
 
 });
 
-describe.skipIf(WIN)("the mouse", () => {
+describe("the mouse", () => {
 
   test("QA-frame/mouse-alt-agent-with-mouse: an alternate-screen agent that asked for the mouse: a click on the tab strip still switches, a click inside reaches the agent @full", async () => {
     const app = await gluon(100, 30, { FAKE_ALT: "1" }, YAML, ["claude", "opencode"]);
@@ -550,7 +550,7 @@ describe.skipIf(WIN)("the mouse", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/mouse-select-big: a drag over a whole 400×100 home view: one OSC 52 sequence, whole, its size reported @full", async () => {
+  test("mouse/drag-copy: a drag over a whole 400×100 home view: one OSC 52 sequence, whole, its size reported (QA-frame/mouse-select-big) @full", async () => {
     const app = await gluon(400, 100, {}, YAML);
     app.mark();
     const [press, motion, release] = mouseReports({ op: "drag", button: "left", x: 1, y: 1, to: { x: 400, y: 99 } });

@@ -32,7 +32,7 @@ const composer = (app: App) => app.lines().at(-2) ?? "";
 const closed = (app: App, line?: string) => app.waitFor((s) => HOME_VIEW.test(s) && !/fix-add-bug +claude code/.test(s) && (!line || s.includes(line)));
 
 describe("from the UI", () => {
-  test("F1/BUG-02/BUG-34: Enter launches Claude Code with the spec after --, a sane tty and no AWS leak @full", async () => {
+  test("agent-choice/start: Enter launches Claude Code with the spec after --, a sane tty and no AWS leak @full #BUG-02 #BUG-34", async () => {
     // FAKE_HANG: the agent stays after its line, so its answer is seen before its session closes (BUG-192).
     const app = await start({ cwd: repo.tiny(), rows: 60, env: { AWS_PROFILE: undefined, FAKE_HANG: "1" } });
     await toLaunch(app);

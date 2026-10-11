@@ -97,7 +97,7 @@ test("Kimi Code (no prompt in argv): every launch types the brief line alone int
   expect(app.screen()).not.toContain("couldn't type");
 });
 
-test("Kimi Code: plan is `--plan` (before the typed brief); BUG-432/explore (ctrl+t) is refused with its reason and nothing starts, no agent file in any launch @full", async () => {
+test("agent-choice/mode-unsupported: Kimi Code: plan is `--plan` (before the typed brief); ctrl+t never lands on explore with it highlighted, and explore picked on another agent is refused for it, the advice first, and nothing starts, no agent file in any launch @full #BUG-432", async () => {
   const plan = await gluon(100, 30, KIMI.env, KIMI.yaml, ["kimi"]);
   // Kimi Code is the highlighted agent: ctrl+t skips explore (BUG-672), so one press is plan.
   await launch(plan, "fix the thing", [KEYS.ctrlT]);
@@ -113,6 +113,8 @@ test("Kimi Code: plan is `--plan` (before the typed brief); BUG-432/explore (ctr
   await explore.press(KEYS.enter);
   // The reason, not "can't start with this model and effort": the agent stays unstarted and the choice stays open.
   await explore.waitFor((s) => s.replace(/[│\s]+/g, "").includes("KimiCodecan'tstartinexploremode"));
+  // The advice first, on its own row: a narrow line cuts the reason, never the advice (BUG-672).
+  expect(explore.lines().find((l) => l.includes("Kimi Code can't start in explore mode"))?.trim()).toStartWith("Pick another agent or change the mode (ctrl+t).");
   expect(explore.agentLog()).not.toContain("ENV KIMI_MODEL_NAME");
   expect(explore.agentLog()).not.toContain("--agent-file");
 });

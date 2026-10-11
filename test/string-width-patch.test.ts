@@ -2,7 +2,8 @@
  * BUG-615 (QA-perf-01): `patches/string-width@8.3.0.patch` puts a cheap pre-check before string-width's
  * `/^\p{RGI_Emoji}$/v` (49 us per cluster, run by Ink for every box glyph of every frame). The pre-check
  * must change no width. Here the patched module is compared with the same source with the pre-check
- * reverted (the unpatched one), over a wide corpus; the `@full` test covers every code point.
+ * reverted (the unpatched one), over a wide corpus; the `@full` test covers every code point. The speed it buys is
+ * held by the perf suite (`perf/key-home … #BUG-615`).
  */
 import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -114,7 +115,7 @@ function mixedStrings(rand: () => number, count: number): string[] {
 
 const emojiPoints = [...codePoints(0, 0x10ffff)].filter((cp) => precheck.test(String.fromCodePoint(cp))).map((cp) => String.fromCodePoint(cp));
 
-test("BUG-615/string-width: the pre-check admits every RGI emoji (singles in the emoji blocks and every sequence shape)", () => {
+test("home/text-widths-exact: the pre-check admits every RGI emoji (singles in the emoji blocks and every sequence shape) #BUG-615", () => {
   expect(emojiPoints.length).toBeGreaterThan(1300);
   let matched = 0;
   const check = (s: string) => {
@@ -130,7 +131,7 @@ test("BUG-615/string-width: the pre-check admits every RGI emoji (singles in the
   expect(matched).toBeGreaterThan(2000);
 });
 
-test("BUG-615/string-width: patched and unpatched give the same width for the frame's glyphs, CJK, marks, jamo and emoji", () => {
+test("home/text-widths-exact: patched and unpatched give the same width for the frame's glyphs, CJK, marks, jamo and emoji #BUG-615", () => {
   const rand = prng(616);
   const corpus: string[] = [
     "",
@@ -152,20 +153,7 @@ test("BUG-615/string-width: patched and unpatched give the same width for the fr
   }
 }, 20_000); // the unpatched module's slow emoji regex over the whole corpus: about 5 s on a loaded machine, the default limit
 
-test("BUG-615/string-width: the pre-check makes a box-drawing line at least 5x cheaper", () => {
-  const line = "─".repeat(120) + "│ done │";
-  const time = (f: Width) => {
-    for (let i = 0; i < 20; i++) f(line);
-    const t = performance.now();
-    for (let i = 0; i < 200; i++) f(line);
-    return performance.now() - t;
-  };
-  // Best of 3 to ride out a loaded machine; the real ratio is 10 to 15.
-  const ratio = Math.max(...[1, 2, 3].map(() => time(unpatched) / time(patched)));
-  expect(ratio).toBeGreaterThan(5);
-});
-
-test("BUG-615/string-width @full: the pre-check admits every RGI emoji among all code points (alone, with FE0F, a skin tone) and widths agree", () => {
+test("home/text-widths-exact: the pre-check admits every RGI emoji among all code points (alone, with FE0F, a skin tone) and widths agree #BUG-615 @full", () => {
   // Slow (about 40 s: the regex under test is the slow part). Every code point alone and with FE0F and a skin tone must
   // not be an RGI emoji the pre-check rejects; widths are compared for every one the pre-check admits plus a seeded sample.
   const rand = prng(615_616);
@@ -187,7 +175,7 @@ test("BUG-615/string-width @full: the pre-check admits every RGI emoji among all
   }
 }, 600_000);
 
-test("BUG-615/string-width: the installed module is the patched one (bun install applied patches/)", () => {
+test("home/text-widths-exact: the installed module is the patched one (bun install applied patches/) #BUG-615", () => {
   expect(patchedSource).toContain("canBeRgiEmoji");
   // The implication tests above use their own copy of the pre-check: keep it the patch's.
   expect(patchedSource).toContain("const emojiPrecheckRegex = /\\p{Emoji}/u;");

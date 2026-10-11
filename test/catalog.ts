@@ -25,6 +25,7 @@ export type Entry = {
 };
 export type Feature = { says: string; entries: Record<string, Entry> };
 
+const b = (says: string, at: Layer[] = ["e2e"]): Entry => ({ kind: "behaviour", says, at });
 const rule = (says: string, at: Layer[] = ["code", "seam"]): Entry => ({ kind: "invariant", says, at });
 const perf = (says: string, at: Layer[] = ["perf"], platforms?: Entry["platforms"]): Entry => ({ kind: "perf", says, at, ...(platforms ? { platforms } : {}) });
 
@@ -33,6 +34,116 @@ export const CATALOG: Record<string, Feature> = {
     says: "the fakes the tests run on behave like the real harnesses, as Gluon reads them (test/real/fidelity.real.test.ts)",
     entries: {
       screens: { kind: "fidelity", says: "given a harness's states (its screen fixture, re-captured on each release), when its fake is driven through them, then Gluon's readers read the fake as they read the real harness", at: ["real"] },
+    },
+  },
+  home: {
+    says: "the sessions home: header, list, hint line and chat in one terminal-sized view (docs/guides/sessions.md, keyboard.md)",
+    entries: {
+      header: b("given a repository (git, no commits, a detached HEAD, no git), when Gluon starts, then the header shows the mark, `Gluon v<version>`, repo · branch (or commit) · n modified, then `workspace <id>` once a session launched; short of columns its lines are cut, never wrapped"),
+      "header-counts": b("given sessions, then the header counts them by state (`1 awaiting input · 2 working · …`), `no sessions yet` before the first, `no sessions running` once all ended"),
+      "first-run": b("given no session yet, when Gluon starts, then it shows the agents available with each one's readiness, the intake agent's first line and `› describe the session you want`; on a short terminal the greeting stays whole and the agent list is cut first"),
+      "fits-terminal": b("given any terminal size (down to a few cells) and any resize, then the home view is exactly rows − 1 tall, nothing wider than the terminal or wrapped, the composer on screen with one rule over it"),
+      "short-terminal-priority": b("given a short terminal and a conversation going on, then the open question or agent choice (lead, options, hint) wins over the list; the list keeps its column header and group label before its blank rows go; at 80×24 two groups and a question show every row"),
+      "no-full-redraw": b("when keys are typed, a turn runs or a huge draft is edited, then Gluon never clears the screen or the scrollback"),
+      theme: b("given a dark or a light terminal (its OSC 11 answer, else COLORFGBG), then Gluon picks the matching theme and paints its own ground on every cell, the spec box's borders included"),
+      "hint-line": b("given what is selected or open (a run, a group label, the draft, text typed, the intake agent working, a question, the agent choice, an ended run without a terminal), then the hint line names only the keys that act on it, ending in `? for keys`; short of columns whole keys go from the end, never enter/esc or `? for keys`"),
+      "one-highlight": b("while a question or the agent choice is open, then only the option Enter acts on is highlighted, never the list's row too; closed, the list's row is again"),
+      "key-list": b("given an empty composer, when `?` is pressed, then every key is listed (sessions, in a session with the configured home key, the intake chat) in columns that fit; cut, it says `↓ N more` and pgdn/pgup scroll it; esc or `?` close it, any other key closes it and acts; with text typed or options open `?` is text"),
+      "key-list-mouse": b("given `handoff.mouse_capture: false`, then the key list names no click, wheel or text selection; with it on, it names them"),
+      "own-question": b("given Gluon's own question at home (end a session, discard the chat, quit, resume, start again), then the hint line names its keys, the composer shows no cursor, and only keys pressed once it shows answer it: Enter yes; esc or ctrl+c no; y/n nothing"),
+      quit: b("given a draft, ctrl+c clears it; twice on an empty composer quits with 130 and gives the terminal back (cursor, paste mode, main screen); with sessions running it asks first"),
+      "text-widths-exact": { kind: "invariant", says: "given any text (emoji, CJK, marks, box glyphs), then the patched string-width (its speed pre-check, patches/) measures it exactly as the unpatched module", at: ["code"] },
+    },
+  },
+  "sessions-list": {
+    says: "the rows of the sessions home (docs/guides/sessions.md)",
+    entries: {
+      groups: b("given sessions in several states, then rows are grouped under Awaiting input, Working, Done, Drafting (`?` `●` `✓` `◌`), a column header names the right-hand columns, nothing wraps at any width, the selected row is a full-width bar"),
+      "row-columns": b("given a session, then its row shows its name, triple, latest activity, its mode (`· explore`, `· plan`, nothing for build), cost and context, as the width allows"),
+      "row-live": b("when a session's state or activity changes (a hook or its screen), then its row, its group and the header counts follow; a finished turn reads awaiting input, never Done"),
+      "draft-row": b("given a chat being drafted, then a Drafting row named from the proposal (`(untitled)` before) reads `Waiting for your pick` while the agent choice is open, `Waiting for your answer` while a question waits, `Talking it through` otherwise; Enter on it says `That's this chat`"),
+      select: b("when ↑↓ are pressed, then the selection moves over rows and group labels; a list longer than its rows shows `… N more`, and ↓ past the window moves it one line, the selection kept in view"),
+      open: b("when Enter is pressed on a row, then that session opens; → on an empty composer opens the first tab; digits on the home composer are text, never a tab; without a pseudo-terminal a session that ended leaves no row, and nothing offers to open one"),
+      collapse: b("when Enter is pressed on a group label, then it collapses to `▸ Working (N)` and expands again"),
+      "mark-done": b("when ctrl+d is pressed, then the selected session is marked done, again not done, the selection following its row; never with text in the composer, never the drafting row"),
+      remove: b("when del is pressed, then Gluon asks `End <name>?` for a running session, `Discard this chat?` for the drafting row; only Enter says yes, esc or ctrl+c no; never with text typed"),
+      "selection-after-remove": b("when a row goes (removed, or its session ended), then the next row is selected (the previous one after the last), not the first"),
+      "back-home-selects": b("when coming home from a session, then its row is selected (its group unfolded), and a ctrl+d at once acts on it"),
+    },
+  },
+  composer: {
+    says: "the chat box at the bottom of home (docs/guides/keyboard.md)",
+    entries: {
+      editing: b("when typing, backspace, delete, ←→, home/end and ctrl+a/e/u/w are pressed, then they edit at the cursor"),
+      graphemes: b("when the cursor moves, backspace deletes or text is inserted, then an emoji or a combined character is one character"),
+      newline: b("when alt+enter, ctrl+j or shift+enter (any encoding) is pressed, then a newline is inserted, never text; ↑↓ move between the lines"),
+      wrap: b("given a draft wider than the composer, then it wraps at words, a word longer than a row is broken there, and the cursor stays where the user types"),
+      "tall-draft": b("given a draft taller than the composer's rows, then the rows around the cursor show, with how many more"),
+      paste: b("when text is pasted, then it is taken whole, keeps its line breaks (CRLF, CR), indentation and tabs, drops escape sequences and control characters as typing does, and never sends by itself"),
+      "esc-esc-clears": b("when esc is pressed on a draft, then it stays and Gluon says `Press esc again to clear the draft`; a second esc clears it"),
+      "batched-keys": b("given keys arriving in one read, then they act as keys (Enter submits, control keys edit); a double Enter sends once"),
+      placeholder: b("given an empty composer, then its placeholder says what Enter does: `describe the session you want`, `describe another session`, `reply to the intake agent`"),
+      "terminal-noise": b("given a late terminal reply (OSC 11) or a focus report, then it is never typed into the composer; a typed `]` still is"),
+    },
+  },
+  "intake-chat": {
+    says: "talking to the intake agent at home (docs/getting-started/quickstart.md)",
+    entries: {
+      send: b("when Enter is pressed on a draft, then it shows in the chat on a full-width bar after `›`, hanging under its text; an empty or blank draft sends nothing"),
+      working: b("while the intake agent works, then a line says what it does and `esc to interrupt`; once it speaks, its tool calls show as one `◇` line (reads, searches, git commands, failures counted)"),
+      queue: b("when Enter is pressed while it works, then the message is queued above the box and sent when the turn ends; esc cancels it before it interrupts; a question or proposal at the turn's end keeps it queued and Enter sends it as the answer; a draft left as a question arrives is flagged"),
+      interrupt: b("when esc or ctrl+c is pressed while it works, then it is interrupted (`Interrupted — tell the intake agent what to do instead.`) without quitting, and the chat goes on"),
+      scroll: b("when pgup/pgdn or the wheel are used, then the chat scrolls back to its first line and forward again"),
+    },
+  },
+  question: {
+    says: "the intake agent's question (docs/getting-started/quickstart.md)",
+    entries: {
+      pick: b("given a question, when ↑↓ (wrapping) or a digit then Enter are pressed, then that option is the answer; a digit alone only highlights; the answer shows under the question, which stays in the chat"),
+      "own-words": b("given a question, when a reply starts with a digit or names an option out of range, then it is text sent whole; Enter on `type your own answer` says to type it; esc hides the options and a typed reply still answers"),
+      "tab-adds-words": b("given a question, when Tab is pressed on an option, then it goes into the composer to add words to, and Enter sends the whole; with text typed Tab does nothing"),
+      "batch-step": b("given several questions asked together, then they come one at a time, each saying which it is: `(2/3) …`, and the answers go back together"),
+      fits: b("given long options, then they wrap inside the terminal, hanging under their text, not under `❯`"),
+    },
+  },
+  "agent-choice": {
+    says: "the proposal: the spec, the recommended agent and its alternatives (docs/getting-started/quickstart.md, docs/guides/routing.md, modes.md)",
+    entries: {
+      shows: b("given a proposal, then the lead line with its reason, the spec box (`spec — what the agent will get`), the recommended harness × model × effort first, up to two alternatives, `keep talking` and the hint show; its first frame already lists the agents and names the drafting row"),
+      "recommended-mark": b("given a proposal, then `· recommended` marks the first option only while it is the intake agent's own"),
+      start: b("when Enter is pressed on an option, then that harness × model × effort starts (with its mode and permissions) in Gluon's frame; ↑↓ wrap through the options"),
+      "model-effort": b("when Tab or Shift+Tab is pressed, then the highlighted option's model or effort cycles, the others keep theirs; the hint names each key only when the highlighted agent has another"),
+      mode: b("when ctrl+t is pressed at the choice, then build → explore → plan cycles for every option, shown on each row (a proposal's own mode shown from the start), and Enter starts in it; with no choice open ctrl+t does nothing"),
+      "mode-unsupported": b("given a mode the highlighted agent can't run, then ctrl+t skips it (explore for Kimi Code), and Enter on an agent that can't run the chosen mode is refused with its advice first, nothing started"),
+      permissions: b("when ctrl+p is pressed, then the highlighted agent's permissions cycle (its own first), shown on its row and started with; an agent with none, or explore/plan, says why and changes nothing; the hint names ctrl+p only where it acts"),
+      "keep-talking": b("when `keep talking` + Enter or esc is pressed, then the choice closes (`Tell the intake agent what to change`) and ↑↓ move on the list again"),
+      "typed-reply": b("when text is typed at the choice (starting with a digit too; not just spaces), then it is a reply that gets a revised proposal; a lone digit + Enter picks that option"),
+      "spec-fold": b("when ctrl+o is pressed, then the spec folds to one line (`(ctrl+o to view)`) and back, the agents staying"),
+      "spec-scroll": b("given a spec too tall for the chat, then it is cut above the agents saying what is left out, and pgup/pgdn (and the wheel) scroll only the spec, never taking the options off screen; with the whole box in view they do nothing; after esc they scroll the chat"),
+      fits: b("given any width, then the options and the hint fit: a wrapped option never ends a line in `·` or `×`, and the hint drops whole keys from its end", ["e2e", "seam"]),
+    },
+  },
+  mouse: {
+    says: "the mouse on the home view (docs/guides/keyboard.md)",
+    entries: {
+      "click-row": b("when a row is clicked, then it is selected; a click on the selected row, or a double-click, opens it, never scrolling the list; a click anywhere else, a release or another button does nothing and types nothing"),
+      "click-group": b("when a group label is clicked, then it folds or unfolds; a double-click folds it once"),
+      "click-option": b("when an option of the question or the agent choice is clicked, then it is picked as its digit + Enter would; a click on `keep talking` closes the choice"),
+      "drag-copy": b("when home text is dragged over, then it is copied with OSC 52 (the spec box's edges left out), highlighted, and Gluon says so; a key ends the selection"),
+    },
+  },
+  markdown: {
+    says: "how the chat's and the spec's text is drawn",
+    entries: {
+      inline: b("given bold, italic or inline code (nested too) in the agent's text or the spec, then it shows styled, never with its markers"),
+      blocks: b("given headings, bullets (nested), numbered items, tasks, quotes, rules, tables and code blocks, then they render and wrap within the width (code wrapped, never cut), and a spec box cut to fit shows exactly its rows", ["e2e", "seam"]),
+      fits: b("given chat text (the agent's, the user's, the spec), then it never overflows the terminal: wrapped lines hang under the text, keep their indentation, and tabs become spaces"),
+    },
+  },
+  demo: {
+    says: "Gluon's demo mode (`gluon --demo`, docs/getting-started/quickstart.md)",
+    entries: {
+      "scripted-intake": b("given `gluon --demo`, then the whole UI runs with a scripted intake agent whose spec is built from the task and the repository, with no API call"),
     },
   },
   subscriptions: {
