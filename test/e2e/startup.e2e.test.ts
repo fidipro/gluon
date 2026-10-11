@@ -62,11 +62,17 @@ describe("terminal", () => {
     expect(app.screen()).not.toContain("11;");
   });
 
-  test("composer/terminal-noise: filtering that reply doesn't swallow a typed ] #BUG-18 @full", async () => {
+  test("composer/terminal-noise: filtering that reply doesn't swallow a typed ], typed slowly or fast #BUG-18 @full", async () => {
     const app = await start({ cwd: repo.tiny() });
     await app.type("a[1]b]");
     // Under load the last keys can land after type() settles: wait for them (a swallowed "]" never comes).
     await app.waitFor("› a[1]b]");
+    // Typed fast, the next key inside the 30 ms a lone `]` is held: the `]` still comes, before it.
+    for (const ch of "c]d]e") {
+      app.write(ch);
+      await Bun.sleep(5); // sleep-ok: keys apart, as a fast typist sends them, but inside the hold
+    }
+    await app.waitFor("› a[1]b]c]d]e");
   });
 
   test("home/theme: Gluon paints its own ground, on a dark and on a light terminal alike #BUG-128 #BUG-42 @full", async () => {

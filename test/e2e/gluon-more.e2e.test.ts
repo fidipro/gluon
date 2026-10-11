@@ -310,7 +310,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(app.screen()).toContain("› abc");
   });
 
-  test("mouse/click-row: at home the terminal reports clicks (SGR); a click on a session's row selects it, a second opens it — the agent choice open or not; the click's release never reaches the agent, nothing is typed into the composer; the wheel and clicks elsewhere do nothing to the view #BUG-269/GLUON-54 @full", async () => {
+  test("mouse/click-row: at home the terminal reports clicks (SGR); a click on a session's row selects it, a second opens it — the agent choice open or not; the click's release never reaches the agent, nothing is typed into the composer; the wheel and clicks elsewhere (left of the list too) do nothing to the view #BUG-269/GLUON-54 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "one task");
     await home(app);
@@ -322,10 +322,11 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     const selected = (name: string) => app.bg(4, app.row(`Gluon-${name}-task `)) === GLUON_HEX.selected;
     expect(selected("two")).toBe(true);
     const fullClick = (x: number, y: number) => mouseReports({ op: "click", button: "left", x, y }).join("");
-    // Elsewhere (the header, a blank row), the wheel: the home view stays, nothing typed.
-    for (const bytes of [fullClick(10, 2), fullClick(10, 1), wheelUp(10, 20), wheelDown(10, 20)]) await app.press(bytes);
+    // Elsewhere (the header, a blank row, left of the list on a row), the wheel: the home view stays, the selection too, nothing typed.
+    for (const bytes of [fullClick(10, 2), fullClick(10, 1), fullClick(1, rowY()), wheelUp(10, 20), wheelDown(10, 20)]) await app.press(bytes);
     await app.type("ab");
     await app.waitFor("› ab");
+    expect(selected("two")).toBe(true);
     await app.press("\x7f\x7f");
     // The row: selected by the first click, opened by the second (press and release in one read).
     await app.press(fullClick(12, rowY()));

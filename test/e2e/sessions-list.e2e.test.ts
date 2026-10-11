@@ -201,7 +201,8 @@ describe("the rows", () => {
     await launch(app, "bravo task");
     await say(app, "!event status working Editing a.ts", "EVENT status working");
     await home(app);
-    await app.waitFor(/Gluon-alpha-task +claude code × sonnet 5\.5 × high · explore +\S.*38% +~?\$1\.23 +\S+/);
+    // Its activity may have gone by the time the row is drawn under load (awaiting input): bravo's row checks that column.
+    await app.waitFor(/Gluon-alpha-task +claude code × sonnet 5\.5 × high · explore +(\S.* +)?38% +~?\$1\.23 +\S+/);
     expect(app.screen()).toMatch(/context +cost +time/);
     expect(app.lines()[app.row("Gluon-bravo-task")]).toMatch(/Gluon-bravo-task +claude code × sonnet 5\.5 × high +Editing a\.ts +— +— +\S+/);
   });
