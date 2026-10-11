@@ -114,7 +114,7 @@ describe("interceptor on captured screens", () => {
     expect(await onFixture("antigravity", "clear", { clear: false, compact: true })).toBeNull();
   });
 
-  test("a pasted /clear is never held, wherever the paste is", async () => {
+  test("pty/screen-never-triggers: a pasted /clear is never held, wherever the paste is", async () => {
     const screen = await screenOf(fixture("claude-code"), "clear");
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), pasted("/clear"), screen)).toBeNull();
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), [...keysOf(["/", "c", "l"]), ...pasted("ear")], screen)).toBeNull();
@@ -125,7 +125,7 @@ describe("interceptor on captured screens", () => {
     expect(i.key({ name: "enter", raw: "\r", pasted: true }, screen)).toBeNull();
   });
 
-  test("a menu drawn by the agent's output without a typed / is never held", async () => {
+  test("pty/screen-never-triggers: a menu drawn by the agent's output without a typed / is never held", async () => {
     for (const h of ["claude-code", "codex", "opencode", "antigravity"] as const) {
       const screen = await screenOf(fixture(h), "clear");
       expect(enter(createInterceptor({ harness: h, ...ON }), [], screen)).toBeNull();
@@ -234,7 +234,7 @@ describe("interceptor without a readable screen", () => {
     expect(enter(createInterceptor({ harness: "codex", ...ON }), keysOf([..."/compact"]), blank())).toBe("compact");
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf([..."/reset"]), blank())).toBe("clear");
   });
-  test("anything else doesn't: Tab, arrows, edits, arguments, prefixes, other commands", () => {
+  test("pty/unsure-forward: anything else doesn't: Tab, arrows, edits, arguments, prefixes, other commands", () => {
     for (const keys of [
       ["/", "c", "l", "tab"],
       ["/", "c", "down"],
@@ -276,7 +276,7 @@ describe("NO_COLOR screens", () => {
       return keep.length ? `\x1b[${keep.join(";")}m` : "";
     });
 
-  test("never trigger a wrong command: without the highlight colours it's the same answer or none", async () => {
+  test("pty/unsure-forward: never trigger a wrong command: without the highlight colours it's the same answer or none", async () => {
     for (const h of ["claude-code", "codex", "opencode", "antigravity"] as const) {
       const f = fixture(h);
       for (const s of f.states) {
@@ -442,7 +442,7 @@ describe("the typed line, untouched since the last Enter (lineAfter)", () => {
 });
 
 describe("keys and screens stay in memory", () => {
-  test("the PTY screen, modes, painter, readers and interceptor import no file, network or process API", async () => {
+  test("pty/screen-stays-in-memory: the PTY screen, modes, painter, readers and interceptor import no file, network or process API", async () => {
     const { Glob } = await import("bun");
     const files = [...new Glob("src/pty/{screen,modes,paint,intercept}.ts").scanSync({ cwd: import.meta.dir + "/.." }), ...new Glob("src/pty/readers/*.ts").scanSync({ cwd: import.meta.dir + "/.." })];
     expect(files.length).toBeGreaterThanOrEqual(9);

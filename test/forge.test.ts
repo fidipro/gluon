@@ -38,7 +38,7 @@ const origin = (url: string) => {
 };
 
 describe("issue #41: forge", () => {
-  test("it is a repo tool, read-only by schema", () => {
+  test("repo-tools/read-only: it is a repo tool, read-only by schema", () => {
     expect(REPO_TOOLS.has("forge")).toBe(true);
     const t = TOOLS.find((x) => x.name === "forge")!;
     expect((t.input_schema as { properties: { action: { enum: string[] } } }).properties.action.enum).toEqual(["issue_view", "issue_list", "pr_view", "pr_list"]);

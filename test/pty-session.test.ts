@@ -84,7 +84,7 @@ async function until(ok: () => boolean, ms = 3000 * SLOW) {
 }
 
 describe.concurrent("what reaches the agent's PTY", () => {
-  test("only the user's bytes (unchanged), the model's replies (in query order) and shifted mouse reports", async () => {
+  test("pty/only-user-bytes-into-agent: only the user's bytes (unchanged), the model's replies (in query order) and shifted mouse reports", async () => {
     const { s, pty, sent } = session({ colours: true, kitty: true, settings: { on_clear: "stay", on_compact: "stay" } });
     // DA1, a cursor position report, OSC 11, kitty's flags query: the model answers each.
     pty.print("hello\x1b[c\x1b[6n\x1b]11;?\x07\x1b[?u");
@@ -110,7 +110,7 @@ describe.concurrent("what reaches the agent's PTY", () => {
     s.dispose();
   });
 
-  test("the source writes into the PTY in one place only, with one of the four kinds", () => {
+  test("pty/only-user-bytes-into-agent: the source writes into the PTY in one place only, with one of the four kinds", () => {
     const src = readFileSync(join(import.meta.dir, "../src/pty/session.ts"), "utf8");
     expect(src.match(/this\.proc\.write\(/g)?.length).toBe(1);
     const kinds = [...src.matchAll(/this\.send\(("[a-z]+")/g)].map((m) => m[1]);
@@ -685,7 +685,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     s.dispose();
   });
 
-  test("a paste never counts; with on_clear: stay nothing is held", async () => {
+  test("pty/screen-never-triggers: a paste never counts; with on_clear: stay nothing is held", async () => {
     const { s, pty } = session({ settings: { on_clear: "stay" } });
     for (const k of keys("/clear\r")) s.input(k);
     await until(() => pty.writes.join("") === "/clear\r");

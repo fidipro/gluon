@@ -17,7 +17,7 @@ export type Added = { file: string; title: string };
 
 /**
  * The bug tests a unified diff adds: a `+` line that opens a `test(` / `it(` (any modifier) whose title is a plain string
- * starting `BUG-<n>` (a title built from `${…}` is skipped: it can't be selected by name). Files outside `test/` are ignored.
+ * starting `BUG-<n>` or tagged `#BUG-<n>` (a catalog entry's test: `feature/entry: … #BUG-<n>`) (a title built from `${…}` is skipped: it can't be selected by name). Files outside `test/` are ignored.
  */
 export function addedBugTests(diff: string): Added[] {
   const out: Added[] = [];
@@ -29,8 +29,8 @@ export function addedBugTests(diff: string): Added[] {
       continue;
     }
     if (!line.startsWith("+") || line.startsWith("+++") || !/^test\/.*\.test\.tsx?$/.test(file)) continue;
-    const m = /\b(?:test|it)(?:\.\w+)*(?:\([^)]*\))?\(\s*(["'`])(BUG-\d+(?:(?!\1)[^\\]|\\.)*)\1/.exec(line);
-    if (m && !(m[1] === "`" && m[2]!.includes("${"))) out.push({ file, title: m[2]! });
+    const m = /\b(?:test|it)(?:\.\w+)*(?:\([^)]*\))?\)?\(\s*(["'`])((?:(?!\1)[^\\]|\\.)*)\1/.exec(line);
+    if (m && /^BUG-\d+|#BUG-\d+/.test(m[2]!) && !(m[1] === "`" && m[2]!.includes("${"))) out.push({ file, title: m[2]! });
   }
   return out;
 }
@@ -59,7 +59,7 @@ if (import.meta.main) {
   const ref = process.argv[2] ?? "origin/main";
   const base = git(["merge-base", ref, "HEAD"]).trim();
   const known = new Set(git(["grep", "-ho", "BUG-[0-9][0-9]*", base, "--", "test/"]).split("\n").map((l) => l.replace(/^[^:]*:/, "").trim()).filter(Boolean));
-  const added = addedBugTests(git(["diff", "--unified=0", "--no-renames", base, "HEAD", "--", "test/"])).filter((a) => !known.has(/^BUG-\d+/.exec(a.title)![0]));
+  const added = addedBugTests(git(["diff", "--unified=0", "--no-renames", base, "HEAD", "--", "test/"])).filter((a) => !known.has(/BUG-\d+/.exec(a.title)![0]));
   if (!added.length) {
     console.log(`red-check: no test for a new bug since ${base.slice(0, 9)}`);
     process.exit(0);

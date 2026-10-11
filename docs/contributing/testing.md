@@ -22,12 +22,12 @@ skipping one, tagging it `@full` or `@quarantine`, or loosening a matcher is a d
 **3. Test at the product's surface; below it only at a typed seam; one layer.** Test a behaviour the way a user meets it:
 an end-to-end scenario through Gluon's terminal with the fake agents; the real-harness tier when it depends on a harness's
 screens, flags or hooks; a live check when only a real model, or a harness with no loopback, shows it. A test below the
-surface is right only at a seam whose contract is a type, such as `route` (`src/routing.ts`), the screen readers
-(`src/pty/readers/index.ts`), the adapters (`src/adapters/index.ts`), the agent session (`src/agent/session.ts`) or the
-cost functions (`src/cost/types.ts`), never at an internal helper. The agent that writes the code writes the test: a test
-of a helper restates the code and breaks with every refactor. The same bug tested at two layers costs twice and catches
-once.
-*Checked:* `test/test-style.test.ts` fails on a new bug tested at both layers (the ones that already are can only go).
+surface is right only at a seam, a module whose contract is a type or an outside format (`test/seams.ts` lists them:
+routing, the adapters, the screen readers, the agent session, the cost functions…), never at an internal helper. The
+agent that writes the code writes the test: a test of a helper restates the code and breaks with every refactor. The
+same bug tested at two layers costs twice and catches once.
+*Checked:* `test/catalog.test.ts`: a test below the surface imports from `src/` only seams; `test/test-style.test.ts`: no
+new bug tested at both layers (the files and bugs that already break these can only go).
 
 **4. Wait for a state, never for a time.** Wait for what the step should produce (`waitFor`, `until`, `exitCode()`);
 a fixed sleep is too short on a loaded runner and too long everywhere else. A sleep is right only as a window in
@@ -47,11 +47,30 @@ and loopback servers (`test/fixtures/`). Mocking a module couples the test to ho
 test per variant, so they run at once) or tagged `@full`. *Checked:* `bun run test:health` lists the slow ones and
 breaks on any far over the threshold.
 
-**8. Extend before adding.** Search for the bug's id or the behaviour first; a new case often belongs in an existing
-test. One behaviour per test, named for what it checks: `BUG-<n>/<case>: <what holds>`.
+**8. Every test names what it promises; a bug strengthens that test.** A test's title starts with the id of its entry in
+the catalog (`test/catalog.ts`): `feature/entry: <what holds>`. A bug fix makes the test of the entry that should have
+caught it fail, then fixes the code, and tags the test `#BUG-<n>`; when no entry could have caught it, the fix adds the
+missing one. Search the catalog before adding a test: a new case often belongs in an existing one.
+*Checked:* `test/catalog.test.ts`: every entry has a test and every test a known entry (today's untagged tests are a
+baseline that only goes down); `red-check` runs a newly tagged test against the base.
 
 **9. A failure says what to do.** A check that fails names the file, what is wrong and how to fix it, so the next
 person, or agent, acts on it without reading the check.
+
+## The catalog
+
+The catalog (`test/catalog.ts`) lists what Gluon promises, so that every promise is tested and every test checks one.
+
+- A **feature** is something a user can name: the composer, resume, the cost figure, routing.
+- A **behaviour** is one observable rule of a feature: given this, when that, then this holds. Observable means through
+  the product's surface (the screen, the bytes that reach the agent, files, the exit code) or a seam's contract, never an
+  internal function.
+- An **invariant** holds everywhere (the rules in `AGENTS.md`); a **perf limit** is how fast Gluon must feel.
+
+A change that adds a behaviour adds its entry and its test in the same pull request, the entry written from the guide or
+the spec before the code. Adding, changing or removing an entry or a seam (`test/seams.ts`) is a maintainer's decision:
+`test-guard` lists it until the pull request has the `tests-reviewed` label. A test may be deleted when it names no entry,
+or when another test checks its entry at the same layer or a better one; the pull request says which, for each test.
 
 ## Pruning
 
@@ -92,4 +111,4 @@ credentials or a network each one is skipped, never failed. They never run in CI
 - [Contributing](contributing.md): running the tests, what CI runs.
 - [Maintenance](maintenance.md): keeping the tests fresh.
 
-<!-- Keeping this file fresh: update when a rule above changes or a check that enforces one does: test/test-style.test.ts (and its baseline), scripts/red-check.ts, scripts/test-guard.ts, the quarantine and slow-test checks in scripts/test-health.ts, or CI's jobs in .github/workflows/ci.yml. test/AGENTS.md holds the same rules in one line each, for agents: change both together. -->
+<!-- Keeping this file fresh: update when a rule above changes or a check that enforces one does: test/test-style.test.ts (and its baseline), test/catalog.test.ts (the catalog, the seams and their baseline), scripts/red-check.ts, scripts/test-guard.ts, the quarantine and slow-test checks in scripts/test-health.ts, or CI's jobs in .github/workflows/ci.yml. test/AGENTS.md holds the same rules in one line each, for agents: change both together. -->

@@ -87,7 +87,8 @@ Linux's, so a Windows agent (`/mnt/c/…/claude.exe`, an npm `codex.cmd`) may be
   keeps some sequences to itself, so the frame may miss an agent's kitty keyboard flags and mouse
   requests, and draws wide characters with ConPTY's widths.
 - **Typing in a session is ~50–65 ms slower** than on Linux and macOS (a key crosses two ConPTYs).
-  `bun run test:windows perf` holds it to 80 ms at the 95th percentile.
+  The perf suite holds it to 80 ms at the 95th percentile (`perf/key-session` in `test/catalog.ts`); CI doesn't run the
+  perf suite, so on Windows it is checked by hand (`bun run test:windows perf`).
 - **Newline in the intake chat:** Windows Terminal takes Alt+Enter (full screen); `ctrl+j` inserts
   a newline. In the legacy console, Alt+Enter works too.
 - **Agents installed by npm** are `.cmd` shims. Gluon runs the native exe behind a shim when there is

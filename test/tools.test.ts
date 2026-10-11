@@ -16,8 +16,8 @@ import { BUN_FLAGS, SLOW, SYSTEM_ENV } from "./e2e/harness.ts";
 const run = (name: string, input: Record<string, unknown>) => runRepoTool(repo.hazards(), name, input);
 
 describe("BUG-27: nothing outside the repo, no secrets, no binaries", () => {
-  test("H1: a path out of the repo is refused", () => expect(run("read_file", { path: "../../etc/passwd" })).rejects.toThrow("outside the repository"));
-  test.skipIf(!canSymlink)("H2: a symlink out of the repo is refused", async () => {
+  test("repo-tools/sandbox-within: H1: a path out of the repo is refused", () => expect(run("read_file", { path: "../../etc/passwd" })).rejects.toThrow("outside the repository"));
+  test.skipIf(!canSymlink)("repo-tools/sandbox-within: H2: a symlink out of the repo is refused", async () => {
     await expect(run("read_file", { path: "host-link" })).rejects.toThrow("links outside");
     await expect(run("read_file", { path: "etc-link/passwd" })).rejects.toThrow("links outside");
     await expect(run("list_files", { path: "etc-link" })).rejects.toThrow("links outside");
@@ -59,7 +59,7 @@ describe("issue 52: sessions' worktrees under .gluon are not the repository's fi
 });
 
 describe("the sandbox check, on every platform's paths", () => {
-  test("win32: another drive and a UNC share are outside", () => {
+  test("repo-tools/sandbox-within: win32: another drive and a UNC share are outside", () => {
     expect(within("C:\\repo", "D:\\x", win32)).toBe(false);
     expect(within("C:\\repo", "\\\\server\\share\\x", win32)).toBe(false);
     expect(within("C:\\repo", "C:\\other", win32)).toBe(false);
@@ -70,7 +70,7 @@ describe("the sandbox check, on every platform's paths", () => {
     expect(within("C:\\repo", "C:\\repo\\src\\a.ts", win32)).toBe(true);
     expect(within("C:\\repo", "C:\\repo\\..foo", win32)).toBe(true);
   });
-  test("posix: .., a sibling and / are outside; ..foo and nested paths are inside", () => {
+  test("repo-tools/sandbox-within: posix: .., a sibling and / are outside; ..foo and nested paths are inside", () => {
     expect(within("/repo", "/", posix)).toBe(false);
     expect(within("/repo", "/other", posix)).toBe(false);
     expect(within("/repo", "/repo-x/a", posix)).toBe(false);
@@ -124,7 +124,7 @@ describe("no POSIX tools: the JS fallbacks", () => {
     expect(r.lines).toHaveLength(3);
     expect(r.total).toBe(301);
   });
-  test("with no rg and no git on PATH, the tools still answer and repoContext says it's not a repo", async () => {
+  test("repo/no-posix-tools: with no rg and no git on PATH, the tools still answer and repoContext says it's not a repo", async () => {
     const tiny = repo.tiny();
     process.env.PATH = mkdtempSync(join(tmpdir(), "gluon-nopath-"));
     expect(await runRepoTool(tiny, "list_files", {})).toBe("README.md\npackage.json\nsrc/math.ts\ntest/math.test.ts");
@@ -172,7 +172,7 @@ describe("the JS search can't hang or leak (phase 1 review)", () => {
     closeSync(fd);
     expect((await grepFallback(d, ".", "needle", 100)).lines).toEqual(["small.txt:1:needle"]);
   });
-  test("BUG-92/H11: read_file refuses a symlink to a secret file, or a file in a .env* directory", async () => {
+  test("repo-tools/secret-files: read_file refuses a symlink to a secret file, or a file in a .env* directory #BUG-92", async () => {
     const d = dir({ "sub/.env.local": "KEY=1\n", ".env.d/app": "KEY=2\n", "ok.txt": "fine\n" });
     if (canSymlink) {
       symlinkSync("sub/.env.local", join(d, "link.txt"));
@@ -189,7 +189,7 @@ describe("the JS search can't hang or leak (phase 1 review)", () => {
     process.env.PATH = mkdtempSync(join(tmpdir(), "gluon-nopath-"));
     expect(await runRepoTool(d, "grep", { pattern: "KEY" })).toBe(".env.example:1:KEY\nok.txt:1:KEY");
   });
-  test("BUG-93/H13: rg and git grep results are filtered by the same rule", () => {
+  test("repo-tools/secret-files: rg and git grep results are filtered by the same rule #BUG-93", () => {
     const r = { lines: ["src/a.ts:1:KEY", "./.ENV:2:KEY", "conf/.env.d/x:3:KEY", "keys/id_ed25519:1:KEY", "b.pem:1:KEY", ".env.example:1:KEY", "odd:name.ts:4:KEY"], total: 9, code: 0, stderr: "" };
     dropSecretMatches(r);
     expect(r.lines).toEqual(["src/a.ts:1:KEY", ".env.example:1:KEY", "odd:name.ts:4:KEY"]);
@@ -289,7 +289,7 @@ describe("grep never searches secret files, whatever backend (docs review)", () 
 });
 
 describe("BUG-131: a hostile .git/config runs nothing", () => {
-  test.skipIf(process.platform === "win32")("H16: core.fsmonitor is never run by list_files, grep or repoContext", async () => {
+  test.skipIf(process.platform === "win32")("repo/git-via-gitargv: H16: core.fsmonitor is never run by list_files, grep or repoContext", async () => {
     const d = mkdtempSync(join(tmpdir(), "gluon-fsmonitor-"));
     const marker = join(d, "..", `${d.split("/").pop()}-PWNED`);
     const git = (...args: string[]) => Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: d, stdout: "pipe", stderr: "pipe" });
@@ -481,7 +481,7 @@ describe("issue #17: git_status, git_log, git_diff", () => {
     expect(await gt(d, "git_diff", { ref: "main" })).toContain("a.txt");
   });
 
-  test("H26: secret files' diffs are omitted, worktree and history; others stay", async () => {
+  test("repo-tools/secret-files: H26: secret files' diffs are omitted, worktree and history; others stay", async () => {
     const { d, git, write } = gitRepo({ "a.txt": "1\n", ".env": "KEY=old\n", "key.pem": "old\n", ".env.d/x": "old\n" });
     write({ "a.txt": "2\n", ".env": "KEY=sk-new\n", "key.pem": "PRIVATE\n", ".env.d/x": "TOKEN\n", ".env.example": "KEY=\n" });
     git("add", "-A");
@@ -499,7 +499,7 @@ describe("issue #17: git_status, git_log, git_diff", () => {
     expect(await gt(d, "git_diff", { ref: "HEAD" })).not.toContain("sk-new");
   });
 
-  test("H27: git_status and git_diff never write .git/index", async () => {
+  test("repo-tools/read-only: H27: git_status and git_diff never write .git/index", async () => {
     const { d, git } = gitRepo({ "a.txt": "1\n" });
     const index = join(d, ".git", "index");
     const old = new Date(2000, 0, 1);
@@ -1136,7 +1136,7 @@ describe("QA-sec: the secret-file rule against what real repositories keep", () 
     expect(leaks).toEqual([]);
   };
 
-  test("the documented rule holds: .env*, keys and certificates, .npmrc, .netrc, .pgpass, credentials (and a link to one)", () => {
+  test("repo-tools/secret-files: the documented rule holds: .env*, keys and certificates, .npmrc, .netrc, .pgpass, credentials (and a link to one)", () => {
     for (const n of [".env", ".env.local", "a/.ENV", "x.pem", "x.KEY", "x.p12", "x.pfx", "x.keystore", "id_rsa", "id_ed25519", "ID_ECDSA", ".npmrc", ".netrc", ".pgpass", ".aws/credentials", "a/.env.d/x.txt", ".envrc"]) expect(isSecretPath(n), n).toBe(true);
     for (const n of [".env.example", ".env.sample", ".env.template", "env.ts", "id_rsa.pub", "README.md"]) expect(isSecretPath(n), n).toBe(false);
   });
@@ -1369,7 +1369,7 @@ describe("QA-sec: untrusted text in the intake prompt (BUG-459 for what isn't a 
 });
 
 describe("QA-sec: a repository's own configuration, every trap at once", () => {
-  test.skipIf(process.platform === "win32")("fsmonitor, pager, diff.external, textconv, filter drivers, sshCommand, askPass, credential helper, gpg, editor, hooksPath, aliases for status and log, an ext:: promisor remote: no tool starts any of them", async () => {
+  test.skipIf(process.platform === "win32")("repo/git-via-gitargv: fsmonitor, pager, diff.external, textconv, filter drivers, sshCommand, askPass, credential helper, gpg, editor, hooksPath, aliases for status and log, an ext:: promisor remote: no tool starts any of them", async () => {
     const root = mkdtempSync(join(tmpdir(), "gluon-qatraps-"));
     const d = join(root, "repo");
     const marks = join(root, "marks");

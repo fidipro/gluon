@@ -576,7 +576,7 @@ describe("Grok Build reader: the box, not the cursor", () => {
     s.dispose();
   });
 
-  test("the menu: the row marked `❯ /` between the two rules above the box; none highlighted: unsure (\"\"); no rule: no menu", async () => {
+  test("pty/unsure-forward: the menu: the row marked `❯ /` between the two rules above the box; none highlighted: unsure (\"\"); no rule: no menu", async () => {
     const rule = "  " + "─".repeat(30);
     const panel = (lit: string) => [rule, ...["/clear", "/compact", "/config"].map((c) => (c === lit ? `    ❯ ${c}  about` : `      ${c}  about`)), rule].join("\r\n");
     const at = async (menu: string, input = "/c") => {

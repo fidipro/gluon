@@ -157,7 +157,7 @@ describe("doctor (BUG-24)", () => {
 });
 
 describe("BUG-98: status checks run outside the repository", () => {
-  test("doctor runs every harness's status and version check in a neutral directory, never the repo", async () => {
+  test("repo/neutral-cwd: doctor runs every harness's status and version check in a neutral directory, never the repo", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-cwdlog-"));
     const log = join(dir, "cwd.log");
     const yaml = "connections: { claude-code: { auth: subscription }, codex: { auth: subscription }, antigravity: { auth: subscription }, grok-build: { auth: subscription }, opencode: { providers: [opencode-go] } }\n";
@@ -175,7 +175,7 @@ describe("QA pass 2", () => {
   let dryN = 0;
   const dry = async (yaml: string, args: string[], env: Record<string, string | undefined> = {}) => cli(["--launch", ...args, "--dry-run", "--", "- a spec"], { env: { GLUON_CONFIG: conn(`dry-${++dryN}-${args.join("-")}`, yaml), ...env } });
 
-  test("BUG-56/8.4: a repository's bunfig.toml preload never runs inside gluon", async () => {
+  test("repo/bun-autoloads-nothing: a repository's bunfig.toml preload never runs inside gluon #BUG-56", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-bunfig-"));
     const marker = join(dir, "PRELOAD-RAN");
     writeFileSync(join(dir, "bunfig.toml"), 'preload = ["./p.ts"]\n');

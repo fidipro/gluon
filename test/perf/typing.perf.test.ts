@@ -114,7 +114,7 @@ function breaches(label: string, rows: Row[], singleLimit = NOTICEABLE_ADDED_MS,
 }
 
 describe.skipIf(!PERF)("perf: burst typing", () => {
-  test("the harness floor: pty, xterm and polling, with the fake agent's TUI alone", async () => {
+  test("perf/key-session: the harness floor: pty, xterm and polling, with the fake agent's TUI alone", async () => {
     const f = await measureFloor();
     m.add("typing.floor_p50_ms", f.p50, "ms", undefined, true);
     m.add("typing.floor_p95_ms", f.p95, "ms", undefined, true);
@@ -124,7 +124,7 @@ describe.skipIf(!PERF)("perf: burst typing", () => {
     expect(f.p50).toBeLessThan(WIN ? NOTICEABLE_ADDED_MS * 0.8 : NOTICEABLE_ADDED_MS / 2);
   }, 60_000);
 
-  test("burst typing inside a session, with 1, 10 and 40 sessions open", async () => {
+  test("perf/burst-typing: burst typing inside a session, with 1, 10 and 40 sessions open", async () => {
     const p = await perfApp(WIDE, 30);
     for (const n of COUNTS) {
       await openTo(p, n);
@@ -154,7 +154,7 @@ describe.skipIf(!PERF)("perf: burst typing", () => {
     p.app.kill();
     expect(worst, `typing latency at the home composer, over its limit (p95 added ${PLATFORM_ADDED_P95_MS} ms, ${PLATFORM_REPEAT_ADDED_P95_MS} at 25 keys/s):\n${worst.join("\n")}`).toEqual([]);
   };
-  (WIN ? test.skip : test)("BUG-615/QA-perf-01: the home composer keeps typing latency under the noticeable limit, with no sessions and with 10 and 40", homeBursts, 900_000);
+  (WIN ? test.skip : test)("perf/key-home: the home composer keeps typing latency under the noticeable limit, with no sessions and with 10 and 40 #BUG-615", homeBursts, 900_000);
   // On Windows the bursts at the home composer stay over the accepted two-ConPTY ceiling (BUG-616). p95 added, 0 / 10 / 40 sessions,
   // production React build (2026-10-07): 50 / 51 / 119 ms at 12 keys/s and 111 / 122 / 156 ms at 25 keys/s. Open: the owner left it.
   (WIN && !QUICK ? test.failing : test.skip)("BUG-CANDIDATE/QA-perf-06: win32 home bursts (12 and 25 keys/s) exceed the accepted 80 ms ConPTY ceiling", homeBursts, 900_000);
@@ -162,7 +162,7 @@ describe.skipIf(!PERF)("perf: burst typing", () => {
   // Typing in a session while another floods (QA-perf-02: a candidate once, when the flood ended before the bursts did and
   // the measurement was of nothing; with a flood that lasts, a quiet Linux machine adds about 20 ms at p95, so it is no
   // bug there). The flood must still run when the bursts end, or the test is wrong.
-  test("burst typing in a session while another session floods: no key is lost, none queues up, the latency stays under the noticeable limit", async () => {
+  test("perf/burst-typing: burst typing in a session while another session floods: no key is lost, none queues up, the latency stays under the noticeable limit", async () => {
     const { p, floor, rows, flooding } = await duringFlood();
     // On Windows two ConPTYs breach the limit with or without a flood (an accepted cost, BUG-616): recorded, not held.
     record("flood.session", floor, rows, !WIN);

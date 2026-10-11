@@ -58,7 +58,7 @@ describe("claudeCacheTtl", () => {
     expect(readSettingsFile(join(dir, "small.json"))).toBe('{"promptCacheTtl":"1h"}');
   });
 
-  test("BUG-333/never-credentials: over a home holding every credential file, only the three settings files are opened, and no other key (the env block included) is read", () => {
+  test("subscriptions/never-read-credentials: over a home holding every credential file, only the three settings files are opened, and no other key (the env block included) is read #BUG-333", () => {
     const home = mkdtempSync(join(tmpdir(), "gluon-home-"));
     const cwd = mkdtempSync(join(tmpdir(), "gluon-cwd-"));
     mkdirSync(join(home, ".claude"));

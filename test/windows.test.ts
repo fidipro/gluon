@@ -148,7 +148,7 @@ describe("the rest of native Windows", () => {
     expect(claudeExecutable("linux", () => "/usr/bin/claude")).toBe("/usr/bin/claude");
   });
 
-  test("BUG-56 on every OS: package scripts run Bun with an empty bunfig (Windows can't open /dev/null), shebangs with /dev/null", () => {
+  test("repo/bun-autoloads-nothing: BUG-56 on every OS: package scripts run Bun with an empty bunfig (Windows can't open /dev/null), shebangs with /dev/null", () => {
     const root = join(import.meta.dir, "..");
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: Record<string, string> };
     const runs = Object.entries(pkg.scripts).filter(([, cmd]) => /^bun (?!test|run|install)/.test(cmd));
@@ -173,7 +173,7 @@ describe("review of phase 3", () => {
   const tmp = mkdtempSync(join(tmpdir(), "gluon-review-"));
   afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
-  test.skipIf(WIN)("BUG-102: a `git` / `rg` planted in the repository never runs, even with . on PATH", () => {
+  test.skipIf(WIN)("repo/spawn-via-binpath: a `git` / `rg` planted in the repository never runs, even with . on PATH #BUG-102", () => {
     const repo = join(tmp, "planted");
     mkdirSync(repo);
     writeFileSync(join(repo, "a.txt"), "needle\n");
@@ -192,7 +192,7 @@ console.log(JSON.stringify({ repo: repoContext(process.cwd()).isRepo, grep: awai
     expect(existsSync(marker)).toBe(false);
   });
 
-  test("BUG-102: no Bun.spawn / spawnSync in src names its binary by a bare name (binPath or windowsTool give the absolute path)", () => {
+  test("repo/spawn-via-binpath: no Bun.spawn / spawnSync in src names its binary by a bare name (binPath or windowsTool give the absolute path) #BUG-102", () => {
     const src = join(import.meta.dir, "../src");
     const all = (d: string): string[] => require("node:fs").readdirSync(d, { withFileTypes: true }).flatMap((e: { name: string; isDirectory(): boolean }) => (e.isDirectory() ? all(join(d, e.name)) : /\.tsx?$/.test(e.name) ? [join(d, e.name)] : []));
     for (const f of all(src)) {

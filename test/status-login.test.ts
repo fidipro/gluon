@@ -60,7 +60,7 @@ describe("the small pure pieces", () => {
 });
 
 describe.skipIf(!POSIX)("run", () => {
-  test("runs in an empty private directory, never the caller's cwd (a repository's bunfig.toml / .env must not be seen), with the env it is given", async () => {
+  test("repo/neutral-cwd: runs in an empty private directory, never the caller's cwd (a repository's bunfig.toml / .env must not be seen), with the env it is given", async () => {
     fakes({ probe: 'pwd; ls -A | wc -l; echo "VAR=$PROBE_VAR"' });
     const r = await run([join(process.env.PATH!.split(delimiter)[0]!, "probe")], 5000, { ...process.env, PROBE_VAR: "x" });
     const [cwd, count, v] = r.stdout.trim().split("\n");
@@ -153,7 +153,7 @@ describe.skipIf(!POSIX)("agy models / grok models", () => {
     expect(await listedModels("grok")).toMatchObject({ loggedIn: false, error: "grok is not installed (not found on PATH)" });
     expect(await loginStatus("grok-build")).toEqual({ installed: false, loggedIn: false });
   });
-  test("a key printed by the binary is masked in the error", async () => {
+  test("keys/masked-when-printed: a key printed by the binary is masked in the error", async () => {
     fakes({ agy: "echo 'AIzaSyA1234567890abcdefghijklmnopqrstu rejected'; exit 2" });
     const r = await listedModels("agy");
     expect(r.error).toBe("AIza•••• rejected");
@@ -179,7 +179,7 @@ describe.skipIf(!POSIX)("versionOf", () => {
   });
 });
 
-test.skipIf(!POSIX)("the status checks never run in the repository: a fake `claude` that records its cwd sees the neutral directory", async () => {
+test.skipIf(!POSIX)("repo/neutral-cwd: the status checks never run in the repository: a fake `claude` that records its cwd sees the neutral directory", async () => {
   const log = join(TMP, "cwd.log");
   fakes({ claude: `pwd > '${log}'; echo '{"loggedIn":false}'` });
   const prev = process.cwd();

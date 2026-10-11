@@ -16,7 +16,7 @@ afterAll(() => {
 });
 
 describe.skipIf(!PERF || QUICK || !CAN_MEASURE_PROCS)("perf: soak", () => {
-  test(`5 sessions printing for ${MINUTES} minutes: no unbounded growth`, async () => {
+  test(`perf/soak: 5 sessions printing for ${MINUTES} minutes: no unbounded growth`, async () => {
     if (MINUTES < 6) throw new Error("GLUON_PERF_SOAK_MIN must be at least 6: the last third needs samples");
     const p = await perfApp();
     for (let i = 0; i < 5; i++) {

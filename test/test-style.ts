@@ -34,10 +34,10 @@ export function bareTimeBounds(text: string): string[] {
   return [...text.matchAll(re)].map((m) => m[0]);
 }
 
-/** The bug ids a file's tests name (`BUG-nn/…` or `BUG-nn:`), outside comments. */
+/** The bug ids a file's tests name (`BUG-nn/…`, `BUG-nn:` or a `#BUG-nn` tag), outside comments. */
 export function bugIds(text: string): Set<string> {
   const code = text.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
-  return new Set([...code.matchAll(/\b(BUG-\d+)[/:]/g)].map((m) => m[1]!));
+  return new Set([...code.matchAll(/\b(BUG-\d+)[/:]|#(BUG-\d+)\b/g)].map((m) => (m[1] ?? m[2])!));
 }
 
 // ——— the suite as it is ———

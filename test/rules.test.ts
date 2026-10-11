@@ -107,7 +107,7 @@ describe("the old name", () => {
 const CONFIG_ALLOWLIST: Record<string, RegExp> = { "src/cost/harness-config.ts": /(["'`/])\.claude(?=["'`/])/g };
 
 describe("rule 1: never touch any harness's credentials", () => {
-  test("no source reads a token file, a harness's config directory or the keychain", () => {
+  test("subscriptions/never-read-credentials: no source reads a token file, a harness's config directory or the keychain", () => {
     for (const [file, source] of SRC) {
       // install.ts looks for grok's binary in the installer's bin directory (~/.grok/bin): a path it checks exists, never reads.
       let text = file.endsWith("install.ts") ? source.replaceAll('".grok", "bin"', "") : source;
@@ -120,7 +120,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     }
   });
 
-  test("the third exception (issue #39): harness-config.ts alone names Claude's settings files, joins only the local, project and user settings, reads only the two TTL keys, and names no credential, account file or other harness's config", () => {
+  test("subscriptions/never-read-credentials: the third exception (issue #39): harness-config.ts alone names Claude's settings files, joins only the local, project and user settings, reads only the two TTL keys, and names no credential, account file or other harness's config", () => {
     const text = SRC.find(([f]) => f === "src/cost/harness-config.ts")![1];
     expect([...text.matchAll(/join\(([^()]*)\)/g)].map((m) => m[1]).filter((a) => /claude|settings/.test(a!))).toEqual([
       'home, ".claude"',
@@ -133,7 +133,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     for (const [file, other] of SRC) if (file !== "src/cost/harness-config.ts") expect([file, /settings\.local\.json|promptCacheTtl/i.test(other)]).toEqual([file, false]);
   });
 
-  test("the second exception (owner-approved, issue #39; off unless cost.antigravity_statusline): agy-settings.ts is the only file that names agy's settings.json, touches only its statusLine key and Gluon's own script, and nothing else of the harnesses'", () => {
+  test("subscriptions/never-edit-other-tools-files: the second exception (owner-approved, issue #39; off unless cost.antigravity_statusline): agy-settings.ts is the only file that names agy's settings.json, touches only its statusLine key and Gluon's own script, and nothing else of the harnesses'", () => {
     const text = SRC.find(([f]) => f === "src/adapters/agy-settings.ts")![1];
     expect([...text.matchAll(/join\(([^()]*)\)/g)].map((m) => m[1]).filter((a) => /gemini/.test(a!))).toEqual(['home, ".gemini", "antigravity-cli", "settings.json"']);
     // Only the statusLine key is ever set or removed; the rest of the user's settings is written back as it was parsed.
@@ -142,7 +142,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     for (const [file, other] of SRC) if (file !== "src/adapters/agy-settings.ts" && file !== "src/adapters/permanent.ts") expect([file, other.includes(`"antigravity-cli", "settings.json"`)]).toEqual([file, false]);
   });
 
-  test("the exception: permanent.ts writes only ~/.grok/hooks/gluon.json (and removes ~/.grok/hooks/fidicode.json and v1's ~/.gemini/config/plugins/fidicode, the names before the rename), inert without GLUON_EVENTS", () => {
+  test("subscriptions/never-edit-other-tools-files: the exception: permanent.ts writes only ~/.grok/hooks/gluon.json (and removes ~/.grok/hooks/fidicode.json and v1's ~/.gemini/config/plugins/fidicode, the names before the rename), inert without GLUON_EVENTS", () => {
     const text = SRC.find(([f]) => f === "src/adapters/permanent.ts")![1];
     // Every path it names under those directories is its own.
     expect([...text.matchAll(/join\(([^()]*(\([^()]*\))?[^()]*)\)/g)].map((m) => m[1]).filter((a) => /grok|gemini/.test(a!))).toEqual([
@@ -160,7 +160,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     expect(removePermanentFiles({ home, env: {} })).toHaveLength(1);
   });
 
-  test("status and login go only through the official binaries' own commands", () => {
+  test("subscriptions/official-binaries-only: status and login go only through the official binaries' own commands", () => {
     for (const h of HARNESSES) {
       const sub = HARNESS_INFO[h].subscription;
       if (sub) expect(sub.loginArgv[0]).toBe(HARNESS_INFO[h].binary);
@@ -175,7 +175,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     expect(SRC.find(([f]) => f === "src/agent/codex.ts")![1]).toContain('[codex, "login", "status"]');
   });
 
-  test("Gluon never edits another tool's settings file: it tells the user what to set", () => {
+  test("subscriptions/never-edit-other-tools-files: Gluon never edits another tool's settings file: it tells the user what to set", () => {
     for (const [file, text] of SRC) expect([file, text]).not.toEqual([file, expect.stringMatching(/writeFileSync\([^)]*(settings\.json|config\.toml)/)]);
     expect(HARNESS_INFO.antigravity.keyNote?.gemini).toContain("set that yourself");
   });
@@ -185,7 +185,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     expect(BASE_URL_ENV).toContain("GOOGLE_GEMINI_BASE_URL");
   });
 
-  test("the subscription brain never builds an HTTP client: no Anthropic SDK or fetch at runtime", () => {
+  test("subscriptions/plan-brain-official-only: the subscription brain never builds an HTTP client: no Anthropic SDK or fetch at runtime", () => {
     const text = SRC.find(([f]) => f === "src/agent/subscription.ts")![1];
     expect(text).not.toMatch(/^import (?!type )[^\n]*"@anthropic-ai\/(sdk|bedrock-sdk)"/m);
     expect(text).not.toMatch(/\bfetch\(|https?:\/\//);
@@ -198,7 +198,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     }
   });
 
-  test("no impersonation of any harness in any prompt Gluon sends", () => {
+  test("subscriptions/no-impersonation: no impersonation of any harness in any prompt Gluon sends", () => {
     // Gluon's own text: the repository's AGENTS.md / CLAUDE.md shown after it are the project's words, not Gluon's.
     const prompt = systemPrompt(loadConfig(), { ...repoContext(ROOT), instructions: [] });
     expect(prompt).not.toMatch(/you are claude code|claude code, anthropic's official|claude-cli|x-app|you are codex|you are (antigravity|gemini cli|grok)/i);
@@ -208,7 +208,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     expect(threadStartParams("gpt-6-sol", ROOT, prompt).baseInstructions).toBe(prompt);
   });
 
-  test("the SDK runs the user's own claude with Gluon's prompt and tools only, none of the user's settings", () => {
+  test("subscriptions/plan-brain-official-only: the SDK runs the user's own claude with Gluon's prompt and tools only, none of the user's settings", () => {
     const opts = subscriptionOptions("claude-sonnet-5-5", ROOT, "You are Gluon.", {});
     expect(opts.pathToClaudeCodeExecutable).toBe(onPath("claude")!);
     expect(opts.pathToClaudeCodeExecutable).toContain("gluon-e2e-");
@@ -220,7 +220,7 @@ describe("rule 1: never touch any harness's credentials", () => {
 });
 
 describe("rules 1 and 4: no base URL on a subscription, no token forwarding", () => {
-  test("the env for claude and codex is the user's own (plus only the SDK's app name for claude)", () => {
+  test("subscriptions/no-token-forwarding: the env for claude and codex is the user's own (plus only the SDK's app name for claude)", () => {
     const env = subscriptionEnv();
     expect(Object.keys(env).filter((k) => !(k in process.env))).toEqual(["CLAUDE_AGENT_SDK_CLIENT_APP"]);
     expect(Object.keys(codexEnv()).filter((k) => !(k in process.env))).toEqual([]);
@@ -230,7 +230,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     }
   });
 
-  test("no source sets a login token, and only the OpenRouter path sets a base URL (OpenRouter's endpoint)", () => {
+  test("subscriptions/no-token-forwarding: no source sets a login token, and only the OpenRouter path sets a base URL (OpenRouter's endpoint)", () => {
     for (const [file, text] of SRC) {
       expect([file, text]).not.toEqual([file, expect.stringMatching(/(CLAUDE_CODE_OAUTH_TOKEN|CODEX_ACCESS_TOKEN|XAI_ACCESS_TOKEN|GOOGLE_OAUTH_ACCESS_TOKEN)["']?\s*(:|=[^=])/)]);
       const sets = [...text.matchAll(/\b([A-Z_]*BASE_URL)\s*=\s*([^;\n]+)/g)];
@@ -283,7 +283,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     }
   });
 
-  test("BUG-81/6: every harness × connection, argv and env: a base URL only on OpenRouter (its endpoints) and Codex on an OpenAI key (OpenAI's own)", () => {
+  test("subscriptions/base-url-allowlist: every harness × connection, argv and env: a base URL only on OpenRouter (its endpoints) and Codex on an OpenAI key (OpenAI's own) #BUG-81", () => {
     const keys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "OPENCODE_API_KEY", "MOONSHOT_API_KEY"];
     for (const k of keys) process.env[k] = `sk-test-${k.toLowerCase()}-0123456789abcdef`;
     // The only endpoints Gluon may point an agent at, and where.
@@ -324,7 +324,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     }
   });
 
-  test("the real-harness tier's seam (GLUON_TEST_MODEL_URL): a loopback URL only, on Anthropic, OpenAI and OpenRouter keys only; never a plan or Bedrock", () => {
+  test("subscriptions/base-url-allowlist: the real-harness tier's seam (GLUON_TEST_MODEL_URL): a loopback URL only, on Anthropic, OpenAI and OpenRouter keys only; never a plan or Bedrock", () => {
     expect(process.env.GLUON_TEST_MODEL_URL).toBeUndefined();
     const keys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"];
     for (const k of keys) process.env[k] = `sk-test-${k.toLowerCase()}-0123456789abcdef`;
@@ -358,7 +358,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     }
   });
 
-  test("a token or a base URL is refused, except OpenRouter's own endpoint on an OpenRouter connection", () => {
+  test("subscriptions/no-token-forwarding: a token or a base URL is refused, except OpenRouter's own endpoint on an OpenRouter connection", () => {
     for (const k of TOKEN_ENV) for (const conn of [undefined, "plan", "openrouter", "anthropic"] as const) expect(() => assertSafeEnv({ [k]: "x" }, conn)).toThrow(k);
     expect(() => assertSafeEnv({ SOME_OAUTH_TOKEN: "x" }, "openrouter")).toThrow();
     for (const k of BASE_URL_ENV) {
@@ -371,7 +371,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     expect(() => assertSafeEnv({ ANTHROPIC_AUTH_TOKEN: "k" }, "anthropic")).toThrow();
   });
 
-  test("Kimi Code's KIMI_MODEL_BASE_URL: OpenRouter's endpoint on kimi-code + openrouter only; nowhere else, no other value, no Kimi plan endpoint", () => {
+  test("subscriptions/base-url-allowlist: Kimi Code's KIMI_MODEL_BASE_URL: OpenRouter's endpoint on kimi-code + openrouter only; nowhere else, no other value, no Kimi plan endpoint", () => {
     const openrouter = { KIMI_MODEL_BASE_URL: "https://openrouter.ai/api/v1" };
     expect(() => assertSafeEnv(openrouter, "openrouter", "kimi-code")).not.toThrow();
     // Not for another harness, another connection, or no harness named (the subscription and login callers).
@@ -385,7 +385,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     expect(() => assertSafeEnv({ ...openrouter, KIMI_MODEL_API_KEY: "sk-or-v1-x", KIMI_MODEL_NAME: "moonshotai/kimi-k3", KIMI_CODE_NO_AUTO_UPDATE: "1" }, "openrouter", "kimi-code")).not.toThrow();
   });
 
-  test("the brain's plan routes never get a key, token or base URL", () => {
+  test("subscriptions/base-url-allowlist: the brain's plan routes never get a key, token or base URL", () => {
     const brain = SRC.find(([f]) => f === "src/brain.ts")![1];
     const plan = brain.slice(brain.indexOf('case "claude-plan":\n      return subscriptionBrain'), brain.indexOf('case "anthropic-api":\n      return anthropicBrain'));
     expect(plan).toContain("subscriptionBrain(model, cwd, undefined, effort as Effort | null)");
@@ -395,7 +395,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
 });
 
 describe("rule 2: keys", () => {
-  test("keys from Gluon's .env stay out of process.env (so an agent on its own login isn't billed)", () => {
+  test("keys/never-in-process-env: keys from Gluon's .env stay out of process.env (so an agent on its own login isn't billed)", () => {
     saveSecret("ANTHROPIC_API_KEY", "sk-ant-api03-savedsavedsavedsaved");
     loadSecrets();
     expect(secret("ANTHROPIC_API_KEY")).toBe("sk-ant-api03-savedsavedsavedsaved");
@@ -448,7 +448,7 @@ describe("rule 2: keys", () => {
     rmSync(process.env.GLUON_CONFIG!);
   });
 
-  test("the environment's key is used as is, never stripped", () => {
+  test("subscriptions/user-env-as-is: the environment's key is used as is, never stripped", () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-api03-fromenvfromenvfromenv";
     try {
       expect(subscriptionEnv().ANTHROPIC_API_KEY).toBe("sk-ant-api03-fromenvfromenvfromenv");
@@ -458,7 +458,7 @@ describe("rule 2: keys", () => {
   });
 });
 
-test("token-like values are masked, for every vendor", () => {
+test("keys/masked-when-printed: token-like values are masked, for every vendor", () => {
   const out = maskSecrets("key sk-ant-api03-AbCdEfGhIjKlMnOp, oauth sk-ant-oat01-ZyXwVuTsRqPo, aws AKIAABCDEFGHIJKLMNOP, Bearer abcdefghijklmnopqrstu");
   expect(out).not.toMatch(/AbCdEfGh|ZyXwVuTs|ABCDEFGHIJKLMNOP|abcdefghijklmnopqrstu/);
   expect(out).toContain("sk-ant-••••");
@@ -670,7 +670,7 @@ describe("masking (QA pass 2)", () => {
     expect(maskSecrets("src/agent/codex.ts line 42: model gpt-6-luna")).toBe("src/agent/codex.ts line 42: model gpt-6-luna");
   });
 
-  test("BUG-55/5.4: a key Gluon knows is masked by value, whatever its shape", () => {
+  test("keys/masked-when-printed: a key Gluon knows is masked by value, whatever its shape #BUG-55", () => {
     saveSecret("DASHSCOPE_API_KEY", "plainKEYwithNoKnownShape42");
     process.env.AWS_BEARER_TOKEN_BEDROCK = "anotherPlainValueNoShape99";
     try {
@@ -723,7 +723,7 @@ describe("installing a harness (Phase 4)", () => {
     for (const { m } of all) expect(new URL(m.docs).protocol).toBe("https:");
   });
 
-  test("the vendor's own installer over https from its own host, or its official npm package; no sudo, nothing interpolated", () => {
+  test("install/verbatim-no-sudo: the vendor's own installer over https from its own host, or its official npm package; no sudo, nothing interpolated", () => {
     for (const { h, p, m } of all) {
       const at = `${h}/${p}: ${m.command}`;
       expect(ALLOWED[h].hosts, at).toContain(m.host);
@@ -749,7 +749,7 @@ describe("installing a harness (Phase 4)", () => {
     }
   });
 
-  test("only install.ts runs an installer, through the shell it names (sh, Windows PowerShell by path, npm): no --yes", () => {
+  test("install/verbatim-no-sudo: only install.ts runs an installer, through the shell it names (sh, Windows PowerShell by path, npm): no --yes", () => {
     const src = readFileSync(join(ROOT, "src/install.ts"), "utf8");
     expect(src).toContain('[bin, "-c", m.command]');
     expect(src).toContain('[ps, "-NoProfile", "-Command", m.command]');

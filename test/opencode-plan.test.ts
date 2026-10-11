@@ -44,7 +44,7 @@ describe("the plan's sign-in", () => {
     expect((await fake({}, () => loginStatus("opencode"))).loggedIn).toBe(true);
   });
 
-  test("an OPENCODE_API_KEY variable (`type: env`) is not the plan, and a sign-in OpenCode wants redone is not signed in", async () => {
+  test("subscriptions/official-binaries-only: an OPENCODE_API_KEY variable (`type: env`) is not the plan, and a sign-in OpenCode wants redone is not signed in", async () => {
     expect(await fake({ FAKE_OPENCODE_ENV_ONLY: "1" }, opencodePlanStatus)).toEqual({ installed: true, loggedIn: false });
     const s = await fake({ FAKE_OPENCODE_NEEDS_AUTH: "1" }, opencodePlanStatus);
     expect(s).toMatchObject({ installed: true, loggedIn: false, error: expect.stringContaining("needs to be signed in to again") });

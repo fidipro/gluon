@@ -62,8 +62,8 @@ probes. Never make a test call a real model, agent or API.
 `bun run test:health` lists what in the tests has gone stale. `test/e2e/README.md` explains the
 end-to-end harness; [Writing tests](docs/contributing/testing.md), the rules CI holds a test to.
 
-- **A fixed bug gets a regression test** in `test/`: an end-to-end scenario in the `test/e2e/` file for its
-  area, or a test of a typed seam when the bug lives behind one ([Writing tests](docs/contributing/testing.md), rule 3). A maintainer gives it its bug number.
+- **A fixed bug makes a test fail first**: its catalog entry's test, end to end or at a seam, tagged `#BUG-nn`
+  ([Writing tests](docs/contributing/testing.md), rules 3 and 8). A maintainer gives it its bug number.
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request the changed areas' tests (`bun run regression --changed`)
   on Ubuntu 24.04, plus macOS 15 and Windows 2025 unless every area is Linux-only (`platforms`, `test/areas.ts`), gitleaks
   and the docs build; a push to main, on Ubuntu; `gate` is the required check. The full suite, `docker-test`, `build:all`
