@@ -154,6 +154,8 @@ function homeProblems(app: App, capture: boolean): string[] {
  * left out only where each shows, so the invariants stay a regression check. Delete an entry with its fix.
  */
 const KNOWN_LINT: { what: string; shows(app: App, problem: string): boolean }[] = [
+  // Not a bug: ConPTY reports a full-width row as wrapped (the wrapped-row check above skips Windows too).
+  { what: "Windows: every full-width row reads as wrapped", shows: (_app, p) => WIN && p.startsWith("wrap:") },
   {
     what: "below the minimum size (the matrix's h.tooSmall, typing at 19 columns), the home view's text reaches its right margin",
     shows: (app, p) => p.startsWith("cut:") && (app.term.cols < MIN_COLS || app.term.rows < MIN_ROWS),
