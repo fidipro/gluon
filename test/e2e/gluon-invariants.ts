@@ -164,16 +164,12 @@ function homeProblems(app: App, capture: boolean): string[] {
 }
 
 /**
- * Screen lints known to fail: real UI bugs the lints found when they joined the invariants (BUG-CANDIDATE, not fixed here),
- * left out only where each shows, so the invariants stay a regression check. Delete an entry with its fix.
+ * Screen lints left out where they can't hold: a terminal's own trait, or a real UI bug found and not fixed yet (a
+ * BUG-CANDIDATE), each narrowed to where it shows, so the invariants stay a regression check. Delete a bug's entry with its fix.
  */
 const KNOWN_LINT: { what: string; shows(app: App, problem: string): boolean }[] = [
   // Not a bug: ConPTY reports a full-width row as wrapped (the wrapped-row check above skips Windows too).
   { what: "Windows: every full-width row reads as wrapped", shows: (_app, p) => WIN && p.startsWith("wrap:") },
-  {
-    what: "below the minimum size (the matrix's h.tooSmall, typing at 19 columns), the home view's text reaches its right margin",
-    shows: (app, p) => p.startsWith("cut:") && (app.term.cols < MIN_COLS || app.term.rows < MIN_ROWS),
-  },
 ];
 
 /** Everything that doesn't hold on the screen now (empty: all good). */
