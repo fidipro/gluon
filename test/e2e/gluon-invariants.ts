@@ -89,6 +89,22 @@ function highlighted(app: App): string[] {
   return runs;
 }
 
+/**
+ * The info line and the frame's title name the same session's triple: `claude code × sonnet 5.5 × medium`, then ` · explore` and
+ * ` · accept edits` when the session has a mode or permissions (`tripleSegs`), which the info line's separator also splits
+ * (BUG-724). The info line's may be cut (BUG-257): ending in `…`, or at a segment, before a " × ". A problem, or undefined.
+ */
+export function tripleProblem(infoRow: string, title: string | undefined): string | undefined {
+  if (!title || title.includes("…")) return undefined;
+  // As many of the info line's parts as the title has, up to the part the cut ended in.
+  const parts = infoRow.trim().split(" · ");
+  const cut = parts.findIndex((p) => p.endsWith("…"));
+  const n = title.split(" · ").length;
+  const info = parts.slice(0, cut < 0 ? n : Math.min(n, cut + 1)).join(" · ");
+  const same = info === title || (info.endsWith("…") && title.startsWith(info.slice(0, -1))) || title.startsWith(`${info} × `);
+  return info.includes(" × ") && !same ? `info line: its triple ${JSON.stringify(info)} isn't the frame's ${JSON.stringify(title)}` : undefined;
+}
+
 function sessionProblems(app: App, e: Expect): string[] {
   const { cols, rows } = app.term;
   const lay = layout(cols, rows);
@@ -109,11 +125,9 @@ function sessionProblems(app: App, e: Expect): string[] {
   const tabs = highlighted(app);
   if (tabs.length !== 1) out.push(`tab strip: ${tabs.length} highlighted tabs (${JSON.stringify(tabs)}), not 1`);
   else if (e.tab && !tabs[0]!.includes(e.tab)) out.push(`tab strip: the highlighted tab is ${JSON.stringify(tabs[0])}, not ${e.tab}`);
-  // The info line and the frame's title name the same session's triple (the info line's may be cut: BUG-257; cut at a segment, it ends before a " × ").
-  const info = lines[lay.infoRow]!.trim().split(" · ")[0]!;
   const title = /^┌─ (.*?) ─+┐$/.exec(lines[lay.frame.top]!)?.[1];
-  const same = info === title || (info.endsWith("…") && !!title?.startsWith(info.slice(0, -1))) || !!title?.startsWith(`${info} × `);
-  if (info.includes(" × ") && title && !title.includes("…") && !same) out.push(`info line: its triple ${JSON.stringify(info)} isn't the frame's ${JSON.stringify(title)}`);
+  const triple = tripleProblem(lines[lay.infoRow]!, title);
+  if (triple) out.push(triple);
   const cur = app.cursor();
   const r = lay.interior;
   if (cur.visible && (cur.x < r.left || cur.x >= r.left + r.cols || cur.y < r.top || cur.y >= r.top + r.rows)) out.push(`cursor: shown at ${cur.x},${cur.y}, outside the interior (${r.left},${r.top} ${r.cols}×${r.rows})`);
