@@ -11,12 +11,11 @@
  * `GLUON_REAL_BINS`; on its own, the cached pinned binaries (`bun scripts/harness-pin.ts --install`). Needs tmux (not on Windows).
  */
 import { describe, expect, test } from "bun:test";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { tablesDir } from "../../src/cost/tables-store.ts";
 import { loadConfig } from "../../src/config.ts";
 import type { Harness } from "../../src/harnesses.ts";
 import { useSecrets } from "../../src/secrets.ts";
+import { firstRunDone, KEY_VALUE, KEYS, QUIET, REAL_HARNESSES } from "../fixtures/real-harness.ts";
 import { cachedBin, readPin } from "../../scripts/harness-cache.ts";
 import { checkHarness, planHarness } from "../../scripts/live-harness.ts";
 import { onPath } from "../../scripts/live-driver.ts";
@@ -24,29 +23,13 @@ import { NO_BUCKET_CAPS, Spend, type Available } from "../../scripts/live-lib.ts
 import { fakeModelApi } from "../fixtures/fake-model-api.ts";
 import { seedTables } from "../fixtures/seed-tables.ts";
 
-/** The harnesses that can be pointed at a loopback model API, and the API-key connection each uses. */
-export const REAL_HARNESSES = { "claude-code": "anthropic", codex: "openai", opencode: "openrouter", "kimi-code": "openrouter" } as const;
-const KEYS = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", openrouter: "OPENROUTER_API_KEY" } as const;
-/** The harnesses' own switches against phoning home (telemetry, updates, error reports): the tier stays on loopback. */
-const QUIET = { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", DISABLE_AUTOUPDATER: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_TELEMETRY: "1", OPENCODE_DISABLE_AUTOUPDATE: "1", NO_PROXY: "127.0.0.1" };
-
 const wanted = (process.env.GLUON_REAL_HARNESSES ?? Object.keys(REAL_HARNESSES).join(",")).split(",").filter((h): h is keyof typeof REAL_HARNESSES => h in REAL_HARNESSES);
 const given = JSON.parse(process.env.GLUON_REAL_BINS ?? "{}") as Partial<Record<Harness, { path: string; version: string }>>;
 const pin = readPin();
 const binary = (h: Harness) => given[h] ?? (cachedBin(h, pin[h]) ? { path: cachedBin(h, pin[h])!, version: pin[h].version } : null);
 const tmux = !!(onPath("tmux") ?? onPath("tmux", "/usr/bin:/usr/local/bin:/opt/homebrew/bin"));
 
-const KEY_VALUE = (k: string) => `sk-fake-${k.toLowerCase()}-0123456789`;
 useSecrets(Object.values(KEYS).map((k) => [k, KEY_VALUE(k)]), "fake");
-
-/**
- * The scratch HOME of a user who already went through the harness's first run (its theme, its "use this API key?" and its folder
- * trust): the harness's own files, in the scratch HOME only. What those screens look like is the live checks' (scripts/live-harness.ts).
- */
-function firstRunDone(h: Harness, home: string, repo: string, key: string): void {
-  if (h === "claude-code")
-    writeFileSync(join(home, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true, theme: "dark", customApiKeyResponses: { approved: [key.slice(-20)], rejected: [] }, projects: { [repo]: { hasTrustDialogAccepted: true } } }));
-}
 
 describe.skipIf(!tmux)("the real harnesses, on a loopback model API", () => {
   for (const h of wanted) {

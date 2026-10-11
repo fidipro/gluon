@@ -1,5 +1,5 @@
 /**
- * `bun run regression`'s real stage (issue #31): the real-harness tier (test/real/harness.real.test.ts) for the harnesses a change
+ * `bun run regression`'s real stage (issue #31): the real-harness tier (`REAL_TESTS`, test/real/) for the harnesses a change
  * touches: the real binaries, Gluon's frame, a model API on loopback. Free and offline but for installing the binaries: the pinned
  * ones from the cache (`bun scripts/harness-pin.ts --install`), or with `newest` (`--newest`, and always in CI: before a merge the
  * tests run on each harness's newest release) the newest, downloaded and hash-checked first.
@@ -7,11 +7,13 @@
  */
 import type { Harness } from "../src/harnesses.ts";
 import type { LiveCheck } from "../test/areas.ts";
+import { REAL_HARNESSES as LOOPBACK } from "../test/fixtures/real-harness.ts";
 import { harnessBin } from "./harness-cache.ts";
 
-export const REAL_TEST = "test/real/harness.real.test.ts";
+/** The tier's files: the real harnesses in Gluon's frame, and the fakes read against the real screens (run at once). */
+export const REAL_TESTS = ["test/real/harness.real.test.ts", "test/real/fidelity.real.test.ts"];
 /** The harnesses that can be pointed at a loopback model API (`testModelBase`, src/launchers.ts); Antigravity and Grok Build can't. */
-export const REAL_HARNESSES: Harness[] = ["claude-code", "codex", "opencode", "kimi-code"];
+export const REAL_HARNESSES = Object.keys(LOOPBACK) as Harness[];
 
 /** The harnesses a run's real stage covers: those of its harness checks that the tier can run. */
 export const realHarnesses = (checks: LiveCheck[]): Harness[] => REAL_HARNESSES.filter((h) => checks.some((c) => c.kind === "harness" && c.harness === h));

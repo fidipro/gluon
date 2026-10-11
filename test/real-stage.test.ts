@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { REAL_HARNESSES, REAL_TEST, realHarnesses, realStage, type RealOptions } from "../scripts/real-stage.ts";
+import { REAL_HARNESSES, REAL_TESTS, realHarnesses, realStage, type RealOptions } from "../scripts/real-stage.ts";
 import { liveChecks, selectChanged } from "./areas.ts";
 import { FAKE_USAGE, fakeModelApi } from "./fixtures/fake-model-api.ts";
 
@@ -34,7 +34,7 @@ describe("the real stage", () => {
     expect(of(["src/brain.ts"])).toEqual([]);
     expect(of(["docs/concepts/architecture.md"])).toEqual([]);
     expect(REAL_HARNESSES).not.toContain("antigravity");
-    expect(existsSync(join(import.meta.dir, "..", REAL_TEST))).toBe(true);
+    for (const f of REAL_TESTS) expect([f, existsSync(join(import.meta.dir, "..", f))]).toEqual([f, true]);
   });
 
   test("hands the tier the harnesses and their binaries (the newest with `newest`); its failure fails the stage", async () => {

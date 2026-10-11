@@ -98,6 +98,11 @@ goes to a model API on loopback (`test/fixtures/fake-model-api.ts`). It is free 
 binaries, runs only for a change that touches the harnesses, and needs tmux (it is skipped on Windows). CI runs it on each
 harness's newest release, so a harness release that breaks Gluon is found before a merge.
 
+The fakes are held to the real harnesses too. Each release's own screens are captured into `test/fixtures/screens/`
+(`scripts/capture-screens.ts`, which the Harness watch runs for the `harness-update` pull request), and the tier drives each
+fake through the same states (`test/real/fidelity.real.test.ts`): Gluon's readers must read the fake as they read the real
+harness. A fake that drifts fails there, before a test built on it passes for the wrong reason.
+
 ## Live checks
 
 The tests themselves are offline and free. After them, `bun run regression` runs the live checks the change needs

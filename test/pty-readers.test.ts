@@ -8,6 +8,7 @@ import { fixture, screenOf } from "./fixtures/screens.ts";
 const EXPECTED: Partial<Record<Harness, Record<string, [string | null, string | null]>>> = {
   "claude-code": {
     idle: ["", null],
+    "idle-placeholder": ["", null],
     hello: ["hello world", null],
     slash: ["/", "/add-dir"],
     cl: ["/cl", "/clear"],
@@ -277,7 +278,7 @@ test("BUG-718/menu-mark: Claude Code's highlighted menu item is read from its `�
 // Claude Code 2.1.296 shows a faint `Try "…"` in the empty box, starting under the cursor.
 test("BUG-719/placeholder: Claude Code's faint placeholder in the empty input box is not input; typed text before the cursor is", async () => {
   const r = READERS["claude-code"];
-  const idle = await screenOf(fixture("claude-code"), "idle");
+  const idle = await screenOf(fixture("claude-code"), "idle-placeholder");
   // Claude draws a no-break space after the `❯`.
   expect(idle.line(idle.cursor().y).text).toStartWith('❯\u00a0Try "');
   expect(r.inputLine(idle)).toBe("");

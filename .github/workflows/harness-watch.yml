@@ -111,8 +111,38 @@ jobs:
           n=$(gh issue list --state open --limit 100 --json number,title | jq -r --arg t "$title" 'map(select(.title == $t))[0].number // empty')
           if [ -n "$n" ]; then gh issue comment "$n" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
 
-  propose:
+  # The new releases' own screens, for the fixtures the readers and the fakes are held to (test/fixtures/screens/,
+  # test/real/fidelity.real.test.ts): the harnesses on a loopback model API, each through Gluon's launch, no prompt sent.
+  # Its own job, read-only: it runs the vendors' binaries (hash-checked by harness-pin.ts), which never see a write token.
+  capture:
     needs: check
+    if: needs.check.outputs.fresh == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: harness-pin
+          path: pin
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - shell: bash
+        run: |
+          set -euo pipefail
+          cp pin/harnesses.json test/harnesses.json
+          for h in claude-code codex opencode kimi-code; do bun scripts/capture-screens.ts --harness "$h" --pinned --update; done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harness-screens
+          path: test/fixtures/screens/
+
+  propose:
+    needs: [check, capture]
     if: needs.check.outputs.fresh == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -128,6 +158,12 @@ jobs:
         with:
           name: harness-pin
           path: pin
+      # The captured screens replace the fixtures whole (a version's file goes with it): a person reviews their diff.
+      - run: rm -rf test/fixtures/screens
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: harness-screens
+          path: test/fixtures/screens
       - shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -135,6 +171,9 @@ jobs:
           SUMMARY: ${{ needs.check.outputs.summary }}
         run: |
           set -euo pipefail
+          # The screens are data a job that ran the vendors' binaries made: fixture JSON files only, each one parsing.
+          if [ -n "$(find test/fixtures/screens -type f ! -name '*.json')" ]; then echo "capture left a file that isn't a fixture" >&2; exit 1; fi
+          find test/fixtures/screens -type f -name '*.json' -exec jq -e '.harness and .version and (.states | type == "array")' {} + > /dev/null
           # The pin is data: it must name every harness with a version, and nothing else changes.
           jq -e '[.["claude-code"], .codex, .antigravity, .["grok-build"], .opencode, .["kimi-code"]] | all(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+"))' pin/harnesses.json > /dev/null
           cp pin/harnesses.json test/harnesses.json
@@ -142,7 +181,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           gh auth setup-git
           git switch -C harness-update
-          git add test/harnesses.json
+          git add test/harnesses.json test/fixtures/screens
           git commit -m "Harness update: $SUMMARY" -m "Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           git push --force origin harness-update
           title="Harness update: $SUMMARY"
@@ -150,7 +189,7 @@ jobs:
 
           $SUMMARY
 
-          Merging moves the fakes, the live checks and the release preflight to these versions. Before merging, run the live checks of each changed harness on your machine (the harness update runbook)."
+          Merging moves the fakes, the live checks and the release preflight to these versions. The screen fixtures of the harnesses on a loopback model API are re-captured from the new releases (the capture job): review their diff, and fix a reader or a fake that CI says no longer reads them. Before merging, run the live checks of each changed harness on your machine (the harness update runbook)."
           n=$(gh pr list --head harness-update --state open --json number --jq '.[0].number // empty')
           if [ -n "$n" ]; then gh pr edit "$n" --title "$title" --body "$body"; else gh pr create --head harness-update --base main --title "$title" --body "$body"; fi
           gh workflow run ci.yml --ref harness-update -f suite=quick
