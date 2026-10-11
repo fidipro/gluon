@@ -30,9 +30,9 @@ bun run build         # standalone binary for this host → dist/gluon-<target>[
 bun run build:all     # every target (linux x64/arm64 glibc+musl, darwin x64/arm64, windows-x64)
 bun run test:dist     # build release + test binaries, run test/dist.test.ts on them and the npm bundle
 bun run pack          # npm-style package → dist/npm/, dist/gluon-<version>.tgz
-bun run docker-test   # offline Docker suite (~7 min): shellcheck, regression on debian+alpine,
+bun run docker-test   # debugging only (CI runs it nightly): shellcheck, regression on debian+alpine,
                       # tarball install, release binaries + install.sh, install.sh over https
-bun run test:windows  # from WSL: the CI Windows job on this machine's Windows (stages, or -t <pattern>)
+bun run test:windows  # debugging only: from WSL, CI's Windows job on this machine's Windows (-t <pattern>)
 ```
 
 Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun.spawn`,
@@ -43,7 +43,7 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 - **Done means `bun run regression --changed` passes** (it runs the whole fast tier itself when a core file
   changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
 - **Every fixed bug gets a regression test that fails before the fix**, named `BUG-nn/<plan case>: …`, at the
-  cheapest layer (unit unless it needs a terminal); never weaken a test to get green (rules: `test/AGENTS.md`).
+  product's surface, below it only at a typed seam (`docs/contributing/testing.md` rule 3); never weaken a test to get green (rules: `test/AGENTS.md`).
 - **The tests are offline and free; regression's last stage is not.** No test calls a real brain, agent, API or
   installer. After them, `regression` runs the live checks the change needs (`scripts/live-stage.ts`): pre-approved
   within its cap in code, local only, never in CI; `--no-live` leaves it out.
@@ -58,8 +58,9 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
 - **CI** runs the tests of the changed areas for every pull request (`regression --changed`; macOS and Windows unless
   every area says `platforms: "linux"` in `test/areas.ts`) and on Linux for a push to main; `gate` is the one required
   check. The full suite, Docker and builds run nightly (a failure opens an issue) and by hand before a release
-  (`gh workflow run ci.yml --ref main -f suite=full`). `gh workflow run ci.yml --ref <branch>` runs one off (`-f os=… -f filter=… -f extras=false`);
-  Windows locally first (`bun run test:windows`).
+  (`gh workflow run ci.yml --ref main -f suite=full`). `gh workflow run ci.yml --ref <branch>` runs one off (`-f os=… -f filter=… -f extras=false`).
+- **Every local run is on this machine; other platforms only in CI.** A Windows- or macOS-only fix is verified with
+  `gh workflow run ci.yml --ref <branch> -f os=…`; `test:windows` and `docker-test` are for debugging what CI found.
 - **Keep `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md`, `docs/` true** when
   behaviour changes.
 
