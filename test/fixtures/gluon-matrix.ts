@@ -311,12 +311,12 @@ rule(["h.working"], NO, homeDoes("interrupt"));
 rule(OPTIONS, UP_DOWN, homeDoes("options"));
 rule(OPTIONS, ENTER, homeDoes("pick"));
 rule(OPTIONS, "k.esc", homeDoes("closeOptions"));
-// Tab on a question's option puts its text in the composer, to add your own words (home.test.tsx `issue-55/tab`).
+// Tab on a question's option puts its text in the composer, to add your own words (`question/tab-adds-words … issue-55/tab`).
 rule("h.question", "k.tab", { case: "issue-55/tab" });
 rule(["h.proposal", "h.spec"], "k.tab", homeDoes("cycleModel"));
 rule(["h.proposal", "h.spec"], "k.shiftTab", homeDoes("cycleEffort"));
 rule(["h.proposal", "h.spec"], "k.ctrlT", homeDoes("cycleMode"));
-// Ctrl+P cycles the highlighted agent's permissions (home.test.tsx `BUG-712/permissions`).
+// Ctrl+P cycles the highlighted agent's permissions (`BUG-712/permissions` in test/modes.test.ts; on screen: `agent-choice/permissions`).
 rule(["h.proposal", "h.spec"], "k.ctrlP", { case: "BUG-712/permissions" });
 rule(["h.proposal", "h.spec"], "k.ctrlO", homeDoes("foldSpec"));
 rule(["h.proposal", "h.spec"], PAGE, homeDoes("scrollSpec"));

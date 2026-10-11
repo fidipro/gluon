@@ -173,7 +173,7 @@ describe("Gluon: a session in the frame", () => {
     await say(app, "still here");
   });
 
-  test("BUG-193/GLUON-8: a status event shows in the info line, and in the other sessions' counts; the agent's done (its turn finished) reads awaiting input, never Done @full", async () => {
+  test("sessions-list/row-live: a status event shows in the info line, and in the other sessions' counts; the agent's done (its turn finished) reads awaiting input, never Done #BUG-193/GLUON-8 @full", async () => {
     const app = await gluon();
     await launch(app, "first task");
     await say(app, "!event status done", "EVENT status done");
@@ -342,7 +342,7 @@ describe("Gluon: several sessions", () => {
     }
   });
 
-  test("BUG-210/GLUON: from home → opens the first session (never into the composer); once a key is typed the bar drops ←/→ and the home key's prefix still switches @full", async () => {
+  test("sessions-list/open: from home → opens the first session (never into the composer); once a key is typed the bar drops ←/→ and the home key's prefix still switches #BUG-210/GLUON @full", async () => {
     const app = await gluon();
     for (const name of ["one", "two"]) {
       await launch(app, `${name} task`);
@@ -416,14 +416,18 @@ describe.skipIf(WIN)("Gluon: the mouse", () => {
 });
 
 describe("Gluon: quitting", () => {
-  test("GLUON-13: Ctrl+C twice with a live session asks first; Esc stays, y quits and ends the agent @full", async () => {
+  test("home/quit: Ctrl+C twice with a live session asks first, its hint naming its keys and no cursor in the composer; Esc stays, y does nothing, Enter quits and ends the agent #GLUON-13 @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-13`);
     rmSync(pidFile, { force: true });
     const app = await gluon({ FAKE_PID_FILE: pidFile });
     await launch(app, "quit task");
     await home(app);
+    expect(composerCursor(app)).toBe(true);
     await app.press(KEY.ctrlC, KEY.ctrlC);
     await app.waitFor("1 session running — quit and end it?");
+    // The hint line names the question's keys; the composer shows no cursor (BUG-224).
+    expect(app.screen()).toContain("enter quits · esc stays");
+    expect(composerCursor(app)).toBe(false);
     await app.press(KEY.esc);
     await app.waitFor((s) => !s.includes("quit and end it?"));
     expect(await app.exitCode(300)).toBeNull();
@@ -469,7 +473,7 @@ describe("Gluon: quitting", () => {
     expect(mine).toEqual([]);
   });
 
-  test("GLUON-15: Ctrl+C twice with no live session quits at once", async () => {
+  test("home/quit: Ctrl+C twice with no live session quits at once #GLUON-15", async () => {
     const app = await gluon();
     await app.press(KEY.ctrlC, KEY.ctrlC);
     expect(await app.exitCode()).toBe(130);
@@ -496,7 +500,7 @@ describe("Gluon: QA findings", () => {
     await app.waitFor("› abc");
   });
 
-  test("BUG-164/GLUON-yes, BUG-213/GLUON: Delete on a live row asks “End Gluon-turn-task?”; Esc keeps it, y and n do nothing, Enter ends the agent (SIGTERM) and its row goes @full", async () => {
+  test("sessions-list/remove: Delete on a live row asks “End Gluon-turn-task?”; Esc keeps it, y and n do nothing, Enter ends the agent (SIGTERM) and its row goes #BUG-164/GLUON-yes #BUG-213/GLUON @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-164y`);
     rmSync(pidFile, { force: true });
     const app = await gluon({ FAKE_PID_FILE: pidFile });
@@ -527,7 +531,7 @@ describe("Gluon: QA findings", () => {
     expect(alive(pid)).toBe(false);
   });
 
-  test.skipIf(WIN)("BUG-200/GLUON-yes: Delete → Enter on an agent slow to exit: its row goes at once (Delete can't ask again, Enter can't reopen it); the agent ends in the background @full", async () => {
+  test.skipIf(WIN)("sessions-list/remove: Delete → Enter on an agent slow to exit: its row goes at once (Delete can't ask again, Enter can't reopen it); the agent ends in the background #BUG-200/GLUON-yes @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-200`);
     rmSync(pidFile, { force: true });
     const app = await gluon({ FAKE_PID_FILE: pidFile, FAKE_HANG: "ignore-term" });
@@ -551,7 +555,7 @@ describe("Gluon: QA findings", () => {
     expect(alive(pid)).toBe(false);
   });
 
-  test("BUG-193/GLUON: Ctrl+D on the home list marks a session done (its tab and info line say so) and back; Delete on the drafting row asks “Discard this chat?”, Enter starts the chat over @full", async () => {
+  test("sessions-list/mark-done: Ctrl+D on the home list marks a session done (its tab and info line say so) and back, never with text in the composer nor on the drafting row; Delete on the drafting row asks “Discard this chat?”, Enter starts the chat over #BUG-193/GLUON @full", async () => {
     const app = await gluon();
     await launch(app, "mark task");
     await home(app);
@@ -565,6 +569,12 @@ describe("Gluon: QA findings", () => {
     await home(app);
     await app.press("\x04");
     await app.waitFor((s) => !s.includes("Done") && s.includes("ctrl+d marks done"));
+    // With text in the composer Ctrl+D edits it (deletes forward), never marks the row.
+    await app.type("x");
+    await app.press(KEY.left, "\x04");
+    await app.waitFor((s) => !s.includes("› x"));
+    await app.settle(200); // sleep-ok: the row must not be marked
+    expect(app.screen()).not.toContain("▾ Done");
     // A chat being drafted: Delete on its row asks, then the chat starts over.
     await app.type("another thing");
     await app.press(KEY.enter);
@@ -575,6 +585,11 @@ describe("Gluon: QA findings", () => {
     await app.press(KEY.down);
     await app.press(KEY.down);
     await app.waitFor("del discards it");
+    // Ctrl+D never marks the drafting row.
+    await app.press("\x04");
+    await app.settle(200); // sleep-ok: the drafting row must not be marked
+    expect(app.screen()).not.toContain("▾ Done");
+    expect(app.screen()).toContain("▾ Drafting");
     await app.press(KEY.delete);
     await app.waitFor("Discard this chat?");
     await app.press(KEY.enter);
@@ -582,7 +597,7 @@ describe("Gluon: QA findings", () => {
     expect(app.screen()).toContain("mark-task");
   });
 
-  test("BUG-179/GLUON: an agent with no status of its own reads Working once it prints, never Starting for good @full", async () => {
+  test("sessions-list/row-live: an agent with no status of its own reads Working once it prints, never Starting for good #BUG-179/GLUON @full", async () => {
     const app = await gluon();
     await launch(app, "quiet task");
     await home(app);
@@ -603,7 +618,7 @@ describe("Gluon: QA findings", () => {
 
   // Home.tsx keeps `optionCount + 4` rows for an open question, counted in lines; at a narrow
   // width the lead line wraps and its first line (the question itself) is cut from the top.
-  test("BUG-167/E: at 60×24 with a session listed, an open question's lead line stays in view @full", async () => {
+  test("home/short-terminal-priority: at 60×24 with a session listed, an open question's lead line stays in view #BUG-167/E @full", async () => {
     const app = await gluon({}, { cols: 60, rows: 24 });
     await launch(app, "first task");
     await home(app);
@@ -624,7 +639,7 @@ function composerCursor(app: App): boolean {
 }
 
 describe("Gluon: round-2 QA findings", () => {
-  test("BUG-231/E: coming home selects the session you came from — the home key twice after →, → past the last tab @full", async () => {
+  test("sessions-list/back-home-selects: coming home selects the session you came from — the home key twice after →, → past the last tab; from a folded group it unfolds, and Ctrl+D at once marks that row #BUG-231/E #BUG-263/GLUON-45 @full", async () => {
     const app = await gluon({}, { cols: 80, rows: 24 });
     for (const task of ["alpha task", "bravo task", "charlie task"]) {
       await launch(app, task);
@@ -647,6 +662,21 @@ describe("Gluon: round-2 QA findings", () => {
     await app.press(KEYS.right);
     await app.waitFor(HOME_VIEW);
     await app.waitFor(() => selected().join() === "charlie");
+    // Its group folded (↑ onto the label, Enter), into the first tab and home again: the group unfolds, that row selected,
+    // and Ctrl+D at once marks it done (BUG-263).
+    // (Once the three fakes fell quiet they share one group: awaiting input.)
+    await app.waitFor("3 awaiting input", 20_000);
+    const label = () => app.lines().findIndex((l, y) => /^ {3}▾ /.test(l) && app.bg(4, y) === GLUON_HEX.selected);
+    for (let i = 0; i < 6 && label() < 0; i++) await app.press(KEY.up);
+    expect(label()).toBeGreaterThanOrEqual(0);
+    await app.press(KEY.enter);
+    await app.waitFor((s) => /▸ [\w ]+ \(\d\)/.test(s) && !s.includes("Gluon-alpha-task "));
+    await app.press(KEYS.right);
+    await app.waitFor((s) => s.includes("◆ gluon") && !HOME_VIEW.test(s));
+    await home(app);
+    await app.waitFor(() => selected().join() === "alpha");
+    await app.press("\x04");
+    await app.waitFor(/▾ Done\n {3}✓  Gluon-alpha-task/);
   });
 
 });

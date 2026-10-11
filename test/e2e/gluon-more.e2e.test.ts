@@ -4,8 +4,8 @@
  * Codex, Antigravity and Grok Build fakes in the frame, and the live-QA findings
  * (`qa/gluon-followups-live/REPORT.md`, #1 #2 #4 #7 #8). A case that describes the behaviour
  * wanted where the app does otherwise today is `test.failing` and titled `BUG-CANDIDATE/<case>:`
- * (`test/e2e/README.md`). On Windows the exact-bytes and mouse cases are skipped (ConPTY re-renders
- * and translates them, as in `gluon.e2e.test.ts`).
+ * (`test/e2e/README.md`). On Windows the exact-bytes cases are skipped (ConPTY re-renders them, as in
+ * `gluon.e2e.test.ts`); the home view's clicks and drags pass through it and run there.
  */
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { click, FOCUS, HOME_KEY, KEYS, mouseReports, wheelDown, wheelUp, type Action } from "./actions.ts";
@@ -233,7 +233,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
 
   for (const fake of ["codex"] as const)
 
-  test("GLUON-34: the home view's end question names the row it ends and its keys (enter yes · esc no); y and n don't answer it; Enter ends that row only (REPORT #8) @full", async () => {
+  test("home/own-question: the end question names the row it ends and its keys (enter yes · esc no); y and n don't answer it; with text typed Delete and Ctrl+D do nothing; Enter ends that row only (REPORT #8) #GLUON-34 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "one task");
     await home(app);
@@ -241,6 +241,12 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     await home(app);
     // The row of the session left is selected (BUG-231): the second.
     await app.waitFor(() => app.bg(4, app.row("Gluon-two-task ")) === GLUON_HEX.selected);
+    // With text typed Delete edits the composer: no question.
+    await app.type("x");
+    await app.press(KEYS.left, KEYS.delete);
+    await app.waitFor((s) => !s.includes("› x"));
+    await app.settle(200); // sleep-ok: Delete with text must not ask
+    expect(app.screen()).not.toContain("End Gluon-two-task?");
     await app.press(KEYS.delete);
     await app.waitFor("? End Gluon-two-task?  enter yes · esc no");
     expect(app.screen()).toContain("enter ends it · esc keeps it");
@@ -251,7 +257,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     await app.waitFor((s) => !s.includes("Gluon-two-task") && s.includes("Gluon-one-task"));
   });
 
-  test("BUG-259/GLUON-41: a home question is answered only by keys pressed once it shows — Delete + Enter in one read asks and waits, so does Ctrl+C Ctrl+C Enter; an Enter after it shows still says yes @full", async () => {
+  test("home/own-question: a home question is answered only by keys pressed once it shows — Delete + Enter in one read asks and waits, so does Ctrl+C Ctrl+C Enter; an Enter after it shows still says yes #BUG-259/GLUON-41 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "one task");
     await home(app);
@@ -277,7 +283,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     await app.waitFor((s) => !s.includes("Gluon-one-task"));
   });
 
-  test("BUG-237/GLUON-35: Shift+Enter in the home composer is a new line in each encoding — xterm's modifyOtherKeys, kitty's CSI u — as Alt+Enter is; never `[27;2;13~` typed", async () => {
+  test("composer/newline: Shift+Enter in the home composer is a new line in each encoding — xterm's modifyOtherKeys, kitty's CSI u — as Alt+Enter is; never `[27;2;13~` typed #BUG-237/GLUON-35", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await app.type("first");
     for (const [i, key] of [KEYS.shiftEnter, "\x1b[13;2u", KEYS.altEnter].entries()) {
@@ -290,7 +296,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(app.screen()).toMatch(/› first\n +line2\n +line3\n +line4/);
   });
 
-  test("BUG-238/GLUON-38: a focus report at home (a late one, from the session left) is dropped, never typed into the composer as `[I` / `[O` @full", async () => {
+  test("composer/terminal-noise: a focus report at home (a late one, from the session left) is dropped, never typed into the composer as `[I` / `[O` #BUG-238/GLUON-38 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "one task");
     await home(app);
@@ -304,7 +310,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(app.screen()).toContain("› abc");
   });
 
-  test.skipIf(WIN)("BUG-269/GLUON-54: at home the terminal reports clicks (SGR); a click on a session's row selects it, a second opens it; the click's release never reaches the agent, nothing is typed into the composer; the wheel and clicks elsewhere do nothing to the view @full", async () => {
+  test("mouse/click-row: at home the terminal reports clicks (SGR); a click on a session's row selects it, a second opens it — the agent choice open or not; the click's release never reaches the agent, nothing is typed into the composer; the wheel and clicks elsewhere (left of the list too) do nothing to the view #BUG-269/GLUON-54 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "one task");
     await home(app);
@@ -316,10 +322,11 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     const selected = (name: string) => app.bg(4, app.row(`Gluon-${name}-task `)) === GLUON_HEX.selected;
     expect(selected("two")).toBe(true);
     const fullClick = (x: number, y: number) => mouseReports({ op: "click", button: "left", x, y }).join("");
-    // Elsewhere (the header, a blank row), the wheel: the home view stays, nothing typed.
-    for (const bytes of [fullClick(10, 2), fullClick(10, 1), wheelUp(10, 20), wheelDown(10, 20)]) await app.press(bytes);
+    // Elsewhere (the header, a blank row, left of the list on a row), the wheel: the home view stays, the selection too, nothing typed.
+    for (const bytes of [fullClick(10, 2), fullClick(10, 1), fullClick(1, rowY()), wheelUp(10, 20), wheelDown(10, 20)]) await app.press(bytes);
     await app.type("ab");
     await app.waitFor("› ab");
+    expect(selected("two")).toBe(true);
     await app.press("\x7f\x7f");
     // The row: selected by the first click, opened by the second (press and release in one read).
     await app.press(fullClick(12, rowY()));
@@ -333,9 +340,22 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(m.got()).toBe("");
     expect(app.screen()).not.toMatch(/\[<\d/);
     assertInvariants(app, { view: "session" });
+    // With the agent choice open (the list's selection not shown) a click selects a row, never opening it; a double-click opens it.
+    await home(app);
+    await toChoice(app, "three task");
+    // The spec folded (ctrl+o), so the list keeps its rows beside the open choice.
+    await app.press("\x0f");
+    await app.waitFor((s) => s.includes("(ctrl+o to view)") && s.includes("Gluon-two-task "));
+    const two = app.row("Gluon-two-task ") + 1;
+    await app.press(fullClick(12, two));
+    await Bun.sleep(500); // sleep-ok: a click alone (past the 400 ms double-click window) must open nothing
+    expect(app.screen()).toContain("keep talking");
+    app.write(fullClick(12, two) + fullClick(12, two));
+    await app.waitFor((s) => s.includes("◆ gluon") && !HOME_VIEW.test(s));
+    expect(shownTab(app)).toContain("two-task");
   });
 
-  test.skipIf(WIN)("BUG-286/GLUON-61: a drag over the spec in the home chat copies its text (OSC 52) without the box's edges, highlights it and says so on the last row, and picks no option; a key ends the selection @full", async () => {
+  test("mouse/drag-copy: a drag over the spec in the home chat copies its text (OSC 52) without the box's edges, highlights it and says so on the last row, and picks no option; a key ends the selection #BUG-286/GLUON-61 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await toChoice(app, "fix the add bug");
     const top = app.row("spec — what the agent will get");

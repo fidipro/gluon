@@ -21,7 +21,7 @@ afterAll(stopAll);
 // Bugs the monkey found, each left out of its alphabet by a `KNOWN` flag (`gluon-monkey.ts`) until
 // fixed, then pinned here. A race is pinned with a burst (keys in one write), which makes it certain.
 
-test("BUG-236/GM-home-selection: back home from a session, Ctrl+D marks that session's row (BUG-231), not the one selected before — also in the same burst as the home key @full", async () => {
+test("sessions-list/back-home-selects: back home from a session, Ctrl+D marks that session's row (BUG-231), not the one selected before — also in the same burst as the home key #BUG-236/GM-home-selection @full", async () => {
   // Two sessions; Gluon-t-1 was left for home once (its row selected then), Gluon-t-2 is shown.
   for (const burst of [true, false]) {
     const app = await setUp({ tabs: ["claude", "claude"], path: ["claude", "codex", "opencode"], cols: 100, rows: 30, homeKey: "ctrl+\\", alt: false, kitty: false });

@@ -53,6 +53,10 @@ export const SEAMS: Record<string, Seam> = {
     says: "a file an older (or this) version wrote → today's state: the config, the sessions, the cost ledger",
     modules: ["src/config.ts", "src/sessions.ts", "src/cost/ledger-file.ts"],
   },
+  "text-layout": {
+    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn",
+    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts"],
+  },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off",
     modules: ["src/launchers.ts", "src/handoff.ts"],

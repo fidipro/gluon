@@ -7,7 +7,7 @@ setDefaultTimeout(30_000 * SLOW);
 afterAll(stopAll);
 
 describe("header", () => {
-  test("A1: shows the mark and gluon with its version, the repo with its branch and the first line", async () => {
+  test("home/header: shows the mark and gluon with its version, the repo with its branch and the first line", async () => {
     const app = await start({ cwd: repo.tiny() });
     const s = app.screen();
     expect(s).toMatch(/⡠● +Gluon v\d+\.\d+\.\d+\s*$/m);
@@ -18,7 +18,7 @@ describe("header", () => {
     expect(s).toContain("› describe the session you want");
   });
 
-  test.each([40, 60, 70])("BUG-40: at %i columns the header's lines are cut, never wrapped, aligned with gluon", async (cols) => {
+  test.each([40, 60, 70])("home/header: at %i columns the header's lines are cut, never wrapped, aligned with gluon #BUG-40", async (cols) => {
     const app = await start({ cwd: repo.tiny(), cols, rows: 30 });
     const lines = app.lines();
     const title = lines.find((l) => l.includes("Gluon v"))!;
@@ -27,18 +27,18 @@ describe("header", () => {
     expect(where.indexOf("tiny")).toBe(title.indexOf("Gluon"));
   });
 
-  test("BUG-35: a repo with no commits still shows its branch", async () => {
+  test("home/header: a repo with no commits still shows its branch #BUG-35", async () => {
     const app = await start({ cwd: repo.emptyGit() });
     expect(app.screen()).toContain("emptygit · main");
   });
 
-  test("BUG-35: a detached HEAD shows its commit", async () => {
+  test("home/header: a detached HEAD shows its commit #BUG-35", async () => {
     const [dir, sha] = repo.detached();
     const app = await start({ cwd: dir });
     expect(app.screen()).toContain(`detached · detached at ${sha}`);
   });
 
-  test("A3/A5: a non-git dir and a path with a space start fine @full", async () => {
+  test("home/header: a non-git dir and a path with a space start fine @full", async () => {
     const a = await start({ cwd: repo.noGit() });
     expect(a.screen()).toMatch(/──⢎──● +nogit\n/);
     const b = await start({ cwd: repo.withSpace() });
@@ -53,7 +53,7 @@ describe("terminal", () => {
     expect(r.stderr).toContain("needs an interactive terminal");
   });
 
-  test("BUG-18: a late background-colour reply is not typed into the composer @full", async () => {
+  test("composer/terminal-noise: a late background-colour reply is not typed into the composer #BUG-18 @full", async () => {
     const app = await start({ cwd: repo.tiny(), osc11: { delayMs: 400 } });
     await app.settle(800);
     await app.type("hi");
@@ -62,21 +62,27 @@ describe("terminal", () => {
     expect(app.screen()).not.toContain("11;");
   });
 
-  test("BUG-18: filtering that reply doesn't swallow a typed ] @full", async () => {
+  test("composer/terminal-noise: filtering that reply doesn't swallow a typed ], typed slowly or fast #BUG-18 @full", async () => {
     const app = await start({ cwd: repo.tiny() });
     await app.type("a[1]b]");
     // Under load the last keys can land after type() settles: wait for them (a swallowed "]" never comes).
     await app.waitFor("› a[1]b]");
+    // Typed fast, the next key inside the 30 ms a lone `]` is held: the `]` still comes, before it.
+    for (const ch of "c]d]e") {
+      app.write(ch);
+      await Bun.sleep(5); // sleep-ok: keys apart, as a fast typist sends them, but inside the hold
+    }
+    await app.waitFor("› a[1]b]c]d]e");
   });
 
-  test("BUG-128/A23: Gluon paints its own ground, on a dark and on a light terminal alike (BUG-42) @full", async () => {
+  test("home/theme: Gluon paints its own ground, on a dark and on a light terminal alike #BUG-128 #BUG-42 @full", async () => {
     // The ground can take a frame or two after the first screen under load (BUG-128): wait for it.
     const ground = (app: App) => app.waitFor(() => app.bg(0, app.row("describe the session")) === "#0f1013");
     await ground(await start({ cwd: repo.tiny(), osc11: "dark" }));
     await ground(await start({ cwd: repo.tiny(), osc11: "light" }));
   });
 
-  test("BUG-38: with no answer from the terminal, COLORFGBG picks the light theme (the setup menus' colours)", async () => {
+  test("home/theme: with no answer from the terminal, COLORFGBG picks the light theme (the setup menus' colours) #BUG-38", async () => {
     const app = new App({ cwd: repo.tiny(), args: ["setup"], noDemo: true, osc11: "none", env: { COLORFGBG: "0;15", GLUON_CONFIG: freshConfig("bug38") } });
     await app.waitFor("Claude Code");
     const y = app.row("› ");
@@ -85,7 +91,7 @@ describe("terminal", () => {
   });
 
   // Not on Windows: ConPTY answers DA1 itself and drops a reply written as input.
-  test.skipIf(WIN)("BUG-160/A: the startup probe: a terminal that speaks the kitty keyboard protocol has its `CSI ? u` answered for every agent", async () => {
+  test.skipIf(WIN)("home/theme: the startup probe: a terminal that speaks the kitty keyboard protocol has its `CSI ? u` answered for every agent #BUG-160", async () => {
     const cfg = freshConfig("kitty-probe", "handoff:\n  on_clear: ask\n");
     // A plain terminal and a kitty one, at once: what the agent's own probe gets back in each.
     const probe = async (kitty: boolean) => {

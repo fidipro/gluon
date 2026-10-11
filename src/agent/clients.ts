@@ -107,6 +107,15 @@ function demoMode(task: string): Record<string, unknown> {
   return {};
 }
 
+/**
+ * What else the demo does, from the task's words, so every kind of turn can be walked to: a task about the repository's
+ * history (`history`, `recent`, `git`) also reads the git log; one that asks for `questions` gets three at once, after a
+ * line with Markdown in it.
+ */
+function demoExtras(task: string): { history: boolean; batch: boolean } {
+  return { history: /\b(history|recent|recently|git)\b/i.test(task), batch: /\bquestions\b/i.test(task) };
+}
+
 /** The demo's spec, built from the developer's task, the files it listed and their answer. */
 function demoSpec(messages: Anthropic.MessageParam[]): string {
   const task = demoTask(messages);
@@ -114,7 +123,8 @@ function demoSpec(messages: Anthropic.MessageParam[]): string {
   const files = (toolResults(messages, "list_files")[0] ?? "").split("\n").filter((f) => f && !f.startsWith("…"));
   const scored = files.map((f) => ({ f, score: [...words].filter((w) => f.toLowerCase().includes(w)).length }));
   const relevant = [...scored.filter((x) => x.score > 0), ...scored.filter((x) => x.score === 0)].slice(0, 4).map((x) => x.f);
-  const answers = toolResults(messages, "ask_user").map((a) => a.replace(/^The developer answered: /, ""));
+  // Several questions asked together come back as one answer, a line each.
+  const answers = toolResults(messages, "ask_user").flatMap((a) => a.replace(/^The developer answered: /, "").split("\n"));
   return [
     task.charAt(0).toUpperCase() + task.slice(1) + (/[.!?]$/.test(task) ? "" : "."),
     "",
@@ -131,7 +141,7 @@ function demoSpec(messages: Anthropic.MessageParam[]): string {
 
 /**
  * A scripted brain for walking the UI without API calls. It explores the real repository, asks
- * one question, routes (a type of the developer's routing.yaml) and proposes a spec built from the
+ * one question (or three, `demoExtras`), routes (a type of the developer's routing.yaml) and proposes a spec built from the
  * task, and on a reply routes again, one level lower. It offers only what `route` returns, like any brain.
  */
 export function demoClient(routing: RoutingConfig = defaultRouting()): ModelClient {
@@ -158,8 +168,34 @@ export function demoClient(routing: RoutingConfig = defaultRouting()): ModelClie
       case 0:
         return { text: "Let me look at how this repo is laid out.", tools: [{ name: "list_files", input: {} }] };
       case 1:
-        return { tools: [{ name: "grep", input: { pattern: "test", path: "." } }, { name: "read_file", input: { path: "package.json" } }] };
+        return {
+          tools: [
+            { name: "grep", input: { pattern: "test", path: "." } },
+            { name: "read_file", input: { path: "package.json" } },
+            ...(demoExtras(demoTask(messages)).history ? [{ name: "git_log", input: { count: 5 } }] : []),
+          ],
+        };
       case 2:
+        if (demoExtras(demoTask(messages)).batch)
+          return {
+            text: "I found the **test setup** in `package.json`. A few things I _can't_ tell from the code:",
+            tools: [
+              {
+                name: "ask_user",
+                input: {
+                  question: "Should the fix include a regression test, or just the change?",
+                  options: [
+                    { label: "Add a regression test", description: "Reproduce the bug in a test first, then fix" },
+                    { label: "Just the fix", description: "Smallest change that works" },
+                  ],
+                  next_questions: [
+                    { question: "Which tests should cover it?", options: [{ label: "Unit tests" }, { label: "An end-to-end test" }] },
+                    { question: "Should it ship behind a flag?", options: [{ label: "Yes, behind a flag" }, { label: "No, on for everyone" }] },
+                  ],
+                },
+              },
+            ],
+          };
         return {
           text: "I found the test setup. One thing I can't tell from the code:",
           tools: [

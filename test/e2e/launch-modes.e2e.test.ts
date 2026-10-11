@@ -34,7 +34,7 @@ test("BUG-409/launch-modes: the note that Codex's /plan line couldn't be typed i
   expect(app.screen().replace(/\s+/g, " ")).toContain("type this yourself: /plan Read the session brief in");
 });
 
-test("BUG-410/launch-modes: ctrl+t to explore (strictly read-only) gives the brief that says what explore allows @full", async () => {
+test("agent-choice/mode: ctrl+t to explore (strictly read-only) gives the brief that says what explore allows @full #BUG-410", async () => {
   const app = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(app, "fix the thing");
   await app.press(KEYS.ctrlT);
@@ -45,7 +45,7 @@ test("BUG-410/launch-modes: ctrl+t to explore (strictly read-only) gives the bri
   expect(log).toContain("## Mode: explore");
 });
 
-test("BUG-410/launch-modes @full: the brief follows the mode ctrl+t ended on, whatever the spec was written for: plan says plan, build says neither mode", async () => {
+test("agent-choice/mode: the brief follows the mode ctrl+t ended on, whatever the spec was written for: plan says plan, build says neither mode @full #BUG-410", async () => {
   const plan = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(plan, "fix the thing");
   await plan.press(KEYS.ctrlT);
