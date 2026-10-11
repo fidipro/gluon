@@ -13,6 +13,7 @@ The tests run on the versions in `test/harnesses.json`: the fakes report them, a
 downloaded and hash-checked into a cache outside the repository (`bun scripts/harness-pin.ts --install`). The Harness watch
 workflow finds a new release within the hour and opens the `harness-update` pull request that moves the pin;
 `bun scripts/harness-pin.ts` shows how far the pin is behind, and a release waits until it isn't (`--check`).
+CI runs the real-harness tier (`test/real/`) on each harness's newest release; locally `bun run test:real` runs it on the pinned ones.
 After an update, with the new version installed:
 
 1. Run `gluon doctor` to catch drift in login and status checks.

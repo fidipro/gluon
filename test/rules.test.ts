@@ -17,7 +17,7 @@ import { defaults, loadConfig, saveConfig, type Config, type Connection } from "
 import { onPath } from "../src/detect.ts";
 import { HARNESS_INFO, HARNESSES, OPENROUTER_ANTHROPIC_BASE, PROVIDERS, type Harness } from "../src/harnesses.ts";
 import { ensurePermanentFiles, removePermanentFiles } from "../src/adapters/permanent.ts";
-import { assertSafeEnv, BASE_URL_ENV, buildCommand, FORBIDDEN_ENV, TOKEN_ENV } from "../src/launchers.ts";
+import { assertSafeEnv, BASE_URL_ENV, buildCommand, FORBIDDEN_ENV, testModelBase, TOKEN_ENV } from "../src/launchers.ts";
 import { loadSecrets, maskSecrets, saveSecret, secret } from "../src/secrets.ts";
 import { fakeAgents, isPrivate } from "./e2e/fixtures.ts";
 
@@ -235,8 +235,10 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
       expect([file, text]).not.toEqual([file, expect.stringMatching(/(CLAUDE_CODE_OAUTH_TOKEN|CODEX_ACCESS_TOKEN|XAI_ACCESS_TOKEN|GOOGLE_OAUTH_ACCESS_TOKEN)["']?\s*(:|=[^=])/)]);
       const sets = [...text.matchAll(/\b([A-Z_]*BASE_URL)\s*=\s*([^;\n]+)/g)];
       for (const [, name, value] of sets) {
-        // Claude Code's and Kimi Code's OpenRouter launches (Kimi's `KIMI_MODEL_BASE_URL`: its documented environment model), nothing else.
-        expect([file, name, value!.trim()]).toEqual(["src/launchers.ts", name, name === "ANTHROPIC_BASE_URL" ? "OPENROUTER_ANTHROPIC_BASE" : "OPENROUTER_OPENAI_BASE"]);
+        // Claude Code's and Kimi Code's OpenRouter launches (Kimi's `KIMI_MODEL_BASE_URL`: its documented environment model), and the
+        // real-harness tier's loopback seam (`testModelBase`: compiled out of a release, loopback only; its own test below), nothing else.
+        const ok = name === "ANTHROPIC_BASE_URL" ? ["OPENROUTER_ANTHROPIC_BASE", "seam.anthropic"] : ["seam?.openai ?? OPENROUTER_OPENAI_BASE"];
+        expect([file, name, ok.includes(value!.trim())]).toEqual(["src/launchers.ts", name, true]);
         expect(["ANTHROPIC_BASE_URL", "KIMI_MODEL_BASE_URL"]).toContain(name!);
       }
     }
@@ -319,6 +321,40 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
       expect(argv.join(" ")).toContain('base_url="https://api.openai.com/v1"');
     } finally {
       delete process.env.OPENAI_API_KEY;
+    }
+  });
+
+  test("the real-harness tier's seam (GLUON_TEST_MODEL_URL): a loopback URL only, on Anthropic, OpenAI and OpenRouter keys only; never a plan or Bedrock", () => {
+    expect(process.env.GLUON_TEST_MODEL_URL).toBeUndefined();
+    const keys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"];
+    for (const k of keys) process.env[k] = `sk-test-${k.toLowerCase()}-0123456789abcdef`;
+    const url = "http://127.0.0.1:43210";
+    const launch = (h: Harness, c: Connection, model: string) => buildCommand({ ...loadConfig(), connections: { [h]: c } }, { harness: h, model, spec: "x", reason: "" });
+    try {
+      for (const bad of ["https://127.0.0.1:1", "http://localhost:1", "http://127.0.0.1:1/x", "http://10.0.0.1:1", "https://api.example.com"]) {
+        process.env.GLUON_TEST_MODEL_URL = bad;
+        expect([bad, testModelBase()]).toEqual([bad, null]);
+        expect(launch("claude-code", { auth: "api", provider: "anthropic" }, "sonnet").env.ANTHROPIC_BASE_URL).toBeUndefined();
+      }
+      process.env.GLUON_TEST_MODEL_URL = url;
+      expect(testModelBase()).toEqual({ anthropic: url, openai: `${url}/v1` });
+      expect(launch("claude-code", { auth: "api", provider: "anthropic" }, "sonnet").env.ANTHROPIC_BASE_URL).toBe(url);
+      expect(launch("codex", { auth: "api", provider: "openai" }, "gpt-6-luna").argv.join(" ")).toContain(`base_url="${url}/v1"`);
+      expect(launch("kimi-code", { auth: "api", provider: "openrouter" }, "kimi-k2.7-code").env.KIMI_MODEL_BASE_URL).toBe(`${url}/v1`);
+      expect(JSON.parse(launch("opencode", { auth: "api", providers: ["openrouter"] }, "deepseek-flash").env.OPENCODE_CONFIG_CONTENT!).provider).toEqual({ openrouter: { options: { baseURL: `${url}/v1` } } });
+      // Never on a plan or Bedrock, and Claude Code on OpenRouter keeps OpenRouter's endpoint.
+      for (const h of ["claude-code", "codex"] as const) {
+        const plan = launch(h, { auth: "subscription" }, h === "codex" ? "gpt-6-luna" : "sonnet");
+        expect([h, JSON.stringify(plan).includes("127.0.0.1")]).toEqual([h, false]);
+      }
+      expect(launch("claude-code", { auth: "api", provider: "openrouter" }, "sonnet").env.ANTHROPIC_BASE_URL).toBe("https://openrouter.ai/api");
+      expect(() => assertSafeEnv({ ANTHROPIC_BASE_URL: url }, "plan")).toThrow();
+      expect(() => assertSafeEnv({ ANTHROPIC_BASE_URL: url }, "bedrock")).toThrow();
+      expect(() => assertSafeEnv({ ANTHROPIC_BASE_URL: "http://127.0.0.1:1" }, "anthropic")).toThrow();
+      expect(() => assertSafeEnv({ ANTHROPIC_BASE_URL: url }, "anthropic")).not.toThrow();
+    } finally {
+      delete process.env.GLUON_TEST_MODEL_URL;
+      for (const k of keys) delete process.env[k];
     }
   });
 

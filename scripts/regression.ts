@@ -11,6 +11,8 @@
  * `bun run test:area a,b`), `--changed [ref]` (the files changed since the merge-base with `ref`,
  * default origin/main, plus uncommitted ones; a core or unknown file means the fast tier), and
  * `--list` (print what would run and stop; `--json`: as JSON, with the OSes the change needs, for CI).
+ * Then the real stage (scripts/real-stage.ts): the real-harness tier for the harnesses the change touches, the real binaries against a
+ * model API on loopback (free; the pinned binaries, the newest with `--newest` and always in CI; needs tmux).
  * Then the live stage (scripts/live-stage.ts; paid, local only, never in CI): the live checks the change needs (`liveChecks`,
  * test/areas.ts) on the pinned harness binaries, with the user's own plan, AWS setup or keys; at most $0.50 a run, a pass kept until
  * src/ or the harness changes. Pre-approved within that cap (the owner's decision, issue #31). `--no-live` leaves it out; `--newest`
@@ -30,6 +32,8 @@ import { join } from "node:path";
 import { AREAS, e2eTestFiles, liveChecks, platformsOf, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
 import { REGRESSION_LIVE_RUN_CAP } from "./live-lib.ts";
 import { liveStage, online } from "./live-stage.ts";
+import { onPath } from "./live-driver.ts";
+import { REAL_TEST, realHarnesses, realStage } from "./real-stage.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
@@ -38,10 +42,10 @@ const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] 
   --full           also the @full and @quarantine tests (bun run regression:full)
   --area a,b       only those areas' unit and e2e tests (bun run test:area a,b); areas: ${Object.keys(AREAS).join(", ")}
   --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too
-  --stages a,b     only those stages (typecheck, unit, e2e, live), to time or meter one of them
+  --stages a,b     only those stages (typecheck, unit, e2e, real, live), to time or meter one of them
   --retry-failed   run a stage's failed tests once more; passing then, they are flaky (qa/logs/flaky.json), not failures
   --no-live        leave out the live stage (the real checks the change needs: paid, at most $0.50, local only, never in CI)
-  --newest         the live stage runs each harness's newest release, not the pinned one (before a merge)
+  --newest         the real and live stages run each harness's newest release, not the pinned one (before a merge; CI's real stage always does)
   --keep-going     run every stage even after one fails
   --list           print what would run, then stop (--json: as JSON, with the OSes the change needs)
 env: GLUON_UNIT_SHARDS (unit processes), GLUON_E2E_SHARDS (e2e processes; fast tier: half the apps, full: 1), GLUON_E2E_CONCURRENCY (apps at once, all e2e processes together),
@@ -82,7 +86,7 @@ if (areaArg !== undefined && changedArg !== undefined) {
   process.exit(2);
 }
 
-const STAGES = ["typecheck", "unit", "e2e", "live"];
+const STAGES = ["typecheck", "unit", "e2e", "real", "live"];
 const stages = stagesArg === undefined ? STAGES : stagesArg.split(",").map((x) => x.trim()).filter(Boolean);
 if (!stages.length || stages.some((x) => !STAGES.includes(x))) {
   console.error(`--stages takes some of: ${STAGES.join(", ")}\n${HELP}`);
@@ -160,6 +164,9 @@ if (areaArg !== undefined) {
 const unitAll = sel ? sel.unit : unitTestFiles();
 /** The live checks this run needs: by the change (`--changed`, `--area`); the journey and every harness for a whole tier. */
 const checks = liveChecks(picked ?? sel, changedList, full && !sel);
+/** The real stage's harnesses: those of the change's harness checks that can run on a loopback model API. */
+const reals = realHarnesses(checks);
+const realNewest = newest || !!process.env.CI;
 const liveLine = () => (checks.length ? `${checks.map((c) => `${c.kind} ${c.harness}`).join(", ")} (≤ $${REGRESSION_LIVE_RUN_CAP.toFixed(2)} in all)` : "none");
 const e2eAll = sel ? sel.e2e : e2eTestFiles();
 
@@ -335,6 +342,7 @@ if (list) {
   console.log(`e2e: ${sel ? `${e2eAll.length} file(s)` : "every file in test/e2e"} in ${e2eGroups.length} process(es), ${perProcess} apps at once in each${left}`);
   for (const f of sel?.e2e ?? []) console.log(`  ${f}`);
   for (const h of sel?.hooks ?? []) console.log(`by hand (${h.area}/${h.name}): ${h.cmd}`);
+  console.log(`real (free, loopback model API${realNewest ? ", newest releases" : ""}): ${reals.join(", ") || "none"}`);
   console.log(`live (paid, local only${noLive ? "; --no-live: left out" : ""}): ${liveLine()}`);
   rmSync(tmp, { recursive: true, force: true });
   process.exit(0);
@@ -404,6 +412,29 @@ async function main(): Promise<number> {
     if (!(await verdict("e2e", from, rs, concurrent)) && stop()) return 1;
   }
   if (!groups.length && !e2eGroups.length) console.log("nothing to run after the typecheck: no test file selected");
+  meter.stage("real");
+  if (reals.length && stages.includes("real")) {
+    if (failed) console.log("── real: not run (an earlier stage failed)");
+    else {
+      const tmux = !!(onPath("tmux") ?? onPath("tmux", "/usr/bin:/usr/local/bin:/opt/homebrew/bin"));
+      const r = await timed("real", () =>
+        realStage(reals, {
+          newest: realNewest,
+          tmux,
+          say: (l) => console.log(l),
+          run: async (env) => {
+            const p = Bun.spawn([bun, "test", "--concurrent", REAL_TEST], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ...env } });
+            children.add(p);
+            const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+            const code = await p.exited;
+            children.delete(p);
+            return { code, out: o + e };
+          },
+        }),
+      );
+      if (r.failed && stop()) return 1;
+    }
+  }
   meter.stage("live");
   if (!checks.length || !stages.includes("live")) {
     // nothing live in this change, or --stages left the stage out

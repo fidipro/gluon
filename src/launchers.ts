@@ -133,6 +133,20 @@ const HARNESS_AGGREGATOR_ENV: Partial<Record<Harness, Partial<Record<Conn, Recor
 export const FORBIDDEN_ENV = [...TOKEN_ENV, ...BASE_URL_ENV];
 
 /**
+ * The real-harness tier's model API (test/real/, test/fixtures/fake-model-api.ts): with `GLUON_TEST_MODEL_URL` set to
+ * `http://127.0.0.1:<port>`, an API-key launch of Claude Code (Anthropic), Codex (OpenAI), OpenCode and Kimi Code (OpenRouter)
+ * sends its model traffic there, so the newest real harnesses run offline and free. A test seam: null in a release build (the
+ * bundler drops the name: test/dist.test.ts), and for any other value. Never on a plan, Bedrock or another provider.
+ */
+export function testModelBase(): { anthropic: string; openai: string } | null {
+  const url = typeof GLUON_BUILD === "string" && GLUON_BUILD !== "test" ? undefined : process.env.GLUON_TEST_MODEL_URL;
+  if (!url || !/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(url)) return null;
+  return { anthropic: url, openai: `${url}/v1` };
+}
+// The build flag written out here, not detect.ts's BUILD, so the bundler drops the seam's name from release builds.
+declare const GLUON_BUILD: string | undefined;
+
+/**
  * Throws when an environment Gluon builds carries a login token, or a base URL other than an
  * API-key aggregator's own documented endpoint on that aggregator's connection. `conn`: the
  * connection the environment is for (none: a subscription, a login, or the brain's plan routes); `harness`: whose launch it is, for the
@@ -143,7 +157,10 @@ export function assertSafeEnv(env: Record<string, string | undefined>, conn?: Co
     if (TOKEN_ENV.includes(k) || TOKEN_LIKE.test(k)) throw new Error(`Gluon doesn't pass ${k} to an agent: login tokens are never forwarded`);
     if (BASE_URL_ENV.includes(k) || BASE_URL_LIKE.test(k)) {
       const allowed = conn ? (AGGREGATOR_ENV[conn]?.[k] ?? (harness ? HARNESS_AGGREGATOR_ENV[harness]?.[conn]?.[k] : undefined)) : undefined;
-      if (allowed === undefined || env[k] !== allowed) throw new Error(`Gluon doesn't pass ${k} to an agent${conn === "plan" || !conn ? " on a subscription" : ` on ${conn}`}: only an API-key aggregator's documented endpoint is allowed`);
+      // The test seam's loopback model API, on the API-key connections it covers (`testModelBase`).
+      const seam = testModelBase();
+      const loopback = !!seam && (conn === "anthropic" || conn === "openai" || conn === "openrouter") && (env[k] === seam.anthropic || env[k] === seam.openai);
+      if (!loopback && (allowed === undefined || env[k] !== allowed)) throw new Error(`Gluon doesn't pass ${k} to an agent${conn === "plan" || !conn ? " on a subscription" : ` on ${conn}`}: only an API-key aggregator's documented endpoint is allowed`);
     }
     // Kimi Code's key variable: the key of its own API-key connection (OpenRouter's or Moonshot's) on that launch alone, never on its plan (BUG-431).
     if (k === "KIMI_MODEL_API_KEY" && !((conn === "openrouter" || conn === "moonshot") && harness === "kimi-code")) throw new Error("Gluon passes KIMI_MODEL_API_KEY only as an OpenRouter or Moonshot key for Kimi Code");
@@ -246,6 +263,7 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
   // Only the key for the chosen model's provider; nothing at all on a subscription.
   const v = keyVar(conn);
   const key = v ? secret(v) : undefined;
+  const seam = testModelBase();
   if (conn === "bedrock") Object.assign(env, awsEnv(config));
   switch (c.harness) {
     case "claude-code":
@@ -256,6 +274,7 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
         if (key) env.ANTHROPIC_AUTH_TOKEN = key;
         env.ANTHROPIC_API_KEY = "";
       } else if (v && key) env[v] = key;
+      if (seam && conn === "anthropic") env.ANTHROPIC_BASE_URL = seam.anthropic;
       break;
     case "codex":
       // Bedrock's runtime provider takes the `global.openai.*` inference profiles; `amazon-bedrock` is the Mantle one (`openai.*` ids): BUG-420.
@@ -264,7 +283,7 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
         // Codex signed in to ChatGPT ignores OPENAI_API_KEY on its built-in provider: a provider of
         // its own that reads the key makes the key what runs (codex 0.158; forced_login_method
         // would log the user out instead).
-        extra.push("-c", `model_providers.openai-api-key={name="OpenAI API key",base_url="${OPENAI_API_BASE}",env_key="OPENAI_API_KEY",wire_api="responses"}`, "-c", 'model_provider="openai-api-key"');
+        extra.push("-c", `model_providers.openai-api-key={name="OpenAI API key",base_url="${seam?.openai ?? OPENAI_API_BASE}",env_key="OPENAI_API_KEY",wire_api="responses"}`, "-c", 'model_provider="openai-api-key"');
       }
       else if (conn === "openrouter") {
         extra.push("-c", `model_providers.openrouter={name="OpenRouter",base_url="${OPENROUTER_OPENAI_BASE}",env_key="OPENROUTER_API_KEY"}`, "-c", 'model_provider="openrouter"');
@@ -285,7 +304,7 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
         // Kimi's documented environment model: in memory only, nothing written to its config. Its own variable names for the key.
         // Moonshot: Gluon sets no base URL, type `kimi` (Kimi's default, pinned so an inherited type of the user's never sends the key to another vendor's default URL) reaches Moonshot's global API.
         env.KIMI_MODEL_PROVIDER_TYPE = conn === "openrouter" ? "openai" : "kimi";
-        if (conn === "openrouter") env.KIMI_MODEL_BASE_URL = OPENROUTER_OPENAI_BASE;
+        if (conn === "openrouter") env.KIMI_MODEL_BASE_URL = seam?.openai ?? OPENROUTER_OPENAI_BASE;
         if (key) env.KIMI_MODEL_API_KEY = key;
         env.KIMI_MODEL_NAME = id;
         // Without it Kimi sizes an environment model at 256K whatever the model: Gluon's window for it (`src/cost/kimi.ts`).
@@ -298,7 +317,13 @@ export function buildCommand(config: Config, c: LaunchChoice, adapter?: AdapterO
     case "opencode":
       model = `${PROVIDERS[conn as Exclude<Conn, "plan">]?.opencodeId ?? conn}/${id}`;
       // A mode's config is merged at the top level; what Gluon sets itself (`model`, `providers`) stays.
-      env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ model, ...opencodeEffort(conn, id, entry, c.effort), ...Object.fromEntries(Object.entries(launch?.opencodeConfig ?? {}).filter(([k]) => k !== "model" && k !== "providers")) });
+      // The test seam (`testModelBase`) points OpenCode at it in OpenCode's 1.x-style `provider` block, the one place 2.0.26 reads a
+      // base URL from; with a 2.x `providers` block (the effort's) present it reads none, so the seam's launch has no effort.
+      env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+        model,
+        ...(seam && conn === "openrouter" ? { provider: { openrouter: { options: { baseURL: seam.openai } } } } : opencodeEffort(conn, id, entry, c.effort)),
+        ...Object.fromEntries(Object.entries(launch?.opencodeConfig ?? {}).filter(([k]) => k !== "model" && k !== "providers")),
+      });
       if (v && key) env[v] = key;
       break;
     default:

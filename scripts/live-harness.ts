@@ -262,6 +262,12 @@ export interface HarnessRunOptions {
   brain?: { step: BrainStep; key?: string; turns: number };
   /** When the whole check must be over (epoch ms): every wait stops there, and the check fails (a journey's wall clock). */
   deadline?: number;
+  /**
+   * The real-harness tier (test/real/): the harness's model traffic goes to this loopback model API (`GLUON_TEST_MODEL_URL`,
+   * src/launchers.ts `testModelBase`), nothing is fetched (no `pricing update`: the test seeds the tables in `prepare`), and `env`
+   * reaches Gluon as it is (a harness's own "no telemetry, no update" switches; nothing `FORBIDDEN`).
+   */
+  loopback?: { url: string; env?: Record<string, string> };
   /** Called with the scratch world before Gluon starts (an agent's own scratch state: a recent model, a setting). */
   prepare?(w: { scratch: string; home: string; repo: string; cfgDir: string; bin: string }): void;
   /** Called with the running session after the standard checks (or at once, `standard: false`). */
@@ -422,19 +428,24 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   o.prepare?.({ scratch, home, repo, cfgDir, bin });
   // The demo brain never fetches price tables (`refreshAllowed`), so the figures would show `—`: build them here, in the scratch HOME,
   // with the official `gluon pricing update` (free: models.dev, OpenRouter's listing and the installed binary), before Gluon starts.
-  const pricing = Bun.spawnSync([process.execPath, ...BUN_FLAGS, CLI, "pricing", "update"], {
-    cwd: repo,
-    env: { PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER ?? "", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), ...xdg },
-    timeout: 90_000,
-  });
-  say(`  pricing update: ${pricing.stdout.toString().trim().split("\n").join("; ") || `exit ${pricing.exitCode}`}`);
+  if (!o.loopback) {
+    const pricing = Bun.spawnSync([process.execPath, ...BUN_FLAGS, CLI, "pricing", "update"], {
+      cwd: repo,
+      env: { PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER ?? "", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), ...xdg },
+      timeout: 90_000,
+    });
+    say(`  pricing update: ${pricing.stdout.toString().trim().split("\n").join("; ") || `exit ${pricing.exitCode}`}`);
+  }
   const launch: Launch = {
     mode: "real",
     cols: 100,
     rows: 30,
     cwd: repo,
     argv: [process.execPath, ...BUN_FLAGS, CLI, ...(o.brain ? [] : ["--demo"])],
-    env: scrubEnv({ PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER, LOGNAME: process.env.LOGNAME, SHELL: process.env.SHELL, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), GLUON_TEST_PROBES: join(cfgDir, "probes.json"), ...xdg, ...o.env }),
+    env: {
+      ...(o.loopback ? { GLUON_TEST_MODEL_URL: o.loopback.url, ...o.loopback.env } : {}),
+      ...scrubEnv({ PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER, LOGNAME: process.env.LOGNAME, SHELL: process.env.SHELL, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), GLUON_TEST_PROBES: join(cfgDir, "probes.json"), ...xdg, ...o.env }),
+    },
     yaml,
     fakes: [],
     alt: [],
