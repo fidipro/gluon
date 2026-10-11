@@ -1,13 +1,13 @@
 /**
  * A frame of Gluon's screen as the headless xterm holds it, cell by cell (`grab`), and as compact
- * golden text for `toMatchSnapshot()` (`serialize`): a header (scene, size, theme), the cursor,
+ * golden text for the visual snapshots (`serialize`): a header (scene, size, theme), the cursor,
  * the text grid with row numbers, a deduplicated style table and each row's style runs by column.
  *
  * Colours: `null` the terminal's default, `#rrggbb` a 24-bit colour, a number a palette colour
  * (0–255). Columns are the terminal's: a wide character takes two, its right half is a cell of
  * width 0 with no character.
  */
-import type { App } from "../e2e/harness.ts";
+import type { App } from "./harness.ts";
 
 export type Color = string | number | null;
 

@@ -233,7 +233,8 @@ function goldens(): Section {
   const last = lastCommit(UI_PATHS);
   return {
     title,
-    lines: [{ level: "stale", text: `${when}; ${n} commit${n === 1 ? "" : "s"} since touched src/ui, the compositor, the chrome or the visual tests${last ? ` (latest: ${last.hash.slice(0, 7)} ${last.subject.slice(0, 60)})` : ""}: goldens may be stale`, action: "bun run test:visual-must; for an intended change, bun run test:visual -u and review the diff" }],
+    // Informational: the goldens are by hand, for a redesign; the screen lints in the standard tests catch what breaks (issue #31).
+    lines: [{ level: "info", text: `${when}; ${n} commit${n === 1 ? "" : "s"} since touched src/ui, the compositor, the chrome or the visual tests${last ? ` (latest: ${last.hash.slice(0, 7)} ${last.subject.slice(0, 60)})` : ""}: goldens may differ`, action: "only for a redesign: bun run test:visual -u and review the diff" }],
   };
 }
 

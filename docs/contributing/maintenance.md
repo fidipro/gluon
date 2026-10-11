@@ -74,7 +74,7 @@ exits 1 only for something definitely broken. Run it before a release.
 |---|---|
 | a new `src/` or test file | add it to an area in `test/areas.ts` (`test/areas.test.ts` fails until you do) |
 | a harness update (the `harness-update` pull request) | re-capture `test/fixtures/screens/` and check the readers (above) |
-| a UI or frame change | review the visual goldens (`bun run test:visual-must`; for an intended change `bun run test:visual -u`) |
+| a redesign (an intended change to how Gluon looks) | `bun run test:visual -u`, then review the goldens' diff (`GLUON_REVIEW=1` renders PNGs); a UI change otherwise needs nothing extra: the screen lints run in the standard tests |
 | a change in `src/pty/`, `src/gluon.ts`, `src/ui/` or `src/sessions.ts` | `GLUON_PERF_QUICK=1 bun run test:perf` |
 | a price source or table builder changes | refresh `test/fixtures/tables/` |
 | a test slower than the fast tier's threshold | put `@full` in its title |

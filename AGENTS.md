@@ -19,7 +19,6 @@ bun run test:value <area>  # what an area's tests are worth: mutation gaps, dele
 bun run test:unit     # unit tests, one process (`regression` shards them)
 bun run test:e2e      # e2e scenarios, all of them (~13 min)
 bun run test:visual   # Gluon's goldens + lints, local only (~6 min; -u updates; test/e2e/README.md)
-bun run test:visual-must  # the short visual batch, local only (~2 min; read-only goldens)
 bun run test:gluon    # Gluon's monkey, 50 seeds × 400 steps, local only (test/e2e/README.md)
 bun run test:gluon-full  # every e2e cell of Gluon's coverage matrix, local only (~12 min)
 bun test -t "BUG-01"  # tests for one bug

@@ -1,6 +1,6 @@
 /**
  * What a reviewer checks on each contact sheet of the visual suite (`GLUON_REVIEW=1 bun run
- * test:visual` prints it after the sheets' paths): what the lints (`lint.ts`) can't judge.
+ * test:visual` prints it after the sheets' paths): what the lints (`test/e2e/screen-lint.ts`) can't judge.
  */
 export const CHECKS: { name: string; ask: string }[] = [
   { name: "alignment", ask: "Columns line up across rows (the list's ctx · cost · time, the key list, option labels); margins equal left and right; nothing off by one cell next to wide characters." },

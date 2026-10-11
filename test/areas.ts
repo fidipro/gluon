@@ -124,7 +124,7 @@ export const AREAS: Record<string, Area> = {
     doc: "Gluon's frame: the app, the compositor and chrome, sessions, tabs, the coverage matrix and the monkey",
     live: "harness",
     src: ["src/gluon.ts", "src/files-poll.ts", "src/sessions.ts", "src/pty/chrome.ts", "src/pty/compositor.ts"],
-    files: ["test/e2e/gluon-*.ts", "test/fixtures/gluon.ts", "test/fixtures/gluon-matrix.ts"],
+    files: ["test/e2e/gluon-*.ts", "test/e2e/scenes.ts", "test/e2e/scene-runs.ts", "test/e2e/screen-lint.ts", "test/e2e/frame.ts", "test/e2e/mask.ts", "test/fixtures/gluon.ts", "test/fixtures/gluon-matrix.ts"],
     unit: [
       "test/gluon.test.ts",
       "test/polling.test.ts",
@@ -137,7 +137,7 @@ export const AREAS: Record<string, Area> = {
       "test/gluon-qa-frame.test.ts",
       "test/run-sweep.test.ts",
     ],
-    e2e: ["test/e2e/gluon.e2e.test.ts", "test/e2e/gluon-more.e2e.test.ts", "test/e2e/gluon-qa-frame.e2e.test.ts", "test/e2e/gluon-matrix.e2e.test.ts", "test/e2e/gluon-monkey.e2e.test.ts", "test/e2e/scoped.e2e.test.ts"],
+    e2e: ["test/e2e/gluon.e2e.test.ts", "test/e2e/gluon-more.e2e.test.ts", "test/e2e/gluon-qa-frame.e2e.test.ts", "test/e2e/gluon-matrix.e2e.test.ts", "test/e2e/gluon-monkey.e2e.test.ts", "test/e2e/scoped.e2e.test.ts", "test/e2e/screens.e2e.test.ts"],
     e2eOnly: ["src/gluon.ts"],
     hooks: {
       matrix: { cmd: "bun run test:gluon-full", files: ["test/e2e/gluon-matrix.e2e.test.ts"] },

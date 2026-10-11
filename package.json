@@ -66,7 +66,6 @@
     "test:perf": "GLUON_PERF=1 bun test --max-concurrency=1 ./test/perf",
     "test:gluon": "GLUON_MONKEY_SEEDS=50 GLUON_MONKEY_STEPS=400 bun test --concurrent --max-concurrency=12 test/e2e/gluon-monkey.e2e.test.ts",
     "test:visual": "bun test --concurrent --max-concurrency=8 ./test/visual",
-    "test:visual-must": "GLUON_VISUAL=must bun test --concurrent --max-concurrency=8 ./test/visual",
     "test:gluon-full": "GLUON_FULL=1 bun test --concurrent --max-concurrency=6 test/e2e/gluon-matrix.e2e.test.ts",
     "docs:dev": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/docs/astro.ts dev",
     "docs:build": "bun --no-env-file --config=scripts/empty-bunfig.toml scripts/docs/astro.ts build",
