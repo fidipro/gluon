@@ -256,7 +256,8 @@ describe("the question", () => {
   });
 
   test("mouse/click-option: a click on an option of the question answers with it, on `keep talking` closes the agent choice, on an agent starts it #BUG-277", async () => {
-    const app = await start({ cwd: repo.tiny(), cols: 100, rows: 40 });
+    // Tall enough that the answer stays on screen under the proposal that comes after it.
+    const app = await start({ cwd: repo.tiny(), cols: 100, rows: 70 });
     await toQuestion(app);
     // The hint line's row picks nothing.
     app.write(clickOn(app, "enter answers"));

@@ -154,7 +154,8 @@ describe("paste", () => {
   });
 
   test("composer/paste: a paste drops escape sequences and control characters as typing does, keeps its line breaks (CRLF and CR too) and tabs, and never sends by itself #BUG-722", async () => {
-    const app = await start({ cwd: repo.tiny(), cols: 60 });
+    // Tall enough that the sent line stays on screen when the question comes after it.
+    const app = await start({ cwd: repo.tiny(), cols: 60, rows: 60 });
     await app.paste("a\x1cb\x00\x7f\x1b[Ac");
     await expectDraft(app, ["› abc"]);
     expect(app.screen()).not.toContain("›  abc");
