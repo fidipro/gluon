@@ -8,6 +8,8 @@ import { truncate } from "../src/ui/layout.ts";
 import { createScreen, type TermScreen } from "../src/pty/screen.ts";
 import type { SessionState, SessionView } from "../src/sessions.ts";
 import { GLUON_HEX } from "../src/ui/theme.ts";
+import { tripleProblem } from "./e2e/gluon-invariants.ts";
+import { tripleSegs } from "../src/ui/layout.ts";
 
 const EL_ED = /\x1b\[[0-9;?]*[JK]/;
 
@@ -246,6 +248,29 @@ describe("the info line", () => {
     // Room for it all: the age too, still short of the last column.
     expect(await line({ harness: "codex", model: "gpt-6-luna", effort: "low" }, 53)).toBe(" codex × gpt-6 luna × low · 3m · awaiting your input");
     expect(await line({ harness: "codex", model: "gpt-6-luna", effort: "low" }, 52)).toBe(" codex × gpt-6 luna × low · awaiting your input");
+  });
+});
+
+describe("the info line against the frame's title", () => {
+  test("BUG-724/mode: a mode or permissions after the triple are part of it for the e2e invariant, whole or cut, and a different one is still found", async () => {
+    const config = { models: { "claude-code": [{ id: "sonnet", label: "Sonnet 5.5" }] } } as unknown as Pick<Config, "models">;
+    const t = { harness: "claude-code" as const, model: "sonnet", effort: "medium" as const };
+    // The frame's title is the same segments the info line draws (`tripleSegs`); the invariant reads both from the screen.
+    const title = (agent: SessionView["agent"]) => tripleSegs(agent, config).map((s) => s.text).join("");
+    const info = async (agent: SessionView["agent"], cols: number) => (await text(infoLine(view({ id: 1, name: "x", agent, activity: "Working" }), 0, cols, true, config), cols)).trimEnd();
+    expect(title({ ...t, mode: "explore" })).toBe("claude code × sonnet 5.5 × medium · explore");
+    for (const agent of [t, { ...t, mode: "explore" as const }, { ...t, mode: "plan" as const }, { ...t, permissions: "accept-edits" as const }]) {
+      const row = await info(agent, 120);
+      expect(row).toContain(title(agent));
+      expect(tripleProblem(row, title(agent))).toBeUndefined();
+      // Cut: in the mode, at the triple's end, in the model.
+      for (const cols of [60, 50, 45, 40]) expect(tripleProblem(await info(agent, cols), title(agent))).toBeUndefined();
+    }
+    // The real differences are still found: another model, another mode, a mode the info line lacks.
+    const explore = title({ ...t, mode: "explore" });
+    expect(tripleProblem(" claude code × opus × medium · explore · now", explore)).toContain("isn't the frame's");
+    expect(tripleProblem(" claude code × sonnet 5.5 × medium · plan · now", explore)).toContain("isn't the frame's");
+    expect(tripleProblem(" claude code × sonnet 5.5 × medium · now · Working", explore)).toContain("isn't the frame's");
   });
 });
 
