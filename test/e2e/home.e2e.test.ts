@@ -59,6 +59,8 @@ describe("the terminal's size", () => {
     for (const [cols, rows] of [[60, 24], [40, 12], [30, 8], [19, 5], [110, 40]] as const) {
       app.resize(cols, rows);
       await app.waitFor((s) => s.split("\n").every((l) => Bun.stringWidth(l) <= cols) && s.includes("›"), 5000);
+      // Under load the resize's last frame can come after one that already fits the width: wait for it, then check.
+      await app.waitFor(() => fitProblems(app).length === 0 && !stackedRules(app), 3000).catch(() => {});
       expect([cols, rows, fitProblems(app)]).toEqual([cols, rows, []]);
       expect([cols, rows, stackedRules(app)]).toEqual([cols, rows, false]);
       if (cols === 60) expect(app.screen()).toContain("❯ 1. claude code");
