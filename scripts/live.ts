@@ -51,7 +51,7 @@ import { availableHere, awsSetupFromHost, checkHarness, harnessesFor, loadDevKey
 import {
   bucketOf, chatStep, DEFAULT_CAPS, DEFAULT_LEDGER, JOURNEY_AGENT_CAP, JOURNEY_BRAIN, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, journeyMonthSpend, parseArgs, PROBE,
   planCharged, planLines, planRouteBlock, regressionSubset, runCapOf, sectionsOf, SESSION, Spend, usd,
-  NO_BUCKET_CAPS, REGRESSION_LIVE_LEDGER,
+  NO_BUCKET_CAPS, REGRESSION_LIVE_CAPS, REGRESSION_LIVE_LEDGER,
   type Args, type Bucket, type PlanItem, type Section,
 } from "./live-lib.ts";
 
@@ -69,14 +69,14 @@ const LEDGER = args.ledger ? resolve(args.ledger) : join(ROOT, args.stage ? REGR
 const CAPS = args.caps ?? (args.stage ? NO_BUCKET_CAPS : DEFAULT_CAPS);
 /** A targeted run's own cap, on top of the buckets' (all paid buckets together). */
 const RUN_CAP = runCapOf(args);
-const spend = new Spend(LEDGER, CAPS, RUN_CAP, campaign, !args.dryRun);
+const spend = new Spend(LEDGER, CAPS, RUN_CAP, campaign, !args.dryRun, args.stage ? (args.stageLeft ?? REGRESSION_LIVE_CAPS) : undefined);
 const sections = sectionsOf(args);
 const out = (s: string) => console.log(maskSecrets(s));
 
 /** Whether a call with this worst case fits its bucket and the run's cap; refused calls are logged. */
 const allow = (bucket: Bucket, what: string, model: string, maxIn: number, maxOut: number) => spend.allow(bucket, what, model, maxIn, maxOut);
 const charge = (bucket: Bucket, what: string, model: string, input: number, output: number, estimated = false) => spend.charge(bucket, what, model, input, output, estimated);
-const bucketFor = (route: string) => bucketOf(route, campaign);
+const bucketFor = (route: string) => bucketOf(route, campaign, !!args.stage);
 
 // ——— setup: a throwaway config and repos, the dev key file for keys ———
 const TMP = mkdtempSync(join(tmpdir(), "gluon-live-"));
@@ -422,7 +422,7 @@ async function regression() {
 /** (d) The real-harness section (scripts/live-harness.ts): each installed harness, or `--harness`. */
 async function realHarness(screens: boolean) {
   out("\n(d) Real harnesses, launched from Gluon's demo brain on their cheapest model over an API key");
-  const r = await runHarnessSection({ spend, campaign, ...(args.conn ? { conn: args.conn } : {}), ...(args.model ? { model: args.model } : {}), home: "scratch", screens, ...(args.harness ? { harness: args.harness } : {}), say: out }, config);
+  const r = await runHarnessSection({ spend, campaign, stage: !!args.stage, ...(args.conn ? { conn: args.conn } : {}), ...(args.model ? { model: args.model } : {}), home: "scratch", screens, ...(args.harness ? { harness: args.harness } : {}), say: out }, config);
   for (const a of r.asserts) asserts.push({ status: a.status });
 }
 
@@ -432,14 +432,16 @@ async function realHarness(screens: boolean) {
 const JOURNEY_MS = 5 * 60_000;
 
 /**
- * The journey's brain: a plan route whose harness is signed in to it (no API money; the journey then runs in the real HOME, where the
- * sign-in is), else the connected API route whose worst case is lowest, within its cap.
+ * The journey's brain: the cheapest connected Bedrock route, else a plan route whose harness is signed in to it (no API money; the
+ * journey then runs in the real HOME, where the sign-in is), else the connected API route whose worst case is lowest, within its cap.
+ * Bedrock first keeps the user's plan for their own work (the owner's decision, 2026-10-11).
  */
 function journeyBrain(): { step: BrainStep; worst: number; bucket: Bucket } | { why: string } {
   const have = availableHere(config);
   const planOk = (s: BrainStep) => (s.route === "claude-plan" ? !!have.plan?.("claude-code") : s.route === "chatgpt-plan" ? !!have.plan?.("codex") : false);
   const pool = config.brain.order.filter((s) => (s.route.endsWith("-plan") ? planOk(s) : !notConnected(config, s)));
-  const priced = pool.map((step) => ({ step, bucket: bucketFor(step.route), worst: step.route.endsWith("-plan") ? 0 : usd(step.model, bucketFor(step.route), JOURNEY_BRAIN.input, JOURNEY_BRAIN.output) })).sort((a, b) => a.worst - b.worst);
+  const rank = (s: BrainStep) => (s.route === "bedrock" ? 0 : s.route.endsWith("-plan") ? 1 : 2);
+  const priced = pool.map((step) => ({ step, bucket: bucketFor(step.route), worst: step.route.endsWith("-plan") ? 0 : usd(step.model, bucketFor(step.route), JOURNEY_BRAIN.input, JOURNEY_BRAIN.output) })).sort((a, b) => rank(a.step) - rank(b.step) || a.worst - b.worst);
   const pick = priced[0];
   if (!pick) return { why: "no API brain route is connected here" };
   if (pick.worst > JOURNEY_BRAIN_CAP) return { why: `the cheapest brain route (${stepLabel(pick.step)}) could cost $${pick.worst.toFixed(4)}, over a journey's brain cap of $${JOURNEY_BRAIN_CAP}` };
@@ -457,7 +459,7 @@ async function journey() {
   }
   const have = availableHere(config);
   for (const h of harnessesFor(args.harness)) {
-    const plan = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
+    const plan = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign, stage: !!args.stage });
     const skip = (why: string) => {
       out(`SKIP journey ${h}: ${why}`);
       asserts.push({ status: "SKIP" });
@@ -482,7 +484,7 @@ async function journey() {
       spend.run.refused.push(`journey ${h}: the month's cap`);
       break;
     }
-    if (!spend.allowUsd(brain.bucket, `journey ${h} brain`, brain.step.model, worst)) {
+    if (!spend.allowUsd(brain.bucket, `journey ${h} brain`, brain.step.model, worst, brain.bucket === "subscription" ? JOURNEY_BRAIN.input + JOURNEY_BRAIN.output : 0)) {
       skip(`refused, over a cap: ${spend.run.refused.at(-1)}`);
       break;
     }
@@ -546,7 +548,7 @@ function planOf(): PlanItem[] {
       const month = journeyMonthSpend(spend.file.runs, new Date());
       add("journey", `brain: ${stepLabel(brain.step)}, at most ${JOURNEY_BRAIN.turns} turns (this month's journeys so far: $${month.toFixed(4)} of $${JOURNEY_MONTH_CAP})`, 0, brain.bucket, "charged per journey below");
       for (const h of harnessesFor(args.harness)) {
-        const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
+        const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign, stage: !!args.stage });
         if (!p.pick.ok) add("journey", `${h}`, 0, "other", `skipped: ${p.pick.why}`);
         else if (!p.binary) add("journey", `${h}`, 0, p.bucket ?? "other", `skipped: ${noBinary(h)}`);
         else add("journey", `${h}: the brain asks and proposes → ${p.pick.conn} · ${p.model?.label} (${p.model?.id}) launched, replies once`, brain.worst + p.worst, p.bucket!, brain.worst + p.worst > JOURNEY_HARNESS_CAP ? `skipped: over a journey's cap of $${JOURNEY_HARNESS_CAP}` : undefined);
@@ -556,7 +558,7 @@ function planOf(): PlanItem[] {
   if (sections.includes("real-harness")) {
     if (!args.harness) add("real-harness", "grok-build", 0, "subscription", "skipped: no API-key route (its xAI plan needs a sign-in)");
     for (const h of harnessesFor(args.harness)) {
-      const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign });
+      const p = planHarness(h, config, have, { conn: args.conn, model: args.model, campaign, stage: !!args.stage });
       if (!p.pick.ok) add("real-harness", `${h}`, 0, "other", `skipped: ${p.pick.why}`);
       else if (!p.binary) add("real-harness", `${h}`, 0, p.bucket ?? "other", `skipped: ${noBinary(h)}`);
       else add("real-harness", `${h}: Gluon (demo brain, free) → ${p.pick.conn} · ${p.model?.label} (${p.model?.id}), one prompt "Reply with just OK"${args.tier === "harness" ? ", screens saved" : ""}`, p.worst, p.bucket!);

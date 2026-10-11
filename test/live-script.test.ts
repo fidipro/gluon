@@ -13,7 +13,7 @@ import { loginLine } from "../scripts/live-driver.ts";
 import { hostOf, install, readPin } from "../scripts/harness-cache.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
-  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, plansAllowed, price, REGRESSION_LIVE_RUN_CAP, runCapOf, sectionsOf, Spend, usd, type Available,
+  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, plansAllowed, price, formatStageCaps, NO_BUCKET_CAPS, parseStageCaps, REGRESSION_LIVE_CAPS, runCapOf, stageUse, sectionsOf, Spend, usd, type Available,
 } from "../scripts/live-lib.ts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -143,14 +143,33 @@ describe("flags and tiers", () => {
     expect(() => parseArgs(["--harness=codex"])).toThrow(/goes with --tier/);
     expect(() => parseArgs(["--tier=regression", "--newest", "--harness-from-path"])).toThrow(/use one/);
     expect(() => parseArgs(["--tier=journey", "--regression-stage", "--ledger", "x.json"])).toThrow(/own ledger/);
-    expect(() => parseArgs(["--tier=journey", "--run-cap", "lots"])).toThrow(/not an amount/);
+    expect(() => parseArgs(["--tier=journey", "--regression-stage", "--stage-left", "plans=lots"])).toThrow(/not an amount/);
+    expect(() => parseArgs(["--tier=journey", "--stage-left", "plans=1"])).toThrow(/goes with --regression-stage/);
   });
-  test("regression's live stage: --regression-stage caps the run at $0.50 or what --run-cap says is left, whichever is less", () => {
-    expect(parseArgs(["--tier=journey", "--harness=codex", "--regression-stage", "--run-cap=0.2"])).toMatchObject({ stage: true, runCap: 0.2 });
-    expect(runCapOf({ tier: "journey", stage: true })).toBe(REGRESSION_LIVE_RUN_CAP);
-    expect(runCapOf({ tier: "journey", stage: true, runCap: 0.2 })).toBe(0.2);
-    expect(runCapOf({ tier: "journey", stage: true, runCap: 9 })).toBe(REGRESSION_LIVE_RUN_CAP);
-    expect(REGRESSION_LIVE_RUN_CAP).toBe(0.5);
+  test("regression's live stage: capped per run and per bucket (plans 200k tokens, Bedrock $0.30, OpenRouter and API keys $0.10), no total", () => {
+    expect(REGRESSION_LIVE_CAPS).toEqual({ plans: 200_000, bedrock: 0.3, openrouter: 0.1, keys: 0.1 });
+    expect(runCapOf({ tier: "journey", stage: true })).toBe(Infinity);
+    expect(parseArgs(["--tier=journey", "--harness=codex", "--regression-stage", "--stage-left=plans=1000,bedrock=0.2"])).toMatchObject({ stage: true, stageLeft: { plans: 1000, bedrock: 0.2, openrouter: 0.1, keys: 0.1 } });
+    expect(parseStageCaps(formatStageCaps({ plans: 1234.5, bedrock: 0.12345, openrouter: 0, keys: 0.1 }))).toEqual({ plans: 1234, bedrock: 0.1235, openrouter: 0, keys: 0.1 });
+    expect(() => parseStageCaps("money=1")).toThrow(/unknown bucket/);
+    // OpenRouter is its own bucket in the stage; plans stay plans.
+    expect(bucketOf("openrouter", false, true)).toBe("openrouter");
+    expect(bucketOf("claude-plan", false, true)).toBe("subscription");
+    expect(stageUse([{ bucket: "subscription", usd: 0, input: 40_000, output: 3_000 }, { bucket: "bedrock", usd: 0.02, input: 0, output: 0 }, { bucket: "other", usd: 0.03, input: 0, output: 0 }, { bucket: "openrouter", usd: 0.01, input: 0, output: 0 }])).toEqual({ plans: 43_000, bedrock: 0.02, openrouter: 0.01, keys: 0.03 });
+  });
+  test("the stage holds each call to what its bucket has left: plan tokens, then dollars; the refusal says to ask the user", () => {
+    const s = new Spend(null, NO_BUCKET_CAPS, Infinity, false, false, { plans: 50_000, bedrock: 0.05, openrouter: 0.1, keys: 0.1 });
+    expect(s.allowUsd("subscription", "harness claude-code", "haiku", 0, 43_000)).toBe(true);
+    s.chargeUsd("subscription", "harness claude-code", "haiku", 0, 40_000, 3_000, true);
+    expect(s.allowUsd("subscription", "harness codex", "gpt-6-luna", 0, 43_000)).toBe(false);
+    expect(s.allowUsd("bedrock", "journey brain", "sonnet", 0.04)).toBe(true);
+    s.chargeUsd("bedrock", "journey brain", "sonnet", 0.04);
+    expect(s.allowUsd("bedrock", "harness codex", "gpt-6-luna", 0.014)).toBe(false);
+    expect(s.allowUsd("openrouter", "harness opencode", "deepseek", 0.01)).toBe(true);
+    expect(s.run.refused).toEqual([
+      expect.stringContaining("this run's plans over what is left of its cap (50000 tokens): ask the user, then bun run regression --live-caps plans=<more>"),
+      expect.stringContaining("this run's bedrock over what is left of its cap ($0.0500)"),
+    ]);
   });
   test("the binary a harness check runs: the pinned release by default, --newest or --harness-from-path instead", () => {
     expect(parseArgs(["--tier=harness", "--harness=codex", "--newest"])).toMatchObject({ newest: true });
@@ -241,9 +260,11 @@ describe("which connection and model a harness check uses", () => {
     expect(pickConn("antigravity", have(["GEMINI_API_KEY"], true))).toMatchObject({ ok: true, conn: "gemini" });
     expect(pickConn("opencode", have(["OPENROUTER_API_KEY"], true))).toMatchObject({ ok: true, conn: "openrouter" });
   });
-  test("signed in to its plan: Claude Code and Codex use it before Bedrock or a key (no API money); --conn=plan asks for it; GLUON_LIVE_PLANS=0 turns it off", () => {
+  test("signed in to its plan: Claude Code and Codex use it after Bedrock, before a key (the plan stays the user's); --conn=plan asks for it; GLUON_LIVE_PLANS=0 turns it off", () => {
     const onPlan = (keys: string[], bedrock: boolean, plans: string[]): Available => ({ ...have(keys, bedrock), plan: (h) => plans.includes(h) });
-    expect(pickConn("claude-code", onPlan(["ANTHROPIC_API_KEY"], true, ["claude-code"]))).toEqual({ ok: true, conn: "plan" });
+    expect(pickConn("claude-code", onPlan(["ANTHROPIC_API_KEY"], true, ["claude-code"]))).toEqual({ ok: true, conn: "bedrock" });
+    expect(pickConn("claude-code", onPlan(["ANTHROPIC_API_KEY"], false, ["claude-code"]))).toEqual({ ok: true, conn: "plan" });
+    expect(pickConn("claude-code", onPlan([], true, ["claude-code"]), "plan")).toEqual({ ok: true, conn: "plan" });
     expect(pickConn("codex", onPlan(["OPENAI_API_KEY"], false, ["codex"]))).toEqual({ ok: true, conn: "plan" });
     expect(pickConn("codex", onPlan(["OPENAI_API_KEY"], false, ["claude-code"]))).toMatchObject({ ok: true, conn: "openai" });
     expect(pickConn("opencode", onPlan(["OPENROUTER_API_KEY"], false, ["opencode"]))).toMatchObject({ ok: true, conn: "openrouter" });

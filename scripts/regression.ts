@@ -14,8 +14,9 @@
  * Then the real stage (scripts/real-stage.ts): the real-harness tier for the harnesses the change touches, the real binaries against a
  * model API on loopback (free; the pinned binaries, the newest with `--newest` and always in CI; needs tmux).
  * Then the live stage (scripts/live-stage.ts; paid, local only, never in CI): the live checks the change needs (`liveChecks`,
- * test/areas.ts) on the pinned harness binaries, with the user's own plan, AWS setup or keys; at most $0.50 a run, a pass kept until
- * src/ or the harness changes. Pre-approved within that cap (the owner's decision, issue #31). `--no-live` leaves it out; `--newest`
+ * test/areas.ts) on the pinned harness binaries, with the user's own AWS setup, plan or keys; capped per run and bucket
+ * (`REGRESSION_LIVE_CAPS`), a pass kept until src/ or the harness changes. Pre-approved within those caps (the owner's decision,
+ * issue #31; `--live-caps` raises one for a run, only after the user agreed). `--no-live` leaves it out; `--newest`
  * runs it on each harness's newest release (before a merge).
  * `--keep-going` runs every stage even after one fails (CI's full suite: a unit failure doesn't hide the e2e results).
  *
@@ -30,21 +31,22 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
 import { AREAS, e2eTestFiles, liveChecks, platformsOf, ROOT, selectAreas, selectChanged, unitTestFiles, type Selection } from "../test/areas.ts";
-import { REGRESSION_LIVE_RUN_CAP } from "./live-lib.ts";
+import { describeStageCaps, parseStageCaps, REGRESSION_LIVE_CAPS, type StageCaps } from "./live-lib.ts";
 import { liveStage, online } from "./live-stage.ts";
 import { onPath } from "./live-driver.ts";
 import { REAL_TEST, realHarnesses, realStage } from "./real-stage.ts";
 import { defaultApps } from "./e2e-concurrency.ts";
 import { FULL_OVER_S, readTimes, saveTimes, unitShards } from "./test-times.ts";
 
-const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--no-live] [--newest] [--list [--json]]
+const HELP = `usage: bun run regression [--full] [--area a,b | --changed [ref]] [--stages a,b] [--retry-failed] [--keep-going] [--no-live] [--live-caps b=n,…] [--newest] [--list [--json]]
   (none)           the fast tier: typecheck + unit + e2e without the tests titled @full or @quarantine
   --full           also the @full and @quarantine tests (bun run regression:full)
   --area a,b       only those areas' unit and e2e tests (bun run test:area a,b); areas: ${Object.keys(AREAS).join(", ")}
   --changed [ref]  the areas of the files changed since merge-base(ref or origin/main, HEAD), uncommitted ones too
   --stages a,b     only those stages (typecheck, unit, e2e, real, live), to time or meter one of them
   --retry-failed   run a stage's failed tests once more; passing then, they are flaky (qa/logs/flaky.json), not failures
-  --no-live        leave out the live stage (the real checks the change needs: paid, at most $0.50, local only, never in CI)
+  --no-live        leave out the live stage (the real checks the change needs: paid, capped per bucket, local only, never in CI)
+  --live-caps b=n  raise a live cap for this run, only after the user agreed (plans=<tokens>, bedrock|openrouter|keys=<usd>)
   --newest         the real and live stages run each harness's newest release, not the pinned one (before a merge; CI's real stage always does)
   --keep-going     run every stage even after one fails
   --list           print what would run, then stop (--json: as JSON, with the OSes the change needs)
@@ -63,6 +65,16 @@ const keepGoing = argv.includes("--keep-going");
 const json = argv.includes("--json");
 const noLive = argv.includes("--no-live");
 const newest = argv.includes("--newest");
+const liveCapsAt = argv.indexOf("--live-caps");
+let liveCaps: StageCaps = { ...REGRESSION_LIVE_CAPS };
+if (liveCapsAt >= 0) {
+  try {
+    liveCaps = parseStageCaps(argv[liveCapsAt + 1] ?? "");
+  } catch (e) {
+    console.error(`${(e as Error).message}\n${HELP}`);
+    process.exit(2);
+  }
+}
 let areaArg: string | undefined;
 let changedArg: string | true | undefined;
 let stagesArg: string | undefined;
@@ -70,6 +82,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i]!;
   const next = argv[i + 1];
   if (["--full", "--list", "--json", "--retry-failed", "--keep-going", "--no-live", "--newest", "--"].includes(a)) continue;
+  if (a === "--live-caps") i++;
   else if (a === "--area") areaArg = next && !next.startsWith("--") ? (i++, next) : "";
   else if (a.startsWith("--area=")) areaArg = a.slice(7);
   else if (a === "--changed") changedArg = next && !next.startsWith("--") ? (i++, next) : true;
@@ -167,7 +180,7 @@ const checks = liveChecks(picked ?? sel, changedList, full && !sel);
 /** The real stage's harnesses: those of the change's harness checks that can run on a loopback model API. */
 const reals = realHarnesses(checks);
 const realNewest = newest || !!process.env.CI;
-const liveLine = () => (checks.length ? `${checks.map((c) => `${c.kind} ${c.harness}`).join(", ")} (≤ $${REGRESSION_LIVE_RUN_CAP.toFixed(2)} in all)` : "none");
+const liveLine = () => (checks.length ? `${checks.map((c) => `${c.kind} ${c.harness}`).join(", ")} (caps: ${describeStageCaps(liveCaps)})` : "none");
 const e2eAll = sel ? sel.e2e : e2eTestFiles();
 
 type Result = { label: string; code: number; out: string };
@@ -445,6 +458,7 @@ async function main(): Promise<number> {
       liveStage(checks, {
         root: ROOT,
         newest,
+        caps: liveCaps,
         online,
         say: (l) => console.log(l),
         run: async (args) => {
