@@ -45,12 +45,13 @@ Use Bun, not Node tooling (no node, npm, npx, jest, vitest, dotenv). Prefer `Bun
   changed; `regression:full` for a big change; `@full`: `test/AGENTS.md`). CI and the nightly run are the net.
 - **Every fixed bug gets a regression test that fails before the fix**, named `BUG-nn/<plan case>: …`, at the
   cheapest layer (unit unless it needs a terminal); never weaken a test to get green (rules: `test/AGENTS.md`).
-- **The regression suite is offline and free.** Never call a real brain, agent, API or installer.
-- **Paid runs only when the user asked for one; if a change needs one, ask first and wait** — this
-  includes `gluon doctor`, `bun run start`, a real `--launch` and `regression --live` (the live journeys: pass `--live`
-  only when the user asked for it in this conversation; without it, regression says which journeys and what cap).
-  `test:live` enforces its own budgets and ledger (gitignored; budgets: the maintainers' private
-  notes); log any manual paid call there.
+- **The tests are offline and free; regression's last stage is not.** No test calls a real brain, agent, API or
+  installer. After them, `regression` runs the live checks the change needs (`scripts/live-stage.ts`): pre-approved
+  within its cap in code, local only, never in CI; `--no-live` leaves it out.
+- **Any other paid run only when the user asked for one; if a change needs one, ask first and wait** — this
+  includes `gluon doctor`, `bun run start`, a real `--launch` and `test:live`. `test:live` enforces its own budgets
+  and ledger (gitignored; budgets: the maintainers' private notes); log any manual paid call there.
+- **Before merging, `bun run regression --changed --newest`**: the live checks on each harness's newest release.
 - **Git**: unless told otherwise, work on a new branch; commit and push as you go; don't merge or
   open a PR unless asked.
 - **Publishing to npm, publishing a release and changing release signing are the owner's decision

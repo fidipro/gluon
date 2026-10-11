@@ -1,6 +1,7 @@
 #!/usr/bin/env -S bun --no-env-file --config=/dev/null
 /**
- * `bun run test:live`: real checks, on a budget. Never part of `bun run regression` (offline).
+ * `bun run test:live`: real checks, on a budget. `bun run regression`'s live stage runs a few of them (`--regression-stage`: its own
+ * ledger and run cap, scripts/live-stage.ts).
  *
  * - Every harness's official status check, every connection's models probed (free listings where
  *   the provider has one, else a tiny call of ≤16 output tokens), every step of the brain order
@@ -30,8 +31,7 @@
  * Keys come from a dev key file, GLUON_DEV_ENV (default: the repo's .env), handed to Gluon's
  * secrets explicitly (never process.env); the default AWS credentials, in the region of AWS_REGION / AWS_DEFAULT_REGION or the AWS
  * config's profile (`awsSetupFromHost`); a throwaway config.
- * In a git worktree there is no .env (it is gitignored): set GLUON_DEV_ENV to the main repo's .env,
- * as an absolute path: GLUON_DEV_ENV=/path/to/main-checkout/.env bun run test:live.
+ * In a git worktree there is no .env (it is gitignored): the main checkout's is read (`devEnvFile`), unless GLUON_DEV_ENV names one.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -51,6 +51,7 @@ import { availableHere, awsSetupFromHost, checkHarness, harnessesFor, loadDevKey
 import {
   bucketOf, chatStep, DEFAULT_CAPS, DEFAULT_LEDGER, JOURNEY_AGENT_CAP, JOURNEY_BRAIN, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, journeyMonthSpend, parseArgs, PROBE,
   planCharged, planLines, planRouteBlock, regressionSubset, runCapOf, sectionsOf, SESSION, Spend, usd,
+  NO_BUCKET_CAPS, REGRESSION_LIVE_LEDGER,
   type Args, type Bucket, type PlanItem, type Section,
 } from "./live-lib.ts";
 
@@ -63,8 +64,9 @@ try {
   process.exit(2);
 }
 const campaign = !!args.caps;
-const LEDGER = args.ledger ? resolve(args.ledger) : join(ROOT, DEFAULT_LEDGER);
-const CAPS = args.caps ?? DEFAULT_CAPS;
+// `bun run regression`'s live stage: its own ledger, no bucket cap (the run cap, what the stage has left, is the limit).
+const LEDGER = args.ledger ? resolve(args.ledger) : join(ROOT, args.stage ? REGRESSION_LIVE_LEDGER : DEFAULT_LEDGER);
+const CAPS = args.caps ?? (args.stage ? NO_BUCKET_CAPS : DEFAULT_CAPS);
 /** A targeted run's own cap, on top of the buckets' (all paid buckets together). */
 const RUN_CAP = runCapOf(args);
 const spend = new Spend(LEDGER, CAPS, RUN_CAP, campaign, !args.dryRun);
@@ -429,10 +431,15 @@ async function realHarness(screens: boolean) {
 /** A journey's wall clock: past it, the check fails (its screens tell where it stood). */
 const JOURNEY_MS = 5 * 60_000;
 
-/** The journey's brain: the connected API route (a plan needs a sign-in in a scratch HOME) whose worst case is lowest, within its cap. */
+/**
+ * The journey's brain: a plan route whose harness is signed in to it (no API money; the journey then runs in the real HOME, where the
+ * sign-in is), else the connected API route whose worst case is lowest, within its cap.
+ */
 function journeyBrain(): { step: BrainStep; worst: number; bucket: Bucket } | { why: string } {
-  const pool = config.brain.order.filter((s) => !s.route.endsWith("-plan") && !notConnected(config, s));
-  const priced = pool.map((step) => ({ step, bucket: bucketFor(step.route), worst: usd(step.model, bucketFor(step.route), JOURNEY_BRAIN.input, JOURNEY_BRAIN.output) })).sort((a, b) => a.worst - b.worst);
+  const have = availableHere(config);
+  const planOk = (s: BrainStep) => (s.route === "claude-plan" ? !!have.plan?.("claude-code") : s.route === "chatgpt-plan" ? !!have.plan?.("codex") : false);
+  const pool = config.brain.order.filter((s) => (s.route.endsWith("-plan") ? planOk(s) : !notConnected(config, s)));
+  const priced = pool.map((step) => ({ step, bucket: bucketFor(step.route), worst: step.route.endsWith("-plan") ? 0 : usd(step.model, bucketFor(step.route), JOURNEY_BRAIN.input, JOURNEY_BRAIN.output) })).sort((a, b) => a.worst - b.worst);
   const pick = priced[0];
   if (!pick) return { why: "no API brain route is connected here" };
   if (pick.worst > JOURNEY_BRAIN_CAP) return { why: `the cheapest brain route (${stepLabel(pick.step)}) could cost $${pick.worst.toFixed(4)}, over a journey's brain cap of $${JOURNEY_BRAIN_CAP}` };
@@ -464,12 +471,13 @@ async function journey() {
       continue;
     }
     const worst = brain.worst + plan.worst;
-    const month = journeyMonthSpend(spend.file.runs, new Date());
+    // The regression stage has no monthly cap (its run cap is the limit).
+    const month = args.stage ? 0 : journeyMonthSpend(spend.file.runs, new Date());
     if (worst > JOURNEY_HARNESS_CAP) {
       skip(`its worst case $${worst.toFixed(4)} is over a journey's cap of $${JOURNEY_HARNESS_CAP}`);
       continue;
     }
-    if (month + worst > JOURNEY_MONTH_CAP) {
+    if (!args.stage && month + worst > JOURNEY_MONTH_CAP) {
       skip(`this month's journeys have cost $${month.toFixed(4)}; this one's worst case would take them over $${JOURNEY_MONTH_CAP}`);
       spend.run.refused.push(`journey ${h}: the month's cap`);
       break;
@@ -572,6 +580,7 @@ function dryRun() {
 try {
   // The harness checks run the pinned releases (test/harnesses.json), installed into the cache first; never in a dry run.
   if (!args.dryRun && (args.tier || !args.only)) await prepareHarnesses(harnessesFor(args.harness), { newest: args.newest, fromPath: args.fromPath, say: out });
+  if (args.stage) out(`Regression stage: this run may spend at most $${RUN_CAP} (ledger ${REGRESSION_LIVE_LEDGER}, no bucket or monthly cap)`);
   if (args.dryRun) dryRun();
   else if (args.tier === "regression") await regression();
   else if (args.tier === "journey") {

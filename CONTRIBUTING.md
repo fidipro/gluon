@@ -52,7 +52,7 @@ probes. Never make a test call a real model, agent or API.
 | Situation | Run |
 |---|---|
 | Editing one area | `bun run test:area <area>` (areas: `test/areas.ts`; several: `a,b`) |
-| Done | `bun run regression --changed`: the areas of what you changed since `origin/main` (the whole fast tier when a core file changed) |
+| Done | `bun run regression --changed`: the areas of what you changed since `origin/main` (the whole fast tier when a core file changed), then the live checks they need, with your own credentials (skipped without them; `--no-live` leaves them out) |
 | A change across areas | `bun run regression`: typecheck + unit + end-to-end, without tests titled `@full` (~2.5 min) |
 | A big change | `bun run regression:full`: everything (~12 min) |
 | `src/pty/`, the frame, `src/gluon.ts` | `bun run test:area pty,gluon-frame`, then `bun run test:gluon` |

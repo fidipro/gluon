@@ -4,16 +4,16 @@
  * whole script (spawned: it must call nothing and write nothing). Offline: no key, no AWS and no harness is ever used.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_MODELS } from "../src/harnesses.ts";
-import { brainAsks, brainBusy, brainProposes, checkConfig, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
+import { brainAsks, brainBusy, brainProposes, checkConfig, devEnvFile, inputRegion, planHarness, proposalMode, regionDiff, saysOK, verdict } from "../scripts/live-harness.ts";
 import { loginLine } from "../scripts/live-driver.ts";
 import { hostOf, install, readPin } from "../scripts/harness-cache.ts";
 import {
   awsRegion, bucketOf, cheapestModel, chatStep, regressionSubset, costFigure, DEFAULT_CAPS, harnessWorstCase, HARNESS_TOKENS, parseArgs, parseCaps, pickConn, planCharged, planEstimate,
-  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, price, runCapOf, sectionsOf, Spend, usd, type Available,
+  JOURNEY_AGENT_CAP, JOURNEY_BRAIN_CAP, JOURNEY_HARNESS_CAP, JOURNEY_MONTH_CAP, JOURNEY_RUN_CAP, journeyMonthSpend, planLines, planRouteBlock, planTotal, plansAllowed, price, REGRESSION_LIVE_RUN_CAP, runCapOf, sectionsOf, Spend, usd, type Available,
 } from "../scripts/live-lib.ts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -142,6 +142,15 @@ describe("flags and tiers", () => {
     expect(() => parseArgs(["--bogus"])).toThrow(/unknown option/);
     expect(() => parseArgs(["--harness=codex"])).toThrow(/goes with --tier/);
     expect(() => parseArgs(["--tier=regression", "--newest", "--harness-from-path"])).toThrow(/use one/);
+    expect(() => parseArgs(["--tier=journey", "--regression-stage", "--ledger", "x.json"])).toThrow(/own ledger/);
+    expect(() => parseArgs(["--tier=journey", "--run-cap", "lots"])).toThrow(/not an amount/);
+  });
+  test("regression's live stage: --regression-stage caps the run at $0.50 or what --run-cap says is left, whichever is less", () => {
+    expect(parseArgs(["--tier=journey", "--harness=codex", "--regression-stage", "--run-cap=0.2"])).toMatchObject({ stage: true, runCap: 0.2 });
+    expect(runCapOf({ tier: "journey", stage: true })).toBe(REGRESSION_LIVE_RUN_CAP);
+    expect(runCapOf({ tier: "journey", stage: true, runCap: 0.2 })).toBe(0.2);
+    expect(runCapOf({ tier: "journey", stage: true, runCap: 9 })).toBe(REGRESSION_LIVE_RUN_CAP);
+    expect(REGRESSION_LIVE_RUN_CAP).toBe(0.5);
   });
   test("the binary a harness check runs: the pinned release by default, --newest or --harness-from-path instead", () => {
     expect(parseArgs(["--tier=harness", "--harness=codex", "--newest"])).toMatchObject({ newest: true });
@@ -231,6 +240,34 @@ describe("which connection and model a harness check uses", () => {
     expect(pickConn("codex", have(["OPENAI_API_KEY"], false))).toMatchObject({ ok: true, conn: "openai" });
     expect(pickConn("antigravity", have(["GEMINI_API_KEY"], true))).toMatchObject({ ok: true, conn: "gemini" });
     expect(pickConn("opencode", have(["OPENROUTER_API_KEY"], true))).toMatchObject({ ok: true, conn: "openrouter" });
+  });
+  test("signed in to its plan: Claude Code and Codex use it before Bedrock or a key (no API money); --conn=plan asks for it; GLUON_LIVE_PLANS=0 turns it off", () => {
+    const onPlan = (keys: string[], bedrock: boolean, plans: string[]): Available => ({ ...have(keys, bedrock), plan: (h) => plans.includes(h) });
+    expect(pickConn("claude-code", onPlan(["ANTHROPIC_API_KEY"], true, ["claude-code"]))).toEqual({ ok: true, conn: "plan" });
+    expect(pickConn("codex", onPlan(["OPENAI_API_KEY"], false, ["codex"]))).toEqual({ ok: true, conn: "plan" });
+    expect(pickConn("codex", onPlan(["OPENAI_API_KEY"], false, ["claude-code"]))).toMatchObject({ ok: true, conn: "openai" });
+    expect(pickConn("opencode", onPlan(["OPENROUTER_API_KEY"], false, ["opencode"]))).toMatchObject({ ok: true, conn: "openrouter" });
+    expect(pickConn("claude-code", onPlan(["ANTHROPIC_API_KEY"], true, ["claude-code"]), "anthropic")).toMatchObject({ ok: true, conn: "anthropic" });
+    expect(pickConn("claude-code", onPlan([], true, []), "plan")).toMatchObject({ ok: false, why: expect.stringContaining("not signed in") });
+    expect(bucketOf("plan", false)).toBe("subscription");
+    expect(bucketOf("plan", true)).toBe("subscription");
+    expect(plansAllowed({})).toBe(true);
+    expect(plansAllowed({ GLUON_LIVE_PLANS: "0" })).toBe(false);
+  });
+  test("a plan check's model: the cheapest at API prices (the plan's ids are aliases), worst case $0; its Gluon config is the subscription", () => {
+    expect(cheapestModel(DEFAULT_MODELS["claude-code"], "plan")?.entry.label).toBe("Haiku 5.5");
+    expect(cheapestModel(DEFAULT_MODELS.codex, "plan")?.entry.label).toBe("GPT-6 Luna");
+    const config = { models: DEFAULT_MODELS } as never;
+    expect(planHarness("claude-code", config, { hasKey: () => false, bedrock: false, plan: () => true })).toMatchObject({ pick: { ok: true, conn: "plan" }, bucket: "subscription", worst: 0 });
+    expect(checkConfig("claude-code", "plan", { region: null })).toContain("auth: subscription");
+    expect(checkConfig("claude-code", "plan", { region: null })).not.toContain("provider:");
+  });
+  test("a journey whose brain is on a plan: that plan's harness is connected to it, the harness under check keeps its own connection", () => {
+    const brain = { route: "claude-plan", model: "haiku" } as never;
+    const y = checkConfig("codex", "openai", { region: null }, brain);
+    expect(y).toContain("claude-code:\n    auth: subscription");
+    expect(y).toContain("codex:\n    auth: api\n    provider: openai");
+    expect(checkConfig("claude-code", "plan", { region: null }, brain)).not.toContain("provider:");
   });
   test("a harness with no usable connection is skipped with a reason; Grok Build has none", () => {
     const none = pickConn("antigravity", have([], true));
@@ -454,5 +491,19 @@ describe("the sign-in guard", () => {
     expect(loginLine(["     ▀▀▀▀▀▀       Gemini API key"])).toBeNull();
     for (const l of ["│ Select login method:                │", "Enter your Gemini API key:", "│ Gemini API key: ______ │", "Paste your API key"])
       expect(loginLine(["│ Antigravity CLI 1.3.3 │", l])).toBe(l.trim());
+  });
+});
+
+describe("the dev key file", () => {
+  test("the checkout's .env; in a git worktree, which has none (gitignored), the main checkout's", () => {
+    const main = tmp();
+    const git = (cwd: string, ...a: string[]) => Bun.spawnSync(["git", ...a], { cwd, env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+    git(main, "init", "-q");
+    git(main, "commit", "-q", "--allow-empty", "-m", "x");
+    const wt = join(main, "wt");
+    git(main, "worktree", "add", "-q", wt);
+    expect(devEnvFile(wt)).toBe(join(realpathSync(main), ".env"));
+    writeFileSync(join(wt, ".env"), "");
+    expect(devEnvFile(wt)).toBe(join(wt, ".env"));
   });
 });

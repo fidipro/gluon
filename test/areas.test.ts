@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, liveJourneys, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
+import { AREAS, CORE, ROOT, e2eTestFiles, manifestProblems, matches, liveChecks, platformsOf, selectAreas, selectChanged, srcFiles, srcOwner, testOwner, unitTestFiles } from "./areas.ts";
 
 const names = Object.keys(AREAS);
 
@@ -122,17 +122,20 @@ describe("--changed: the OSes a pull request needs (CI's plan job)", () => {
   });
 });
 
-describe("--live: the journeys a change needs", () => {
-  const j = (fs: string[]) => liveJourneys(selectChanged(fs), fs);
-  test("none for an area with nothing live (docs, cost); the cheapest for the brain, routing or a whole tier", () => {
+describe("the live checks a change needs (regression's live stage)", () => {
+  const j = (fs: string[]) => liveChecks(selectChanged(fs), fs).map((c) => `${c.kind} ${c.harness}`);
+  const every = ["journey claude-code", "harness claude-code", "harness codex", "harness opencode", "harness antigravity", "harness kimi-code"];
+  test("none for an area with nothing live (docs, cost); the journey on the cheapest harness for the brain or routing", () => {
     expect(j(["docs/concepts/architecture.md"])).toEqual([]);
     expect(j(["src/cost/ledger.ts"])).toEqual([]);
-    expect(j(["src/brain.ts"])).toEqual(["claude-code"]);
-    expect(j(["bun.lock"])).toEqual(["claude-code"]);
+    expect(j(["src/brain.ts"])).toEqual(["journey claude-code"]);
   });
-  test("a harness's own files: that harness's journey; a harness area that names none: the cheapest; the full tier: every harness", () => {
-    expect(j(["src/adapters/codex.ts"])).toEqual(["codex"]);
-    expect(j(["src/pty/session.ts"])).toEqual(["claude-code"]);
-    expect(liveJourneys(undefined, [], true)).toHaveLength(6);
+  test("a harness's own files: that harness's check; a harness area that names none: the cheapest's", () => {
+    expect(j(["src/adapters/codex.ts"])).toEqual(["harness codex"]);
+    expect(j(["src/pty/session.ts"])).toEqual(["harness claude-code"]);
+  });
+  test("the whole tier (a core file) and the full tier: the journey first, then every harness with a check", () => {
+    expect(j(["bun.lock"])).toEqual(every);
+    expect(liveChecks(undefined, [], true).map((c) => `${c.kind} ${c.harness}`)).toEqual(every);
   });
 });

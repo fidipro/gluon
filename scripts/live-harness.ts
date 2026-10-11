@@ -23,18 +23,18 @@
  */
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { stringify } from "yaml";
 import { bedrockConnected } from "../src/brain.ts";
 import { defaults, loadConfig, type BrainStep, type Config } from "../src/config.ts";
 import { HARNESS_INFO, HARNESSES, type Harness } from "../src/harnesses.ts";
 import { loadSecrets, maskSecrets, parseEnv, secret, useSecrets } from "../src/secrets.ts";
 import { HARNESS_WORD } from "../src/sessions.ts";
-import { versionOf } from "../src/status.ts";
+import { loginStatus, versionOf } from "../src/status.ts";
 import { cachedBin, harnessBin, readPin } from "./harness-cache.ts";
 import { GuardedDriver, inputHolds, LoginScreenError, onPath, PromptCapError, scrubEnv, TmuxDriver, type Launch } from "./live-driver.ts";
 import {
-  awsRegion, BINARY, CHECKED_HARNESSES, bucketOf, cheapestModel, costFigure, DEFAULT_CAPS, DEFAULT_LEDGER, harnessWorstCase, HARNESS_RUN_CAP, HARNESS_TOKENS, parseArgs, pickConn,
+  awsRegion, BINARY, CHECKED_HARNESSES, PLAN_HARNESSES, plansAllowed, bucketOf, cheapestModel, costFigure, DEFAULT_CAPS, DEFAULT_LEDGER, harnessWorstCase, HARNESS_RUN_CAP, HARNESS_TOKENS, parseArgs, pickConn,
   Spend, type Args, type Available, type Bucket, type ConnPick,
 } from "./live-lib.ts";
 
@@ -88,10 +88,19 @@ export const SCREENS_DIR = join(ROOT, "qa/logs/screens");
 export function loadDevKeys(tmp: string): { names: string[]; file: string } {
   process.env.GLUON_CONFIG ??= join(tmp, "config.yaml");
   loadSecrets();
-  const file = process.env.GLUON_DEV_ENV || join(ROOT, ".env");
+  const file = process.env.GLUON_DEV_ENV || devEnvFile();
   const entries = parseEnv(file);
   useSecrets(entries, file);
   return { names: entries.filter(([, v]) => v).map(([k]) => k), file };
+}
+
+/** The dev key file: the checkout's `.env`, or in a git worktree (which has none: it's gitignored) the main checkout's. */
+export function devEnvFile(root = ROOT): string {
+  const own = join(root, ".env");
+  if (existsSync(own)) return own;
+  const r = Bun.spawnSync(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: root, env: process.env, stderr: "ignore" });
+  const common = r.success ? r.stdout.toString().trim() : "";
+  return common ? join(dirname(common), ".env") : own;
 }
 
 /** Bedrock's region and profile as the AWS setup says (env, then the AWS config file's profile): `region` null when nothing says. */
@@ -107,8 +116,11 @@ export function awsSetupFromHost(env: Record<string, string | undefined> = proce
 
 /** Which connections a check can use here: the keys loaded, and a Bedrock setup (a region or profile). */
 export function availableHere(config: Config): Available {
-  return { hasKey: (name) => !!secret(name), bedrock: bedrockConnected(config) };
+  return { hasKey: (name) => !!secret(name), bedrock: bedrockConnected(config), plan: (h) => planSignedIn.get(h) === true };
 }
+
+/** Which harnesses' official login check said "signed in to the plan" (`prepareHarnesses`); a check uses the plan first. */
+const planSignedIn = new Map<Harness, boolean>();
 
 // ——— the plan of one harness check ———
 
@@ -132,7 +144,15 @@ const prepared = new Map<Harness, { path: string; version: string }>();
  * the cache when missing (scripts/harness-cache.ts); with `newest`, the newest release instead; with `fromPath`, the one on PATH
  * (the old way). A harness that can't be had is left out (its check SKIPs, saying why). Never in a dry run: it downloads.
  */
-export async function prepareHarnesses(hs: readonly Harness[], o: { newest?: boolean; fromPath?: boolean; say: (s: string) => void }): Promise<void> {
+export async function prepareHarnesses(hs: readonly Harness[], o: { newest?: boolean; fromPath?: boolean; say: (s: string) => void; env?: Record<string, string | undefined> }): Promise<void> {
+  // The plans: asked of each official binary (free), unless GLUON_LIVE_PLANS=0.
+  if (plansAllowed(o.env ?? process.env))
+    for (const h of hs.filter((x) => PLAN_HARNESSES.includes(x))) {
+      const s = await loginStatus(h).catch(() => null);
+      const on = !!s?.loggedIn && !s.wrongMethod;
+      planSignedIn.set(h, on);
+      if (on) o.say(`${h}: signed in to its plan (${s!.detail ?? "plan"}): its check runs on the plan, in the real HOME`);
+    }
   for (const h of hs) {
     if (o.fromPath) {
       const p = onPath(BINARY[h]);
@@ -170,7 +190,7 @@ export function planHarness(h: Harness, config: Config, have: Available, want: {
   if (!pick.ok) return base;
   const m = cheapestModel(config.models[h], pick.conn, want.model);
   if (!m) return { ...base, pick: { ok: false, why: `no model${want.model ? ` "${want.model}"` : ""} on ${pick.conn}` } };
-  return { ...base, model: { id: m.id, label: m.entry.label }, bucket: bucketOf(pick.conn, !!want.campaign), worst: harnessWorstCase(m.id, pick.conn) };
+  return { ...base, model: { id: m.id, label: m.entry.label }, bucket: bucketOf(pick.conn, !!want.campaign), worst: pick.conn === "plan" ? 0 : harnessWorstCase(m.id, pick.conn) };
 }
 
 // ——— the screen, as Gluon draws it ———
@@ -289,10 +309,12 @@ function makeRepo(dir: string): string {
 
 /** Gluon's throwaway config for one check: the harness on one API-key connection, asking before /clear ends a session. */
 export function checkConfig(h: Harness, conn: string, aws: { region: string | null; profile?: string }, brain?: BrainStep): string {
-  const connection = h === "opencode" ? { auth: "api", providers: [conn] } : { auth: "api", provider: conn };
+  const connection = conn === "plan" ? { auth: "subscription" } : h === "opencode" ? { auth: "api", providers: [conn] } : { auth: "api", provider: conn };
+  // A brain on a plan needs its harness on that plan (`notConnected`); the harness under check keeps its own connection.
+  const brainHarness = brain?.route === "claude-plan" ? "claude-code" : brain?.route === "chatgpt-plan" ? "codex" : null;
   return stringify({
     handoff: { on_clear: "ask" },
-    connections: { [h]: connection },
+    connections: { ...(brainHarness && brainHarness !== h ? { [brainHarness]: { auth: "subscription" } } : {}), [h]: connection },
     ...(brain ? { brain: { order: [brain] } } : {}),
     ...(conn === "bedrock" && (aws.region || aws.profile) ? { bedrock: { ...(aws.region ? { region: aws.region } : {}), ...(aws.profile ? { profile: aws.profile } : {}) } } : {}),
   });
@@ -360,8 +382,14 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   // ——— the scratch world ———
   const scratch = mkdtempSync(join(tmpdir(), `gluonlive-${h}-`));
   chmodSync(scratch, 0o700);
-  const home = o.home === "real" ? process.env.HOME || homedir() : join(scratch, "home");
+  // A plan's sign-in is in the real HOME: a check on a plan (the harness's or the brain's) runs there, with Gluon's own config, data,
+  // state and cache in the scratch directory (XDG_*), so the user's sessions and tables are never touched.
+  const onPlan = conn === "plan" || !!o.brain?.step.route.endsWith("-plan");
+  const realHome = o.home === "real" || onPlan;
+  const home = realHome ? process.env.HOME || homedir() : join(scratch, "home");
   mkdirSync(join(scratch, "home"), { recursive: true });
+  const xdg: Record<string, string> = onPlan ? Object.fromEntries((["CONFIG", "DATA", "STATE", "CACHE"] as const).map((k) => [`XDG_${k}_HOME`, join(scratch, "xdg", k.toLowerCase())])) : {};
+  for (const d of Object.values(xdg)) mkdirSync(d, { recursive: true });
   const bin = join(scratch, "bin");
   mkdirSync(bin);
   const target = realpathSync(plan.binary);
@@ -374,10 +402,10 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     }
   } catch {}
   // Bedrock's credentials come from the user's AWS files: the one directory linked in, nothing else of HOME.
-  if (o.home === "scratch" && conn === "bedrock" && existsSync(join(homedir(), ".aws"))) symlinkSync(join(homedir(), ".aws"), join(scratch, "home", ".aws"));
+  if (!realHome && conn === "bedrock" && existsSync(join(homedir(), ".aws"))) symlinkSync(join(homedir(), ".aws"), join(scratch, "home", ".aws"));
   // Antigravity takes GEMINI_API_KEY only once its own settings say so (`keyNote`; Gluon never writes them): the scratch HOME is
   // a user who did, past agy's first-run screens. Without it agy shows its sign-in and the check is skipped.
-  if (o.home === "scratch" && h === "antigravity" && conn === "gemini") {
+  if (!realHome && h === "antigravity" && conn === "gemini") {
     const agy = join(scratch, "home", ".gemini", "antigravity-cli");
     mkdirSync(join(agy, "cache"), { recursive: true });
     writeFileSync(join(agy, "settings.json"), JSON.stringify({ modelProvider: "gemini", theme: "terminal" }));
@@ -396,7 +424,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
   // with the official `gluon pricing update` (free: models.dev, OpenRouter's listing and the installed binary), before Gluon starts.
   const pricing = Bun.spawnSync([process.execPath, ...BUN_FLAGS, CLI, "pricing", "update"], {
     cwd: repo,
-    env: { PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER ?? "", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml") },
+    env: { PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER ?? "", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), ...xdg },
     timeout: 90_000,
   });
   say(`  pricing update: ${pricing.stdout.toString().trim().split("\n").join("; ") || `exit ${pricing.exitCode}`}`);
@@ -406,7 +434,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     rows: 30,
     cwd: repo,
     argv: [process.execPath, ...BUN_FLAGS, CLI, ...(o.brain ? [] : ["--demo"])],
-    env: scrubEnv({ PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER, LOGNAME: process.env.LOGNAME, SHELL: process.env.SHELL, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), GLUON_TEST_PROBES: join(cfgDir, "probes.json"), ...o.env }),
+    env: scrubEnv({ PATH: [bin, ...SYSTEM_PATH].join(delimiter), HOME: home, USER: process.env.USER, LOGNAME: process.env.LOGNAME, SHELL: process.env.SHELL, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "C.UTF-8", GLUON_CONFIG: join(cfgDir, "config.yaml"), GLUON_TEST_PROBES: join(cfgDir, "probes.json"), ...xdg, ...o.env }),
     yaml,
     fakes: [],
     alt: [],
@@ -417,7 +445,7 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     userConfig: false,
   };
   const version = plan.version ?? "unknown";
-  say(`${h} ${version} · ${conn} · ${plan.model.label} (${plan.model.id}) · worst case $${plan.worst.toFixed(4)} · HOME ${o.home}`);
+  say(`${h} ${version} · ${conn} · ${plan.model.label} (${plan.model.id}) · worst case $${plan.worst.toFixed(4)} · HOME ${realHome ? "real" : "scratch"}${onPlan ? " (a plan's sign-in)" : ""}`);
 
   let tmux: TmuxDriver;
   try {
@@ -673,13 +701,14 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
 
       // ——— the cost figure ———
       // Gluon shows no cost for Antigravity: agy reports none, and its status line is no source for one (`src/cost/antigravity.ts`).
-      if (h === "antigravity") add("the cost figure is shown", "SKIP", "Gluon shows no cost for Antigravity (src/cost/antigravity.ts)");
-      for (const end = Date.now() + 60_000; h !== "antigravity" && Date.now() < end && !figure; ) {
+      const noFigure = h === "antigravity" ? "Gluon shows no cost for Antigravity (src/cost/antigravity.ts)" : conn === "plan" ? "on the plan: no API money to check" : null;
+      if (noFigure) add("the cost figure is shown", "SKIP", noFigure);
+      for (const end = Date.now() + 60_000; !noFigure && Date.now() < end && !figure; ) {
         figure = costFigure(infoRow(await lines()));
         if (!figure) await d.wait(1000);
       }
-      if (h !== "antigravity") add("the cost figure is shown", figure ? "PASS" : "FAIL", figure ? `${figure.approx ? "~" : ""}$${figure.usd} on the info row` : `none on the info row: ${infoRow(await lines()).slice(0, 110)}`);
-      if (figure) add("the spend is within the check's token budget", figure.usd <= plan.worst ? "PASS" : "FAIL", `$${figure.usd} against a budget of $${plan.worst.toFixed(4)} (${HARNESS_TOKENS.input} in / ${HARNESS_TOKENS.output} out)`);
+      if (!noFigure) add("the cost figure is shown", figure ? "PASS" : "FAIL", figure ? `${figure.approx ? "~" : ""}$${figure.usd} on the info row` : `none on the info row: ${infoRow(await lines()).slice(0, 110)}`);
+      if (figure && !noFigure) add("the spend is within the check's token budget", figure.usd <= plan.worst ? "PASS" : "FAIL", `$${figure.usd} against a budget of $${plan.worst.toFixed(4)} (${HARNESS_TOKENS.input} in / ${HARNESS_TOKENS.output} out)`);
       await saveScreen("final");
       if (o.screens) await printFixtureDiff(h, version, (await lines()), say);
     }
@@ -715,9 +744,9 @@ export async function checkHarness(plan: HarnessPlan, config: Config, o: Harness
     }
   } finally {
     // `--tier=harness`: keep Gluon's own state of this run (the cost audit's counts and model names, the price tables) beside the screens, before the driver removes the scratch directory.
-    if (o.screens && o.home === "scratch") {
+    if (o.screens && (!realHome || onPlan)) {
       try {
-        const st = join(scratch, "home/.local/state/gluon");
+        const st = onPlan ? join(xdg.XDG_STATE_HOME!, "gluon") : join(scratch, "home/.local/state/gluon");
         if (existsSync(st)) cpSync(st, join(screensOut, "state"), { recursive: true, filter: (src) => !/analytics\.db/.test(src) });
       } catch {}
     }

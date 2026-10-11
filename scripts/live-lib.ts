@@ -27,7 +27,15 @@ export const REGRESSION_RUN_CAP = 3;
 /** `--tier=harness`: one harness's check, all buckets together (USD). */
 export const HARNESS_RUN_CAP = 1;
 /**
- * `--tier=journey` (`bun run regression --live`): the user's whole way through, on the real brain. Hard caps, in USD: one journey's
+ * `bun run regression`'s live stage (`--regression-stage`, always on locally, never in CI): the whole stage, every check together
+ * (USD). Its own ledger, with no bucket cap and no monthly cap: this per-run cap is the only limit (the owner's decision, issue #31).
+ */
+export const REGRESSION_LIVE_RUN_CAP = 0.5;
+export const REGRESSION_LIVE_LEDGER = "qa/logs/live-regression-spend.json";
+/** The caps of the regression stage's ledger: none per bucket. */
+export const NO_BUCKET_CAPS: Readonly<Caps> = { bedrock: Infinity, other: Infinity };
+/**
+ * `--tier=journey` (`bun run regression`'s live stage, `test:live`): the user's whole way through, on the real brain. Hard caps, in USD: one journey's
  * brain part (at most `JOURNEY_BRAIN.turns` turns), its agent part (the cheapest model, one prompt), one harness's journey, every
  * harness's, and all journeys in a calendar month (the ledger's runs).
  */
@@ -114,6 +122,8 @@ export const planEstimate = (model: string, input: number, output: number): numb
  */
 export function bucketOf(route: string, campaign: boolean): Bucket {
   if (route === "bedrock") return "bedrock";
+  // A harness on its own plan (`pickConn`'s "plan"): no API money, campaign or not.
+  if (route === "plan") return "subscription";
   if (route === "openrouter") return campaign ? "openrouter" : "other";
   if (route === "claude-plan") return campaign ? "other" : "subscription";
   return route.endsWith("-plan") ? "subscription" : "other";
@@ -257,6 +267,10 @@ export interface Args {
   newest?: boolean;
   /** `--harness-from-path`: they run the binary on PATH instead. */
   fromPath?: boolean;
+  /** `--regression-stage`: run as `bun run regression`'s live stage (its ledger, no bucket or monthly cap; `REGRESSION_LIVE_RUN_CAP`). */
+  stage?: boolean;
+  /** `--run-cap <usd>`: this run's cap instead of its tier's (the regression stage passes what its budget has left). */
+  runCap?: number;
 }
 
 /** Flags take `--name=value` or `--name value`. Throws on an unknown or contradictory flag. */
@@ -293,9 +307,17 @@ export function parseArgs(argv: string[]): Args {
       case "--dry-run": a.dryRun = true; break;
       case "--newest": a.newest = true; break;
       case "--harness-from-path": a.fromPath = true; break;
+      case "--regression-stage": a.stage = true; break;
+      case "--run-cap": {
+        const v = Number(value());
+        if (!Number.isFinite(v) || v < 0) throw new Error(`--run-cap: not an amount`);
+        a.runCap = v;
+        break;
+      }
       default: throw new Error(`unknown option ${arg}`);
     }
   }
+  if (a.stage && (a.ledger || a.caps)) throw new Error("--regression-stage keeps its own ledger and caps: no --ledger or --caps");
   if (a.newest && a.fromPath) throw new Error("--newest and --harness-from-path are two ways to pick a binary: use one");
   if (a.only && a.tier) throw new Error("--only and --tier are two ways to pick a run: use one");
   if (a.tier === "harness" && !a.harness) throw new Error("--tier=harness needs --harness=<id> (claude-code, codex, antigravity, opencode, kimi-code)");
@@ -305,7 +327,9 @@ export function parseArgs(argv: string[]): Args {
 }
 
 /** A run's whole-run cap in dollars: a targeted check's own, the tier's, or none (the buckets' caps alone). */
-export function runCapOf(a: Pick<Args, "only" | "tier" | "harness">): number {
+export function runCapOf(a: Pick<Args, "only" | "tier" | "harness" | "stage" | "runCap">): number {
+  if (a.stage) return Math.min(a.runCap ?? REGRESSION_LIVE_RUN_CAP, REGRESSION_LIVE_RUN_CAP);
+  if (a.runCap !== undefined) return a.runCap;
   if (a.tier === "regression") return REGRESSION_RUN_CAP;
   if (a.tier === "harness") return HARNESS_RUN_CAP;
   if (a.tier === "journey") return a.harness ? JOURNEY_HARNESS_CAP : JOURNEY_RUN_CAP;
@@ -361,12 +385,20 @@ export const CHECKED_HARNESSES: Harness[] = ["claude-code", "codex", "antigravit
 /** The binary on PATH of each harness (`HARNESS_INFO[h].binary`, written out so this file stays pure). */
 export const BINARY: Record<Harness, string> = { "claude-code": "claude", codex: "codex", antigravity: "agy", "grok-build": "grok", opencode: "opencode", "kimi-code": "kimi" };
 
-/** A connection a check may use: its id, and the key it needs (`bedrock` needs the AWS setup, not a key). */
+/** A connection a check may use: its id, and the key it needs (`bedrock` needs the AWS setup, not a key; `plan` the harness's own sign-in). */
 export interface ConnOption {
-  conn: "bedrock" | "anthropic" | "openai" | "gemini" | "openrouter";
+  conn: "plan" | "bedrock" | "anthropic" | "openai" | "gemini" | "openrouter";
   key?: string;
 }
-/** In the order the checks prefer them: Bedrock (the largest budget), the provider's own key, then OpenRouter (the smallest). Never a plan: a sign-in. */
+
+/**
+ * The harnesses a check may run on the user's own plan (no API money): when the official binary's login check says it's signed
+ * in, the check uses it first, in the real HOME, where the sign-in is (Gluon's own state still goes to a scratch directory).
+ * `GLUON_LIVE_PLANS=0` turns this off.
+ */
+export const PLAN_HARNESSES: Harness[] = ["claude-code", "codex"];
+export const plansAllowed = (env: Record<string, string | undefined>): boolean => env.GLUON_LIVE_PLANS !== "0";
+/** In the order the checks prefer them: Bedrock (the largest budget), the provider's own key, then OpenRouter (the smallest). A plan comes first when signed in (`pickConn`). */
 export const HARNESS_CONNS: Record<Harness, ConnOption[]> = {
   "claude-code": [{ conn: "bedrock" }, { conn: "anthropic", key: "ANTHROPIC_API_KEY" }, { conn: "openrouter", key: "OPENROUTER_API_KEY" }],
   codex: [{ conn: "bedrock" }, { conn: "openai", key: "OPENAI_API_KEY" }, { conn: "openrouter", key: "OPENROUTER_API_KEY" }],
@@ -376,16 +408,20 @@ export const HARNESS_CONNS: Record<Harness, ConnOption[]> = {
   "kimi-code": [{ conn: "openrouter", key: "OPENROUTER_API_KEY" }],
 };
 
-/** What is available to a check: which keys are set, and whether Bedrock has a region or profile. */
+/** What is available to a check: which keys are set, whether Bedrock has a region or profile, and which harnesses are signed in to their plan. */
 export interface Available {
   hasKey(name: string): boolean;
   bedrock: boolean;
+  plan?(h: Harness): boolean;
 }
 
 export type ConnPick = { ok: true; conn: ConnOption["conn"]; key?: string } | { ok: false; why: string };
 
 /** The connection a harness check uses: `want` when given (and usable), else the first usable one in `HARNESS_CONNS`. */
 export function pickConn(h: Harness, have: Available, want?: string): ConnPick {
+  // The plan first: it costs no API money.
+  if ((!want || want === "plan") && PLAN_HARNESSES.includes(h) && have.plan?.(h)) return { ok: true, conn: "plan" };
+  if (want === "plan") return { ok: false, why: PLAN_HARNESSES.includes(h) ? `${h} is not signed in to its plan (or GLUON_LIVE_PLANS=0)` : `${h} has no plan check` };
   const options = HARNESS_CONNS[h];
   if (!options.length) return { ok: false, why: h === "grok-build" ? "Grok Build has no API-key route (its xAI plan needs a sign-in)" : "no API-key connection" };
   const usable = (o: ConnOption) => (o.conn === "bedrock" ? have.bedrock : !!o.key && have.hasKey(o.key));
@@ -415,7 +451,8 @@ export function cheapestModel(models: ModelEntry[], conn: string, want?: string)
   let best: { entry: ModelEntry; id: string; cost: number } | null = null;
   for (const m of served) {
     const id = m.ids[conn as keyof ModelEntry["ids"]]!;
-    const cost = usd(id, bucket, 1_000_000, 1_000_000);
+    // A plan's ids are aliases (`haiku`): ranked by the model's API price, the plan's own usage limits follow it.
+    const cost = conn === "plan" ? usd(m.ids.anthropic ?? m.ids.openai ?? id, "other", 1_000_000, 1_000_000) : usd(id, bucket, 1_000_000, 1_000_000);
     if (!best || cost < best.cost) best = { entry: m, id, cost };
   }
   return best ? { entry: best.entry, id: best.id } : null;
