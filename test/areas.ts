@@ -205,6 +205,15 @@ export const AREAS: Record<string, Area> = {
     unit: ["test/workspaces.test.ts"],
     e2e: ["test/e2e/resume.e2e.test.ts", "test/e2e/resume-hostile.e2e.test.ts", "test/e2e/resume-qa.e2e.test.ts"],
   },
+  "real-harness": {
+    doc: "the real-harness tier: the real, newest harness binaries against a model API on loopback (test/real/, scripts/real-stage.ts)",
+    live: "harness",
+    src: [],
+    files: ["test/real/**", "test/fixtures/fake-model-api.ts", "scripts/real-stage.ts"],
+    unit: ["test/real-stage.test.ts"],
+    e2e: [],
+    optional: true,
+  },
   "install-dist": {
     doc: "build, pack, release, installers, Docker suite, workflows",
     src: ["src/repo.ts"],

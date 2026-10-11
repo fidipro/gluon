@@ -17,7 +17,8 @@ Gluon itself. Brain rules: `src/agent/AGENTS.md`; UI rules: `src/ui/AGENTS.md`.
   `statusLine` key (`agy-settings.ts` only). A config is read for named keys only, never credentials
   (`src/cost/harness-config.ts` only). A resume id is Gluon's own or its hook's (`RESUME_ID`).
 - **No base URL on a subscription or plan brain route**; only OpenRouter (its documented endpoint; Kimi Code's
-  `KIMI_MODEL_BASE_URL` on it alone: `assertSafeEnv`'s harness argument) and Codex + OpenAI key (`model_providers.openai-api-key`; BUG-81). OTEL: loopback (`telemetryLaunch`).
+  `KIMI_MODEL_BASE_URL` on it alone: `assertSafeEnv`'s harness argument) and Codex + OpenAI key (`model_providers.openai-api-key`; BUG-81). OTEL: loopback (`telemetryLaunch`). The real-harness tier's
+  model API: loopback only, API-key launches only, compiled out of releases (`testModelBase`).
 - **No impersonation**: Gluon's prompt goes unchanged to `claude` and `codex app-server`. **Don't strip
   the user's variables** (`ANTHROPIC_API_KEY`, …): warn (`*EnvWarnings`).
 

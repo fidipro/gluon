@@ -73,7 +73,7 @@ Break none of these. Tests enforce them (`test/rules.test.ts`, `windows.test.ts`
   read another tool's credentials or edit its files (exceptions: `src/adapters/permanent.ts`,
   `agy-settings.ts`, inert unless `GLUON_EVENTS` is set; named config keys, `src/cost/harness-config.ts`
   alone); no token forwarding (`assertSafeEnv`);
-  no base URL except OpenRouter (Claude Code; Kimi Code's `KIMI_MODEL_BASE_URL`) and Codex + OpenAI key; no impersonation; any future sharing,
+  no base URL except OpenRouter (Claude Code; Kimi Code's `KIMI_MODEL_BASE_URL`), Codex + OpenAI key and the test seam's loopback (`testModelBase`); no impersonation; any future sharing,
   bot, webhook or remote run is blocked on a subscription. → `src/AGENTS.md`
 - **The user's repo is untrusted**: spawn only via `binPath`/`windowsTool`, never `Bun.which`;
   git only via `gitArgv`; checks/probes/logins in `neutralCwd()`; Bun autoloads nothing from the

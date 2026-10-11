@@ -59,8 +59,9 @@
   "scripts": {
     "start": "bun --no-env-file --config=scripts/empty-bunfig.toml src/cli.tsx",
     "demo": "bun --no-env-file --config=scripts/empty-bunfig.toml src/cli.tsx --demo",
-    "test": "bun test --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/perf/**'",
-    "test:unit": "bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/perf/**'",
+    "test": "bun test --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/perf/**' --path-ignore-patterns='test/real/**'",
+    "test:unit": "bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/perf/**' --path-ignore-patterns='test/real/**'",
+    "test:real": "bun test --concurrent test/real",
     "test:e2e": "bun test --concurrent --max-concurrency=6 test/e2e",
     "test:perf": "GLUON_PERF=1 bun test --max-concurrency=1 ./test/perf",
     "test:gluon": "GLUON_MONKEY_SEEDS=50 GLUON_MONKEY_STEPS=400 bun test --concurrent --max-concurrency=12 test/e2e/gluon-monkey.e2e.test.ts",

@@ -63,6 +63,16 @@ the run, and a `flaky.json` artifact). A flaky test is fixed, or quarantined whi
 `@quarantine <bug> until:<date>` in its title, at most 30 days, keeps it out of the blocking runs; the nightly full run
 still runs it, and `bun run test:health` breaks once the date has passed. Tests never retry themselves.
 
+## Real harnesses
+
+The fakes in `test/fixtures/` stand in for the harnesses where a test needs speed or a case a real harness rarely shows (a
+failure, a flood of input, a sign-in screen). What a fake can't tell is whether the newest harness still works in Gluon's
+frame, so `bun run regression` also runs the real-harness tier (`test/real/`, `scripts/real-stage.ts`): Gluon launches the
+real Claude Code, Codex, OpenCode and Kimi Code binaries, on the versions in `test/harnesses.json`, and their model traffic
+goes to a model API on loopback (`test/fixtures/fake-model-api.ts`). It is free and offline but for installing the
+binaries, runs only for a change that touches the harnesses, and needs tmux (it is skipped on Windows). CI runs it on each
+harness's newest release, so a harness release that breaks Gluon is found before a merge.
+
 ## Live checks
 
 The tests themselves are offline and free. After them, `bun run regression` runs the live checks the change needs

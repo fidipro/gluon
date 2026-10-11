@@ -185,6 +185,19 @@ jobs:
             node_modules/.cache/tsc.tsbuildinfo
           key: test-state-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: test-state-${{ matrix.os }}-
+      # The real stage (scripts/real-stage.ts) drives the real harnesses in tmux, on each harness's newest release in CI (before a
+      # merge, the tests run on the newest): tmux where the runner lacks it, and the harness binaries kept between runs (each
+      # download is hash-checked; a new release adds its own). Windows has no tmux: the stage says it skipped.
+      - name: tmux
+        if: runner.os != 'Windows' && (env.SUITE == 'changed' || env.SUITE == 'quick' || env.SUITE == 'full')
+        shell: bash
+        run: command -v tmux || { if [ "$RUNNER_OS" = macOS ]; then brew install tmux; else sudo apt-get install -y tmux; fi; }
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.os != 'Windows' && (env.SUITE == 'changed' || env.SUITE == 'quick' || env.SUITE == 'full')
+        with:
+          path: ~/.cache/gluon-test/harness
+          key: harness-bins-${{ runner.os }}-${{ hashFiles('test/harnesses.json') }}
+          restore-keys: harness-bins-${{ runner.os }}-
       # The typecheck runs in every suite but dist: `regression` does its own first.
       - name: tests
         if: env.SUITE == 'changed' || env.SUITE == 'quick' || env.SUITE == 'full'
@@ -203,7 +216,7 @@ jobs:
             bun run regression --retry-failed ${AREA:+--area "$AREA"}
           elif [ -n "$FILTER" ]; then
             bun run typecheck
-            bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' -t "$FILTER"
+            bun test --path-ignore-patterns='test/e2e/**' --path-ignore-patterns='test/visual/**' --path-ignore-patterns='test/real/**' -t "$FILTER"
             bun test --concurrent --max-concurrency=3 test/e2e -t "$FILTER"
           elif [ -n "$AREA" ]; then
             bun run regression:full --retry-failed --area "$AREA"
