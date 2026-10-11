@@ -65,8 +65,12 @@ still runs it, and `bun run test:health` breaks once the date has passed. Tests 
 
 ## Live checks
 
-The regression suite is offline and free. Checks against real models and real agents (`bun run test:live`) spend
-money: they run only when a person asks, never in CI, and each one has a hard budget in code.
+The tests themselves are offline and free. After them, `bun run regression` runs the live checks the change needs
+(`scripts/live-stage.ts`): the real brain and the real harnesses, on the versions in `test/harnesses.json`, with your
+own credentials (a plan you're signed in to first, then an AWS setup for Bedrock, then an API key). They have a hard
+budget per run in code, a check that passed isn't run again until `src/` or the harness changes, and without
+credentials or a network each one is skipped, never failed. They never run in CI. `--no-live` leaves them out;
+`--newest` runs them on each harness's newest release. Wider checks (`bun run test:live`) run only when a person asks.
 
 ## Next steps
 

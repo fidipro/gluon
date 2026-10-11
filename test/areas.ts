@@ -12,9 +12,9 @@
  *   coverage table marks them `e2e`, not 0 %.
  * - `unmeasured`: `src` files that run where the coverage report can't see (a subprocess, a Worker): glob → why.
  * - `optional`: the area's globs may match nothing yet (a directory another change is adding).
- * - `live`: what a change here needs from the live checks (`bun run regression --live`, paid, only when the user asks): `"brain"`,
- *   one journey (the real brain to an agent's reply) on the cheapest harness; `"harness"`, the journey of each harness the change
- *   names (else the cheapest one). Left out: nothing live.
+ * - `live`: what a change here needs from `bun run regression`'s live stage (paid, capped, local only: `liveChecks`): `"brain"`,
+ *   one journey (the real brain to an agent's reply) on the cheapest harness; `"harness"`, the real-harness check of each harness
+ *   the change names (else the cheapest one). Left out: nothing live.
  * - `platforms`: `"linux"` when a change to this area alone needs CI on Linux only (pure logic, no process, path or
  *   terminal that differs by OS); left out, a pull request runs macOS and Windows too. The nightly full run covers every OS.
  */
@@ -216,6 +216,7 @@ export const AREAS: Record<string, Area> = {
       "scripts/dco.ts",
       "scripts/harness-cache.ts",
       "scripts/harness-pin.ts",
+      "scripts/live-stage.ts",
       "install.sh",
       "install.ps1",
       ".github/workflows/**",
@@ -223,7 +224,7 @@ export const AREAS: Record<string, Area> = {
       "test/docker/**",
       "test/install-ps1.ps1",
     ],
-    unit: ["test/dist.test.ts", "test/release.test.ts", "test/dco.test.ts", "test/live-script.test.ts", "test/harness-cache.test.ts"],
+    unit: ["test/dist.test.ts", "test/release.test.ts", "test/dco.test.ts", "test/live-script.test.ts", "test/harness-cache.test.ts", "test/live-stage.test.ts"],
     e2e: [],
   },
   update: {
@@ -299,7 +300,7 @@ export const CORE: string[] = [
 ];
 
 /** Files no test reads: a change to one runs nothing. */
-export const IGNORED: string[] = ["qa/**", ".claude/**", ".gitignore", ".gitleaks.toml", ".github/CODEOWNERS", ".env.example", "scripts/coverage.ts", "scripts/live.ts", "scripts/live-lib.ts", "scripts/live-harness.ts", "scripts/live-driver.ts", "scripts/drive.py"];
+export const IGNORED: string[] = ["qa/**", ".claude/**", ".gitignore", ".gitleaks.toml", ".github/CODEOWNERS", ".env.example", "scripts/coverage.ts", "scripts/live.ts", "scripts/live-lib.ts", "scripts/live-harness.ts", "scripts/live-driver.ts", "scripts/live-park.ts", "scripts/drive.py"];
 
 const globs = new Map<string, Bun.Glob>();
 const glob = (p: string) => globs.get(p) ?? (globs.set(p, new Bun.Glob(p)), globs.get(p)!);
@@ -381,24 +382,29 @@ export function selectAreas(areas: string[], extra: { unit?: string[]; e2e?: str
   };
 }
 
-/** The journey a change needs when nothing names a harness: the cheapest one. */
+/** The harness a change's live checks use when nothing names one: the cheapest. */
 export const LIVE_DEFAULT_HARNESS = "claude-code";
-const LIVE_HARNESSES = ["claude-code", "codex", "opencode", "antigravity", "kimi-code", "grok-build"];
+/** The harnesses with a real-harness check (Grok Build has no API-key route; `CHECKED_HARNESSES` in scripts/live-lib.ts). */
+const LIVE_HARNESSES = ["claude-code", "codex", "opencode", "antigravity", "kimi-code"];
+
+/** One live check: a journey (the real brain to an agent's reply, on `harness`) or a real-harness check (the demo brain, the real agent). */
+export type LiveCheck = { kind: "journey" | "harness"; harness: string };
 
 /**
- * The live journeys a selection needs (`bun run regression --live`): none when no touched area has `live`; for `"harness"` areas, the
- * harnesses the changed files name (`src/adapters/codex.ts`, a `claude` in its name), else the cheapest; for `"brain"`, the cheapest.
- * The whole tier (a core or unknown file): the cheapest journey. `all`: every harness (the full tier).
+ * The live checks a selection needs (`bun run regression`'s live stage), most wanted first (the stage's $ cap may stop the rest): none
+ * when no touched area has `live`; for `"brain"` areas, the journey on the cheapest harness; for `"harness"` areas, the check of each
+ * harness the changed files name (`src/adapters/codex.ts`, a `claude` in its name), else the cheapest. The whole tier (a core or unknown
+ * file) and `all` (the full tier): the journey, then every harness's check.
  */
-export function liveJourneys(sel: Selection | undefined, changed: string[], all = false): string[] {
-  if (all) return [...LIVE_HARNESSES];
-  if (!sel || sel.kind === "fast") return [LIVE_DEFAULT_HARNESS];
+export function liveChecks(sel: Selection | undefined, changed: string[], all = false): LiveCheck[] {
+  const journey: LiveCheck = { kind: "journey", harness: LIVE_DEFAULT_HARNESS };
+  const harness = (h: string): LiveCheck => ({ kind: "harness", harness: h });
+  if (all || !sel || sel.kind === "fast") return [journey, ...LIVE_HARNESSES.map(harness)];
   if (sel.kind === "none") return [];
   const owners = new Set([...sel.areas, ...[...sel.unit, ...sel.e2e].map(testOwner).filter((a): a is string => !!a)]);
   const kinds = new Set([...owners].map((a) => AREAS[a]?.live).filter(Boolean));
-  if (!kinds.size) return [];
-  const named = kinds.has("harness") ? LIVE_HARNESSES.filter((h) => changed.some((f) => f.includes(h) || f.includes(h.split("-")[0]!))) : [];
-  return named.length ? named : [LIVE_DEFAULT_HARNESS];
+  const named = LIVE_HARNESSES.filter((h) => changed.some((f) => f.includes(h) || f.includes(h.split("-")[0]!)));
+  return [...(kinds.has("brain") ? [journey] : []), ...(kinds.has("harness") ? (named.length ? named : [LIVE_DEFAULT_HARNESS]).map(harness) : [])];
 }
 
 /**
