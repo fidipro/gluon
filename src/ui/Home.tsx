@@ -663,7 +663,11 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     if (text) setDraft((x) => ed.insert(x, text));
   };
 
-  usePaste((text) => setDraft((d) => ed.insert(d, text)));
+  // A paste drops what typing drops (BUG-722): a terminal escape sequence (typed, an arrow key) and the control characters; it keeps
+  // its line breaks (a CR or CRLF is one) and tabs, which the composer draws as spaces (BUG-16).
+  usePaste((text) =>
+    setDraft((d) => ed.insert(d, text.replace(/\r\n?/g, "\n").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ""))),
+  );
 
   // A late OSC 11 reply (the terminal's background colour) must not be typed or read as Esc.
   const onKey = useLateOscFilter((input, key) => {

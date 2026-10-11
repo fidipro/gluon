@@ -6,6 +6,9 @@ All notable changes to Gluon are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- A paste into the home view's composer drops escape sequences and control characters, as typing does, instead of keeping them in the draft (a pasted control character left the composer row's last cell on the terminal's own background). Line breaks (CR and CRLF too) and tabs are kept.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added
