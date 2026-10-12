@@ -55,26 +55,26 @@ function exeIn(dir = scratch(), body = "gluon 1.0.0"): string {
 const says = (version: string) => async () => version;
 
 describe("update: the release's signature", () => {
-  test("the real v1.0.0 SHA256SUMS verifies against its Sigstore bundle (the release workflow on main of this repository)", () => {
+  test("update/signed-only: the real v1.0.0 SHA256SUMS verifies against its Sigstore bundle (the release workflow on main of this repository)", () => {
     expect(() => verifySignature(SUMS, BUNDLE, TRUSTED_ROOT)).not.toThrow();
   });
 
-  test("one changed byte of SHA256SUMS is refused", () => {
+  test("update/signed-only: one changed byte of SHA256SUMS is refused", () => {
     const bad = Buffer.from(SUMS);
     bad[10] = bad[10]! ^ 1;
     expect(() => verifySignature(bad, BUNDLE, TRUSTED_ROOT)).toThrow(/signature doesn't verify \(SIGNATURE_ERROR\)/);
   });
 
-  test("a signature by another workflow, branch or repository is refused", () => {
+  test("update/signed-only: a signature by another workflow, branch or repository is refused", () => {
     for (const other of [CERT_IDENTITY.replace("@refs/heads/main", "@refs/heads/dev"), CERT_IDENTITY.replace("release.yml", "ci.yml"), CERT_IDENTITY.replace(REPO_SLUG, "someone/gluon")])
       expect(() => verifySignature(SUMS, BUNDLE, TRUSTED_ROOT, other)).toThrow(/UNTRUSTED_SIGNER_ERROR/);
   });
 
-  test("a bundle that isn't one is refused", () => {
+  test("update/signed-only: a bundle that isn't one is refused", () => {
     expect(() => verifySignature(SUMS, { not: "a bundle" }, TRUSTED_ROOT)).toThrow(UpdateError);
   });
 
-  test("the identity and issuer are install.sh's (cosign checks the same signature there)", () => {
+  test("update/signed-only: the identity and issuer are install.sh's (cosign checks the same signature there)", () => {
     const sh = readFileSync(join(ROOT, "install.sh"), "utf8");
     const repo = /^REPO="([^"]+)"$/m.exec(sh)![1]!;
     expect(/^CERT_IDENTITY="([^"]+)"$/m.exec(sh)![1]!.replace("$REPO", repo)).toBe(CERT_IDENTITY);
@@ -83,7 +83,7 @@ describe("update: the release's signature", () => {
 });
 
 describe("update: SHA256SUMS, versions, targets and hosts", () => {
-  test("a file's hash is found in either line form, CRLF or LF; a missing name is null", () => {
+  test("update/releases: a file's hash is found in either line form, CRLF or LF; a missing name is null", () => {
     const h = "a".repeat(64);
     expect(expectedHash(`${h}  gluon-bun-linux-x64\n`, "gluon-bun-linux-x64")).toBe(h);
     expect(expectedHash(`${"B".repeat(64)} *gluon-bun-linux-x64\r\n`, "gluon-bun-linux-x64")).toBe("b".repeat(64));
@@ -91,7 +91,7 @@ describe("update: SHA256SUMS, versions, targets and hosts", () => {
     expect(expectedHash(SUMS.toString("utf8"), "gluon-bun-windows-x64.exe")).toBe("2847442477460271e7537279977644b599ffec984afbc74426f66d9fff1f92d3");
   });
 
-  test("newer compares x.y.z numerically; a pre-release or junk is never newer", () => {
+  test("update/releases: newer compares x.y.z numerically; a pre-release or junk is never newer", () => {
     expect(newer("1.1.0", "1.0.0")).toBe(true);
     expect(newer("1.10.0", "1.9.9")).toBe(true);
     expect(newer("2.0.0", "10.0.0")).toBe(false);
@@ -100,7 +100,7 @@ describe("update: SHA256SUMS, versions, targets and hosts", () => {
     expect(newer("latest", "1.0.0")).toBe(false);
   });
 
-  test("each target has its release file; the host's is found (musl only on Linux)", () => {
+  test("update/releases: each target has its release file; the host's is found (musl only on Linux)", () => {
     expect(TARGETS.map(assetName)).toContain("gluon-bun-windows-x64.exe");
     expect(hostTarget("linux", "x64", true)).toBe("bun-linux-x64-musl");
     expect(hostTarget("linux", "arm64", false)).toBe("bun-linux-arm64");
@@ -110,7 +110,7 @@ describe("update: SHA256SUMS, versions, targets and hosts", () => {
     expect(hostTarget("freebsd", "x64")).toBeNull();
   });
 
-  test("a request goes only to GitHub's release hosts over https (or the seam's own loopback origin)", () => {
+  test("update/hosts: a request goes only to GitHub's release hosts over https (or the seam's own loopback origin)", () => {
     expect(allowedUrl(new URL(`${RELEASES.base}/latest`), RELEASES)).toBe(true);
     expect(allowedUrl(new URL("https://release-assets.githubusercontent.com/x"), RELEASES)).toBe(true);
     expect(allowedUrl(new URL(`${RELEASES.base.replace("https:", "http:")}/latest`), RELEASES)).toBe(false);
@@ -123,14 +123,14 @@ describe("update: SHA256SUMS, versions, targets and hosts", () => {
 });
 
 describe("update: reading the releases", () => {
-  test("the latest version comes from the /latest redirect", async () => {
+  test("update/releases: the latest version comes from the /latest redirect", async () => {
     const r = serve("1.4.2");
     expect(await latestVersion(sourceOf(r).releases)).toBe("1.4.2");
     r.latest = "nightly";
     await expect(latestVersion(sourceOf(r).releases)).rejects.toThrow("couldn't read the latest release's version");
   });
 
-  test("a download redirected off the release hosts is refused", async () => {
+  test("update/hosts: a download redirected off the release hosts is refused", async () => {
     const r = serve("1.4.2");
     const other = serve("1.4.2");
     r.redirectTo = other.base.replace("/releases", "");
@@ -138,12 +138,12 @@ describe("update: reading the releases", () => {
     expect(other.requests).toEqual([]);
   });
 
-  test("a file larger than its cap is refused", async () => {
+  test("update/hosts: a file larger than its cap is refused", async () => {
     const r = serve("1.4.2", "x", { big: "y".repeat(2000) });
     await expect(fetchFile(sourceOf(r).releases, "1.4.2", "big", 1000)).rejects.toThrow("larger than 1000 bytes");
   });
 
-  test("the seam is loopback http only, and nothing at all in a test run without it", () => {
+  test("update/hosts: the seam is loopback http only, and nothing at all in a test run without it", () => {
     const seam = (o: unknown) => {
       const p = join(scratch(), "seam.json");
       writeFileSync(p, JSON.stringify(o));
@@ -156,7 +156,7 @@ describe("update: reading the releases", () => {
     expect(updateSource({})).toEqual({ releases: RELEASES });
   });
 
-  test("the seam is compiled out of a release build and kept in a test build; the pack and dist checks name it", async () => {
+  test("update/hosts: the seam is compiled out of a release build and kept in a test build; the pack and dist checks name it", async () => {
     const build = async (flavor: string) => {
       const r = await Bun.build({ entrypoints: [join(ROOT, "src/update/update.ts")], target: "bun", minify: true, define: { GLUON_BUILD: JSON.stringify(flavor), "process.env.NODE_ENV": JSON.stringify("production") } });
       expect(r.success).toBe(true);
@@ -171,7 +171,7 @@ describe("update: reading the releases", () => {
 });
 
 describe("update: installing a release", () => {
-  test("a verified download replaces the executable, and nothing is left beside it", async () => {
+  test("update/replace: a verified download replaces the executable, and nothing is left beside it", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     const exe = exeIn();
     await installRelease("1.1.0", sourceOf(r), exe, { versionOf: says("1.1.0"), dir: scratch() });
@@ -182,7 +182,7 @@ describe("update: installing a release", () => {
     expect(readdirSync(join(exe, ".."))).toEqual(["gluon"]);
   });
 
-  test("a binary that doesn't match SHA256SUMS is refused, and the executable is unchanged", async () => {
+  test("update/signed-only: a binary that doesn't match SHA256SUMS is refused, and the executable is unchanged", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     r.files["1.1.0"]![ASSET] = "TAMPERED";
     const exe = exeIn();
@@ -191,7 +191,7 @@ describe("update: installing a release", () => {
     expect(readdirSync(join(exe, ".."))).toEqual(["gluon"]);
   });
 
-  test("a signed release: the signature is checked first, then the binary against the signed SHA256SUMS", async () => {
+  test("update/signed-only: a signed release: the signature is checked first, then the binary against the signed SHA256SUMS", async () => {
     // v1.0.0's real signed SHA256SUMS, served with a binary that isn't the real one: the signature passes, the checksum doesn't.
     const r = fakeRelease("1.0.0", { "1.0.0": { SHA256SUMS: SUMS, "SHA256SUMS.sigstore.json": JSON.stringify(BUNDLE), [ASSET]: "NOT THE REAL BINARY" } });
     servers.push(r);
@@ -210,7 +210,7 @@ describe("update: installing a release", () => {
     expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
   });
 
-  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("an executable in a directory Gluon can't write to: nothing changes, and the error says to use the installer", async () => {
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("update/replace: an executable in a directory Gluon can't write to: nothing changes, and the error says to use the installer", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     const dir = scratch();
     const exe = exeIn(dir);
@@ -223,7 +223,7 @@ describe("update: installing a release", () => {
     }
   });
 
-  test("a new executable that doesn't answer --version with its version is not put in place", async () => {
+  test("update/replace: a new executable that doesn't answer --version with its version is not put in place", async () => {
     const exe = exeIn();
     const staged = stagedPath(exe);
     writeFileSync(staged, "x");
@@ -232,7 +232,7 @@ describe("update: installing a release", () => {
     expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
   });
 
-  test("Windows: the running .exe moves aside to .old and the new one takes its name; a later start sweeps the old copy", async () => {
+  test("update/replace: Windows: the running .exe moves aside to .old and the new one takes its name; a later start sweeps the old copy", async () => {
     const dir = scratch();
     const exe = join(dir, "gluon.exe");
     writeFileSync(exe, "OLD");
@@ -246,7 +246,7 @@ describe("update: installing a release", () => {
     expect(readdirSync(dir)).toEqual(["gluon.exe"]);
   });
 
-  test("a staged file a crashed update left is swept once it is a day old, not before", () => {
+  test("update/replace: a staged file a crashed update left is swept once it is a day old, not before", () => {
     const exe = exeIn();
     const staged = stagedPath(exe);
     writeFileSync(staged, "x");
@@ -258,7 +258,7 @@ describe("update: installing a release", () => {
     expect(existsSync(staged)).toBe(false);
   });
 
-  test("one update at a time: the lock is exclusive, and one a crash left is taken over after 30 minutes", () => {
+  test("update/replace: one update at a time: the lock is exclusive, and one a crash left is taken over after 30 minutes", () => {
     const dir = scratch();
     const unlock = takeLock(dir)!;
     expect(unlock).toBeFunction();
@@ -276,13 +276,13 @@ describe("update: at start", () => {
     return notices;
   };
 
-  test("off checks nothing", async () => {
+  test("update/at-start: off checks nothing", async () => {
     const r = serve("1.1.0");
     expect(await start(r, "off", { dir: scratch() })).toEqual([]);
     expect(r.requests).toEqual([]);
   });
 
-  test("notify says a newer release exists, confirming it with GitHub at each start; up to date, GitHub is asked once a day", async () => {
+  test("update/at-start: notify says a newer release exists, confirming it with GitHub at each start; up to date, GitHub is asked once a day", async () => {
     const r = serve("1.1.0");
     const dir = scratch();
     expect(await start(r, "notify", { dir })).toEqual(["Gluon 1.1.0 is available (you have 1.0.0): run gluon update to install it."]);
@@ -301,7 +301,7 @@ describe("update: at start", () => {
     expect(r.requests).toHaveLength(4);
   });
 
-  test("a remembered version GitHub doesn't confirm (a stale or foreign state file) is never said or downloaded", async () => {
+  test("update/at-start: a remembered version GitHub doesn't confirm (a stale or foreign state file) is never said or downloaded", async () => {
     const r = serve("1.0.0");
     const dir = scratch();
     const exe = exeIn();
@@ -312,21 +312,21 @@ describe("update: at start", () => {
     expect(readFileSync(exe, "utf8")).toBe("gluon 1.0.0");
   });
 
-  test("nothing is said when this is the latest, or GitHub can't be reached", async () => {
+  test("update/at-start: nothing is said when this is the latest, or GitHub can't be reached", async () => {
     const r = serve("1.0.0");
     expect(await start(r, "auto", { dir: scratch() })).toEqual([]);
     r.stop();
     expect(await start(r, "auto", { dir: scratch() })).toEqual([]);
   });
 
-  test("auto installs a newer release for the next start, and says so", async () => {
+  test("update/at-start: auto installs a newer release for the next start, and says so", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     const exe = exeIn();
     expect(await start(r, "auto", { dir: scratch(), exe })).toEqual(["Gluon 1.1.0 is installed: it starts the next time you open Gluon (this one stays 1.0.0)."]);
     expect(readFileSync(exe, "utf8")).toBe("NEW BINARY");
   });
 
-  test("auto that fails says why, and doesn't download that version again for a day", async () => {
+  test("update/at-start: auto that fails says why, and doesn't download that version again for a day", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     r.files["1.1.0"]![ASSET] = "TAMPERED";
     const exe = exeIn();
@@ -345,13 +345,13 @@ describe("update: at start", () => {
     expect(downloads()).toBe(4);
   });
 
-  test("auto without an executable to replace (the npm package, source) says how to update instead", async () => {
+  test("update/cannot-replace: auto without an executable to replace (the npm package, source) says how to update instead", async () => {
     const r = serve("1.1.0");
     const [notice] = await start(r, "auto", { dir: scratch() });
     expect(notice).toStartWith("Gluon 1.1.0 is available (you have 1.0.0): this Gluon runs from source");
   });
 
-  test("another Gluon updating (the lock) is left alone", async () => {
+  test("update/at-start: another Gluon updating (the lock) is left alone", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     const dir = scratch();
     const exe = exeIn();
@@ -361,14 +361,14 @@ describe("update: at start", () => {
     unlock();
   });
 
-  test("GLUON_UPDATES wins over the config; anything else in it is ignored", () => {
+  test("update/setting: GLUON_UPDATES wins over the config; anything else in it is ignored", () => {
     expect(updateMode("auto", {})).toBe("auto");
     expect(updateMode("auto", { GLUON_UPDATES: "off" })).toBe("off");
     expect(updateMode("off", { GLUON_UPDATES: " Notify " })).toBe("notify");
     expect(updateMode("notify", { GLUON_UPDATES: "never" })).toBe("notify");
   });
 
-  test("a state file that isn't one reads as no check", () => {
+  test("update/at-start: a state file that isn't one reads as no check", () => {
     const dir = scratch();
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "update.json"), "{nope");
@@ -387,7 +387,7 @@ describe("update: gluon update", () => {
     return { code, out: out.join("\n"), err: err.join("\n") };
   };
 
-  test("--check says whether a newer release exists and installs nothing", async () => {
+  test("update/command: --check says whether a newer release exists and installs nothing", async () => {
     const r = serve("1.1.0");
     const exe = exeIn();
     expect(await run(["--check"], r, exe)).toEqual({ code: 0, out: "Gluon 1.1.0 is available (you have 1.0.0).\nRun gluon update to install it.", err: "" });
@@ -395,7 +395,7 @@ describe("update: gluon update", () => {
     expect(await run(["--check"], serve("1.0.0"), exe)).toMatchObject({ code: 0, out: "Gluon 1.0.0 is up to date (the latest release is 1.0.0)." });
   });
 
-  test("it installs the newer release and says where", async () => {
+  test("update/command: it installs the newer release and says where", async () => {
     const r = serve("1.1.0", "NEW BINARY");
     const exe = exeIn();
     const res = await run([], r, exe);
@@ -404,7 +404,7 @@ describe("update: gluon update", () => {
     expect(readFileSync(exe, "utf8")).toBe("NEW BINARY");
   });
 
-  test("a failure says nothing was changed; a bad argument is refused; a test run reaches no network", async () => {
+  test("update/command: a failure says nothing was changed; a bad argument is refused; a test run reaches no network", async () => {
     const r = serve("1.1.0");
     r.files["1.1.0"]![ASSET] = "TAMPERED";
     expect(await run([], r, exeIn())).toMatchObject({ code: 1, err: expect.stringMatching(/^gluon: update failed: .* doesn't match SHA256SUMS .*\. Nothing was changed\.$/) });
@@ -420,7 +420,7 @@ describe("update: the config key", () => {
     else process.env.GLUON_CONFIG = saved;
   });
 
-  test("auto by default; auto, notify and off are read (false as off, true as auto); anything else names the key", () => {
+  test("update/setting: auto by default; auto, notify and off are read (false as off, true as auto); anything else names the key", () => {
     const cfg = join(scratch(), "config.yaml");
     process.env.GLUON_CONFIG = cfg;
     expect(loadConfig().updates).toBe("auto");

@@ -399,11 +399,34 @@ export const CATALOG: Record<string, Feature> = {
       "verbatim-no-sudo": rule("when an installer is shown and run, then it is the vendor's constant https or npm command, shown as it runs, with nothing interpolated, no --yes and no sudo", ["code", "seam", "e2e"]),
     },
   },
+  update: {
+    says: "Gluon's own updates (docs/getting-started/install.md \"Updating\", docs/concepts/security-privacy.md \"Updates\", SECURITY.md, docs/reference/cli.md, docs/reference/config.md)",
+    entries: {
+      "signed-only": b("given a release, then nothing is installed unless its `SHA256SUMS` carries a valid Sigstore signature by the Release workflow on `main` of this repository, and the binary matches that `SHA256SUMS`. Refused: one changed byte, another workflow, branch or repository, a bundle that isn't one, a binary it doesn't list. The signature is checked before the binary, with the identity and issuer `install.sh` checks; Gluon checks it itself, no `cosign` needed", ["seam"]),
+      hosts: b("a request goes only to GitHub's release hosts over https: a redirect off them is refused, and each file has a size cap. The requests are plain GETs with nothing of the user's in them. Without the test seam a test run reaches no network; the seam is loopback http only, kept in a test build and compiled out of a release build", ["seam", "e2e"]),
+      releases: b("the latest version is the one GitHub's `/latest` redirect names. x.y.z compares numerically; a pre-release or junk is never newer. `SHA256SUMS` reads in either line form, CRLF or LF. This host's release file is picked (musl only on Linux)", ["seam"]),
+      replace: b("a verified download takes the executable's place and leaves nothing beside it (Windows: the running `.exe` moves aside to `.old`, swept at a later start). A new binary that doesn't answer `--version` with its version, or doesn't match, is not put in place; the executable stays as it was. A staged file a crashed update left is swept once it is a day old. One update runs at a time; a crashed one's lock is taken over after 30 minutes", ["seam", "e2e"]),
+      "at-start": b("at start, in the background and never before the first screen. `off` checks nothing. `notify` says a newer release exists, confirmed with GitHub at each start; while up to date GitHub is asked once a day. `auto` installs a newer release for the next start and says so; a failure says why, and that version isn't tried again for a day. Nothing is said when Gluon is up to date or GitHub can't be reached. A remembered version GitHub doesn't confirm is never said or downloaded. Another Gluon's update (its lock) is left alone. A state file that isn't one reads as no check", ["seam", "e2e"]),
+      "cannot-replace": b("given no executable Gluon can replace (the npm package, a source checkout), then `auto` says how to update instead", ["seam"]),
+      command: b("`gluon update` installs the latest release now and says where. `--check` only says whether there is one, and installs nothing. A failure says nothing was changed; a bad argument is refused", ["seam", "e2e"]),
+      setting: b("the config key `updates` is `auto` by default. It reads `auto`, `notify` and `off` (false as off, true as auto); anything else is refused naming the key. `GLUON_UPDATES` wins over it; anything else in that variable is ignored", ["seam"]),
+    },
+  },
+  installers: {
+    says: "`install.sh` (docs/getting-started/install.md \"Linux and macOS: install.sh\", SECURITY.md \"Releases\")",
+    entries: {
+      signature: b("given `cosign` on the PATH, then `install.sh` checks `SHA256SUMS`'s signature. A cosign 2 that needs `--new-bundle-format` is retried with it and installs. A signature that fails both ways dies `does not verify`, and a cosign older than 2.4 dies asking for an upgrade; in both cases nothing is installed"),
+      checksum: b("given a release whose binary doesn't match `SHA256SUMS`, or that `SHA256SUMS` doesn't list, then `install.sh` stops with nothing installed"),
+    },
+  },
   dist: {
-    says: "the compiled binary loads only what is built into it (scripts/AGENTS.md)",
+    says: "the standalone executable: it runs without Bun and loads only what is built into it (docs/getting-started/install.md, scripts/AGENTS.md)",
     entries: {
       "no-autoload": rule("given a hostile working directory (a bunfig preload, a .env, tsconfig paths), when the compiled or release binary runs, then nothing of it loads", ["e2e"]),
       "no-external": rule("given node_modules in the working directory or its parent, when the compiled binary runs, then its own embedded modules are used, nothing from the directory", ["e2e"]),
+      standalone: b("the compiled binary runs without Bun as the source does: `--version` and `--help`, `doctor`, a `--launch` dry run, the UI with a session in its bundled pseudo-terminal (the frame, the home key twice), the bundled grep worker, and `gluon stats sql`'s query child (the binary itself)"),
+      "patched-modules": b("the release binary carries Gluon's patched modules: string-width with its pre-check (`patches/`), and the patched Sigstore libraries, which verify a real signature inside the binary"),
+      "no-test-seams": rule("the release binary contains none of Gluon's test seams (`GLUON_TEST_*`); the test build keeps them", ["e2e"]),
     },
   },
   perf: {
@@ -443,7 +466,7 @@ export function testTitles(text: string): string[] {
 
 /** A test file's layer from where it lives (`seam` and `code` share `test/*.test.ts`; `test/dist.test.ts` runs the built binary). */
 export function layersOf(file: string): Layer[] {
-  if (file === "test/dist.test.ts") return ["e2e"];
+  if (file === "test/dist.test.ts" || file === "test/installers.test.ts") return ["e2e"];
   if (file.startsWith("test/e2e/")) return ["e2e"];
   if (file.startsWith("test/real/")) return ["real"];
   if (file.startsWith("test/perf/")) return ["perf"];

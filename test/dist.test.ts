@@ -24,7 +24,7 @@ setDefaultTimeout(30_000 * SLOW);
 afterAll(stopAll);
 
 describe.skipIf(!BIN)("compiled binary", () => {
-  test("--version and --help", async () => {
+  test("dist/standalone: --version and --help", async () => {
     const v = await cli(["--version"]);
     expect([v.code, v.stdout.trim(), v.stderr]).toEqual([0, pkg.version, ""]);
     const h = await cli(["--help"]);
@@ -32,14 +32,14 @@ describe.skipIf(!BIN)("compiled binary", () => {
     expect(h.stdout).toContain(`gluon ${pkg.version} — Gluon, a control platform for coding agents`);
   });
 
-  test("doctor with a temp config and fake agents", async () => {
+  test("dist/standalone: doctor with a temp config and fake agents", async () => {
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: config("dist-doctor", "connections: { claude-code: { auth: subscription } }\n") } });
     expect(r.stdout).toContain(`✓ Claude Code (claude ${PINNED.claude})`);
     expect(r.stdout).toContain("✓ 1. Sonnet 5.5 on your Claude plan (personal)   ← in use");
     expect(r.code).toBe(0);
   });
 
-  test("--launch --dry-run", async () => {
+  test("dist/standalone: --launch --dry-run", async () => {
     const r = await cli(["--launch", "codex", "--model", "gpt-6.1-sol", "--dry-run", "--", "- a spec"], { env: { GLUON_CONFIG: config("dist-dry", "connections: { codex: { auth: api, provider: openai } }\n"), OPENAI_API_KEY: "sk-proj-0123456789abcdef0123" } });
     expect(r.code).toBe(0);
     const c = JSON.parse(r.stdout);
@@ -48,7 +48,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
     expect(c.env).toEqual({ OPENAI_API_KEY: "sk-proj-••••" });
   });
 
-  test("the fallback grep runs in its worker (no rg, not a git repo)", async () => {
+  test("dist/standalone: the fallback grep runs in its worker (no rg, not a git repo)", async () => {
     // PATH holds only the fake agents: no rg, no git, so grep falls back to the bundled worker
     // (a repo with a package.json: the demo reads it, so any failure is the search's).
     const app = await start({ cwd: repo.withSpace(), rows: 50, env: { PATH: fakeAgents(["claude", "opencode"]) } });
@@ -58,7 +58,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
     expect(h).not.toContain("failed");
   });
 
-  test("`gluon stats sql` runs its query in a child (the binary itself), cuts its rows and, where the seam exists, stops at the deadline (BUG-597)", async () => {
+  test("dist/standalone: `gluon stats sql` runs its query in a child (the binary itself), cuts its rows and, where the seam exists, stops at the deadline", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-dist-stats-"));
     try {
       mkdirSync(join(state, "gluon"));
@@ -81,7 +81,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
     }
   });
 
-  test("a UI launch runs the agent in Gluon's frame, in the bundled pseudo-terminal; Ctrl+\\ twice shows home", async () => {
+  test("dist/standalone: a UI launch runs the agent in Gluon's frame, in the bundled pseudo-terminal; Ctrl+\\ twice shows home", async () => {
     // The demo intake agent's Claude Code proposal, launched with the fake's raw-mode TUI: only a
     // session (the bundled @xterm/headless screen, with its Unicode 11 addon) draws a frame.
     const app = await start({ cwd: repo.tiny(), rows: 60, cols: 100, env: { FAKE_TUI: "1" } });
@@ -228,7 +228,7 @@ describe.skipIf(!BIN)("compiled binary", () => {
 });
 
 describe.skipIf(!BIN)("compiled binary: gluon update", () => {
-  test("update: the bundled (patched) Sigstore libraries verify the real v1.0.0 signature inside the binary, then refuse a binary SHA256SUMS doesn't list", async () => {
+  test("dist/patched-modules: the bundled (patched) Sigstore libraries verify the real v1.0.0 signature inside the binary, then refuse a binary SHA256SUMS doesn't list", async () => {
     // The npm bundle, like the release binary, has no test seam: it would ask the real GitHub, so it is left out.
     if (!readFileSync(BIN!).includes("GLUON_TEST_UPDATE")) return;
     const dir = mkdtempSync(join(tmpdir(), "gluon-dist-update-"));
@@ -251,11 +251,11 @@ describe.skipIf(!BIN)("compiled binary: gluon update", () => {
 });
 
 describe.skipIf(!RELEASE)("release binary", () => {
-  test("BUG-615: the binary carries the patched string-width (the emoji pre-check)", async () => {
+  test("dist/patched-modules: the binary carries the patched string-width (the emoji pre-check)", async () => {
     expect(STRING_WIDTH_PATCHED.test(Buffer.from(await Bun.file(RELEASE!).arrayBuffer()).toString("latin1"))).toBe(true);
   });
 
-  test.each(["GLUON_TEST_PROBES", "GLUON_TEST_PTY_FAIL", "GLUON_TEST_COMPACT_TIMEOUT_MS", "GLUON_TEST_NO_PTY", "GLUON_TEST_DEMO_PACE", "GLUON_TEST_MAINTAINER_MODELS", "GLUON_TEST_OPENROUTER", "GLUON_TEST_PRICING", "GLUON_TEST_SQL_DEADLINE_MS", "GLUON_TEST_UPDATE", "GLUON_TEST_MODEL_URL"])("the %s seam is compiled out", async (seam) => {
+  test.each(["GLUON_TEST_PROBES", "GLUON_TEST_PTY_FAIL", "GLUON_TEST_COMPACT_TIMEOUT_MS", "GLUON_TEST_NO_PTY", "GLUON_TEST_DEMO_PACE", "GLUON_TEST_MAINTAINER_MODELS", "GLUON_TEST_OPENROUTER", "GLUON_TEST_PRICING", "GLUON_TEST_SQL_DEADLINE_MS", "GLUON_TEST_UPDATE", "GLUON_TEST_MODEL_URL"])("dist/no-test-seams: the %s seam is compiled out", async (seam) => {
     const bytes = new Uint8Array(await Bun.file(RELEASE!).arrayBuffer());
     expect(Buffer.from(bytes).includes(seam)).toBe(false);
     expect(Buffer.from(await Bun.file(BIN ?? RELEASE!).arrayBuffer()).includes(seam)).toBe(!!BIN);
