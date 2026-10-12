@@ -86,8 +86,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/update/update.ts", "src/update/verify.ts", "src/update/fetch.ts", "src/update/target.ts", "src/update/apply.ts"],
   },
   launch: {
-    says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory and the stale sweep",
-    modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts"],
+    says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",
+    modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts", "src/self.ts"],
   },
 };
 
