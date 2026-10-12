@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { defaults } from "../src/config.ts";
-import { initialReadiness } from "../src/gluon.ts";
+import { initialReadiness } from "../src/home-rules.ts";
 import { resolveModel } from "../src/models.ts";
 import { catalog, DEFAULT_MODELS, HARNESS_INFO, isPlanConn, PROVIDERS, subscriptionOf } from "../src/harnesses.ts";
 import { buildCommand, launchProblem, opencodeEffort } from "../src/launchers.ts";

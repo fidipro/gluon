@@ -388,15 +388,11 @@ describe("rule 2: keys", () => {
     rmSync(env);
     loadSecrets();
     // The setup's commit: config first; when it fails, no key is saved and nothing changes.
-    const { SetupFlow } = await import("../src/auth.ts");
-    const { makeTheme } = await import("../src/ui/theme.ts");
+    const { saveSetup } = await import("../src/setup-save.ts");
     writeFileSync(process.env.GLUON_CONFIG!, "connections: [unclosed\n");
     const config = { ...loadConfigSafe(), connections: {} };
-    const flow = new SetupFlow(config, makeTheme(null), ["grok-build"]);
-    flow.draft.connections["grok-build"] = { auth: "api", provider: "xai" };
-    flow.draft.connected = ["grok-build"];
-    flow.draft.secrets = { XAI_API_KEY: "xai-pastedkey3333333333333" };
-    expect(() => flow.commit()).toThrow(/not valid YAML/);
+    const answers = { connections: { "grok-build": { auth: "api" as const, provider: "xai" as const } }, connected: ["grok-build" as const], dropped: [], bedrock: { ...config.bedrock }, secrets: { XAI_API_KEY: "xai-pastedkey3333333333333" } };
+    expect(() => saveSetup(config, answers)).toThrow(/not valid YAML/);
     expect(statSync(env, { throwIfNoEntry: false })).toBeUndefined();
     expect(config.connections).toEqual({});
     rmSync(process.env.GLUON_CONFIG!);

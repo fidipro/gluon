@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { changedSince, statusSnapshot } from "../src/agent/tools.ts";
 import { loadConfig, saveConfig, setConfigNotices } from "../src/config.ts";
-import { homeQuestions, RESUME_EARLY_MS, resumeModeProblem, resumeRefused } from "../src/gluon.ts";
+import { homeQuestions, RESUME_EARLY_MS, resumeModeProblem, resumeRefused } from "../src/home-rules.ts";
 import { handoffFor } from "../src/handoff.ts";
 import { tryStartTelemetry } from "../src/telemetry.ts";
 import { ADAPTERS } from "../src/adapters/index.ts";
@@ -147,7 +147,7 @@ test("frame/no-console-writes: without a pseudo-terminal, what Gluon prints befo
   expect(body).not.toContain("process.stdout");
 });
 
-test("BUG-305/resume: only a non-zero exit under 128, soon after the resume, is a refusal (a signal, the user's Ctrl+C, a clean exit or a late one are not)", () => {
+test("resume/cannot-resume: only a non-zero exit under 128, soon after the resume, is a refusal (a signal, the user's Ctrl+C, a clean exit or a late one are not) #BUG-305/resume", () => {
   const t0 = 1_000_000;
   const soon = t0 + 3_000;
   expect([1, 2, 3, 127].map((c) => resumeRefused(c, t0, soon))).toEqual([true, true, true, true]);
@@ -156,7 +156,7 @@ test("BUG-305/resume: only a non-zero exit under 128, soon after the resume, is 
   expect(resumeRefused(3, t0, t0 + RESUME_EARLY_MS)).toBe(false);
 });
 
-test("BUG-612/resume-modes: a saved Codex, Grok Build or OpenCode session with no mode (saved before Gluon recorded it) is refused with a message naming `gluon sessions --delete <id>`; any with a mode, and Claude Code with none, are not", () => {
+test("modes/on-resume: a saved Codex, Grok Build or OpenCode session with no mode (saved before Gluon recorded it) is refused with a message naming `gluon sessions --delete <id>`; any with a mode, and Claude Code with none, are not #BUG-612/resume-modes", () => {
   for (const harness of ["codex", "grok-build", "opencode"] as const) {
     const why = resumeModeProblem({ harness }, "abc234")!;
     expect(why).toContain("`gluon sessions --delete abc234`");
@@ -168,7 +168,7 @@ test("BUG-612/resume-modes: a saved Codex, Grok Build or OpenCode session with n
   for (const harness of ["claude-code", "antigravity", "kimi-code"] as const) expect(resumeModeProblem({ harness }, "abc234")).toBeNull();
 });
 
-test("BUG-304/resume: the reason in the start-again question is masked and one safe line (it can hold an agent's or a launch's message)", () => {
+test("resume/cannot-resume: the reason in the start-again question is masked and one safe line (it can hold an agent's or a launch's message) #BUG-304/resume", () => {
   const key = "sk-ant-api03-" + "A1b2C3d4E5f6G7h8".repeat(3);
   const forms = homeQuestions.again("Gluon-fix", "Claude Code", `exited: bad ${key}\x1b]0;PWNED\x07\nsecond line`);
   for (const f of forms) {

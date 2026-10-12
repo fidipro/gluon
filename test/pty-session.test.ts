@@ -1412,7 +1412,7 @@ describe("OpenCode's step records reach Gluon whole (issue #39)", () => {
 });
 
 describe("the harness's figures reach Gluon once each (issue #39)", () => {
-  test("BUG-399/figures-not-resent: the merged status keeps the last cost and context, but a later state or activity change delivers neither again; a changed figure, a compaction's null and the same tokens after it do", async () => {
+  test("frame/info-line: the merged status keeps the last cost and context, but a later state or activity change delivers neither again; a changed figure, a compaction's null and the same tokens after it do #BUG-399/figures-not-resent", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const figs: unknown[] = [];
@@ -1442,7 +1442,7 @@ describe("the harness's figures reach Gluon once each (issue #39)", () => {
 
 describe("OpenCode's step counter restarts (issue #39)", () => {
   const rec = (n: number) => ({ n, model: "fake/fake-1", input: n, output: 1, reasoning: 0, cacheRead: 0, cacheWrite: 0 });
-  test("BUG-402/step-counter-restart: a plugin reload or a second follower restarts `n` at 1: its records are new, not repeats of the first run's; an exact repeat is left out and counted", () => {
+  test("cost/counted-once: a plugin reload or a second follower restarts `n` at 1: its records are new, not repeats of the first run's; an exact repeat is left out and counted #BUG-402/step-counter-restart", () => {
     const gate = stepGate();
     expect(gate([rec(1), rec(2), rec(3), rec(4), rec(5)]).fresh.map((r) => r.n)).toEqual([1, 2, 3, 4, 5]);
     // Restarted: every later step used to be dropped for good (`n <= stepsSeen`).
@@ -1452,7 +1452,7 @@ describe("OpenCode's step counter restarts (issue #39)", () => {
     expect(gate([rec(3), rec(4)])).toMatchObject({ repeated: 1, fresh: [{ n: 4 }] });
   });
 
-  test("BUG-402/step-repeat-is-a-dropped-entry: the tracker records the repeats it was told of, with a reason and a count", () => {
+  test("cost/counted-once: the tracker records the repeats it was told of, with a reason and a count #BUG-402/step-repeat-is-a-dropped-entry", () => {
     const ledger = new Ledger();
     new CostTracker({ harness: "opencode", conn: "openrouter", ledger }).stepsRepeated(2);
     expect(ledger.entries).toMatchObject([{ kind: "dropped", what: "usage", reason: "opencode-step-repeated", count: 2 }]);

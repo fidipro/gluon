@@ -75,7 +75,7 @@ test("perf/smoke: startup, three sessions, keys and tab switches stay under the 
 // harness's and Gluon's own for the agent), which adds about 49 ms at the p50 and 64 at the p95 on a quiet machine, past
 // the 50 ms limit Linux and macOS keep. No fix is planned; this test holds the accepted cost, so a regression beyond it
 // (`WIN_SESSION_ADDED_P95_MS`, 80 ms at the p95) still fails. No allowance, as BUG-615's. Skipped where the cost does not exist.
-(WIN ? test : test.skip)("BUG-616/QA-perf-05: typing in a session on Windows stays under the accepted ceiling @full", async () => {
+(WIN ? test : test.skip)("perf/smoke: typing in a session on Windows stays under the accepted ceiling @full #BUG-616/QA-perf-05", async () => {
   const p = await perfApp();
   await openSession(p);
   const floor = (await measureFloor(15)).p50;
