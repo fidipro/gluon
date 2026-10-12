@@ -8,7 +8,7 @@ import { DEFAULT_ROUTING_YAML, loadRouting, parseRouting, predatesDefault, routi
 const OLD = DEFAULT_ROUTING_YAML.replace(/^version: \d+$/m, "version: 1").replace("[claude-code/haiku, codex/gpt-6-luna, kimi-code/kimi-k2.7-code]", "[codex/gpt-6-luna, claude-code/haiku]");
 const shipped = [...SHIPPED_ROUTING, { hash: routingHash(OLD), version: 1 }];
 
-test("the older default the tests build differs from the current one in its rank, not only its version", () => {
+test("routing/upgrade: the older default the tests build differs from the current one in its rank, not only its version", () => {
   expect(OLD.replace("version: 1", "version: 0")).not.toBe(DEFAULT_ROUTING_YAML.replace(/^version: \d+$/m, "version: 0"));
 });
 
@@ -24,7 +24,7 @@ afterEach(() => {
   else process.env.GLUON_CONFIG = savedConfig;
 });
 
-test("BUG-461/the embedded default is the last of the shipped defaults: its hash is listed, with its version, and no other version is as high", () => {
+test("routing/upgrade: the embedded default is the last of the shipped defaults: its hash is listed, with its version, and no other version is as high #BUG-461", () => {
   const mine = SHIPPED_ROUTING.find((s) => s.hash === routingHash(DEFAULT_ROUTING_YAML));
   // Failing here: src/routing.yaml changed. Bump its `version:` and add its hash to SHIPPED_ROUTING (keep the old lines).
   expect(mine).toBeDefined();
@@ -33,7 +33,7 @@ test("BUG-461/the embedded default is the last of the shipped defaults: its hash
   expect(new Set(SHIPPED_ROUTING.map((s) => s.hash)).size).toBe(SHIPPED_ROUTING.length);
 });
 
-test("BUG-461/a routing.yaml that is an older shipped default, unedited, is replaced by the current one, privately, and said once", () => {
+test("routing/upgrade: a routing.yaml that is an older shipped default, unedited, is replaced by the current one, privately, and said once #BUG-461", () => {
   writeFileSync(routingPath(), OLD);
   const warnings: string[] = [];
   const c = loadRouting((m) => warnings.push(m), shipped);
@@ -48,7 +48,7 @@ test("BUG-461/a routing.yaml that is an older shipped default, unedited, is repl
   expect(again).toEqual([]);
 });
 
-test("BUG-461/an edited routing.yaml (even one that began as an older default) is kept as it is", () => {
+test("routing/upgrade: an edited routing.yaml (even one that began as an older default) is kept as it is #BUG-461", () => {
   const edited = OLD.replace("limits:", "# mine\nlimits:");
   writeFileSync(routingPath(), edited);
   const warnings: string[] = [];
@@ -59,7 +59,7 @@ test("BUG-461/an edited routing.yaml (even one that began as an older default) i
   expect(predatesDefault(c)).toBe("your routing.yaml predates this Gluon's default; compare with `gluon routing default`");
 });
 
-test("BUG-461/the current default is left alone, and only a lower version predates it", () => {
+test("routing/upgrade: the current default is left alone, and only a lower version predates it #BUG-461", () => {
   writeFileSync(routingPath(), DEFAULT_ROUTING_YAML);
   const warnings: string[] = [];
   loadRouting((m) => warnings.push(m), shipped);
@@ -71,7 +71,7 @@ test("BUG-461/the current default is left alone, and only a lower version predat
   expect(predatesDefault({ rank: {}, types: {} })).toBeUndefined();
 });
 
-test("QA: an older shipped default whose line endings were changed (git's autocrlf, a Windows editor) and nothing else is still unedited: replaced; one more character is an edit: kept", () => {
+test("routing/upgrade: an older shipped default whose line endings were changed (git's autocrlf, a Windows editor) and nothing else is still unedited: replaced; one more character is an edit: kept", () => {
   writeFileSync(routingPath(), OLD.replace(/\n/g, "\r\n"));
   const warnings: string[] = [];
   loadRouting((m) => warnings.push(m), shipped);
@@ -86,7 +86,7 @@ test("QA: an older shipped default whose line endings were changed (git's autocr
   }
 });
 
-test("QA: a read-only routing.yaml that is an older shipped default is not replaced, and the current default still applies for the run, said once", () => {
+test("routing/upgrade: a read-only routing.yaml that is an older shipped default is not replaced, and the current default still applies for the run, said once", () => {
   if (process.platform === "win32") return; // directory modes aren't enforced the same way
   writeFileSync(routingPath(), OLD);
   chmodSync(dirname(routingPath()), 0o500);

@@ -15,7 +15,7 @@ const config = defaults();
 const routing = defaultRouting();
 const everything = { ...config, agents: offeredAgents(config, { installed: () => true, demo: true, optedIn: optedInBy(routing) }) };
 
-test("the route catalog is the build's catalog: ids, labels, per-model efforts, families, opt-ins; OpenCode delegates in its family", () => {
+test("routing/catalog: the route catalog is the build's catalog: ids, labels, per-model efforts, families, opt-ins; OpenCode delegates in its family", () => {
   const cat = routeCatalog(everything, everything.agents, routing);
   expect(cat.map((h) => h.id)).toEqual(Object.keys(HARNESS_INFO));
   const model = (h: string, m: string) => cat.find((x) => x.id === h)!.models.find((x) => x.id === m)!;
@@ -29,7 +29,7 @@ test("the route catalog is the build's catalog: ids, labels, per-model efforts, 
   expect(JSON.stringify(cat)).not.toContain("openrouter");
 });
 
-test("route sees only the models Gluon offers (reachable), and only the harnesses connected", () => {
+test("routing/catalog: route sees only the models Gluon offers (reachable), and only the harnesses connected", () => {
   const offered = { ...config, agents: config.agents.filter((a) => a.harness === "claude-code").map((a) => ({ ...a, models: a.models.filter((m) => m.id !== "opus") })) };
   const cat = routeCatalog(offered, offered.agents, routing);
   expect(cat.map((h) => h.id)).toEqual(["claude-code"]);
@@ -41,7 +41,7 @@ test("route sees only the models Gluon offers (reachable), and only the harnesse
   expect(route(routing, cat, { types: [{ type: "feature", model_steps: 0, effort_steps: 0 }], pinned: "codex" }, routeEnv(offered))).toEqual({ error: expect.stringContaining("codex isn't available") });
 });
 
-test("an opt-in model stays in the catalog only to explain a pin; routing.yaml's opt-in turns it on", () => {
+test("routing/opt-in: an opt-in model stays in the catalog only to explain a pin; routing.yaml's opt-in turns it on", () => {
   const off = routeCatalog({ ...config, agents: offeredAgents(config, { installed: () => true, demo: true }) }, undefined, routing);
   const contributor = off.find((h) => h.id === "opencode")!.models.find((m) => m.id === "muse-spark-1.3-contributor");
   expect(contributor).toBeDefined();
@@ -53,7 +53,7 @@ test("an opt-in model stays in the catalog only to explain a pin; routing.yaml's
   expect(out).toMatchObject({ recommended: { harness: "opencode", model: "muse-spark-1.3-contributor" } });
 });
 
-test("the default routing.yaml names only models of this build, kimi-code's included", () => {
+test("routing/default-valid: the default routing.yaml names only models of this build, kimi-code's included", () => {
   expect(checkConfig(routing, allRouteCatalog(config))).toEqual([]);
 });
 
@@ -66,29 +66,29 @@ const routed = (input: Parameters<typeof route>[2]) => {
 };
 const call = (type: string, model_steps = 0, effort_steps = 0) => ({ type, model_steps, effort_steps });
 
-test("BUG-462/light on the real catalog: Haiku 5.5 first, then Luna", () => {
+test("routing/rank: light on the real catalog: Haiku 5.5 first, then Luna #BUG-462", () => {
   expect(routed({ types: [call("docs")] })).toBe("build claude-code/haiku@high | codex/gpt-6-luna@high");
 });
 
-test("BUG-462/prefer kimi-code on the real catalog: K2.7 Code (no effort) at light, K3 at standard, Haiku when the effort asked is above Kimi's", () => {
+test("routing/prefer: prefer kimi-code on the real catalog: K2.7 Code (no effort) at light, K3 at standard, Haiku when the effort asked is above Kimi's #BUG-462", () => {
   const kimi = { harness: "kimi-code", because: "Prefer Kimi." };
   expect(routed({ types: [call("docs")], ...kimi })).toMatch(/^build kimi-code\/kimi-k2.7-code( |$)/);
   expect(routed({ types: [call("docs", 0, 1)], ...kimi })).toMatch(/^build claude-code\/haiku@xhigh/);
   expect(routed({ types: [call("feature")], ...kimi })).toMatch(/^build kimi-code\/kimi-k3@high/);
 });
 
-test("BUG-462/a pin to kimi-code reaches K3 at its default effort, and K2.7 Code refuses an effort", () => {
+test("routing/pins: a pin to kimi-code reaches K3 at its default effort, and K2.7 Code refuses an effort #BUG-462", () => {
   expect(routed({ types: [call("debug", 1)], pinned: "kimi-code" })).toMatch(/^build kimi-code\/kimi-k3@high/);
   expect(routed({ types: [call("feature")], pinned: "kimi-code/kimi-k2.7-code@high" })).toBe("kimi-k2.7-code accepts efforts: none");
 });
 
-test("BUG-462/the available-agents block lists the Kimi Code models when connected", () => {
+test("routing/available-agents: the available-agents block lists the Kimi Code models when connected #BUG-462", () => {
   const text = renderAvailableAgents(routing, routeCatalog(everything, everything.agents, routing), routeEnv(everything), allRouteCatalog(config));
   expect(text).toContain("- kimi-code (Kimi Code)\n  models: kimi-k2.7-code (Kimi K2.7 Code)");
   expect(text).toContain("kimi-k3 (Kimi K3)");
 });
 
-test("the available-agents block lists what is connected and says why the rest isn't", () => {
+test("routing/available-agents: the available-agents block lists what is connected and says why the rest isn't", () => {
   const only = { ...config, agents: config.agents.filter((a) => a.harness === "claude-code" || a.harness === "codex") };
   const text = renderAvailableAgents(routing, routeCatalog(only, only.agents, routing), routeEnv(only), allRouteCatalog(config));
   expect(text).toContain("- claude-code (Claude Code)\n  models: haiku (Haiku 5.5), sonnet (Sonnet 5.5), opus (Opus 5.5), fable");
@@ -98,7 +98,7 @@ test("the available-agents block lists what is connected and says why the rest i
   expect(text).not.toContain("opencode (OpenCode)\n  models");
 });
 
-test("the launcher tells an agent to read the instruction file its harness doesn't load", () => {
+test("launch/instruction-file: the launcher tells an agent to read the instruction file its harness doesn't load", () => {
   expect(unloadedInstructionFiles("codex", ["AGENTS.md", "CLAUDE.md"])).toEqual(["CLAUDE.md"]);
   expect(unloadedInstructionFiles("codex", ["AGENTS.md"])).toEqual([]);
   expect(unloadedInstructionFiles("codex", ["CLAUDE.md"])).toEqual(["CLAUDE.md"]);
@@ -117,7 +117,7 @@ test("the launcher tells an agent to read the instruction file its harness doesn
   expect(readInstructionLine("CLAUDE.md")).toBe("Read `CLAUDE.md` before you start: it is this project's instructions for coding agents, and your harness doesn't load it.");
 });
 
-test("launcher lines: the instruction-file line, and OpenCode's subagent models only when the family has several ranked models", () => {
+test("routing/subagent-note: launcher lines: the instruction-file line, and OpenCode's subagent models only when the family has several ranked models", () => {
   const catalog = routeCatalog(everything, everything.agents, routing);
   const lines = (harness: string, model: string, files: string[], r = routing) => launcherLines({ routing: r, catalog, harness: harness as never, model, instructionFiles: files });
   expect(lines("codex", "gpt-6.1-sol", ["AGENTS.md", "CLAUDE.md"])).toEqual([readInstructionLine("CLAUDE.md")]);
@@ -134,7 +134,7 @@ test("launcher lines: the instruction-file line, and OpenCode's subagent models 
   expect(withLauncherLines("Do it.", [])).toBe("Do it.");
 });
 
-test("BUG-462/the brain's prompt lists the kimi-code models when connected, and says it isn't connected otherwise", () => {
+test("routing/available-agents: the brain's prompt lists the kimi-code models when connected, and says it isn't connected otherwise #BUG-462", () => {
   const dir = mkdtempSync(join(tmpdir(), "gluon-kimi-prompt-"));
   const on = systemPrompt(everything, repoContext(dir), routing);
   expect(on).toContain("- kimi-code (Kimi Code)\n  models: kimi-k2.7-code (Kimi K2.7 Code)");
@@ -154,7 +154,7 @@ const routeOn = (cfg: typeof config, input: Parameters<typeof route>[2], r = rou
   return "error" in out ? out.error : `${out.mode} ${fmt(out.recommended)} | ${out.alternatives.map(fmt).join(", ")} | ${out.why.join("; ")}`;
 };
 
-test("BUG-433/the real catalog gives Kimi K3 efforts only on the plan: route never picks an effort Kimi can't receive", () => {
+test("routing/catalog: the real catalog gives Kimi K3 efforts only on the plan: route never picks an effort Kimi can't receive #BUG-433", () => {
   const k3 = (cfg: typeof config) => routeCatalog(cfg, cfg.agents, routing).find((h) => h.id === "kimi-code")!.models.find((m) => m.id === "kimi-k3")!;
   expect(k3(withKimi("openrouter"))).toMatchObject({ efforts: [] });
   expect(k3(withKimi("openrouter"))).not.toHaveProperty("defaultEffort");
@@ -168,7 +168,7 @@ test("BUG-433/the real catalog gives Kimi K3 efforts only on the plan: route nev
   expect(routeOn(withKimi("plan"), { types: [call("feature")], pinned: "kimi-code/kimi-k3@max" })).toMatch(/^build kimi-code\/kimi-k3@max/);
 });
 
-test("BUG-432/the real catalog marks Kimi Code as unable to explore; a session in explore never reaches it: not first, not an alternative, not a preference, not a pin; `use:` falls back", () => {
+test("routing/mode-capable: the real catalog marks Kimi Code as unable to explore; a session in explore never reaches it: not first, not an alternative, not a preference, not a pin; `use:` falls back #BUG-432", () => {
   for (const conn of ["plan", "openrouter"] as const) {
     const cfg = withKimi(conn);
     const cat = routeCatalog(cfg, cfg.agents, routing);
@@ -202,7 +202,7 @@ test("BUG-432/the real catalog marks Kimi Code as unable to explore; a session i
 
 // --- QA pass (brain, offline): the shipped routing against the shipped catalog
 
-test("QA: whatever the default routing.yaml routes to, on the real catalog, is a launch a proposal accepts (every type × steps × mode; nothing connected in the demo, every plan, Bedrock)", async () => {
+test("routing/default-valid: whatever the default routing.yaml routes to, on the real catalog, is a launch a proposal accepts (every type × steps × mode; nothing connected in the demo, every plan, Bedrock)", async () => {
   const { parseProposal } = await import("../src/agent/choices.ts");
   const subscriptions = Object.fromEntries(Object.entries(HARNESS_INFO).filter(([, i]) => i.subscription).map(([h]) => [h, { auth: "subscription" as const }]));
   const setups: Record<string, { cfg: typeof config; demo: boolean }> = {

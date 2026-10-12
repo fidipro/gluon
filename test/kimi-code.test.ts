@@ -78,7 +78,7 @@ describe("the harness", () => {
     expect(argv?.slice(1)).toEqual(["-c", m!.command]);
   });
 
-  test("two models: K2.7 Code (no effort) and K3 (low, high, max; high by default); each with its id per connection", () => {
+  test("routing/catalog: two models: K2.7 Code (no effort) and K3 (low, high, max; high by default); each with its id per connection", () => {
     const [k27, k3] = DEFAULT_MODELS["kimi-code"];
     expect(k27).toMatchObject({ id: "kimi-k2.7-code", efforts: [], ids: { moonshot: "kimi-k2.7-code", openrouter: "moonshotai/kimi-k2.7-code" } });
     expect(k27!.defaultEffort).toBeUndefined();
@@ -91,7 +91,7 @@ describe("the harness", () => {
     expect(validateChoice(on("moonshot"), choice("kimi-k2.7-code"))).toBeNull();
   });
 
-  test("efforts belong to the model: K3 takes low, high, max on the plan; K2.7 Code takes none", () => {
+  test("routing/catalog: efforts belong to the model: K3 takes low, high, max on the plan; K2.7 Code takes none", () => {
     const config = on("plan");
     expect(validateChoice(config, choice("kimi-k3", { effort: "max" }))).toBeNull();
     expect(validateChoice(config, choice("kimi-k3", { effort: "medium" }))).toContain('does not take effort "medium"');
@@ -431,7 +431,7 @@ describe("the plan's sign-in (`kimi provider list`)", () => {
     }
   });
 
-  test("a connected plan is offered both ways round: the catalog before a probe, and K2.7 Code only on OpenRouter (K3 without efforts there: BUG-433)", () => {
+  test("routing/catalog: a connected plan is offered both ways round: the catalog before a probe, and K2.7 Code only on OpenRouter (K3 without efforts there: BUG-433)", () => {
     const plan = offeredAgents(on("plan"), { installed: () => true }).find((a) => a.harness === "kimi-code")!;
     expect(plan.models.map((m) => m.id)).toEqual(["kimi-k3"]);
     const router = offeredAgents(on("openrouter"), { installed: () => true }).find((a) => a.harness === "kimi-code")!;

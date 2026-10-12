@@ -80,7 +80,7 @@ describe("the plan as a connection", () => {
     expect(Object.keys(cmd.env)).toEqual(["OPENCODE_CONFIG_CONTENT"]);
   });
 
-  test("BUG-424/plan-first: a model both the plan and OpenRouter serve goes through the plan, whatever order the config lists them in", () => {
+  test("routing/catalog: a model both the plan and OpenRouter serve goes through the plan, whatever order the config lists them in #BUG-424/plan-first", () => {
     const connected = (providers: string[]) => ({ ...defaults(), connections: { opencode: { auth: "api", providers } } }) as ReturnType<typeof defaults>;
     for (const providers of [["openrouter", "opencode-go"], ["opencode-go", "openrouter"]]) {
       expect(resolveModel(connected(providers), "opencode", "deepseek-flash")).toEqual({ conn: "opencode-go", id: "deepseek-v4.1-flash" });
@@ -144,7 +144,7 @@ describe("OpenCode's effort: the model's `settings` in its config", () => {
     expect(content.default_agent).toBe("gluon-explore");
   });
 
-  test("the maintainers' catalog adds Sonnet 4.6 on Claude Code over Bedrock only, behind its seam", () => {
+  test("routing/catalog: the maintainers' catalog adds Sonnet 4.6 on Claude Code over Bedrock only, behind its seam", () => {
     expect(catalog()["claude-code"].map((m) => m.id)).toEqual(["haiku", "sonnet", "opus", "fable"]);
   });
 });

@@ -130,7 +130,7 @@ describe("agents on PATH", () => {
     expect(app.history().replace(/\n/g, "")).toContain("none of claude, codex, agy, grok, opencode, kimi is on PATH");
   });
 
-  test("BUG-07/A13: with only Claude Code, the demo's cheaper revision stays on Claude Code @full", async () => {
+  test("routing/round-up: with only Claude Code, the demo's cheaper revision stays on Claude Code @full #BUG-07/A13", async () => {
     const app = await start({ cwd: repo.tiny(), agents: ["claude"] });
     await toProposal(app);
     await app.type("cheaper please");
