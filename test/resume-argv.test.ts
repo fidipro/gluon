@@ -20,7 +20,7 @@ const modelOf = (h: Harness) => (h === "codex" ? "gpt-6.1-sol" : h === "claude-c
 const build = (h: Harness, session?: { id: string; resume: boolean }) => buildCommand(config, { harness: h, model: modelOf(h), spec: SPEC, reason: "" }, undefined, session);
 
 describe("BUG-313/resume: argv per harness", () => {
-  test("Claude Code: --session-id <id> before the --; a resume is --resume=<id> with no spec", () => {
+  test("resume/argv: Claude Code: --session-id <id> before the --; a resume is --resume=<id> with no spec #BUG-313/resume", () => {
     expect(build("claude-code").argv).toEqual(["claude", "--model", "sonnet", "--", SPEC]);
     expect(build("claude-code", { id: ID, resume: false }).argv).toEqual(["claude", "--model", "sonnet", "--session-id", ID, "--", SPEC]);
     const r = build("claude-code", { id: ID, resume: true });
@@ -29,12 +29,12 @@ describe("BUG-313/resume: argv per harness", () => {
     expect(r.resumed).toBe(true);
   });
 
-  test("Grok Build: the same flags", () => {
+  test("resume/argv: Grok Build: the same flags #BUG-313/resume", () => {
     expect(build("grok-build", { id: ID, resume: false }).argv).toEqual(["grok", "-m", "grok-4.7", "--session-id", ID, "--", SPEC]);
     expect(build("grok-build", { id: ID, resume: true }).argv).toEqual(["grok", "-m", "grok-4.7", `--resume=${ID}`]);
   });
 
-  test("Codex: a new session is as before (its id comes by hook); a resume is `codex resume -m … -- <id>`", () => {
+  test("resume/argv: Codex: a new session is as before (its id comes by hook); a resume is `codex resume -m … -- <id>` #BUG-313/resume", () => {
     const fresh = ["codex", "-m", "gpt-6.1-sol", "--", SPEC];
     expect(build("codex").argv).toEqual(fresh);
     expect(build("codex", { id: ID, resume: false }).argv).toEqual(fresh);
@@ -43,13 +43,13 @@ describe("BUG-313/resume: argv per harness", () => {
     expect(r.spec).toBeUndefined();
   });
 
-  test("OpenCode: a resume is --session=<id> instead of --prompt=<spec>", () => {
+  test("resume/argv: OpenCode: a resume is --session=<id> instead of --prompt=<spec> #BUG-313/resume", () => {
     expect(build("opencode").argv).toEqual(["opencode", "--standalone", `--prompt=${SPEC}`]);
     expect(build("opencode", { id: "ses_3f2a9c", resume: false }).argv).toEqual(["opencode", "--standalone", `--prompt=${SPEC}`]);
     expect(build("opencode", { id: "ses_3f2a9c", resume: true }).argv).toEqual(["opencode", "--standalone", "--session=ses_3f2a9c"]);
   });
 
-  test("Antigravity: unchanged, and a resume is refused (its argv would start a new session)", () => {
+  test("resume/argv: Antigravity: unchanged, and a resume is refused (its argv would start a new session) #BUG-313/resume", () => {
     const argv = build("antigravity").argv;
     expect(argv.at(-1)).toBe(`--prompt-interactive=${SPEC}`);
     expect(build("antigravity", { id: ID, resume: false }).argv).toEqual(argv);
@@ -57,11 +57,11 @@ describe("BUG-313/resume: argv per harness", () => {
     expect(() => build("antigravity", { id: ID, resume: true })).toThrow("can't resume a session");
   });
 
-  test("every harness says how it resumes, and only those with an argv for it", () => {
+  test("resume/argv: every harness says how it resumes, and only those with an argv for it #BUG-313/resume", () => {
     expect(Object.fromEntries(HARNESSES.map((h) => [h, HARNESS_INFO[h].resume]))).toEqual({ "claude-code": "minted", codex: "captured", antigravity: undefined, "grok-build": "minted", opencode: "captured" });
   });
 
-  test("an id that could be read as an option never reaches an argv", () => {
+  test("resume/argv: an id that could be read as an option never reaches an argv #BUG-313/resume", () => {
     for (const h of HARNESSES) for (const id of ["-x", "--resume=evil", "a b", "", "x".repeat(65), "a\nb"]) for (const resume of [true, false]) expect(() => build(h, { id, resume })).toThrow("not a valid session id");
   });
 });
@@ -69,7 +69,7 @@ describe("BUG-313/resume: argv per harness", () => {
 describe("BUG-287/resume: a resume through telemetry, tokens and Windows shims", () => {
   const session = { token: "ab".repeat(24), endpoint: "http://127.0.0.1:4318" };
 
-  test("withTelemetry still puts Codex's options before the -- of a resume, and Claude's variables in", () => {
+  test("resume/argv: withTelemetry still puts Codex's options before the -- of a resume, and Claude's variables in #BUG-287/resume", () => {
     const codex = build("codex", { id: "019a1b2c-d3e4", resume: true });
     const t = telemetryLaunch("codex", session, {})!;
     const r = withTelemetry(codex, t);
@@ -83,14 +83,14 @@ describe("BUG-287/resume: a resume through telemetry, tokens and Windows shims",
     expect(withTelemetry(oc, { env: {}, argv: ["-c", "y"] }).argv).toEqual(oc.argv);
   });
 
-  test("tokens are substituted in every argument of a resume (there is no spec to leave alone)", () => {
+  test("resume/argv: tokens are substituted in every argument of a resume (there is no spec to leave alone) #BUG-287/resume", () => {
     const cmd: Command = { argv: ["claude", "--settings", ADAPTER_DIR, `--resume=${ID}`], env: {}, resumed: true, harness: "claude-code" };
     expect(substituteTokens(cmd, "/a", "/s").argv).toEqual(["claude", "--settings", "/a", `--resume=${ID}`]);
     const codex = build("codex", { id: "019a1b2c-d3e4", resume: true });
     expect(substituteTokens(codex, "/a", "/s").argv).toEqual(codex.argv);
   });
 
-  test("a Windows .cmd shim: a resume has no spec, so launchPlan leaves every argument as it is and writes no file", () => {
+  test("resume/argv: a Windows .cmd shim: a resume has no spec, so launchPlan leaves every argument as it is and writes no file #BUG-287/resume", () => {
     const tmp = mkdtempSync(join(tmpdir(), "gluon-resume-plan-"));
     try {
       for (const h of ["claude-code", "codex", "grok-build", "opencode"] as const) {

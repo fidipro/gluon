@@ -223,10 +223,11 @@ the files named):
 | Antigravity | its status line, context only (cost is `—`) | `src/adapters/agy-settings.ts` |
 
 Per-agent adapters are in `src/adapters/`; `gluon doctor` shows, per agent, the effective settings
-and what its adapter does with them. Gluon keeps two files in another tool's directory, both inert
-unless `GLUON_EVENTS` is set and both removed by `gluon uninstall`: Grok Build's hooks file and
-Antigravity's plugin (`src/adapters/permanent.ts`). The one other thing it writes there is
-Antigravity's `statusLine` key, only with `cost.antigravity_statusline` on.
+and what its adapter does with them. Gluon keeps one file in another tool's directory, inert
+unless `GLUON_EVENTS` is set and removed by `gluon uninstall`: Grok Build's hooks file
+(`src/adapters/permanent.ts`; the Antigravity plugin an earlier version wrote is removed at the next
+Antigravity launch). The one other thing it writes there is Antigravity's `statusLine` key, only with
+`cost.antigravity_statusline` on.
 
 ### Ending
 

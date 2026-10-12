@@ -11,9 +11,9 @@ Gluon itself. Brain rules: `src/agent/AGENTS.md`; UI rules: `src/ui/AGENTS.md`.
   A plan brain runs only through `claude` (Agent SDK) or `codex app-server`.
 - **Never read another tool's credentials** (`~/.claude`, `~/.codex/auth.json`, `~/.gemini/…`,
   `~/.grok/…`, OpenCode's auth file, `~/.kimi-code`, the keychain; never set `KIMI_CODE_HOME`) **or edit its files** — tell the user. Exception:
-  one file or folder of Gluon's own in Grok Build's hooks dir and Antigravity's plugins dir
-  (`src/adapters/permanent.ts` only), inert unless `GLUON_EVENTS` is set; uninstall removes it,
-  and the legacy `fidicode` ones (removal only); with `cost.antigravity_statusline` on, also agy's
+  one file of Gluon's own in Grok Build's hooks dir (`src/adapters/permanent.ts` only), inert unless
+  `GLUON_EVENTS` is set; uninstall removes it, and v1's Antigravity plugin and the legacy `fidicode`
+  ones (removal only); with `cost.antigravity_statusline` on, also agy's
   `statusLine` key (`agy-settings.ts` only). A config is read for named keys only, never credentials
   (`src/cost/harness-config.ts` only). A resume id is Gluon's own or its hook's (`RESUME_ID`).
 - **No base URL on a subscription or plan brain route**; only OpenRouter (its documented endpoint; Kimi Code's

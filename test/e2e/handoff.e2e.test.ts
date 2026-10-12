@@ -51,7 +51,7 @@ describe("from the UI", () => {
     await app.waitFor("GOT <hello>");
   });
 
-  test("BUG-455/instruction files: the spec ends with a line to read the instruction file the chosen harness doesn't load, and only then @full", async () => {
+  test("launch/instruction-file: the spec ends with a line to read the instruction file the chosen harness doesn't load, and only then @full #BUG-455/instruction-files", async () => {
     // A repository with AGENTS.md and CLAUDE.md: Codex loads AGENTS.md only, Claude Code CLAUDE.md only (with both).
     for (const [fake, file] of [["codex", "CLAUDE.md"], ["claude", "AGENTS.md"]] as const) {
       const app = await start({ cwd: repo.withInstructions(), rows: 60, agents: [fake], env: { FAKE_HANG: "1" } });
@@ -67,7 +67,7 @@ describe("from the UI", () => {
     expect(argv(plain.agentLog()).at(-1)).not.toContain("Read `");
   });
 
-  test("F2: a revised OpenCode proposal launches with --prompt= (no AWS profile, no key when none is connected) @full", async () => {
+  test("launch/environment: a revised OpenCode proposal launches with --prompt= (no AWS profile, no key when none is connected) @full #F2", async () => {
     const app = await start({ cwd: repo.tiny(), rows: 60 });
     await toProposal(app);
     await app.type("cheaper please");
@@ -85,7 +85,7 @@ describe("from the UI", () => {
     expect(log).toContain("ANTHROPIC_API_KEY=unset");
   });
 
-  test("BUG-192/F3: when the agent exits its session closes: home without its row, the chat says how it ended; Ctrl+C twice quits with 130 @full", async () => {
+  test("session-end/closes: when the agent exits its session closes: home without its row, the chat says how it ended; Ctrl+C twice quits with 130 @full #BUG-192/F3", async () => {
     const app = await launched("f3", { FAKE_EXIT: "3" }, "");
     expect(app.lines().at(-1)).toMatch(/^ ctrl\+\\ sessions/);
     const log = app.agentLog();
@@ -169,7 +169,7 @@ async function waitForFile(file: string, text: string, ms = 15_000 * SLOW) {
 }
 
 describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
-  test.skipIf(MAC_STEALS || WIN)("F10: the agent gets the terminal itself; `back` from inside it (the return command) ends it at once and shows home with a note @full", async () => {
+  test.skipIf(MAC_STEALS || WIN)("no-pty/hands-terminal: the agent gets the terminal itself; `back` from inside it (the return command) ends it at once and shows home with a note @full #F10", async () => {
     const log = killLog("f10");
     const app = await direct("f10", { FAKE_HOOK: signal("back"), FAKE_KILL_LOG: log });
     // The normal screen, not Gluon's frame.
@@ -188,7 +188,7 @@ describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
     expect(app.screen()).not.toMatch(/fix-add-bug +claude code/);
   });
 
-  test.skipIf(MAC_STEALS || WIN)("F13: on_exit: quit exits with the agent's code, but `back` still comes back @full", async () => {
+  test.skipIf(MAC_STEALS || WIN)("session-end/on-exit-quit: on_exit: quit exits with the agent's code, but `back` still comes back @full #F13", async () => {
     const app = await direct("f13", { FAKE_HOOK: signal("back"), FAKE_EXIT: "5" }, "handoff:\n  on_exit: quit\n  on_clear: stay\n");
     // Quitting the agent ends Gluon too.
     expect(app.history()).not.toContain("to come back to Gluon");
@@ -203,7 +203,7 @@ describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
   });
 
   // Windows has no SIGTERM to ignore: the agent's tree is ended at once (killTree).
-  test.skipIf(WIN || MAC_STEALS)("F14: an agent that ignores SIGTERM is killed after 3 s @full", async () => {
+  test.skipIf(WIN || MAC_STEALS)("session-end/agent-ends: an agent that ignores SIGTERM is killed after 3 s @full #F14", async () => {
     const log = killLog("f14");
     const app = await direct("f14", { FAKE_HOOK: signal("back"), FAKE_HANG: "ignore-term", FAKE_KILL_LOG: log });
     const ms = await clear(app);
@@ -213,7 +213,7 @@ describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
   });
 
   // Not on Windows: ConPTY re-renders the output, so the exact reset bytes don't appear.
-  test.skipIf(WIN || MAC_STEALS)("F15: the terminal is reset after the agent, and keys it never read don't reach the composer @full", async () => {
+  test.skipIf(WIN || MAC_STEALS)("no-pty/hands-terminal: the terminal is reset after the agent, and keys it never read don't reach the composer @full #F15", async () => {
     // The hook takes a moment: keys typed meanwhile wait, unread, when the agent ends.
     const app = await direct("f15", { FAKE_HOOK: then(pause(SLOW), signal("back")) });
     app.mark();
@@ -227,7 +227,7 @@ describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
     expect(app.since()).toContain("\x1b[?25h\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[<u\x1b[?1004l");
   });
 
-  test.skipIf(MAC_STEALS || WIN)("F17: the return command `\"$GLUON_SELF\" signal back` brings the user back (v1's `signal clear` no longer does anything) @full", async () => {
+  test.skipIf(MAC_STEALS || WIN)("no-pty/hands-terminal: the return command `\"$GLUON_SELF\" signal back` brings the user back (v1's `signal clear` no longer does anything) @full #F17", async () => {
     // The return command as a harness's shell runs it: here GLUON_SELF is the launch's wrapper (gluon.cmd on Windows, BUG-144).
     const self = (words: string) => (WIN ? `call "%GLUON_SELF%" ${words}` : `"$GLUON_SELF" ${words}`);
     const app = await direct("f17", { FAKE_HOOK: then(self("signal clear"), self("signal back")) });
@@ -235,7 +235,7 @@ describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
     expect(app.screen()).not.toContain("(/clear)");
   });
 
-  test.skipIf(MAC_STEALS || WIN)("F19: status events (the harnesses' status hooks, the real `gluon hook`) never end the agent @full", async () => {
+  test.skipIf(MAC_STEALS || WIN)("no-pty/hands-terminal: status events (the harnesses' status hooks, the real `gluon hook`) never end the agent @full #F19", async () => {
     const self = (words: string) => (WIN ? `call "%GLUON_SELF%" ${words}` : `"$GLUON_SELF" ${words}`);
     // Two status events, then time for several polls before the agent asks again.
     const app = await direct("f19", { FAKE_HOOK: then(then(self("hook claude-code stop"), signal("status", "awaiting")), pause(SLOW)) });
@@ -252,7 +252,7 @@ describe("one session at a time, without a pseudo-terminal (issue #13)", () => {
 });
 
 describe("returning home (issue #13)", () => {
-  test("F16: the config file gets its handoff section at the first launch from the UI, not before @full", async () => {
+  test("session-settings/added-at-first-launch: the config file gets its handoff section at the first launch from the UI, not before @full #F16", async () => {
     const cfg = freshConfig("f16", "# mine\n");
     const dry = await cli(["--launch", "claude-code", "--model", "sonnet", "--dry-run", "x"], { env: { GLUON_CONFIG: cfg } });
     expect(dry.code).toBe(0);
@@ -265,7 +265,7 @@ describe("returning home (issue #13)", () => {
     await closed(app, "exited (code 7)");
   });
 
-  test("F18: --launch is unchanged: no channel back, no line about returning, the agent's exit code", async () => {
+  test("direct-launch/terminal: --launch is unchanged: no channel back, no line about returning, the agent's exit code #F18", async () => {
     const app = new App({ cwd: repo.tiny(), args: ["--launch", "claude-code", "--model", "sonnet", "fix it"], env: { FAKE_EXIT: "4" }, agents: ["claude"], noDemo: true, rows: 40 });
     await app.waitFor("type a line>");
     const h = app.history();
@@ -322,7 +322,7 @@ async function gone(pid: number): Promise<boolean> {
 const answerLog = (name: string) => join(tmpdir(), `gluon-answer-${name}-${process.pid}.log`);
 
 describe("the agent in Gluon's frame (issue #13 v2)", () => {
-  test("F20: Ctrl+\\ twice shows home at once, with no question (the first arms the prefix and names it in the bar); the keys never reach the agent, which keeps running @full", async () => {
+  test("tabs/home-key: Ctrl+\\ twice shows home at once, with no question (the first arms the prefix and names it in the bar); the keys never reach the agent, which keeps running @full #F20", async () => {
     const log = killLog("f20");
     const app = await tui({ FAKE_KILL_LOG: log });
     app.write("\x1c");
@@ -340,7 +340,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     await app.waitFor("GOT <x>");
   });
 
-  test("F21: Ctrl+\\ in the kitty keyboard protocol (twice) goes home too; kitty keys reach the agent @full", async () => {
+  test("frame/key-protocols: Ctrl+\\ in the kitty keyboard protocol (twice) goes home too; kitty keys reach the agent @full #F21", async () => {
     const app = await tui({ FAKE_KITTY: "1" });
     await app.type("hi");
     // Enter as the kitty protocol encodes it.
@@ -352,7 +352,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     await app.waitFor(HOME_VIEW);
   });
 
-  test("F22: typing goes through: editing, Tab completion, the slash menu; the agent's /exit ends its session @full", async () => {
+  test("frame/keys-to-agent: typing goes through: editing, Tab completion, the slash menu; the agent's /exit ends its session @full #F22", async () => {
     const app = await tui();
     await app.type("helx");
     await app.press(KEY.backspace);
@@ -371,7 +371,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     await closed(app, "fix-add-bug exited (code 7)");
   });
 
-  test("F22b: Ctrl+C is a key for the agent: Gluon stays out of it @full", async () => {
+  test("frame/keys-to-agent: Ctrl+C is a key for the agent: Gluon stays out of it @full #F22b", async () => {
     const app = await tui();
     await app.press(KEY.ctrlC);
     await app.waitFor("CTRL-C");
@@ -380,7 +380,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     expect(await app.exitCode(300)).toBeNull();
   });
 
-  test("F23: colours and resizes pass through @full", async () => {
+  test("frame/agent-screen: colours and resizes pass through @full #F23", async () => {
     const app = await tui();
     // 100 × 60 minus the chrome.
     expect(app.screen()).toContain("SIZE 98x54");
@@ -391,7 +391,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     await app.waitFor("SIZE 88x44");
   });
 
-  test("F24: auto-compaction (a waiting PreCompact hook) asks; Enter answers yes and ends the session @full", async () => {
+  test("clear-compact/auto-compact: auto-compaction (a waiting PreCompact hook) asks; Enter answers yes and ends the session @full #F24", async () => {
     const log = answerLog("f24");
     const app = await tui({ FAKE_HOOK: signal("compact", "c24", "--wait"), FAKE_ANSWER_LOG: log });
     await app.type("!compact");
@@ -403,7 +403,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     expect(app.screen()).not.toContain("exited (code");
   });
 
-  test("BUG-151: yes to an auto-compaction ends the agent before its hook answers (no \"blocked\" message) @full", async () => {
+  test("clear-compact/auto-compact: yes to an auto-compaction ends the agent before its hook answers (no \"blocked\" message) @full", async () => {
     const log = answerLog("bug151");
     const pidFile = join(tmpdir(), `gluon-pid-bug151-${process.pid}`);
     // POSIX: the hook outlives the agent's hangup, as a hook in its own process group would.
@@ -422,7 +422,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     if (!WIN) expect(await fileText(log)).toBe("none\n");
   });
 
-  test("F25: Esc answers no: the frame is as it was, the agent compacts and goes on @full", async () => {
+  test("clear-compact/auto-compact: Esc answers no: the frame is as it was, the agent compacts and goes on @full #F25", async () => {
     const log = answerLog("f25");
     // The hook lingers after the answer: the agent draws nothing meanwhile.
     const app = await tui({ FAKE_HOOK: then(signal("compact", "c25", "--wait"), pause(2 * SLOW)), FAKE_ANSWER_LOG: log });
@@ -443,7 +443,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     await app.waitFor("GOT <x>");
   });
 
-  test("F26: an unanswered compaction question lets the agent compact @full", async () => {
+  test("clear-compact/auto-compact: an unanswered compaction question lets the agent compact @full #F26", async () => {
     const log = answerLog("f26");
     const app = await tui({ FAKE_HOOK: signal("compact", "c26", "--wait"), FAKE_ANSWER_LOG: log, GLUON_TEST_COMPACT_TIMEOUT_MS: "500" });
     await app.type("!compact");
@@ -453,7 +453,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     expect(await fileText(log)).toBe("no\n");
   });
 
-  test("F27: a failure in Gluon ends every agent and gives the terminal back @full", async () => {
+  test("session-end/signals: a failure in Gluon ends every agent and gives the terminal back @full #F27", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-f27-${process.pid}`);
     const app = await tui({ GLUON_TEST_PTY_FAIL: "1", FAKE_PID_FILE: pidFile });
     const pid = Number(readFileSync(pidFile, "utf8"));
@@ -470,7 +470,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
     ["SIGTERM", 143],
     ["SIGHUP", 129],
   ] as const) {
-    test.skipIf(WIN)(`BUG-149: ${sig} ends the agents and restores the terminal`, async () => {
+    test.skipIf(WIN)(`session-end/signals: ${sig} ends the agents and restores the terminal #BUG-149`, async () => {
       // ECHO is 0x8 everywhere; ICANON 0x2 on Linux, 0x100 on macOS.
       const ICANON = process.platform === "darwin" ? 0x100 : 0x2;
       const pidFile = join(tmpdir(), `gluon-pid-bug149-${sig}-${process.pid}`);
@@ -502,7 +502,7 @@ describe("the agent in Gluon's frame (issue #13 v2)", () => {
 });
 
 describe("the question at the agent's /clear and /compact (issue #13 v2)", () => {
-  test("BUG-192/F30: a typed /clear asks; Enter: the agent's own /clear runs first, then the session ends and closes — the sessions home, its row gone @full", async () => {
+  test("clear-compact/answer: a typed /clear asks; Enter: the agent's own /clear runs first, then the session ends and closes — the sessions home, its row gone @full #BUG-192/F30", async () => {
     const log = killLog("f30");
     const app = await tui({ FAKE_KILL_LOG: log });
     await app.type("/clear");
@@ -520,7 +520,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("Done");
   });
 
-  test("BUG-145/F30: yes waits for the agent's output after the forwarded Enter @full", async () => {
+  test("clear-compact/answer: yes waits for the agent's output after the forwarded Enter @full #BUG-145/F30", async () => {
     // The agent answers /clear only after a moment: the output from before the question (the
     // typed line's echo) must not count as the agent having settled.
     const log = killLog("bug145");
@@ -536,7 +536,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     await waitForFile(log, WIN ? "CLEARED\n" : "CLEARED\nKILLED\n");
   });
 
-  test("BUG-146/F23: a resize while the bar is up redraws it @full", async () => {
+  test("clear-compact/bar: a resize while the bar is up redraws it @full #BUG-146/F23", async () => {
     const app = await tui();
     await app.type("/clear");
     await app.press(KEY.enter);
@@ -551,7 +551,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("CLEARED");
   });
 
-  test("F32: Esc that closes the slash menu keeps the typed / line @full", async () => {
+  test("clear-compact/asks: Esc that closes the slash menu keeps the typed / line @full #F32", async () => {
     const app = await tui();
     const menu = () => app.lines().some((l) => /^│ {2}❯ \/clear +│$/.test(l));
     await app.type("/clear");
@@ -565,7 +565,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("CLEARED");
   });
 
-  test("F30: /clear and Enter in one chunk still asks @full", async () => {
+  test("clear-compact/asks: /clear and Enter in one chunk still asks @full #F30", async () => {
     const app = await tui();
     app.write("/clear\r");
     await app.waitFor(END_BAR);
@@ -580,7 +580,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("enter yes");
   });
 
-  test("F31: Esc sends nothing — /clear stays typed and the session goes on; Enter on it asks again (/new too) @full", async () => {
+  test("clear-compact/answer: Esc sends nothing — /clear stays typed and the session goes on; Enter on it asks again (/new too) @full #F31", async () => {
     const app = await tui();
     await app.type("/clear");
     await app.press(KEY.enter);
@@ -602,7 +602,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(info(app)).not.toMatch(/ended|exited/);
   });
 
-  test("F32: /cl + Tab, and /clear picked from the slash menu, ask too; /compact picked from it asks about compacting @full", async () => {
+  test("clear-compact/asks: /cl + Tab, and /clear picked from the slash menu, ask too; /compact picked from it asks about compacting @full #F32", async () => {
     const app = await tui();
     await app.type("/cl");
     await app.press("\t");
@@ -621,7 +621,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toMatch(/CLEARED|COMPACTED/);
   });
 
-  test("F33: a typed /compact asks each time; Esc sends nothing (no compaction, no hook asks), Enter ends without compacting @full", async () => {
+  test("clear-compact/answer: a typed /compact asks each time; Esc sends nothing (no compaction, no hook asks), Enter ends without compacting @full #F33", async () => {
     const log = answerLog("f33");
     // As a PreCompact hook would, were the agent to compact.
     const app = await tui({ FAKE_HOOK: signal("compact", "c33", "--wait", "1500"), FAKE_ANSWER_LOG: log });
@@ -643,7 +643,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     if (!WIN) expect(app.since()).not.toContain("COMPACTED");
   });
 
-  test("BUG-191: in a Codex-shaped session, a typed /clear, /cl + Tab, the menu's /clear and /new ask; yes ends the agent @full", async () => {
+  test("clear-compact/asks: in a Codex-shaped session, a typed /clear, /cl + Tab, the menu's /clear and /new ask; yes ends the agent @full #BUG-191", async () => {
     // Only `codex` installed: the demo proposes it; the fake draws Codex's composer and menu.
     const app = await start({ cwd: repo.tiny(), rows: 30, cols: 100, agents: ["codex"], env: { FAKE_TUI: "1" } });
     await toLaunch(app, "TUI ready");
@@ -677,7 +677,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     await app.waitFor((s) => HOME_VIEW.test(s) && !/fix-add-bug +codex/.test(s));
   });
 
-  test("BUG-191/busy: a yes to /clear shows the sessions home at once while a busy agent still ends @full", async () => {
+  test("clear-compact/answer: a yes to /clear shows the sessions home at once while a busy agent still ends @full #BUG-191/busy", async () => {
     // Codex mid-turn refuses /clear and keeps printing, so it is ended only after SETTLE_MAX_MS
     // (10 s); the user is home long before that.
     const app = await start({ cwd: repo.tiny(), rows: 30, cols: 100, agents: ["codex"], env: { FAKE_TUI: "1" } });
@@ -694,7 +694,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(performance.now() - yes).toBeLessThan(5000 * SLOW);
   });
 
-  test("F34: a pasted /clear never asks; on_clear: stay never asks @full", async () => {
+  test("clear-compact/asks: a pasted /clear never asks; on_clear: stay never asks @full #F34", async () => {
     const app = await tui();
     await app.paste("/clear");
     await app.press(KEY.enter);
@@ -716,7 +716,7 @@ describe("--launch", () => {
     // An agent that ignores SIGTERM is killed after KILL_GRACE_MS: more than the fast tier's 3 s.
     ["SIGTERM", 143, "ignore-term", " (an agent that ignores it is killed after the grace; still 143, the signal Gluon got) @full"],
   ] as const) {
-    (WIN ? test.skip : test)(`BUG-572/launch-signal: ${signal} to a --launch Gluon ends the agent too, and Gluon exits ${code}${note}`, async () => {
+    (WIN ? test.skip : test)(`direct-launch/terminal: ${signal} to a --launch Gluon ends the agent too, and Gluon exits ${code}${note} #BUG-572/launch-signal`, async () => {
       const proc = tracked(Bun.spawn([...GLUON, "--launch", "claude-code", "--model", "sonnet", "fix it"], {
         cwd: repo.tiny(),
         env: baseEnv(["claude"], { FAKE_HANG: hang }),
@@ -743,7 +743,7 @@ describe("--launch", () => {
     });
   }
 
-  test("BUG-134: OpenCode 1.x isn't started (its launch changed in 2.x): the spec is printed with the command that installs 2.x", async () => {
+  test("launch/version-gate: OpenCode 1.x isn't started (its launch changed in 2.x): the spec is printed with the command that installs 2.x", async () => {
     const r = await cli(["--launch", "opencode", "--model", "deepseek-flash", "fix the add bug"], { env: { FAKE_VERSION: "1.18.34" }, agents: ["opencode"] });
     expect(r.code).toBe(127);
     expect(r.stderr).toContain("couldn't launch opencode: OpenCode 1.18.34 is too old for Gluon (it needs 2.x):");
@@ -751,7 +751,7 @@ describe("--launch", () => {
     expect(r.stdout + r.stderr).not.toContain("FAKE-OPENCODE");
   });
 
-  test("BUG-02/G9: a prompt that starts with '-' is the prompt", async () => {
+  test("launch/spec-last: a prompt that starts with '-' is the prompt #BUG-02/G9", async () => {
     const r = await cli(["--launch", "claude-code", "--model", "sonnet", "--dry-run", "- fix the thing"]);
     expect(r.code).toBe(0);
     expect(JSON.parse(r.stdout).argv).toEqual(["claude", "--model", "sonnet", "--", "- fix the thing"]);
@@ -759,7 +759,7 @@ describe("--launch", () => {
     expect(JSON.parse(oc.stdout).argv.at(-1)).toBe("--prompt=- fix");
   });
 
-  test("--mode: explore and plan add the harness's own options before the spec; build adds nothing; the mode is on the command @full", async () => {
+  test("direct-launch/mode: --mode: explore and plan add the harness's own options before the spec; build adds nothing; the mode is on the command @full", async () => {
     // Each call is stopped when it hangs, and says which one (CI's Windows run timed out at 120 s with no word of which of the seven).
     const dry = async (harness: string, model: string, mode: string) => {
       const r = await cli(["--launch", harness, "--model", model, "--mode", mode, "--dry-run", "--", "- fix"], { timeoutMs: 30_000 * SLOW });
@@ -784,13 +784,13 @@ describe("--launch", () => {
     expect(config.agents["gluon-explore"].permissions[0]).toEqual({ action: "*", resource: "*", effect: "deny" });
   });
 
-  test("--mode explore reaches the agent when launched for real (a fake agent prints its argv)", async () => {
+  test("direct-launch/mode: --mode explore reaches the agent when launched for real (a fake agent prints its argv)", async () => {
     const app = new App({ cwd: repo.tiny(), args: ["--launch", "grok-build", "--model", "grok-4.7", "--mode", "explore", "- look"], env: { GLUON_CONFIG: freshConfig("launch-mode-explore", "connections: { grok-build: { auth: subscription } }\n") }, agents: ["grok"], noDemo: true, rows: 40, cols: 120 });
     await app.waitFor("type a line>");
     expect(argv(app.history())).toEqual(["-m", "grok-4.7", "--sandbox", "read-only", "--deny", "Edit", "--deny", "Write", "--deny", "Bash", "--", "- look"]);
   });
 
-  test("--mode plan on Codex is refused (nothing can type /plan into it here), a dry run included, before anything starts; explore and build go @full", async () => {
+  test("modes/needs-frame: --mode plan on Codex is refused (nothing can type /plan into it here), a dry run included, before anything starts; explore and build go @full", async () => {
     for (const extra of [[], ["--dry-run"]]) {
       const r = await cli(["--launch", "codex", "--model", "gpt-6.1-sol", "--mode", "plan", ...extra, "fix it"]);
       expect(r.code).toBe(2);
@@ -805,7 +805,7 @@ describe("--launch", () => {
     expect((await cli(["--launch", "codex", "--model", "gpt-6.1-sol", "--mode", "build", "--dry-run", "fix it"])).code).toBe(0);
   });
 
-  test("--mode takes build, explore or plan, and only with --launch", async () => {
+  test("direct-launch/mode: --mode takes build, explore or plan, and only with --launch", async () => {
     const bad = await cli(["--launch", "claude-code", "--model", "sonnet", "--mode", "yolo", "--dry-run", "x"]);
     expect(bad.code).toBe(2);
     expect(bad.stderr).toContain("--mode takes one of: build, explore, plan");
@@ -815,14 +815,14 @@ describe("--launch", () => {
     expect((await cli(["--help"])).stdout).toContain("[--mode <m>]");
   });
 
-  test("BUG-25/F9: an agent that isn't installed fails with 127 and prints the spec", async () => {
+  test("direct-launch/refused: an agent that isn't installed fails with 127 and prints the spec #BUG-25/F9", async () => {
     const r = await cli(["--launch", "opencode", "--model", "deepseek-flash", "do the thing"], { agents: ["claude"] });
     expect(r.code).toBe(127);
     expect(r.stderr).toContain("opencode is not installed");
     expect(r.stderr).toContain("do the thing");
   });
 
-  test("G7/G8: bad model, harness or effort is refused with the valid choices @full", async () => {
+  test("direct-launch/refused: bad model, harness or effort is refused with the valid choices @full #G7/G8", async () => {
     expect((await cli(["--launch", "claude-code", "x"])).stderr).toContain("--model is required with --launch (claude-code models: haiku, sonnet, opus, fable)");
     expect((await cli(["--launch", "pi", "--model", "m", "x"])).stderr).toContain('unknown harness "pi"');
     // Efforts are the model's: DeepSeek takes low, high, max; Haiku 5.5 every level.
@@ -844,7 +844,7 @@ describe("each harness, handed the terminal", () => {
     return app.history();
   };
 
-  test("Claude Code on OpenRouter: OpenRouter's documented setup, no Anthropic key, no token", async () => {
+  test("launch/environment: Claude Code on OpenRouter: OpenRouter's documented setup, no Anthropic key, no token", async () => {
     const h = await launch("connections: { claude-code: { auth: api, provider: openrouter } }\n", ["claude-code", "--model", "opus", "--effort", "high", "- fix it"], { OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef0123456789abcdef" });
     expect(argv(h)).toEqual(["--model", "anthropic/claude-opus-5.5", "--effort", "high", "--", "- fix it"]);
     expect(h).toContain("ENV ANTHROPIC_BASE_URL=https://openrouter.ai/api");
@@ -853,14 +853,14 @@ describe("each harness, handed the terminal", () => {
     expect(h).toContain("ENV CLAUDE_CODE_OAUTH_TOKEN=unset");
   });
 
-  test("Codex on its ChatGPT plan: nothing added, no base URL, no key", async () => {
+  test("launch/environment: Codex on its ChatGPT plan: nothing added, no base URL, no key", async () => {
     const h = await launch("connections: { codex: { auth: subscription } }\n", ["codex", "--model", "gpt-6-astra", "--effort", "xhigh", "fix it"], { OPENAI_API_KEY: "" });
     expect(argv(h)).toEqual(["-m", "gpt-6-astra", "-c", 'model_reasoning_effort="xhigh"', "--", "fix it"]);
     expect(h).toContain("ENV OPENAI_BASE_URL=unset");
     expect(h).toContain("ENV OPENAI_API_KEY=unset");
   });
 
-  test("Grok Build with an xAI key: only XAI_API_KEY", async () => {
+  test("launch/environment: Grok Build with an xAI key: only XAI_API_KEY", async () => {
     const h = await launch("connections: { grok-build: { auth: api, provider: xai } }\n", ["grok-build", "--model", "grok-4.7", "fix it"], { XAI_API_KEY: "xai-0123456789abcdef0123456789", OPENROUTER_API_KEY: "sk-or-v1-notpassednotpassed01" });
     expect(argv(h)).toEqual(["-m", "grok-4.7", "--", "fix it"]);
     expect(h).toContain("ENV XAI_API_KEY=set");

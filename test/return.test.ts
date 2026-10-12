@@ -14,7 +14,7 @@ const TMP = mkdtempSync(join(tmpdir(), "gluon-return-test-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));
 
 describe("the adapter's tokens and files", () => {
-  test("ADAPTER_DIR and SELF are replaced in argv, env and files, never in the spec", () => {
+  test("launch/spec-last: ADAPTER_DIR and SELF are replaced in argv, env and files, never in the spec", () => {
     const cmd: Command = {
       argv: ["claude", `--plugin-dir=${ADAPTER_DIR}/p`, "--", `spec ${SELF} ${ADAPTER_DIR}`],
       env: { X: `${SELF} hook` },
@@ -27,7 +27,7 @@ describe("the adapter's tokens and files", () => {
     expect(r.adapter!.files).toEqual({ "p/a.json": '{"cmd":"/self","dir":"/ad"}' });
   });
 
-  test("files are written private, inside their directory only", () => {
+  test("launch/private-dirs: files are written private, inside their directory only", () => {
     const dir = mkdtempSync(join(TMP, "files-"));
     writeAdapterFiles(dir, { "a/b/c.json": "{}", "d.txt": "x" });
     expect(readFileSync(join(dir, "a/b/c.json"), "utf8")).toBe("{}");
@@ -68,7 +68,7 @@ eval "$ACT"
     }
   }
 
-  test("the agent gets the channel; it exits on its own: reason exit, its code, nothing left behind", async () => {
+  test("no-pty/hands-terminal: the agent gets the channel; it exits on its own: reason exit, its code, nothing left behind", async () => {
     const r = await run("exit 9");
     expect(r.end).toEqual({ code: 9, reason: "exit" });
     expect(r.out).toMatch(/^EVENTS=.*gluon-events-/m);
@@ -77,25 +77,25 @@ eval "$ACT"
     expect(r.left).toEqual([]);
   });
 
-  test("`back` ends it within a poll or two: SIGTERM", async () => {
+  test("no-pty/hands-terminal: `back` ends it within a poll or two: SIGTERM", async () => {
     const r = await run(`printf back > "$GLUON_EVENTS/1.event"; sleep 10`);
     expect(r.end).toEqual({ code: 143, reason: "back" });
     expect(r.ms).toBeLessThan(1500 * SLOW);
     expect(r.left).toEqual([]);
   });
 
-  test("an event that isn't one is ignored (v1's clear and session-start included)", async () => {
+  test("events/strict: an event that isn't one is ignored (v1's clear and session-start included)", async () => {
     const r = await run(`printf 'nope' > "$GLUON_EVENTS/0.event"; printf clear > "$GLUON_EVENTS/01.event"; printf 'session-start b' > "$GLUON_EVENTS/02.event"; sleep 0.3; printf back > "$GLUON_EVENTS/1.event"; sleep 10`);
     expect(r.end.reason).toBe("back");
   });
 
-  test("a status event (display only) never ends the agent; `back` after it still does", async () => {
+  test("no-pty/hands-terminal: a status event (display only) never ends the agent; `back` after it still does", async () => {
     const r = await run(`printf 'status {"state":"working","activity":"Bash: ls"}' > "$GLUON_EVENTS/1.event"; sleep 0.4; echo ALIVE >> "$OUT"; printf back > "$GLUON_EVENTS/2.event"; sleep 10`);
     expect(r.out).toContain("ALIVE");
     expect(r.end).toEqual({ code: 143, reason: "back" });
   });
 
-  test("without a PTY a waiting hook's compaction gets no at once (nothing can ask); on_clear: stay is passed on", async () => {
+  test("no-pty/no-questions: without a PTY a waiting hook's compaction gets no at once (nothing can ask); on_clear: stay is passed on", async () => {
     const settings = { ...handoffDefaults(), on_clear: "stay" as const };
     const r = await run(`printf 'compact c1' > "$GLUON_EVENTS/1.event"; for i in 1 2 3 4 5 6 7 8 9 10; do [ -f "$GLUON_EVENTS/c1.answer" ] && break; sleep 0.1; done; cat "$GLUON_EVENTS/c1.answer" >> "$OUT"; exit 3`, {}, settings);
     expect(r.end).toEqual({ code: 3, reason: "exit" });
@@ -103,13 +103,13 @@ eval "$ACT"
     expect(r.out).toEndWith("no");
   });
 
-  test("SIGTERM ignored: SIGKILL after the grace @full", async () => {
+  test("session-end/agent-ends: SIGTERM ignored: SIGKILL after the grace @full", async () => {
     const r = await run(`trap '' TERM; printf back > "$GLUON_EVENTS/1.event"; while :; do sleep 1; done`);
     expect(r.end).toEqual({ code: 137, reason: "back" });
     expect(r.ms).toBeGreaterThan(2900);
   }, 10_000);
 
-  test("the adapter's files go to their own private directory, named in argv and env; removed after", async () => {
+  test("launch/private-dirs: the adapter's files go to their own private directory, named in argv and env; removed after", async () => {
     const r = await run("exit 0", {
       argv: ["fakeagent", `--dir=${ADAPTER_DIR}`],
       env: { X: `${SELF}`, FILE: `${ADAPTER_DIR}/sub/f.json` },
@@ -198,7 +198,7 @@ describe("after a handoff", () => {
     }
   }
 
-  posix("BUG-614/handoff: every line reaches the child, the stale reader is ended while it runs, and the UI's keys come from a fresh one (3 rounds)", async () => {
+  posix("no-pty/hands-terminal: every line reaches the child, the stale reader is ended while it runs, and the UI's keys come from a fresh one (3 rounds) #BUG-614/handoff", async () => {
     const { out, exited } = await run("", 3);
     for (let i = 0; i < 3; i++) {
       expect(out).toContain(`KEYS${i} <k${i}>`);
@@ -210,7 +210,7 @@ describe("after a handoff", () => {
     expect(exited).toBe(true);
   }, 30_000);
 
-  posix("BUG-614/handoff: a child that cannot start still leaves the UI a fresh reader", async () => {
+  posix("no-pty/hands-terminal: a child that cannot start still leaves the UI a fresh reader #BUG-614/handoff", async () => {
     const { out } = await run("spawnfail", 2, true);
     expect(out).toContain("CHILD0 code=threw");
     expect(out).toContain("stdin1 fresh=true");
@@ -218,7 +218,7 @@ describe("after a handoff", () => {
     expect(out).toContain("GOT1 <line1>");
   }, 30_000);
 
-  posix("BUG-614/handoff: the fresh reader does not hold the process open (it ends by itself once the UI is done)", async () => {
+  posix("no-pty/hands-terminal: the fresh reader does not hold the process open (it ends by itself once the UI is done) #BUG-614/handoff", async () => {
     const { out, exited } = await run("natural", 2);
     expect(out).toContain("done");
     expect(exited).toBe(true);
@@ -226,7 +226,7 @@ describe("after a handoff", () => {
 });
 
 describe("the stale sweep", () => {
-  test("events, adapter and neutral-cwd dirs go once their Gluon is gone (or, without a pid, a day old); spec dirs a day old", () => {
+  test("launch/private-dirs: events, adapter and neutral-cwd dirs go once their Gluon is gone (or, without a pid, a day old); spec dirs a day old", () => {
     const dir = mkdtempSync(join(TMP, "sweep-"));
     const make = (name: string, pid?: string, old = false) => {
       mkdirSync(join(dir, name));
@@ -249,7 +249,7 @@ describe("the stale sweep", () => {
     expect(readdirSync(dir).sort()).toEqual(["gluon-cwd-live", "gluon-events-live", "gluon-events-mine", "gluon-events-nopid", "gluon-spec-new", "other-old"]);
   });
 
-  test("BUG-143/v1 fixes: spec and neutral-cwd dirs carry their Gluon's pid; a running one's spec dir survives the sweep", () => {
+  test("launch/private-dirs: spec and neutral-cwd dirs carry their Gluon's pid; a running one's spec dir survives the sweep #BUG-143/v1", () => {
     const tmp = mkdtempSync(join(TMP, "spec-"));
     const plan = launchPlan({ argv: ["claude", "--", "x"], env: {}, spec: "x" }, "C:\\npm\\claude.cmd", { tmp, platform: "linux" });
     expect(readFileSync(join(dirname(plan.specFile!), "pid"), "utf8")).toBe(String(process.pid));

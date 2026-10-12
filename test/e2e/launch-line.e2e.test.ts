@@ -14,7 +14,7 @@ import { SLOW, stopAll } from "./harness.ts";
 setDefaultTimeout(90_000 * SLOW);
 afterAll(stopAll);
 
-test("Codex started in Plan mode at 100 columns (the line wraps in its composer) gets `/plan Read the session brief in <file> and start.` typed, then its Enter apart; the file holds the spec, and the spec is not in argv @full", async () => {
+test("frame/brief-line: Codex started in Plan mode at 100 columns (the line wraps in its composer) gets `/plan Read the session brief in <file> and start.` typed, then its Enter apart; the file holds the spec, and the spec is not in argv @full", async () => {
   // 100 columns: the line (a temp path in it) wraps in the composer.
   const app = await gluon(100, 30, {}, undefined, ["codex"]);
   // The demo brain proposes build for this task; ctrl+t twice: explore, then plan.
@@ -40,7 +40,7 @@ test("Codex started in Plan mode at 100 columns (the line wraps in its composer)
   expect(app.agentLog()).not.toContain(spec.slice(0, 40));
 });
 
-test("Grok Build started in Plan mode gets the same line typed in its composer box, then its Enter apart; its border shows ` · plan` and no note is posted @full", async () => {
+test("frame/brief-line: Grok Build started in Plan mode gets the same line typed in its composer box, then its Enter apart; its border shows ` · plan` and no note is posted @full", async () => {
   const app = await gluon(100, 30, {}, undefined, ["grok"]);
   await launch(app, "fix the thing", [KEYS.ctrlT, KEYS.ctrlT]);
   const end = performance.now() + 20_000 * SLOW;
@@ -79,7 +79,7 @@ async function chunksOf(app: Awaited<ReturnType<typeof gluon>>, n: number): Prom
   return chunks();
 }
 
-test("Kimi Code (no prompt in argv): every launch types the brief line alone into its composer box, then its Enter apart; the file holds the spec, which is in no argument; the box answers with it @full", async () => {
+test("frame/brief-line: Kimi Code (no prompt in argv): every launch types the brief line alone into its composer box, then its Enter apart; the file holds the spec, which is in no argument; the box answers with it @full", async () => {
   const app = await gluon(100, 30, KIMI.env, KIMI.yaml, ["kimi"]);
   await launch(app, "fix the thing");
   const [text, enter] = await chunksOf(app, 2);
@@ -97,7 +97,7 @@ test("Kimi Code (no prompt in argv): every launch types the brief line alone int
   expect(app.screen()).not.toContain("couldn't type");
 });
 
-test("agent-choice/mode-unsupported: Kimi Code: plan is `--plan` (before the typed brief); ctrl+t never lands on explore with it highlighted, and explore picked on another agent is refused for it, the advice first, and nothing starts, no agent file in any launch @full #BUG-432", async () => {
+test("agent-choice/mode-unsupported: Kimi Code: plan is `--plan` (before the typed brief); ctrl+t never lands on explore with it highlighted, and explore picked on another agent is refused for it, the advice first, and nothing starts, no agent file in any launch @full", async () => {
   const plan = await gluon(100, 30, KIMI.env, KIMI.yaml, ["kimi"]);
   // Kimi Code is the highlighted agent: ctrl+t skips explore (BUG-672), so one press is plan.
   await launch(plan, "fix the thing", [KEYS.ctrlT]);
@@ -119,7 +119,7 @@ test("agent-choice/mode-unsupported: Kimi Code: plan is `--plan` (before the typ
   expect(explore.agentLog()).not.toContain("--agent-file");
 });
 
-test("BUG-462/kimi-code: with Claude Code also connected, a reply naming kimi-code pins it: the brain's route offers it and the fake kimi starts on OpenRouter @full", async () => {
+test("agent-choice/typed-reply: with Claude Code also connected, a reply naming kimi-code pins it: the brain's route offers it and the fake kimi starts on OpenRouter @full", async () => {
   const app = await gluon(100, 30, KIMI.env, KIMI.yaml, ["claude", "kimi"]);
   await openSessions(app, ["kimi"], "pin kimi");
   await chunksOf(app, 2);

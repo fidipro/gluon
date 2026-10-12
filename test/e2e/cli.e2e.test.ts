@@ -482,7 +482,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("BUG-143/v1 fixes: uninstall keeps a running Gluon's spec and neutral-cwd dirs (their pid file)", async () => {
+  test("uninstall keeps a running Gluon's spec and neutral-cwd dirs (their pid file)", async () => {
     const s = sandbox();
     for (const d of ["gluon-spec-live", "gluon-cwd-live", "gluon-spec-dead", "gluon-cwd-dead"]) {
       mkdirSync(join(s.tmp, d));

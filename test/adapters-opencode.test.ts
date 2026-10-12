@@ -17,7 +17,7 @@ const ctx = (s: Partial<HandoffSettings> = {}, env: Record<string, string | unde
 const OURS = `${ADAPTER_DIR_JSON}/${PLUGIN_DIR}`;
 
 describe("OpenCode adapter", () => {
-  test("adds the CLI plugin through OPENCODE_CLI_CONFIG_CONTENT, and stops OpenCode updating itself", () => {
+  test("launch/adapter: adds the CLI plugin through OPENCODE_CLI_CONFIG_CONTENT, and stops OpenCode updating itself", () => {
     const out = adapterOutput(ctx());
     expect(out.argv).toEqual([]);
     expect(out.env).toEqual({ [CLI_CONFIG_ENV]: JSON.stringify({ plugins: [OURS] }), OPENCODE_DISABLE_AUTOUPDATE: "1" });
@@ -26,19 +26,19 @@ describe("OpenCode adapter", () => {
     expect(JSON.parse(out.files[`${PLUGIN_DIR}/package.json`]!)).toMatchObject({ type: "module", exports: { "./tui": "./tui.js" } });
   });
 
-  test("BUG-140/v1 fixes: a Windows adapter dir goes into OPENCODE_CLI_CONFIG_CONTENT as valid JSON", () => {
+  test("launch/adapter: a Windows adapter dir goes into OPENCODE_CLI_CONFIG_CONTENT as valid JSON #BUG-140/v1", () => {
     const out = adapterOutput({ ...ctx({}, { [CLI_CONFIG_ENV]: '{"tabs":{"mode":"off"}}' }), platform: "win32" });
     const dir = 'C:\\Users\\me "x"\\AppData\\Local\\Temp\\gluon-adapter-abc';
     const cmd = substituteTokens({ argv: ["opencode", "x"], env: out.env, adapter: out, spec: "x" }, dir, "C:\\x\\gluon.cmd");
     expect(JSON.parse(cmd.env[CLI_CONFIG_ENV]!)).toEqual({ tabs: { mode: "off" }, plugins: [`${dir}/${PLUGIN_DIR}`] });
   });
 
-  test("nothing below 2.0.21 or when the version is unknown", () => {
+  test("launch/version-gate: nothing below 2.0.21 or when the version is unknown", () => {
     for (const v of ["1.18.34", "2.0.20", null]) expect(adapterOutput(ctx({}, {}, v))).toEqual(NO_ADAPTER);
     for (const v of ["2.0.21", "2.1.0", "3.0.0"]) expect(adapterOutput(ctx({}, {}, v)).files).not.toEqual({});
   });
 
-  test("the plugin is /gluon only, whatever the settings (/new, /clear and /compact are the PTY's)", () => {
+  test("launch/adapter: the plugin is /gluon only, whatever the settings (/new, /clear and /compact are the PTY's)", () => {
     const text = (s: Partial<HandoffSettings>) => adapterOutput(ctx(s)).files[`${PLUGIN_DIR}/tui.js`]!;
     for (const s of [{}, { on_clear: "stay" as const }, { on_compact: "stay" as const }, { on_exit: "quit" as const }]) {
       expect(text(s)).toBe(pluginSource());
@@ -49,7 +49,7 @@ describe("OpenCode adapter", () => {
     for (const gone of ["session.new", "session.clear", "session.compaction.started", "toast"]) expect(pluginSource()).not.toContain(gone);
   });
 
-  test("merges with the user's own OPENCODE_CLI_CONFIG_CONTENT: their settings and plugins stay, ours is appended", () => {
+  test("launch/adapter: merges with the user's own OPENCODE_CLI_CONFIG_CONTENT: their settings and plugins stay, ours is appended", () => {
     const user = JSON.stringify({ tabs: { mode: "off" }, plugins: ["/home/me/plug", { package: "x", options: { a: 1 } }] });
     expect(JSON.parse(adapterOutput(ctx({}, { [CLI_CONFIG_ENV]: user })).env[CLI_CONFIG_ENV]!)).toEqual({ tabs: { mode: "off" }, plugins: ["/home/me/plug", { package: "x", options: { a: 1 } }, OURS] });
     expect(JSON.parse(mergeCliConfig('{"theme":{"name":"x"}}', "p")!)).toEqual({ theme: { name: "x" }, plugins: ["p"] });
@@ -63,7 +63,7 @@ describe("OpenCode adapter", () => {
     }
   });
 
-  test("notes say what's supported and what isn't", () => {
+  test("session-settings/doctor: notes say what's supported and what isn't", () => {
     const n = (s: Partial<HandoffSettings>, env = {}) => opencode.notes(ctx(s, env)).join("\n");
     expect(n({})).toContain("/gluon shows Gluon's sessions home");
     expect(n({})).toContain("auto-compaction: OpenCode compacts without asking");
@@ -74,7 +74,7 @@ describe("OpenCode adapter", () => {
     expect(n({}, { [CLI_CONFIG_ENV]: '{"plugins":[]}' })).toContain("doesn't update itself");
   });
 
-  test("buildCommand: the adapter's env joins the model's config, the spec stays last, the env passes assertSafeEnv", () => {
+  test("launch/environment: buildCommand: the adapter's env joins the model's config, the spec stays last, the env passes assertSafeEnv", () => {
     const config = defaults();
     const out = adapterOutput(ctx());
     const cmd = buildCommand(config, { harness: "opencode", model: "deepseek-flash", spec: "- fix it", reason: "" }, out);
@@ -106,7 +106,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     return { plugin, commands: () => commands, stop, stopped: () => stopped };
   }
 
-  test("/gluon sends `back`; outside a Gluon launch nothing", async () => {
+  test("tabs/back-event: /gluon sends `back`; outside a Gluon launch nothing", async () => {
     const spawn = spyOn(Bun, "spawn").mockImplementation((() => ({})) as never);
     const saved = { self: process.env.GLUON_SELF, events: process.env.GLUON_EVENTS };
     process.env.GLUON_SELF = "/x/gluon";
@@ -131,7 +131,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     }
   });
 
-  test("the status from OpenCode 1.x's event names (still handled): working, the activity, awaiting, cost per message and context, done", async () => {
+  test("session-state/hooks: the status from OpenCode 1.x's event names (still handled): working, the activity, awaiting, cost per message and context, done", async () => {
     const events = mkdtempSync(join(dir, "events-"));
     const saved = process.env.GLUON_EVENTS;
     process.env.GLUON_EVENTS = events;
@@ -232,7 +232,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     }
   }
 
-  test("BUG-188/opencode-2: the status from OpenCode 2.x's events (shapes seen on 2.0.21): execution, tools, forms, cumulative cost per session, the last step's context", async () => {
+  test("session-state/hooks: the status from OpenCode 2.x's events (shapes seen on 2.0.21): execution, tools, forms, cumulative cost per session, the last step's context #BUG-188/opencode-2", async () => {
     const tokens = (input: number, cache: unknown) => ({ input, output: 40, reasoning: 0, cache });
     const called = (id: string, name: string, input: unknown) => [
       { type: "session.tool.input.started", data: { sessionID: "ses_1", assistantMessageID: "msg_1", id, name } },
@@ -321,7 +321,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     }
   }
 
-  test("BUG-311/resume: the first TOP-LEVEL session's id goes out as a `session` event; sub-sessions (parentID) and later sessions never do", async () => {
+  test("resume/session-id: the first TOP-LEVEL session's id goes out as a `session` event; sub-sessions (parentID) and later sessions never do #BUG-311/resume", async () => {
     expect(
       await sessionsSent([
         { type: "session.created", data: { sessionID: "ses_child", parentID: "ses_top" } },
@@ -331,7 +331,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     ).toEqual(["ses_top"]);
   });
 
-  test("BUG-311/resume: OpenCode 1.x's session.created ({sessionID, info: {id, parentID}}), and an id Gluon would refuse, are handled", async () => {
+  test("resume/session-id: OpenCode 1.x's session.created ({sessionID, info: {id, parentID}}), and an id Gluon would refuse, are handled #BUG-311/resume", async () => {
     expect(
       await sessionsSent([
         { type: "session.created", data: { sessionID: "ses_c", info: { id: "ses_c", parentID: "ses_p" } } },
@@ -347,7 +347,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
   const states = (got: StatusInfo[]): string[] => got.flatMap((s) => (s.state ? [s.state] : []));
   const on = (type: string, sessionID = "ses_1") => ({ type, data: { sessionID } });
 
-  test("issue-40/opencode-2: every way an execution ends is done once no session is busy; a form waits, whatever answers it (reply, reject, cancel) is working", async () => {
+  test("session-state/hooks: every way an execution ends is done once no session is busy; a form waits, whatever answers it (reply, reject, cancel) is working #issue-40/opencode-2", async () => {
     const ends = ["succeeded", "failed", "cancelled", "canceled", "aborted", "errored", "interrupted"];
     const got = await statuses(
       [
@@ -380,7 +380,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     ]);
   });
 
-  test("issue-40/opencode-1: idle (status or session.idle) is done once no session is busy; busy and retry are working; a permission waits and its reply works on", async () => {
+  test("session-state/hooks: idle (status or session.idle) is done once no session is busy; busy and retry are working; a permission waits and its reply works on #issue-40/opencode-1", async () => {
     const status = (type: string, sessionID = "ses_1") => ({ type: "session.status", data: { sessionID, status: { type } } });
     const got = await statuses(
       [
@@ -443,7 +443,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
   }
   const stepEnded = (cost: number, input = 100) => ({ type: "session.step.ended", data: { sessionID: "ses_1", cost, tokens: { input, output: 1, reasoning: 0, cache: { read: 0, write: 0 } } } });
 
-  test("BUG-344/flushsteps-no-loss: a burst of steps in one tick goes out as batches of at most 12, every record once and in order, none overwritten; the plugin being stopped sends what is waiting at once", async () => {
+  test("frame/events-read: a burst of steps in one tick goes out as batches of at most 12, every record once and in order, none overwritten; the plugin being stopped sends what is waiting at once #BUG-344/flushsteps-no-loss", async () => {
     // 60 steps written the same millisecond; stopped 150 ms later, long before the second's timer.
     const { statuses, stoppedAfterMs } = await written(Array.from({ length: 60 }, (_, i) => stepEnded(0.001 * (i + 1), 100 + i)), 150);
     const steps = statuses.flatMap((s) => s.steps ?? []);
@@ -453,7 +453,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     expect(stoppedAfterMs).toBeLessThan(500 * SLOW);
   });
 
-  test("BUG-344/flushsteps-batch-fits: the biggest batch the plugin builds (12 records with a 128-character model, 13-digit counts and a long cost, a context and a side flag) is a status file Gluon reads (under MAX_STATUS_BYTES), not one it drops whole", () => {
+  test("frame/events-read: the biggest batch the plugin builds (12 records with a 128-character model, 13-digit counts and a long cost, a context and a side flag) is a status file Gluon reads (under MAX_STATUS_BYTES), not one it drops whole #BUG-344/flushsteps-batch-fits", () => {
     const model = `p/${"m".repeat(126)}`;
     const record = { n: 999_999_999, model, input: 999_999_999_999, output: 999_999_999_999, reasoning: 999_999_999_999, cacheRead: 999_999_999_999, cacheWrite: 999_999_999_999, cost: 0.12345678901234568, context: "compacted" as const, side: true as const };
     const line = `status ${JSON.stringify({ steps: Array.from({ length: 12 }, () => record) })}`;
@@ -463,7 +463,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     expect(pluginSource()).toContain("stepQueue.splice(0, 12)");
   });
 
-  test("without an event stream, or one that fails, the plugin still loads and /gluon still works", async () => {
+  test("tabs/back-event: without an event stream, or one that fails, the plugin still loads and /gluon still works", async () => {
     const saved = process.env.GLUON_EVENTS;
     process.env.GLUON_EVENTS = mkdtempSync(join(dir, "events-"));
     try {

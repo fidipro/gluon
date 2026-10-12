@@ -11,7 +11,7 @@ import { SLOW, start, stopAll } from "./harness.ts";
 setDefaultTimeout(90_000 * SLOW);
 afterAll(stopAll);
 
-test("BUG-409/launch-modes: the note that Codex's /plan line couldn't be typed is shown over the agent's frame (the line whole, until Esc), and in the home chat too @full", async () => {
+test("frame/note: the note that Codex's /plan line couldn't be typed is shown over the agent's frame (the line whole, until Esc), and in the home chat too @full", async () => {
   // The fake codex without FAKE_TUI draws no composer: the user's first key into it means the line is never typed.
   const app = await gluon(100, 30, { FAKE_TUI: "" }, undefined, ["codex"]);
   await toChoice(app, "fix the thing");
@@ -34,7 +34,7 @@ test("BUG-409/launch-modes: the note that Codex's /plan line couldn't be typed i
   expect(app.screen().replace(/\s+/g, " ")).toContain("type this yourself: /plan Read the session brief in");
 });
 
-test("agent-choice/mode: ctrl+t to explore (strictly read-only) gives the brief that says what explore allows @full #BUG-410", async () => {
+test("agent-choice/mode: ctrl+t to explore (strictly read-only) gives the brief that says what explore allows @full", async () => {
   const app = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(app, "fix the thing");
   await app.press(KEYS.ctrlT);
@@ -45,7 +45,7 @@ test("agent-choice/mode: ctrl+t to explore (strictly read-only) gives the brief 
   expect(log).toContain("## Mode: explore");
 });
 
-test("agent-choice/mode: the brief follows the mode ctrl+t ended on, whatever the spec was written for: plan says plan, build says neither mode @full #BUG-410", async () => {
+test("agent-choice/mode: the brief follows the mode ctrl+t ended on, whatever the spec was written for: plan says plan, build says neither mode @full", async () => {
   const plan = await gluon(100, 30, {}, undefined, ["claude"]);
   await toChoice(plan, "fix the thing");
   await plan.press(KEYS.ctrlT);
@@ -65,7 +65,7 @@ test("agent-choice/mode: the brief follows the mode ctrl+t ended on, whatever th
 });
 
 for (const cols of [60, 40]) {
-  test(`Codex plan at ${cols} columns @full: the line is typed once with its Enter apart, Plan mode shows, and no note is posted`, async () => {
+  test(`frame/brief-line: Codex plan at ${cols} columns @full: the line is typed once with its Enter apart, Plan mode shows, and no note is posted`, async () => {
     const app = await gluon(cols, 30, {}, undefined, ["codex"]);
     await toChoice(app, "fix the thing");
     await app.press(KEYS.ctrlT);
@@ -114,7 +114,7 @@ const quitApp = async (app: Awaited<ReturnType<typeof start>>) => {
   return app.exitCode();
 };
 
-test("BUG-612/resume-modes: with no mode on record, Claude Code (whose own session keeps it) still resumes, and a Codex one beside it is the only refusal", async () => {
+test("modes/on-resume: with no mode on record, Claude Code (whose own session keeps it) still resumes, and a Codex one beside it is the only refusal", async () => {
   const s = sandbox("resume-unmoded-mixed");
   seed(s, repo.tiny(), {}, [{ key: "k2", name: "Gluon-beta-task", harness: "claude-code", model: "sonnet", effort: "high", spec: "other", startedAt: Date.now() - 50_000, resume: { id: UUID, source: "minted" } }]);
   const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ["claude", "codex"], env: s.env });
@@ -126,7 +126,7 @@ test("BUG-612/resume-modes: with no mode on record, Claude Code (whose own sessi
   app.kill();
 });
 
-test("BUG-612/resume-modes @full: round trip — a Codex session launched in explore saves its mode in the workspace, and gluon resume reopens it with -s read-only -a never", async () => {
+test("modes/on-resume: @full round trip — a Codex session launched in explore saves its mode in the workspace, and gluon resume reopens it with -s read-only -a never", async () => {
   const s = sandbox("roundtrip");
   const app = await start({ cwd: repo.tiny(), cols: 110, rows: 30, agents: ["codex"], env: s.env });
   await toChoice(app, "fix the thing");
@@ -152,7 +152,7 @@ test("BUG-612/resume-modes @full: round trip — a Codex session launched in exp
   again.kill();
 });
 
-test("Codex plan's spec file @full is private (0600 in a 0700 directory) while the session runs and removed when the agent exits", async () => {
+test("launch/private-dirs: Codex plan's spec file @full is private (0600 in a 0700 directory) while the session runs and removed when the agent exits", async () => {
   const app = await gluon(120, 30, {}, undefined, ["codex"]);
   await toChoice(app, "fix the thing");
   await app.press(KEYS.ctrlT);
@@ -176,7 +176,7 @@ test("Codex plan's spec file @full is private (0600 in a 0700 directory) while t
   expect(existsSync(dirname(file))).toBe(false);
 });
 
-test("two Codex plan sessions @full started one after the other each get their own line (own spec file) typed into their own PTY, once", async () => {
+test("frame/brief-line: two Codex plan sessions @full started one after the other each get their own line (own spec file) typed into their own PTY, once", async () => {
   const app = await gluon(120, 30, {}, undefined, ["codex"]);
   const planOne = async (task: string) => {
     await toChoice(app, task);

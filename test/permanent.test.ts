@@ -48,7 +48,7 @@ const oldAgyPlugin = (home: string) => {
 };
 
 describe("permanent files", () => {
-  test("write exactly ~/.grok/hooks/gluon.json, private; agy gets nothing; list and remove only them (v1's agy plugin too)", () => {
+  test("subscriptions/never-edit-other-tools-files: write exactly ~/.grok/hooks/gluon.json, private; agy gets nothing; list and remove only them (v1's agy plugin too)", () => {
     const home = newHome();
     const opts = { home, env: {} };
     expect(ensurePermanentFiles("grok-build", opts)).toBeNull();
@@ -67,7 +67,7 @@ describe("permanent files", () => {
     expect(removePermanentFiles(opts)).toEqual([]);
   });
 
-  test("an Antigravity launch removes v1's agy plugin (its hook has no job any more), nothing else", () => {
+  test("subscriptions/never-edit-other-tools-files: an Antigravity launch removes v1's agy plugin (its hook has no job any more), nothing else", () => {
     const home = newHome();
     oldAgyPlugin(home);
     mkdirSync(join(home, ".gemini/config/plugins/other"), { recursive: true });
@@ -76,7 +76,7 @@ describe("permanent files", () => {
     expect(tree(home)).toEqual([".gemini/config/plugins/other/plugin.json"]);
   });
 
-  test("leave everything else in those directories alone, and don't read it", () => {
+  test("subscriptions/never-edit-other-tools-files: leave everything else in those directories alone, and don't read it", () => {
     const home = newHome();
     const others = [".grok/hooks/mine.json", ".grok/config.toml", ".grok/auth.json", ".gemini/config/plugins/other/plugin.json", ".gemini/config/hooks.json", ".gemini/settings.json"];
     for (const f of others) {
@@ -97,7 +97,7 @@ describe("permanent files", () => {
     expect(tree(home)).toEqual([...others].sort());
   });
 
-  test("written only when missing or different", () => {
+  test("subscriptions/never-edit-other-tools-files: written only when missing or different", () => {
     const home = newHome();
     const opts = { home, env: {} };
     ensurePermanentFiles("grok-build", opts);
@@ -111,7 +111,7 @@ describe("permanent files", () => {
     expect(tree(home)).toEqual([GROK]);
   });
 
-  test("GROK_HOME wins, as in grok", () => {
+  test("subscriptions/never-edit-other-tools-files: GROK_HOME wins, as in grok", () => {
     const home = newHome();
     const grokHome = join(home, "elsewhere");
     ensurePermanentFiles("grok-build", { home, env: { GROK_HOME: grokHome } });
@@ -119,7 +119,7 @@ describe("permanent files", () => {
     expect(removePermanentFiles({ home, env: { GROK_HOME: grokHome } })).toEqual([join(grokHome, "hooks", "gluon.json")]);
   });
 
-  test("a failure is a note, not an error", () => {
+  test("subscriptions/never-edit-other-tools-files: a failure is a note, not an error", () => {
     if (!POSIX || process.getuid?.() === 0) return;
     const home = newHome();
     mkdirSync(join(home, ".grok"));
@@ -129,7 +129,7 @@ describe("permanent files", () => {
     expect(note).toStartWith("couldn't write ~/.grok/hooks/gluon.json (EACCES)");
   });
 
-  test("Windows: grok gets the PowerShell form; with GROK_SHELL=bash or cmd none (and an old one goes); agy gets no plugin", () => {
+  test("subscriptions/never-edit-other-tools-files: Windows: grok gets the PowerShell form; with GROK_SHELL=bash or cmd none (and an old one goes); agy gets no plugin", () => {
     const home = newHome();
     expect(ensurePermanentFiles("grok-build", { home, env: {}, platform: "win32" })).toBeNull();
     expect(readFileSync(join(home, GROK), "utf8")).toBe(grokHooks("win32"));
@@ -140,7 +140,7 @@ describe("permanent files", () => {
     expect(tree(home)).toEqual([]);
   });
 
-  test("the contents never change between installs: no path, no environment value", async () => {
+  test("subscriptions/never-edit-other-tools-files: the contents never change between installs: no path, no environment value", async () => {
     const texts = () => [grokHooks("linux"), grokHooks("darwin"), grokHooks("win32")].join("\n");
     const saved = process.env.GLUON_SELF;
     process.env.GLUON_SELF = "/opt/one/gluon";
@@ -162,7 +162,7 @@ describe("permanent files", () => {
     expect(readFileSync(join(h1, GROK), "utf8")).toBe(readFileSync(join(h2, GROK), "utf8"));
   });
 
-  test("grok's file: one PreCompact hook for both triggers, with a timeout above the hook's wait; the status hooks", () => {
+  test("clear-compact/auto-compact: grok's file: one PreCompact hook for both triggers, with a timeout above the hook's wait; the status hooks", () => {
     // The POSIX file (Windows gets the PowerShell form, checked above).
     const grok = JSON.parse(grokHooks("linux"));
     const cmd = (name: string) => `[ -z "\${GLUON_EVENTS:-}" ] || [ -z "\${GLUON_SELF:-}" ] || exec "\${GLUON_SELF:-}" hook grok-build ${name}`;
@@ -201,7 +201,7 @@ describe.if(POSIX)("the commands, run by sh -c", () => {
     return { code: r.exitCode, out: r.stdout.toString(), err: r.stderr.toString() };
   };
 
-  test("exit 0 and print nothing outside a Gluon launch (no environment at all), or with half of it", () => {
+  test("events/inert-outside-launch: exit 0 and print nothing outside a Gluon launch (no environment at all), or with half of it", () => {
     expect(posixCommands().length).toBe(9);
     for (const c of posixCommands()) {
       expect(sh(c, {})).toEqual({ code: 0, out: "", err: "" });
@@ -210,14 +210,14 @@ describe.if(POSIX)("the commands, run by sh -c", () => {
     }
   });
 
-  test("inside a launch they run $GLUON_SELF hook <harness> <name> with the harness's input", () => {
+  test("events/inert-outside-launch: inside a launch they run $GLUON_SELF hook <harness> <name> with the harness's input", () => {
     const self = join(TMP, "self with space");
     writeFileSync(self, `#!/bin/sh\nprintf '%s|' "$@"; cat\n`, { mode: 0o700 });
     const [compact] = posixCommands();
     expect(sh(compact!, { GLUON_EVENTS: TMP, GLUON_SELF: self }, '{"x":1}')).toEqual({ code: 0, out: 'hook|grok-build|pre-compact|{"x":1}', err: "" });
   });
 
-  test("end to end: grok's PreCompact hook sends `compact <id>` and waits for Gluon's answer; a marker from a typed /compact skips the question", async () => {
+  test("clear-compact/auto-compact: end to end: grok's PreCompact hook sends `compact <id>` and waits for Gluon's answer; a marker from a typed /compact skips the question", async () => {
     const events = mkdtempSync(join(TMP, "events-"));
     const self = join(TMP, "gluon-src");
     writeFileSync(self, `#!/bin/sh\nexec '${process.execPath}' --no-env-file --config=/dev/null '${join(ROOT, "src", "cli.tsx")}' "$@"\n`, { mode: 0o700 });
@@ -238,7 +238,7 @@ describe.if(POSIX)("the commands, run by sh -c", () => {
 });
 
 describe.if(process.platform === "win32")("the PowerShell command (grok on Windows)", () => {
-  test("exits 0 and prints nothing without the environment", () => {
+  test("events/inert-outside-launch: exits 0 and prints nothing without the environment", () => {
     const ps = join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
     const command = JSON.parse(grokHooks("win32")).hooks.PreCompact[0].hooks[0].command;
     const r = Bun.spawnSync([ps, "-NoProfile", "-NonInteractive", "-Command", command], { env: { SystemRoot: process.env.SystemRoot ?? "C:\\Windows" }, stdin: Buffer.from("{}"), stdout: "pipe", stderr: "pipe" });
@@ -249,12 +249,12 @@ describe.if(process.platform === "win32")("the PowerShell command (grok on Windo
 describe("Grok Build adapter", () => {
   const ctx = (over: object = {}) => ({ harness: "grok-build" as const, version: "1.0.46", handoff: { ...handoffFor(handoffDefaults(), "grok-build"), ...over } });
 
-  test("adds nothing per launch (no --rules: the brief line is in the spec)", () => {
+  test("launch/adapter: adds nothing per launch (no --rules: the brief line is in the spec)", () => {
     expect(adapterOutput(ctx())).toEqual({ argv: [], env: {}, files: {} });
     expect(adapterOutput(ctx({ on_clear: "stay", on_compact: "stay" }))).toEqual({ argv: [], env: {}, files: {} });
   });
 
-  test("pre-compact: asks (an event, then waits), prints nothing whatever the answer; nothing with on_compact: stay or another hook", async () => {
+  test("clear-compact/auto-compact: pre-compact: asks (an event, then waits), prints nothing whatever the answer; nothing with on_compact: stay or another hook", async () => {
     const dir = mkdtempSync(join(TMP, "grok-events-"));
     const run = grokBuild.hook!("pre-compact", "{}", { eventsDir: dir, pieces: ["compact"], answerTimeoutMs: 5000 });
     let asked: { name: string; id?: string }[] = [];
@@ -271,13 +271,13 @@ describe("Grok Build adapter", () => {
     expect(readdirSync(off)).toEqual([]);
   });
 
-  test("notes say what each setting does", () => {
+  test("session-settings/doctor: notes say what each setting does", () => {
     const status = "its status and latest activity show in Gluon, through the same hook file";
     expect(grokBuild.notes(ctx())).toEqual([expect.stringContaining("auto-compaction asks first"), status]);
     expect(grokBuild.notes(ctx({ on_compact: "stay" }))).toEqual(["auto-compaction: Grok Build compacts (on_compact: stay)", status]);
   });
 
-  test("status hooks, with grok's camelCase inputs: working, the activity line, awaiting, done; a subagent's own say nothing", async () => {
+  test("session-state/hooks: status hooks, with grok's camelCase inputs: working, the activity line, awaiting, done; a subagent's own say nothing", async () => {
     const dir = mkdtempSync(join(TMP, "grok-events-"));
     const run = (name: string, input: object) => grokBuild.hook!(name, JSON.stringify({ sessionId: "s", cwd: "/w/repo", ...input }), { eventsDir: dir, pieces: ["compact"] });
     const st = (status: StatusInfo): HookResult => ({ events: [{ name: "status", status }] });
@@ -295,7 +295,7 @@ describe("Grok Build adapter", () => {
 describe("Antigravity adapter", () => {
   const ctx = (over: object = {}) => ({ harness: "antigravity" as const, version: "1.2.14", handoff: { ...handoffFor(handoffDefaults(), "antigravity"), ...over } });
 
-  test("adds nothing per launch; its only hook is its status line's (test/agy-settings.test.ts); auto-compaction can't ask", async () => {
+  test("launch/adapter: adds nothing per launch; its only hook is its status line's (test/agy-settings.test.ts); auto-compaction can't ask", async () => {
     expect(adapterOutput(ctx())).toEqual({ argv: [], env: {}, files: {} });
     // Nothing waits or asks: a compaction hook answers nothing and writes nothing.
     expect(await antigravity.hook!("pre-compact", "{}", { eventsDir: "/x", pieces: ["compact"] })).toEqual({});
@@ -305,7 +305,7 @@ describe("Antigravity adapter", () => {
 });
 
 describe("doctor", () => {
-  test("per connected agent: the effective settings and the adapter's notes; the permanent files; never a ✗", () => {
+  test("session-settings/doctor: per connected agent: the effective settings and the adapter's notes; the permanent files; never a ✗", () => {
     const config = defaults();
     config.handoff.agents = { codex: { on_clear: "stay" } };
     const lines = handoffLines(config, [{ harness: "grok-build", version: "1.0.46" }, { harness: "codex", version: "0.159.3" }, { harness: "grok-build", version: "1.0.40" }], [join("/h", GROK)]);
