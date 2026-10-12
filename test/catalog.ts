@@ -264,7 +264,7 @@ export const CATALOG: Record<string, Feature> = {
   events: {
     says: "the events channel between a launched agent and Gluon (docs/concepts/architecture.md \"The events channel\")",
     entries: {
-      "inert-outside-launch": rule("given a hook, plugin or command of Gluon's run outside a launch from Gluon (no `GLUON_EVENTS` or `GLUON_SELF`, or half of them), then it does nothing and prints nothing (exit 0); inside one it runs this Gluon with the harness's input", ["seam"]),
+      "inert-outside-launch": rule("given a hook, plugin or command of Gluon's run outside a launch from Gluon (no `GLUON_EVENTS` or `GLUON_SELF`, or half of them), then it does nothing and prints nothing (exit 0); inside one it runs this Gluon with the harness's input", ["seam", "e2e"]),
       strict: b("an event is read strictly: fixed names, bounded sizes (a larger file is never read), known fields of the right types; a FIFO, a symlink or a directory is never read or followed; the activity line is made safe to draw (no escapes, controls, bidi or format characters, at most 120 characters); anything else is ignored", ["seam"]),
     },
   },
@@ -290,6 +290,43 @@ export const CATALOG: Record<string, Feature> = {
       terminal: b("`gluon --launch` gives the agent the terminal directly: no events channel, no adapter files, no line about returning, the handoff settings ignored; Gluon exits with the agent's code; a signal to Gluon ends the agent too"),
       mode: b("`--mode` takes build, explore or plan, and only with `--launch`; explore and plan add the harness's own options before the spec; build adds nothing"),
       refused: b("a bad model, harness or effort is refused naming the valid choices; an agent that isn't installed fails with 127 and prints the spec"),
+      "dry-run": b("`--dry-run` prints the exact command (argv) and environment as JSON and starts nothing; every key in it is masked, whatever its shape, for every provider"),
+    },
+  },
+  cli: {
+    says: "the command line: `gluon --help`, its flags and subcommands (docs/reference/cli.md, docs/getting-started/quickstart.md)",
+    entries: {
+      help: b("`gluon --help` (and `-h`; after a subcommand such as `cost-report` or `uninstall` too; with a broken config too) prints the usage and exits 0: the version, every subcommand and flag, and every harness with its models and their efforts from the built-in catalog, never the config's"),
+      version: b("`gluon --version` prints the version alone and exits 0"),
+      "bad-args": b("an unknown flag, a flag without its value (`--launch=`, an empty `--effort` or `--model`), a launch flag (`--model`, `--effort`, `--dry-run`, `--mode`) without `--launch`, `--launch` without `--model`, or extra words after a subcommand: one `gluon: …` line naming the flag or the subcommand's form, exit 2, no stack trace, nothing started"),
+      "did-you-mean": b("a word close to a subcommand (any of them: `stats`, `pricing`, `cost-report` too) gets `did you mean \"gluon <it>\"`, exit 2, and no chat starts with the typo"),
+      "task-words": b("words that aren't a subcommand are the intake chat's first message (`gluon \"fix the add bug\"`; `gluon mcp` too); a prompt that starts with `- ` is the prompt and flags around it stay flags, `--` ends the options; typed in a terminal, words starting with `signal` or `hook` say how to quote them (inside an agent they stay silent)"),
+      "needs-terminal": b("Gluon's UI (the chat, `--demo`) without an interactive terminal refuses, saying it needs one, exit 2"),
+      "no-agents": b("with none of the agents' binaries on PATH, Gluon says which it looked for and exits 2"),
+    },
+  },
+  config: {
+    says: "the config file (docs/guides/connections.md \"Know where things live\", docs/reference/config.md)",
+    entries: {
+      refused: b("a config that is no valid config (not YAML, not a mapping, a wrong type, an unknown harness, route or provider, a first version's `auth:` with a malformed `connections:`, a path that can't be read) is refused naming the key and what is allowed (or that it's unreadable), exit 2, no stack trace"),
+      "defaults-and-migration": b("an empty config uses the defaults; a first version's config is migrated (on disk; in memory with one warning when the file can't be written, the output and exit code as usual); a key no longer read (`models:`) is ignored with one notice"),
+      paths: b("the config is at `GLUON_CONFIG` (made absolute at start) or under `XDG_CONFIG_HOME` (a relative one ignored, as the XDG spec says), else the platform's default; the keys and `routing.yaml` go next to it, never into the repository Gluon runs in"),
+    },
+  },
+  doctor: {
+    says: "`gluon doctor` and `gluon brain` (docs/concepts/architecture.md \"Checks: gluon doctor\", docs/guides/troubleshooting.md)",
+    entries: {
+      checks: b("`gluon doctor` checks each agent (installed with its version, connected), each connection's models (✓, or ✗ with the reason) and the brain order with the step in use marked; what's missing gets its install command; a key's source is named (the environment, Gluon's `.env`, an AWS profile and region), never the key; exit 1 on any ✗, or with no working brain step or no launchable agent (`·` lines and `!` notes don't count); each run starts clean", ["seam", "e2e"]),
+      brain: b("`gluon brain` prints the brain order: each step ✓, ✗ with its reason, `·` not connected, or not tried (naming the step in use), the step in use marked with its effort (its own, the default marked, or none); exit 1 and the hint to run doctor when no step works", ["seam", "e2e"]),
+      warnings: b("given a Codex with features on that Gluon hasn't checked, then the ChatGPT-plan step still shows ✓ with a `!` warning under it, and `gluon doctor` says it once per harness, not once per model", ["seam"]),
+    },
+  },
+  uninstall: {
+    says: "`gluon uninstall` (docs/getting-started/install.md \"Uninstall\")",
+    entries: {
+      asks: b("in a terminal it lists what it removes and asks `[y/N]` (anything but y keeps everything); without one it needs `--yes` and removes nothing; it takes only `--yes` (and `--help`)"),
+      removes: b("it removes the config, the saved keys, `routing.yaml` and the saved sessions next to it, Gluon's files in the agents' directories, the cost audit ledger, the price tables, the analytics database (with `-wal`, `-shm`) and its stale temporary directories, then the default config directory once empty, saying `Removed <path>` for each; with nothing left to remove it still succeeds"),
+      "only-gluons": b("it never removes anything else: with `GLUON_CONFIG`, only Gluon's files there (never that directory, the user's own files, their `.env` minus Gluon's keys, their own `.gluon-*` or workspace-named files), the state directory around Gluon's, a running launch's spec and neutral directories; a symlink at a path it removes is never followed; it says it removed only what it removed"),
     },
   },
   "whole-app": {
@@ -381,6 +418,7 @@ export const CATALOG: Record<string, Feature> = {
       soak: perf("given 5 sessions printing for minutes, then nothing grows without bound"),
       smoke: perf("when Gluon starts, opens three sessions and takes keys and tab switches, then each stays under the noticeable limit (the fast check of the perf suite)", ["e2e"]),
       polling: perf("given N sessions in one work tree, then a files-changed poll runs three git processes; an unchanged events directory is not listed again (at least every `FULL_LIST_MS`), and a read event is removed", ["seam"]),
+      "hook-light": perf("`gluon hook` and `gluon signal` run on every tool call or status change of a launched agent, so nothing under `src/cost/` and not `src/models.ts` is reachable by an import from `src/internal.ts`", ["code"]),
     },
   },
 };

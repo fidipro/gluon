@@ -570,7 +570,7 @@ describe("review of PR #1", () => {
     }
   });
 
-  test("BUG-421/models-key-removed: a `models:` key in the config is ignored with one notice: the catalog is Gluon's own, an extra model is never offered", () => {
+  test("a `models:` key in the config is ignored with one notice: the catalog is Gluon's own, an extra model is never offered", () => {
     writeFileSync(process.env.GLUON_CONFIG!, "connections: { claude-code: { auth: subscription } }\nmodels:\n  claude-code:\n    - { id: sonnet }\n    - { id: claude-next-preview, label: Next, note: trial }\n");
     const seen: string[] = [];
     setConfigNotices((m) => seen.push(m));

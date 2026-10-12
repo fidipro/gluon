@@ -61,7 +61,7 @@ afterAll(() => {
 });
 
 describe.skipIf(!POSIX)("doctor", () => {
-  test("everything works: ✓ lines only, exit 0, the brain step in use is marked, and the key's source is named, never the key", async () => {
+  test("doctor/checks: everything works: ✓ lines only, exit 0, the brain step in use is marked, and the key's source is named, never the key", async () => {
     const d = setup(OPENAI, {});
     process.env.OPENAI_API_KEY = KEY;
     const { code, text } = await printed(() => doctor(loadConfig(), d));
@@ -74,7 +74,7 @@ describe.skipIf(!POSIX)("doctor", () => {
     expect(text).not.toContain("abcdefghijklmnop");
   });
 
-  test("mixed: one model refused is a ✗ line and exit 1, the others stay ✓, and the brain still works", async () => {
+  test("doctor/checks: mixed: one model refused is a ✗ line and exit 1, the others stay ✓, and the brain still works", async () => {
     const d = setup(OPENAI, { "openai/gpt-6-luna": "model not found" });
     process.env.OPENAI_API_KEY = KEY;
     const { code, text } = await printed(() => doctor(loadConfig(), d));
@@ -84,7 +84,7 @@ describe.skipIf(!POSIX)("doctor", () => {
     expect(text).toContain("← in use");
   });
 
-  test("all ✗: every agent model refused, so no agent can be launched: exit 1; the next run on the same config starts clean (exit 0 once they answer)", async () => {
+  test("doctor/checks: all ✗: every agent model refused, so no agent can be launched: exit 1; the next run on the same config starts clean (exit 0 once they answer)", async () => {
     const d = setup(OPENAI, { "openai/gpt-6-luna": "denied", "openai/gpt-6.1-sol": "denied", "openai/gpt-6-astra": "denied" });
     process.env.OPENAI_API_KEY = KEY;
     const bad = await printed(() => doctor(loadConfig(), d));
@@ -98,7 +98,7 @@ describe.skipIf(!POSIX)("doctor", () => {
     expect(good.code).toBe(0);
   });
 
-  test("nothing installed and nothing connected: a ✗ for the missing launch, exit 1, install commands shown", async () => {
+  test("doctor/checks: nothing installed and nothing connected: a ✗ for the missing launch, exit 1, install commands shown", async () => {
     const d = setup("", {}, []);
     const { code, text } = await printed(() => doctor(loadConfig(), d));
     expect(code).toBe(1);
@@ -118,7 +118,7 @@ describe.skipIf(!POSIX)("doctor", () => {
     expect(text).not.toContain("abcdefghijklmnopqrstuvwxyz0123");
   });
 
-  test("`gluon brain`: the step in use with its effort, exit 0; with no working step, ✗ and exit 1", async () => {
+  test("doctor/brain: `gluon brain`: the step in use with its effort, exit 0; with no working step, ✗ and exit 1", async () => {
     const d = setup(OPENAI, {});
     process.env.OPENAI_API_KEY = KEY;
     const ok = await printed(() => showBrain(loadConfig(), d));
@@ -131,7 +131,7 @@ describe.skipIf(!POSIX)("doctor", () => {
   });
 });
 
-test("BUG-79/doctor-warnings: a ChatGPT-plan step that works with something Gluon hasn't checked shows ✓ and the warning under it in `gluon brain`", async () => {
+test("doctor/warnings: a ChatGPT-plan step that works with something Gluon hasn't checked shows ✓ and the warning under it in `gluon brain` #BUG-79/doctor-warnings", async () => {
   const d = setup("connections: { codex: { auth: subscription } }\nbrain: { order: [{ route: chatgpt-plan, model: gpt-6-sol }] }\n", {});
   process.env.FAKE_CODEX_FEATURES_EXTRA = "hosted_agent_tools  stable  true";
   process.env.FAKE_CODEX_FORCED_ON = "unified_exec,hosted_agent_tools";
@@ -141,7 +141,7 @@ test("BUG-79/doctor-warnings: a ChatGPT-plan step that works with something Gluo
   expect(text).toMatch(/\n {6}! This codex keeps features on that Gluon hasn't checked \(hosted_agent_tools\)/);
 });
 
-test("BUG-79/doctor-once: `gluon doctor` says a codex warning once under the ChatGPT plan, not once per model", async () => {
+test("doctor/warnings: `gluon doctor` says a codex warning once under the ChatGPT plan, not once per model #BUG-79/doctor-once", async () => {
   const d = setup("connections: { codex: { auth: subscription } }\nbrain: { order: [{ route: chatgpt-plan, model: gpt-6-sol }] }\n", {});
   process.env.FAKE_CODEX_FEATURES_EXTRA = "hosted_agent_tools  stable  true";
   process.env.FAKE_CODEX_FORCED_ON = "unified_exec,hosted_agent_tools";
@@ -155,7 +155,7 @@ test("BUG-79/doctor-once: `gluon doctor` says a codex warning once under the Cha
 describe("stepLine and awsLabel", () => {
   const step = (route: string, model: string) => ({ route, model }) as StepResult["step"];
   const at = (i: number, result: StepResult["result"]): StepResult => ({ index: i, step: step("openai-api", "gpt-6-sol"), result }) as StepResult;
-  test("every state: in use, working, failed, not connected (·, not ✗), not tried", () => {
+  test("doctor/brain: every state: in use, working, failed, not connected (·, not ✗), not tried", () => {
     expect(stepLine(at(3, { ok: true } as never), 3)).toMatch(/^ {2}✓ 4\. .* {3}← in use$/);
     expect(stepLine(at(0, { ok: true } as never), 3)).toMatch(/^ {2}✓ 1\. /);
     expect(stepLine(at(1, { ok: false, error: "key rejected" } as never), 3)).toMatch(/^ {2}✗ 2\. .* · key rejected$/);
@@ -164,11 +164,11 @@ describe("stepLine and awsLabel", () => {
     expect(stepLine(at(5, null), 3)).toContain("not tried (step 4 is in use)");
     expect(stepLine(at(5, null), null)).toContain("not tried (step 1 is in use)");
   });
-  test("with effort: the step's own, the default marked, or no effort setting", () => {
+  test("doctor/brain: with effort: the step's own, the default marked, or no effort setting", () => {
     expect(stepLine({ ...at(0, { ok: true } as never), step: { route: "openai-api", model: "gpt-6-sol", effort: "high" } } as StepResult, 0, true)).toContain("· effort high");
     expect(stepLine(at(0, { ok: true } as never), 0, true)).toMatch(/· effort \w+ \(default\)|· no effort setting/);
   });
-  test("awsLabel names the profile and region, never a key", () => {
+  test("doctor/checks: awsLabel names the profile and region, never a key", () => {
     const config = defaults();
     config.bedrock = { profile: "work", region: "eu-west-1" };
     expect(awsLabel(config)).toBe("AWS profile work, eu-west-1");

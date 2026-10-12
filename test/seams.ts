@@ -77,6 +77,10 @@ export const SEAMS: Record<string, Seam> = {
     says: "a work tree and an events directory over time → the files changed and the events read, and the processes and listings each poll costs",
     modules: ["src/files-poll.ts", "src/events.ts"],
   },
+  doctor: {
+    says: "a config, the probes' answers (`GLUON_TEST_PROBES`) and the agents on PATH → the lines `gluon doctor` and `gluon brain` print, and their exit code",
+    modules: ["src/doctor.ts"],
+  },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory and the stale sweep",
     modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts"],

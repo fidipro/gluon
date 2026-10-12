@@ -62,7 +62,7 @@ describe("header", () => {
 });
 
 describe("terminal", () => {
-  test("BUG-26: refuses to start without a terminal", async () => {
+  test("cli/needs-terminal: refuses to start without a terminal #BUG-26", async () => {
     const r = await cli(["--demo"], { cwd: repo.tiny() });
     expect(r.code).toBe(2);
     expect(r.stderr).toContain("needs an interactive terminal");
@@ -124,7 +124,7 @@ describe("terminal", () => {
 });
 
 describe("agents on PATH", () => {
-  test("A12: with no agent installed it says which binaries it looked for", async () => {
+  test("cli/no-agents: with no agent installed it says which binaries it looked for #A12", async () => {
     const app = new App({ cwd: repo.tiny(), agents: [] });
     expect(await app.exitCode(5000)).toBe(2);
     expect(app.history().replace(/\n/g, "")).toContain("none of claude, codex, agy, grok, opencode, kimi is on PATH");

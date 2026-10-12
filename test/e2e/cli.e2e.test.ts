@@ -4,7 +4,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os";
 import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { readEvents } from "../../src/events.ts";
+import { defaults } from "../../src/config.ts";
 import { DEFAULT_ROUTING_YAML } from "../../src/routing-config.ts";
+import { SUBCOMMANDS } from "../../src/usage.ts";
 import { config, fakeAgents, repo, WIN } from "./fixtures.ts";
 import { PINNED } from "../fixtures/harness-versions.ts";
 import { App, baseEnv, BUN_FLAGS, cli, GLUON, QUESTION, SLOW, start, stopAll, SYSTEM_PATH, tracked } from "./harness.ts";
@@ -13,13 +15,20 @@ setDefaultTimeout(30_000 * SLOW);
 afterAll(stopAll);
 
 describe("arguments (BUG-21/22)", () => {
-  test("G1: --help lists the harnesses and their models", async () => {
+  test("cli/help: --help lists the harnesses and their models #G1", async () => {
     const r = await cli(["--help"]);
     expect(r.code).toBe(0);
     // Efforts are the model's: Haiku 5.5 takes every level, DeepSeek low, high, max, Kimi K2.7 Code none.
     expect(r.stdout).toContain("claude-code (models: haiku [low, medium, high, xhigh, max], sonnet [low, medium, high, xhigh, max], opus [low, medium, high, xhigh, max], fable [");
     expect(r.stdout).toContain("opencode (models: deepseek-flash [low, high, max], muse-spark-1.3 [low, medium, high, xhigh, max], muse-spark-1.3-contributor [low, medium, high, xhigh])");
     for (const h of ["codex", "antigravity", "grok-build", "opencode"]) expect(r.stdout).toContain(`${h} (models: `);
+    // The version, every subcommand, every flag, every model of the built-in catalog, the stats forms.
+    expect(r.stdout).toMatch(/^gluon \d+\.\d+\.\d+ — Gluon, a control platform for coding agents\n/);
+    for (const c of SUBCOMMANDS) expect(r.stdout).toContain(`gluon ${c}`);
+    for (const name of ["launch", "model", "effort", "mode", "dry-run", "all", "force", "delete", "demo", "version"]) expect(r.stdout).toContain(`--${name}`);
+    for (const a of defaults().agents) for (const m of a.models) expect(r.stdout).toContain(m.id);
+    for (const form of ["gluon stats", "gluon stats sessions", "gluon stats <id>", "gluon stats sql", "gluon stats --delete"]) expect(r.stdout).toContain(form);
+    expect(r.stdout).not.toContain("undefined");
   });
 
   test("BUG-454/routing: `routing path` says where routing.yaml is (next to the config), `routing check` reports a typo and exits 1, and a clean file exits 0 @full", async () => {
@@ -85,13 +94,13 @@ describe("arguments (BUG-21/22)", () => {
     }
   });
 
-  test("G2: --version prints the version", async () => {
+  test("cli/version: --version prints the version #G2", async () => {
     const r = await cli(["--version"]);
     expect(r.code).toBe(0);
     expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  test("G3/G4: bad flags get a short error, no stack trace", async () => {
+  test("cli/bad-args: bad flags get a short error, no stack trace #G3/G4", async () => {
     for (const args of [["--foo"], ["--launch"]]) {
       const r = await cli(args);
       expect(r.code).toBe(2);
@@ -100,13 +109,13 @@ describe("arguments (BUG-21/22)", () => {
     }
   });
 
-  test("G15: a mistyped subcommand is caught", async () => {
+  test("cli/did-you-mean: a mistyped subcommand is caught #G15", async () => {
     const r = await cli(["doctr"]);
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('did you mean "gluon doctor"');
   });
 
-  test("G15: a task on the command line is the first message @full", async () => {
+  test("cli/task-words: a task on the command line is the first message @full #G15", async () => {
     const app = await start({ cwd: repo.tiny(), args: ["fix the add bug"], rows: 40 });
     await app.waitFor(QUESTION, 20_000);
     expect(app.screen()).toContain("›  fix the add bug");
@@ -124,14 +133,14 @@ describe("config (BUG-23)", () => {
     ["opencode-providers", "connections: { opencode: { providers: opencode-go } }\n", "connections.opencode.providers must be a list"],
     ["scalar-string", "just a string\n", "expected a mapping"],
   ];
-  test.each(cases)("%s is refused with a readable message", async (name, yaml, message) => {
+  test.each(cases)("config/refused: %s is refused with a readable message", async (name, yaml, message) => {
     const r = await cli(["--help"], { env: { GLUON_CONFIG: config(name, yaml) } });
     expect(r.code).toBe(2);
     expect(r.stderr).toContain(message);
     expect(r.stderr).not.toContain("    at ");
   });
 
-  test("BUG-421/models-key-removed: a `models:` key is ignored with one notice: --help lists the built-in catalog, never the config's", async () => {
+  test("config/defaults-and-migration: a `models:` key is ignored with one notice: --help lists the built-in catalog, never the config's #BUG-421/models-key-removed", async () => {
     const r = await cli(["--help"], { env: { GLUON_CONFIG: config("models-ignored", "models:\n  claude-code:\n    - id: sonnet\n    - { id: sonnet-6, label: Sonnet 6, ids: { plan: sonnet, anthropic: claude-sonnet-6 } }\n") } });
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("claude-code (models: haiku [low, medium, high, xhigh, max], sonnet [");
@@ -139,14 +148,14 @@ describe("config (BUG-23)", () => {
     expect(r.stderr).toContain("`models:` is no longer read");
   });
 
-  test("A18: an empty config uses the defaults", async () => {
+  test("config/defaults-and-migration: an empty config uses the defaults #A18", async () => {
     const r = await cli(["--help"], { env: { GLUON_CONFIG: config("empty", "") } });
     expect(r.code).toBe(0);
   });
 });
 
 describe("doctor (BUG-24)", () => {
-  test("reports a brain problem with ✗, a hint and exit 1, without the aws CLI", async () => {
+  test("doctor/checks: reports a brain problem with ✗, a hint and exit 1, without the aws CLI", async () => {
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: config("anthropic", "connections: { claude-code: { auth: api, provider: anthropic } }\n"), ANTHROPIC_API_KEY: undefined, PATH: [fakeAgents(["claude", "opencode"]), ...SYSTEM_PATH].join(delimiter) } });
     expect(r.code).toBe(1);
     expect(r.stdout).toContain(`✗ Claude Code (claude ${PINNED.claude}) · Anthropic key`);
@@ -191,7 +200,7 @@ describe("QA pass 2", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("BUG-64/9.3: a read-only config: a warning, the normal output and exit code, no stack trace", async () => {
+  test("config/defaults-and-migration: a read-only config: a warning, the normal output and exit code, no stack trace #BUG-64/9.3", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-ro-"));
     const path = join(dir, "config.yaml");
     writeFileSync(path, "notices: { claude: 2026-01-01 }\nconnections: { claude-code: { auth: subscription } }\n");
@@ -214,7 +223,7 @@ describe("QA pass 2", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("BUG-72/2.12: a subcommand with extra words is an error, not a task", async () => {
+  test("cli/bad-args: a subcommand with extra words is an error, not a task #BUG-72/2.12", async () => {
     for (const args of [["doctor", "now"], ["connect", "claude-code", "extra"], ["setup", "again"], ["brain", "please"]]) {
       const r = await cli(args);
       expect(r.code).toBe(2);
@@ -222,7 +231,7 @@ describe("QA pass 2", () => {
     }
   });
 
-  test("BUG-60/7.4: --launch refuses a model the harness has no such model of, or the connection can't serve @full", async () => {
+  test("direct-launch/refused: --launch refuses a model the harness has no such model of, or the connection can't serve @full #BUG-60/7.4", async () => {
     const cases: [string, string[], string][] = [
       ["connections: { claude-code: { auth: subscription } }\n", ["claude-code", "--model", "opus-4.6"], 'Claude Code has no model "opus-4.6" (models: haiku, sonnet, opus, fable)'],
       ["connections: { codex: { auth: api, provider: openai } }\n", ["codex", "--model", "gpt-oss-120b"], 'Codex has no model "gpt-oss-120b" (models: gpt-6-luna, gpt-6.1-sol, gpt-6-astra)'],
@@ -239,7 +248,7 @@ describe("QA pass 2", () => {
     expect((await dry("connections: { opencode: { providers: [openrouter] } }\n", ["opencode", "--model", "muse-spark-1.3"], { OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef0123" })).code).toBe(0);
   });
 
-  test("BUG-55/7.1: --dry-run never prints a key, whatever its shape, for every provider (the OpenCode plan has none)", async () => {
+  test("direct-launch/dry-run: --dry-run never prints a key, whatever its shape, for every provider (the OpenCode plan has none) #7.1", async () => {
     const keys: Record<string, string> = {
       XAI_API_KEY: "xai-EEEEEEEEEEEEEEEEEEEE",
       OPENROUTER_API_KEY: "sk-or-v1-CCCCCCCCCCCCCCCCCCCC",
@@ -257,7 +266,7 @@ describe("QA pass 2", () => {
     }
   });
 
-  test("BUG-51/2.3: an API-key connection forces the key over the harness's own subscription login", async () => {
+  test("launch/environment: an API-key connection forces the key over the harness's own subscription login #BUG-51/2.3", async () => {
     const codex = await dry("connections: { codex: { auth: api, provider: openai } }\n", ["codex", "--model", "gpt-6.1-sol"], { OPENAI_API_KEY: "sk-proj-0123456789abcdef0123" });
     const c = JSON.parse(codex.stdout);
     expect(c.argv).toEqual([
@@ -280,14 +289,14 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
   const events = (dir: string) => readdirSync(dir).filter((n) => n.endsWith(".event")).map((n) => readFileSync(join(dir, n), "utf8"));
   const channel = (dir: string, pieces = "clear,compact") => ({ GLUON_EVENTS: dir, GLUON_HANDOFF: pieces });
 
-  test("G16: signal outside a launch does nothing: exit 0, no output", async () => {
+  test("events/inert-outside-launch: signal outside a launch does nothing: exit 0, no output #G16", async () => {
     for (const args of [["signal", "clear"], ["signal"], ["signal", "back", "x"]]) {
       const r = await cli(args);
       expect([args, r.code, r.stdout, r.stderr]).toEqual([args, 0, "", ""]);
     }
   });
 
-  test("BUG-141/v1 fixes: an unquoted session starting with signal or hook, typed in a terminal, says how to quote it", async () => {
+  test("cli/task-words: an unquoted session starting with signal or hook, typed in a terminal, says how to quote it #BUG-141/v1", async () => {
     for (const args of [["signal", "is", "flaky"], ["hook", "up", "the", "logger"]]) {
       const app = new App({ cwd: repo.tiny(), args, noDemo: true, cols: 200 });
       expect(await app.exitCode()).toBe(2);
@@ -300,7 +309,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     }
   });
 
-  test("G17: signal writes `back` and nothing else (v1's clear and session-start, a compact without its hook, bad words); a missing dir is never created", async () => {
+  test("tabs/back-event: signal writes `back` and nothing else (v1's clear and session-start, a compact without its hook, bad words); a missing dir is never created #G17", async () => {
     const dir = scratch();
     const ok = await cli(["signal", "back"], { env: channel(dir) });
     expect([ok.code, ok.stdout, ok.stderr]).toEqual([0, "", ""]);
@@ -319,14 +328,14 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("G18: `back` doesn't depend on GLUON_HANDOFF (the user asked)", async () => {
+  test("tabs/back-event: `back` doesn't depend on GLUON_HANDOFF (the user asked) #G18", async () => {
     const dir = scratch();
     await cli(["signal", "back"], { env: channel(dir, "") });
     expect(events(dir)).toEqual(["back"]);
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("G19: `gluon mcp` is no subcommand any more: it's handled like any other first word, and nothing speaks MCP", async () => {
+  test("cli/task-words: `gluon mcp` is no subcommand any more: it's handled like any other first word, and nothing speaks MCP #G19", async () => {
     const dir = scratch();
     const r = await cli(["mcp"], { cwd: repo.tiny(), env: channel(dir) });
     expect(r.code).not.toBe(0);
@@ -336,7 +345,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("G20: hook: a waiting PreCompact hook asks through the events dir and answers the harness (Claude: block on yes)", async () => {
+  test("clear-compact/auto-compact: hook: a waiting PreCompact hook asks through the events dir and answers the harness (Claude: block on yes) #G20", async () => {
     const dir = scratch();
     const proc = tracked(Bun.spawn([...GLUON, "hook", "claude-code", "pre-compact"], { cwd: repo.tiny(), env: baseEnv(undefined, channel(dir)), stdin: "pipe", stdout: "pipe", stderr: "pipe" }));
     proc.stdin.write('{"hook_event_name":"PreCompact","trigger":"auto"}');
@@ -365,7 +374,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     return { root, ...dirs, env };
   }
 
-  test("G21: uninstall --yes removes the config, keys, grok-key-launch and stale temp dirs, then the empty default config dir; a live launch's dir stays", async () => {
+  test("uninstall/removes: uninstall --yes removes the config, keys, grok-key-launch and stale temp dirs, then the empty default config dir; a live launch's dir stays #G21", async () => {
     const s = sandbox();
     const cfg = join(s.xdg, "gluon");
     mkdirSync(join(cfg, "grok-key-launch"), { recursive: true });
@@ -384,7 +393,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("BUG-356/uninstall-ledger: uninstall --yes removes the audit ledger (every file and the directory); the state directory around it stays, and a symlink at its path is never followed", async () => {
+  test("uninstall/removes: uninstall --yes removes the audit ledger (every file and the directory); the state directory around it stays, and a symlink at its path is never followed #BUG-356/uninstall-ledger", async () => {
     const s = sandbox();
     const state = join(s.root, "state");
     const ledger = join(state, "gluon", "cost-audit");
@@ -408,7 +417,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     }
   });
 
-  test("BUG-364/pricing-update: uninstall --yes removes the price-table overlay `gluon pricing update` kept, in the state directory", async () => {
+  test("uninstall/removes: uninstall --yes removes the price-table overlay `gluon pricing update` kept, in the state directory #BUG-364/pricing-update", async () => {
     const s = sandbox();
     const state = join(s.root, "state");
     const tables = join(state, "gluon", "tables");
@@ -422,7 +431,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("analytics: uninstall --yes removes the analytics database with its -wal and -shm, in the state directory, and leaves the rest of it", async () => {
+  test("uninstall/removes: uninstall --yes removes the analytics database with its -wal and -shm, in the state directory, and leaves the rest of it", async () => {
     const s = sandbox();
     const state = join(s.root, "state");
     const gluon = join(state, "gluon");
@@ -440,7 +449,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("BUG-289/resume: uninstall --yes removes the saved sessions (workspaces/) and a failed save's leftovers, and the config dir with them; with GLUON_CONFIG only that directory", async () => {
+  test("uninstall/removes: uninstall --yes removes the saved sessions (workspaces/) and a failed save's leftovers, and the config dir with them; with GLUON_CONFIG only that directory #BUG-289/resume", async () => {
     const s = sandbox();
     const cfg = join(s.xdg, "gluon");
     mkdirSync(join(cfg, "workspaces", ".gluon-abc123"), { recursive: true });
@@ -463,7 +472,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("BUG-293/resume: uninstall --yes with GLUON_CONFIG beside a directory of the user's own named workspaces removes only Gluon's session files from it", async () => {
+  test("uninstall/only-gluons: uninstall --yes with GLUON_CONFIG beside a directory of the user's own named workspaces removes only Gluon's session files from it #BUG-293/resume", async () => {
     const s = sandbox();
     const mine = join(s.root, "dotfiles");
     mkdirSync(join(mine, "workspaces", "project"), { recursive: true });
@@ -482,7 +491,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("uninstall keeps a running Gluon's spec and neutral-cwd dirs (their pid file)", async () => {
+  test("uninstall/only-gluons: uninstall keeps a running Gluon's spec and neutral-cwd dirs (their pid file)", async () => {
     const s = sandbox();
     for (const d of ["gluon-spec-live", "gluon-cwd-live", "gluon-spec-dead", "gluon-cwd-dead"]) {
       mkdirSync(join(s.tmp, d));
@@ -494,7 +503,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("BUG-456/routing: uninstall --yes removes routing.yaml with the config, also beside a GLUON_CONFIG, and never anything else in that directory", async () => {
+  test("uninstall/removes: uninstall --yes removes routing.yaml with the config, also beside a GLUON_CONFIG, and never anything else in that directory #BUG-456/routing", async () => {
     const s = sandbox();
     const cfg = join(s.xdg, "gluon");
     mkdirSync(cfg, { recursive: true });
@@ -514,7 +523,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("G22: uninstall with GLUON_CONFIG removes only Gluon's files there, never the directory or anything else in it", async () => {
+  test("uninstall/only-gluons: uninstall with GLUON_CONFIG removes only Gluon's files there, never the directory or anything else in it #G22", async () => {
     const s = sandbox();
     const mine = join(s.root, "dotfiles");
     mkdirSync(mine);
@@ -531,7 +540,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("BUG-156/v1 fixes: uninstall with GLUON_CONFIG in the user's directory keeps their .env, minus Gluon's keys, and their own .gluon-* dirs", async () => {
+  test("uninstall/only-gluons: uninstall with GLUON_CONFIG in the user's directory keeps their .env, minus Gluon's keys, and their own .gluon-* dirs #BUG-156/v1", async () => {
     const s = sandbox();
     const mine = join(s.root, "project");
     mkdirSync(mine);
@@ -553,7 +562,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("G23: uninstall without a terminal asks for --yes and removes nothing; it's in --help and takes no other words", async () => {
+  test("uninstall/asks: uninstall without a terminal asks for --yes and removes nothing; it's in --help and takes no other words #G23", async () => {
     const s = sandbox();
     const cfg = join(s.xdg, "gluon", "config.yaml");
     mkdirSync(dirname(cfg));
@@ -568,7 +577,7 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     rmSync(s.root, { recursive: true, force: true });
   });
 
-  test("G24: uninstall in a terminal lists what it removes and asks; no keeps everything, yes removes it", async () => {
+  test("uninstall/asks: uninstall in a terminal lists what it removes and asks; no keeps everything, yes removes it #G24", async () => {
     const s = sandbox();
     const cfg = join(s.xdg, "gluon", "config.yaml");
     mkdirSync(dirname(cfg));
@@ -688,13 +697,13 @@ describe("QA B5: the flag matrix", () => {
     }
   };
 
-  test("BUG-599/QA-cli-02: a flag after a prompt that starts with `- ` is a flag, not part of the spec: `--dry-run` there never starts the agent", async () => {
+  test("cli/task-words: a flag after a prompt that starts with `- ` is a flag, not part of the spec: `--dry-run` there never starts the agent #BUG-599/QA-cli-02", async () => {
     const r = await launched(["- fix the bug", "--dry-run"]);
     expect([r.code, r.ran]).toEqual([0, false]);
     expect(r.argv).toEqual(["claude", "--model", "sonnet", "--", "- fix the bug"]);
   });
 
-  test("BUG-599/variants: flags before, after and around a `- ` prompt; a spec that looks like a flag; an explicit `--`; an unknown later flag still errors @full", async () => {
+  test("cli/task-words: flags before, after and around a `- ` prompt; a spec that looks like a flag; an explicit `--`; an unknown later flag still errors @full #BUG-599/variants", async () => {
     // Flags on both sides of the prompt, and --mode after it.
     const around = await launched(["--dry-run", "- fix the bug", "--mode", "explore"]);
     expect([around.code, around.ran]).toEqual([0, false]);
@@ -720,7 +729,7 @@ describe("QA B5: the flag matrix", () => {
     expect([x.code, x.ran, x.stderr]).toEqual([2, false, expect.stringContaining("Unknown option '-x'")]);
   });
 
-  test("BUG-600/QA-cli-03: --model, --effort and --dry-run without --launch are refused like --mode is (\"goes with --launch\"), not silently ignored @full", async () => {
+  test("cli/bad-args: --model, --effort and --dry-run without --launch are refused like --mode is (\"goes with --launch\"), not silently ignored @full #BUG-600/QA-cli-03", async () => {
     const seen: string[] = [];
     for (const flag of [["--model", "sonnet"], ["--effort", "high"], ["--dry-run"], ["--mode", "explore"]]) {
       // A subcommand that reads files only, one that needs a config, an installer and a bare prompt.
@@ -735,7 +744,7 @@ describe("QA B5: the flag matrix", () => {
     expect((await launched(["--effort", "high", "--dry-run", "x"])).code).toBe(0);
   });
 
-  test("BUG-601/QA-cli-04: an empty `--launch=` is an error that names --launch, not a silent fall-through to the chat's \"needs an interactive terminal\"", async () => {
+  test("cli/bad-args: an empty `--launch=` is an error that names --launch, not a silent fall-through to the chat's \"needs an interactive terminal\" #BUG-601/QA-cli-04", async () => {
     for (const args of [["--launch=", "--model", "sonnet", "fix it"], ["--launch", "", "--model", "sonnet", "fix it"], ["--launch", "", "fix it"]]) {
       const r = await cli(args);
       expect([args.join(" "), r.code, r.stderr]).toEqual([args.join(" "), 2, expect.stringContaining("--launch needs an agent")]);
@@ -743,7 +752,7 @@ describe("QA B5: the flag matrix", () => {
     }
   });
 
-  test("BUG-601/variants: an empty --effort (with or without --launch) and an empty --model name their flag", async () => {
+  test("cli/bad-args: an empty --effort (with or without --launch) and an empty --model name their flag #BUG-601/variants", async () => {
     const effort = await launched(["--effort", "", "--dry-run", "x"]);
     expect([effort.code, effort.ran, effort.stderr]).toEqual([2, false, expect.stringContaining("--effort needs a value")]);
     const effort2 = await cli(["--effort=", "fix it"]);
@@ -754,7 +763,7 @@ describe("QA B5: the flag matrix", () => {
     expect([loose.code, loose.stderr]).toEqual([2, expect.stringContaining("--model goes with --launch")]);
   });
 
-  test("BUG-617/QA-cli-05: `--help` after cost-report or uninstall prints the usage (it is refused as \"takes no arguments\" / \"quote it as a session\")", async () => {
+  test("cli/help: `--help` after cost-report or uninstall prints the usage (it is refused as \"takes no arguments\" / \"quote it as a session\") #BUG-617/QA-cli-05", async () => {
     const results: string[] = [];
     for (const sub of ["cost-report", "uninstall"]) {
       const r = await cli([sub, "--help"]);
@@ -763,13 +772,13 @@ describe("QA B5: the flag matrix", () => {
     expect(results).toEqual(["cost-report: 0 usage", "uninstall: 0 usage"]);
   });
 
-  test("BUG-618/QA-cli-06: a mistyped `stats`, `pricing` or `cost-report` gets a \"did you mean\" like the other subcommands (SUBCOMMANDS lacks them), not a chat with the typo as its first message @full", async () => {
+  test("cli/did-you-mean: a mistyped `stats`, `pricing` or `cost-report` gets a \"did you mean\" like the other subcommands (SUBCOMMANDS lacks them), not a chat with the typo as its first message @full #BUG-618/QA-cli-06", async () => {
     const hints: string[] = [];
     for (const word of ["stat", "pricin", "cost-reprot"]) hints.push(`${word}: ${(await cli([word])).stderr.includes("did you mean") ? "hint" : "no hint"}`);
     expect(hints).toEqual(["stat: hint", "pricin: hint", "cost-reprot: hint"]);
   });
 
-  test("BUG-617/variants: -h works after cost-report and uninstall, with a broken config and without it removing anything", async () => {
+  test("cli/help: -h works after cost-report and uninstall, with a broken config and without it removing anything #BUG-617/variants", async () => {
     for (const sub of ["cost-report", "uninstall"]) {
       const r = await cli([sub, "-h"], { env: { GLUON_CONFIG: config("qa-cli-05-broken", "connections: [\n") } });
       expect([sub, r.code, r.stdout.includes(`gluon ${sub}`)]).toEqual([sub, 0, true]);
@@ -778,13 +787,13 @@ describe("QA B5: the flag matrix", () => {
     expect((await cli(["uninstall", "--nope"])).stderr).toContain("uninstall takes only --yes");
   });
 
-  test("BUG-618/variants: the hint names the command it is near", async () => {
+  test("cli/did-you-mean: the hint names the command it is near #BUG-618/variants", async () => {
     const r = await cli(["pricin"]);
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('did you mean "gluon pricing"');
   });
 
-  test("BUG-602/QA-cli-07: `--launch <harness>` without --model says --model is missing, not `has no model \"\"`", async () => {
+  test("cli/bad-args: `--launch <harness>` without --model says --model is missing, not `has no model \"\"` #BUG-602/QA-cli-07", async () => {
     const r = await cli(["--launch", "claude-code", "x"]);
     expect(r.code).toBe(2);
     expect(r.stderr).toContain("--model is required with --launch (claude-code models: haiku, sonnet, opus, fable)");
@@ -796,34 +805,34 @@ describe("QA B5: the flag matrix", () => {
 });
 
 describe("QA B5: config and paths", () => {
-  test("BUG-619/QA-onb-01: a config that has the first version's `auth:` key and a malformed `connections:` is \"bad config\" (exit 2), not a raw YAML library stack (exit 1)", async () => {
+  test("config/refused: a config that has the first version's `auth:` key and a malformed `connections:` is \"bad config\" (exit 2), not a raw YAML library stack (exit 1) #BUG-619/QA-onb-01", async () => {
     const r = await cli(["--help"], { env: { GLUON_CONFIG: config("qa-onb-01", "auth: { claude-code: api }\nconnections: 5\n") } });
     expect(r.stderr).not.toContain("node_modules");
     expect(r.stderr).toContain("bad config");
     expect(r.code).toBe(2);
   });
 
-  test("BUG-619/variants: a first-version `auth:` with an empty or valid `connections:` still migrates (no crash, no bad config)", async () => {
+  test("config/defaults-and-migration: a first-version `auth:` with an empty or valid `connections:` still migrates (no crash, no bad config) #BUG-619/variants", async () => {
     const empty = await cli(["--help"], { env: { GLUON_CONFIG: config("qa-onb-01-null", "auth: { claude-code: api }\nconnections:\n") } });
     expect([empty.code, empty.stderr]).toEqual([0, ""]);
     const list = await cli(["--help"], { env: { GLUON_CONFIG: config("qa-onb-01-list", "auth: { claude-code: api }\nconnections: [a]\n") } });
     expect([list.code, list.stderr]).toEqual([2, expect.stringContaining("connections must be a mapping")]);
   });
 
-  test("BUG-620/QA-onb-02: a relative XDG_CONFIG_HOME is ignored (the XDG spec says so): Gluon's config, saved keys and routing.yaml never land in the repository it runs in", async () => {
+  test("config/paths: a relative XDG_CONFIG_HOME is ignored (the XDG spec says so): Gluon's config, saved keys and routing.yaml never land in the repository it runs in #BUG-620/QA-onb-02", async () => {
     const r = await cli(["routing", "path"], { cwd: repo.tiny(), env: { GLUON_CONFIG: "", XDG_CONFIG_HOME: "qa-relative-xdg" } });
     expect(r.code).toBe(0);
     expect(isAbsolute(r.stdout.trim())).toBe(true);
     expect(r.stdout).not.toContain("qa-relative-xdg");
   });
 
-  test("BUG-621/QA-onb-03: a relative GLUON_CONFIG is made absolute at startup (BUG-291 does it only for `resume`): its `.env` of keys is not whatever `.env` the repository has", async () => {
+  test("config/paths: a relative GLUON_CONFIG is made absolute at startup (BUG-291 does it only for `resume`): its `.env` of keys is not whatever `.env` the repository has #BUG-621/QA-onb-03", async () => {
     const r = await cli(["routing", "path"], { cwd: repo.tiny(), env: { GLUON_CONFIG: "config.yaml" } });
     expect(r.code).toBe(0);
     expect(isAbsolute(r.stdout.trim())).toBe(true);
   });
 
-  test("BUG-622/QA-onb-04: a config path that can't be read (a directory) is reported as unreadable, not as \"is not valid YAML\"", async () => {
+  test("config/refused: a config path that can't be read (a directory) is reported as unreadable, not as \"is not valid YAML\" #BUG-622/QA-onb-04", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-qa-onb04-"));
     const r = await cli(["--help"], { env: { GLUON_CONFIG: dir } });
     expect(r.code).toBe(2);
@@ -831,7 +840,7 @@ describe("QA B5: config and paths", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("BUG-623/QA-onb-05: `uninstall` doesn't say it removed session files when the workspaces directory holds none of Gluon's (only the user's own file)", async () => {
+  test("uninstall/only-gluons: `uninstall` doesn't say it removed session files when the workspaces directory holds none of Gluon's (only the user's own file) #BUG-623/QA-onb-05", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-qa-onb05-"));
     const env = { GLUON_CONFIG: join(dir, "config.yaml"), XDG_STATE_HOME: join(dir, "state") };
     mkdirSync(join(dir, "workspaces"));

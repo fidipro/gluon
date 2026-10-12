@@ -272,7 +272,7 @@ describe("the ledger on disk", () => {
     expect(readdirSync(d)).toEqual([]);
   });
 
-  test.skipIf(process.platform === "win32")("BUG-356/remove: removeLedger unlinks a symlink at the path and leaves what it points to", () => {
+  test.skipIf(process.platform === "win32")("removeLedger unlinks a symlink at the path and leaves what it points to", () => {
     const real = join(TMP, "linked-target");
     mkdirSync(real);
     writeFileSync(join(real, "keep.jsonl"), "x");

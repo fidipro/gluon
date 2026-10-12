@@ -589,7 +589,7 @@ describe("BUG-363/pricing-update: writes only the local store; the store reads b
   });
 });
 
-describe("BUG-364/uninstall: the overlay goes with the rest of Gluon's files", () => {
+describe("the overlay goes with the rest of Gluon's files", () => {
   test("uninstallTargets names the tables directory when it exists, and not before", () => {
     const state = scratch();
     const was = process.env.XDG_STATE_HOME;
