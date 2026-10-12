@@ -166,7 +166,7 @@ describe("the agent choice's keys", () => {
     expect(app.agentLog()).not.toContain("--permission-mode");
   });
 
-  test("agent-choice/fits: at 50 columns a wrapped option starts its next line with `· recommended`, and no line ends in `·` or `×`; the hint drops whole keys from its end, never `enter starts the session` #BUG-225", async () => {
+  test("agent-choice/fits: at 50 columns a wrapped option starts its next line with `· recommended`, and no line ends in `·` or `×`; the hint drops whole keys from its end, Enter's and Esc's last #BUG-225", async () => {
     const app = await start({ cwd: repo.tiny(), cols: 50, rows: 40 });
     await toProposal(app);
     const at = app.row("❯ 1.");
@@ -179,7 +179,10 @@ describe("the agent choice's keys", () => {
       await app.settle();
       const keys = hint(app).split(" · ");
       expect(keys.length).toBeGreaterThanOrEqual(2);
-      expect(keys).toEqual(full.slice(0, keys.length));
+      // The others go from the end, `↑↓ choose` too, before Enter's and Esc's (as the hint line above the list drops them).
+      const essential = (k: string) => /^(enter|esc) /.test(k);
+      const rest = full.filter((k) => !essential(k));
+      expect(keys).toEqual(full.filter((k) => essential(k) || rest.slice(0, keys.length - 2).includes(k)));
       expect(hint(app)).not.toContain("…");
       for (const l of app.lines()) expect(Bun.stringWidth(l)).toBeLessThanOrEqual(cols);
     }

@@ -86,7 +86,8 @@ question and the home view's composer. The demo runs at a twentieth of its pace
 (`GLUON_TEST_DEMO_PACE`, a seam compiled out of release builds): a walk to a session is that much faster.
 A test that acts while the intake agent works (`esc to interrupt`) passes `env: FULL_PACE`.
 A task's words reach the demo's other turns (`demoExtras` in `src/agent/clients.ts`): `questions` gets three asked
-together (`(2/3)`) after a line with Markdown, `history` or `git` adds a `git_log` call to the tool line.
+together (`(2/3)`) after a line with Markdown, `history` or `git` adds a `git_log` call to the tool line, `talk` gets a
+first reply of plain text (a turn that ends with no question or proposal).
 For Gluon, `modes()` (the terminal modes Gluon left on: mouse tracking and encoding, focus,
 bracketed paste, kitty flags, the alternate screen, the cursor shown), `kittyDepth()` (kitty
 keyboard entries pushed and not popped), `cursor()` and `cells()` (the screen in the recorded

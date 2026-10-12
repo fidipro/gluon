@@ -35,8 +35,11 @@ const fitProblems = (app: App) => checkInvariants(app, { view: "home" }).filter(
 const stackedRules = (app: App) => app.lines().some((l, y, ls) => y > 0 && /^\s*─+\s*$/.test(l) && /^\s*─+\s*$/.test(ls[y - 1]!));
 
 describe("first run", () => {
-  test("home/first-run: the agents available with each one's readiness, the intake agent's first line and `? for keys`; at 50×20 the greeting stays whole #BUG-250", async () => {
-    const [wide, short] = await Promise.all([start({ cwd: repo.tiny() }), start({ cwd: repo.tiny(), cols: 50, rows: 20 })]);
+  test("home/first-run: the agents available with each one's readiness, the intake agent's first line and `? for keys`; at 50×20 the greeting stays whole #BUG-250; at 30 columns a name never runs into its readiness", async () => {
+    const [wide, short, narrow] = await Promise.all([start({ cwd: repo.tiny() }), start({ cwd: repo.tiny(), cols: 50, rows: 20 }), start({ cwd: repo.tiny(), cols: 30, rows: 30 })]);
+    const agentRows = narrow.lines().filter((l) => /^ +[●○◌] /.test(l));
+    expect(agentRows.length).toBeGreaterThan(0);
+    for (const l of agentRows) expect(l).toMatch(/^ +[●○◌] +(claude code|codex|antigravity|grok build|opencode|kimi code) +\S/);
     const s = wide.screen();
     expect(s).toContain("Agents available");
     expect(s).toMatch(/○ +claude code +sign-in needed/);
@@ -91,8 +94,10 @@ describe("a short terminal", () => {
 });
 
 describe("the hint line and the highlight", () => {
-  test("home/hint-line: at the question and the choice it names what Enter does — answers, starts the session, keeps talking, sends, picks N — as the hint under them does; while the intake agent works, `still working` #BUG-217 #BUG-225", async () => {
-    const [app, busy] = await Promise.all([start({ cwd: repo.tiny(), cols: 80, rows: 40 }), start({ cwd: repo.tiny(), cols: 80, rows: 40, env: FULL_PACE })]);
+  test("home/hint-line: at the question and the choice it names what Enter does — answers, starts the session, keeps talking, sends, picks N — as the hint under them does; while the intake agent works, `still working`; narrow, both drop other keys before Enter's and Esc's #BUG-217 #BUG-225", async () => {
+    const [app, busy, narrow] = await Promise.all([start({ cwd: repo.tiny(), cols: 80, rows: 40 }), start({ cwd: repo.tiny(), cols: 80, rows: 40, env: FULL_PACE }), start({ cwd: repo.tiny(), cols: 56, rows: 40 })]);
+    // The narrow one walks to its agent choice meanwhile.
+    const narrowAtChoice = toProposal(narrow);
     // The intake agent at work: Enter doesn't send, the hint says so.
     await busy.enter("fix the add bug");
     await busy.press(KEY.enter);
@@ -118,6 +123,9 @@ describe("the hint line and the highlight", () => {
     await app.press(KEY.backspace);
     await app.type("2");
     await agree("enter picks 2 · esc esc clears it");
+
+    await narrowAtChoice;
+    for (const h of [hintLine(narrow), underHint(narrow)]) expect(h).toMatch(/enter starts the session · esc cancels$/);
   });
 
   test("home/one-highlight: while the question or the agent choice is open only the option Enter acts on is highlighted, never the list's row too; closed, the row is again #BUG-217 #BUG-247", async () => {

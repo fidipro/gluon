@@ -75,6 +75,7 @@ function blocks(text: string, theme: Theme): Block[] {
     }
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
+      // The #s stay, as in Codex (markdown_render.rs `start_heading`).
       out.push({ key: i, kind: "heading", text: inline(`${heading[1]} ${heading[2]}`, theme), level: heading[1]!.length });
       listIndents = [];
       continue;

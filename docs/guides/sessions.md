@@ -13,9 +13,10 @@ Each row on the home view is display only: Gluon never acts on it. A header line
 - **Latest activity.** What the agent is doing now.
 - **Mode.** `· explore` or `· plan`. Build shows nothing. A session reopened with `gluon resume` shows the mode it was started in ([Modes](modes.md)).
 - **Cost and context.** Both are Gluon's own figures: see [Cost and context](cost-and-context.md).
-- **Files changed** in your checkout since the session started. Sessions work where Gluon was started, so they share the work tree.
 
-Rows are grouped (awaiting input, working, drafting). `ctrl+d` marks the selected session done, and again marks it not done: only you decide what is done. `del` removes any row, asking first.
+Files changed are not on the row: the session's own line in the frame counts the files changed in your checkout since it started, and the home header counts every modified file (`3 modified`, or `clean`). Sessions work where Gluon was started, so they share the work tree.
+
+Rows are grouped: awaiting input, working, done, drafting. `ctrl+d` marks the selected session done, and again marks it not done: only you decide what is done. `del` removes any row, asking first.
 
 ## Work in the frame
 

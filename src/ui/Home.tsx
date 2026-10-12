@@ -21,7 +21,7 @@
  *   selected run done, or not (`store.toggleDone`: Done is the user's word alone; BUG-193);
  *   Delete removes any row — a run's agent is ended after asking (`onEnd`; BUG-164), the drafting
  *   row's chat discarded after asking (`onDiscard`); the hint line says which. Without a
- *   pseudo-terminal (`canOpen` false) an ended session can't be opened: Enter says so.
+ *   pseudo-terminal (`canOpen` false) a session has the terminal until it ends, and its row goes then.
  * - PgUp/PgDn scroll the chat; while the agent choice is open, its spec only (when cut to fit;
  *   BUG-218), so the options never leave the screen. Enter while the intake agent works queues the
  *   message until its turn ends (`queued`; BUG-716). Esc cancels a queued message, then
@@ -125,9 +125,6 @@ export function shownOption(text: string, selected: number, count: number): numb
 
 /** The composer's placeholder while a chat is being drafted: what is typed goes on with it (BUG-227). */
 export const REPLY_PLACEHOLDER = "reply to the intake agent";
-
-/** No pseudo-terminal: what Enter on an ended session says. */
-export const NO_REOPEN = "No pseudo-terminal here, so an ended session can't be shown again (del removes it)";
 
 export function Home({ store, session, theme, header, readiness, offeredAgents, config, onOpen, onStart, onQuit, onEnd, onDiscard, asking = null, back = () => null, homeKey = "ctrl+\\", canOpen = true, onDraft, now = Date.now, mouse }: HomeProps) {
   const palette = theme.gluon;
@@ -401,11 +398,8 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
     else show(s);
   };
 
-  /** Shows a session in the frame (none without a pseudo-terminal: it ended, BUG-180). */
-  const show = (s: SessionView) => {
-    if (canOpen) onOpen(s.id);
-    else setNudge(NO_REOPEN);
-  };
+  /** Shows a session in the frame (without a pseudo-terminal there is no row to show: BUG-180). */
+  const show = (s: SessionView) => onOpen(s.id);
 
   /** The selected session (none while a group label is selected). */
   const selectedRow = () => rowOf(currentKey());
@@ -768,7 +762,7 @@ export function Home({ store, session, theme, header, readiness, offeredAgents, 
             {listRows === 0 ? null : (
               <>
                 {/* The one hint line: short of rows it stays, taking a row from the list (BUG-228). */}
-                <Hint text={homeHint(hintFor, canOpen, picked ?? 1)} palette={palette} />
+                <Hint text={homeHint(hintFor, picked ?? 1)} palette={palette} />
                 {listGap}
                 {shownRows === 0 ? null : firstRun ? <AgentsAvailable readiness={readiness} palette={palette} maxRows={shownRows} /> : <SessionList sessions={sessions} selected={selected} collapsed={collapsed} maxRows={shownRows} palette={palette} config={config} now={now()} dim={optionsOpen} boxRef={listBox} top={listTop} />}
               </>
