@@ -89,6 +89,14 @@ export const SEAMS: Record<string, Seam> = {
     says: "a session's start, its changes and its end → its row in `analytics.db` (the columns `gluon stats sql` queries, `MIGRATIONS` the schema); the database → what `gluon stats` prints, as text and as JSON",
     modules: ["src/analytics.ts", "src/stats.ts", "src/stats-sql.ts"],
   },
+  "agent-status": {
+    says: "each harness's own status, model-list and version output, as its vendor prints it → installed, signed in (on a plan, its label), the models listed, the version, or a failure that is transient or definitive",
+    modules: ["src/status.ts"],
+  },
+  install: {
+    says: "an agent and the OS (PATH, WSL, Windows) → its official install commands, which of them can run here and what is missing, the argv that runs one, and where its installer puts the binary",
+    modules: ["src/install.ts"],
+  },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",
     modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts", "src/self.ts"],
