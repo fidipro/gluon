@@ -6,7 +6,7 @@ import { delimiter, join } from "node:path";
 import { assertShimArgs } from "../src/detect.ts";
 import { HARNESS_INFO, HARNESSES, installHint, installMethods } from "../src/harnesses.ts";
 import { findInstalled, harnessNamed, installArgv, installDirs, methodsFor, powershellPath } from "../src/install.ts";
-import { wholeLines } from "../src/ui/signin.tsx";
+import { wholeLines } from "../src/ui/menu-fit.ts";
 
 const WIN = process.platform === "win32";
 const TMP = mkdtempSync(join(tmpdir(), "gluon-install-"));

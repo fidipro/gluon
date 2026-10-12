@@ -70,8 +70,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/config.ts", "src/sessions.ts", "src/workspaces.ts", "src/cost/ledger-file.ts"],
   },
   "text-layout": {
-    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars",
-    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts", "src/ui/layout.ts", "src/pty/chrome.ts"],
+    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars, a setup menu's fit",
+    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts", "src/ui/layout.ts", "src/ui/menu-fit.ts", "src/pty/chrome.ts"],
   },
   polling: {
     says: "a work tree and an events directory over time → the files changed and the events read, and the processes and listings each poll costs",

@@ -1,6 +1,7 @@
 /** The setup screens' menus (`src/ui/signin.tsx`): fitting a short terminal, a long checklist. */
 import { describe, expect, test } from "bun:test";
-import { fitMenu, PickMany } from "../src/ui/signin.tsx";
+import { PickMany } from "../src/ui/signin.tsx";
+import { fitMenu } from "../src/ui/menu-fit.ts";
 import { makeTheme } from "../src/ui/theme.ts";
 import { inkTerm } from "./fixtures/ink-term.tsx";
 
