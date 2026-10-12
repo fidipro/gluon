@@ -22,12 +22,16 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/adapters/index.ts"],
   },
   readers: {
-    says: "a harness's screen → its state (the input line, ready, awaiting a choice, plan mode)",
-    modules: ["src/pty/readers/index.ts", "src/pty/screen.ts"],
+    says: "a harness's screen → its state (the input line, ready, awaiting a choice, plan mode), the Enter held or forwarded, and the bytes that paint it",
+    modules: ["src/pty/readers/index.ts", "src/pty/screen.ts", "src/pty/intercept.ts", "src/pty/paint.ts"],
   },
   keys: {
     says: "the terminal's bytes → keys → what Gluon does with each (forward, home, a menu), the terminal modes it asks for and a drag's selection",
     modules: ["src/pty/keys.ts", "src/pty/compositor.ts", "src/pty/modes.ts", "src/pty/selection.ts"],
+  },
+  session: {
+    says: "an agent's PTY output, its hooks' events and the user's keys → what reaches the agent, its state and activity, the launch's first line, the /clear and compaction question",
+    modules: ["src/pty/session.ts"],
   },
   brain: {
     says: "the user's messages, with a model client → the intake's questions, its spec and its classification",
