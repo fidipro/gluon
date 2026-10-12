@@ -17,12 +17,13 @@ import { homedir } from "node:os";
 import { codexEnvWarnings } from "./agent/codex.ts";
 import { subscriptionEnvWarnings } from "./agent/subscription.ts";
 import { activeStep, bedrockConnected, chooseBrain, stepLabel } from "./brain.ts";
-import { configDocument, ConfigError, connsOf, saveConfig, type Config, type Connection, type Harness } from "./config.ts";
+import { ConfigError, connsOf, type Config, type Connection, type Harness } from "./config.ts";
 import { absentLabel, installed, neutralCwd } from "./detect.ts";
 import { HARNESS_INFO, HARNESSES, installHint, OPENROUTER_KEY_NOTICE, PROVIDERS, type ProviderId, type Subscription } from "./harnesses.ts";
 import { offerInstall, offPathAdvice } from "./install.ts";
 import { handOff } from "./launchers.ts";
-import { saveSecrets, secretSource, secretsPath, storageNote } from "./secrets.ts";
+import { secretSource, secretsPath, storageNote } from "./secrets.ts";
+import { saveSetup } from "./setup-save.ts";
 import { loginStatus, type LoginStatus } from "./status.ts";
 import { askText, pick, pickMany, type EscAction } from "./ui/signin.tsx";
 import type { Theme } from "./ui/theme.ts";
@@ -459,31 +460,13 @@ export class SetupFlow {
     );
   }
 
-  /**
-   * Writes the draft and says what changed: the config is checked first (not valid YAML: nothing
-   * is saved), then every key goes to the .env in one replace, then config.yaml in one write. A
-   * failure before the config write leaves both files as they were and nothing changed in memory.
-   */
+  /** Writes the draft (`saveSetup`: all or nothing) and says what changed. */
   commit(): void {
     const d = this.draft;
     const config = this.config;
-    const changes: [string[], unknown][] = [];
     const bedrock = JSON.stringify(d.bedrock) !== JSON.stringify(config.bedrock);
-    if (bedrock) changes.push([["bedrock"], d.bedrock]);
-    for (const h of d.dropped) changes.push([["connections", h], undefined]);
-    for (const h of d.connected) changes.push([["connections", h], d.connections[h]]);
-    if (changes.length) configDocument();
     const keys = Object.entries(d.secrets);
-    let warning: string | undefined;
-    try {
-      if (keys.length) warning = saveSecrets(keys);
-    } catch (e) {
-      throw new ConfigError(`couldn't save the keys to ${tilde(secretsPath())}: ${(e as Error).message}. Nothing was saved`);
-    }
-    if (changes.length) saveConfig(changes);
-    if (bedrock) config.bedrock = d.bedrock;
-    for (const h of d.dropped) delete config.connections[h];
-    for (const h of d.connected) config.connections[h] = d.connections[h];
+    const warning = saveSetup(config, d);
     for (const [env] of keys) ok(`Saved ${env} to ${tilde(secretsPath())}`);
     if (warning) note(warning);
     if (bedrock) ok(`Amazon Bedrock · ${awsLabel(config)}`);

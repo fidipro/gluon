@@ -28,9 +28,12 @@ const named = (t: string) => {
 };
 const tests = FILES.flatMap((file) => testTitles(read(file)).map((title) => ({ file, title, id: named(title) })));
 
+/** An open bug candidate names no entry until a maintainer triages it (`bun run test:health` lists them; test/test-health.test.ts keeps its id first). */
+const CANDIDATE = /^(BUG-CANDIDATE|MODEL-GAP)\//;
+
 function current(): Baseline {
   const untagged: Record<string, number> = {};
-  for (const t of tests) if (!t.id) untagged[t.file] = (untagged[t.file] ?? 0) + 1;
+  for (const t of tests) if (!t.id && !CANDIDATE.test(t.title)) untagged[t.file] = (untagged[t.file] ?? 0) + 1;
   const past: Record<string, string[]> = {};
   for (const f of UNIT) {
     const p = pastSeams(f, read(f));

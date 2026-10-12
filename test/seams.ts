@@ -43,7 +43,7 @@ export const SEAMS: Record<string, Seam> = {
   },
   session: {
     says: "an agent's PTY output, its hooks' events and the user's keys → what reaches the agent, its state and activity, the launch's first line, the /clear and compaction question",
-    modules: ["src/pty/session.ts"],
+    modules: ["src/pty/session.ts", "src/pty/types.ts"],
   },
   brain: {
     says: "the user's messages, with a model client → the intake's questions, its spec and its classification",
@@ -82,8 +82,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/secrets.ts"],
   },
   files: {
-    says: "a file an older (or this) version wrote → today's state: the config, the sessions, the workspaces, the cost ledger",
-    modules: ["src/config.ts", "src/sessions.ts", "src/workspaces.ts", "src/cost/ledger-file.ts"],
+    says: "a file an older (or this) version wrote → today's state: the config, the sessions, the workspaces, the cost ledger; the setup's answers → the config and the keys on disk, all or nothing",
+    modules: ["src/config.ts", "src/sessions.ts", "src/workspaces.ts", "src/setup-save.ts", "src/cost/ledger-file.ts"],
   },
   "text-layout": {
     says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars, a setup menu's fit",
@@ -128,6 +128,10 @@ export const SEAMS: Record<string, Seam> = {
   checks: {
     says: "the config's connections and `brain.order`, with the providers' answers → which models each connection reaches (recorded with a date), the brain step in use and its client, and whether an error means the model is unavailable",
     modules: ["src/brain.ts", "src/verify.ts"],
+  },
+  home: {
+    says: "the connections, the sessions and a resumed agent's exit → the agents' readiness before any check, the home view's questions with their shorter forms, and whether a resume was refused",
+    modules: ["src/home-rules.ts"],
   },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",

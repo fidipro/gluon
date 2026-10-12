@@ -194,15 +194,11 @@ describe("saving keys (review of phase 3)", () => {
     writeFileSync(process.env.GLUON_CONFIG, "# mine\n");
     // The .env's place is taken by a directory: the rename fails.
     mkdirSync(join(dir, ".env"));
-    const { SetupFlow } = await import("../src/auth.ts");
-    const { makeTheme } = await import("../src/ui/theme.ts");
+    const { saveSetup } = await import("../src/setup-save.ts");
     const { defaults } = await import("../src/config.ts");
     const config = { ...defaults(), connections: {} };
-    const flow = new SetupFlow(config, makeTheme(null), ["grok-build"]);
-    flow.draft.connections["grok-build"] = { auth: "api", provider: "xai" };
-    flow.draft.connected = ["grok-build"];
-    flow.draft.secrets = { XAI_API_KEY: "xai-pastedkey4444444444444" };
-    expect(() => flow.commit()).toThrow(/couldn't save the keys to .*Nothing was saved/);
+    const answers = { connections: { "grok-build": { auth: "api" as const, provider: "xai" as const } }, connected: ["grok-build" as const], dropped: [], bedrock: { ...config.bedrock }, secrets: { XAI_API_KEY: "xai-pastedkey4444444444444" } };
+    expect(() => saveSetup(config, answers)).toThrow(/couldn't save the keys to .*Nothing was saved/);
     expect(readFileSync(process.env.GLUON_CONFIG, "utf8")).toBe("# mine\n");
     expect(config.connections).toEqual({});
     expect(readdirSync(dir).sort()).toEqual([".env", "config.yaml"]);

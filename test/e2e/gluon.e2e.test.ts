@@ -190,7 +190,7 @@ describe("Gluon: a session in the frame", () => {
 });
 
 describe("Gluon: cost, context and the agent's own questions", () => {
-  test("GLUON-16: a Claude Code status event's own figures (cost, tokens, window) are audited only: no cost is shown for them, and never a context % @full", async () => {
+  test("cost/own-figure: a Claude Code status event's own figures (cost, tokens, window) are audited only: no cost is shown for them, and never a context % @full #GLUON-16", async () => {
     const app = await gluon();
     await launch(app, "figures task");
     await say(app, "!event figures cost=0.5 tokens=100000 window=200000", "EVENT figures");
@@ -200,7 +200,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     expect(app.lines()[1]).not.toContain("% context");
   });
 
-  test("BUG-320/step-priced-by-gluon: a step's counts (OpenCode's plugin) are priced from Gluon's table, unmarked; the harness's own total is only audited @full", async () => {
+  test("cost/own-figure: a step's counts (OpenCode's plugin) are priced from Gluon's table, unmarked; the harness's own total is only audited @full #BUG-320/step-priced-by-gluon", async () => {
     const app = await gluon();
     await launch(app, "steps task");
     await say(app, "!event figures cost=0.5", "EVENT figures");
@@ -212,7 +212,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     expect(app.lines()[1]).not.toContain("$0.50");
   });
 
-  test("GLUON-17: Claude Code's OpenTelemetry export (cost metric, api_request tokens) reaches the info line @full", async () => {
+  test("cost/claude-code: Claude Code's OpenTelemetry export (cost metric, api_request tokens) reaches the info line @full #GLUON-17", async () => {
     const app = await gluon();
     await launch(app, "otel task");
     await say(app, "!otel 1.23 380000", "OTEL 200,200");
@@ -226,7 +226,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     await app.waitFor((s) => /· ~?\$2\.53 · 10% context/.test(s.split("\n")[1]!));
   });
 
-  test("BUG-321/plugin-window-is-only-audited: Claude Code's plugin (session.measure) says 380k tokens of a 2M window, and the % stays Gluon's own (38% of 1M; 10% on the next request); the ledger records both (BUG-322) @full", async () => {
+  test("context/window: Claude Code's plugin (session.measure) says 380k tokens of a 2M window, and the % stays Gluon's own (38% of 1M; 10% on the next request); the ledger records both (BUG-322) @full #BUG-321/plugin-window-is-only-audited", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-ledger-"));
     try {
       const app = await gluon({ XDG_STATE_HOME: state });

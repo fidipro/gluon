@@ -1,27 +1,4 @@
 {
- "untagged": {
-  "test/e2e/gluon.e2e.test.ts": 4,
-  "test/e2e/perf-smoke.e2e.test.ts": 1,
-  "test/gluon-qa-frame.test.ts": 1,
-  "test/gluon.test.ts": 3,
-  "test/perf/typing.perf.test.ts": 1,
-  "test/pty-session.test.ts": 3
- },
- "pastSeams": {
-  "test/adapters-claude-codex.test.ts": [
-   "src/pty/types.ts"
-  ],
-  "test/gluon.test.ts": [
-   "src/gluon.ts"
-  ],
-  "test/opencode-plan.test.ts": [
-   "src/gluon.ts"
-  ],
-  "test/platform.test.ts": [
-   "src/auth.ts"
-  ],
-  "test/rules.test.ts": [
-   "src/auth.ts"
-  ]
- }
+ "untagged": {},
+ "pastSeams": {}
 }

@@ -52,8 +52,8 @@ lists the slow ones, breaks on any far over the threshold, and on the fast tier 
 the catalog (`test/catalog.ts`): `feature/entry: <what holds>`. A bug fix makes the test of the entry that should have
 caught it fail, then fixes the code, and tags the test `#BUG-<n>`; when no entry could have caught it, the fix adds the
 missing one. Search the catalog before adding a test: a new case often belongs in an existing one.
-*Checked:* `test/catalog.test.ts`: every entry has a test and every test a known entry (today's untagged tests are a
-baseline that only goes down); `red-check` runs a newly tagged test against the base.
+*Checked:* `test/catalog.test.ts`: every entry has a test and every test a known entry (an open `BUG-CANDIDATE` names
+none until it is triaged); `red-check` runs a newly tagged test against the base.
 
 **9. A failure says what to do.** A check that fails names the file, what is wrong and how to fix it, so the next
 person, or agent, acts on it without reading the check.

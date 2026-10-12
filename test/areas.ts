@@ -51,7 +51,7 @@ export const AREAS: Record<string, Area> = {
   "onboarding-auth": {
     doc: "connecting the agents: sign-in checks, keys, installs, status of each harness",
     live: "harness",
-    src: ["src/auth.ts", "src/status.ts", "src/verify.ts", "src/install.ts", "src/detect.ts", "src/secrets.ts", "src/harnesses.ts", "src/ui/signin.tsx", "src/ui/menu-fit.ts"],
+    src: ["src/auth.ts", "src/status.ts", "src/verify.ts", "src/install.ts", "src/detect.ts", "src/secrets.ts", "src/harnesses.ts", "src/ui/signin.tsx", "src/ui/menu-fit.ts", "src/setup-save.ts"],
     unit: ["test/install.test.ts", "test/detect.test.ts", "test/secrets.test.ts", "test/status-login.test.ts", "test/menus-fit.test.ts"],
     e2e: ["test/e2e/auth.e2e.test.ts", "test/e2e/install.e2e.test.ts"],
     e2eOnly: ["src/auth.ts", "src/verify.ts", "src/install.ts"],
@@ -123,7 +123,7 @@ export const AREAS: Record<string, Area> = {
   "gluon-frame": {
     doc: "Gluon's frame: the app, the compositor and chrome, sessions, tabs, the coverage matrix and the monkey",
     live: "harness",
-    src: ["src/gluon.ts", "src/files-poll.ts", "src/sessions.ts", "src/pty/chrome.ts", "src/pty/compositor.ts"],
+    src: ["src/gluon.ts", "src/home-rules.ts", "src/files-poll.ts", "src/sessions.ts", "src/pty/chrome.ts", "src/pty/compositor.ts"],
     files: ["test/e2e/gluon-*.ts", "test/e2e/scenes.ts", "test/e2e/scene-runs.ts", "test/e2e/screen-lint.ts", "test/e2e/frame.ts", "test/e2e/mask.ts", "test/fixtures/gluon.ts", "test/fixtures/gluon-matrix.ts"],
     unit: [
       "test/gluon.test.ts",
