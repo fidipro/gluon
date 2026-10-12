@@ -24,7 +24,7 @@ const chain = (seen: Map<string, string | null>, file: string) => {
 
 describe("the import walker", () => {
   const tmp = (name: string) => join(import.meta.dir, "fixtures", "hook-graph", name);
-  test("follows static, re-export and literal dynamic imports; ignores type-only ones, bare specifiers and comments", () => {
+  test("perf/hook-light: the import walker follows static, re-export and literal dynamic imports; ignores type-only ones, bare specifiers and comments", () => {
     const seen = reachable(tmp("entry.ts"));
     const names = [...seen.keys()].map((f) => rel(tmp(""), f)).sort();
     expect(names).toEqual(["a.ts", "dyn.ts", "entry.ts", "idx/index.ts", "re.ts", "tsx.tsx"]);
@@ -32,7 +32,7 @@ describe("the import walker", () => {
 });
 
 describe("gluon hook / gluon signal stay light", () => {
-  test("BUG-358/hook-graph: nothing under src/cost/ and not src/models.ts is reachable from src/internal.ts", () => {
+  test("perf/hook-light: nothing under src/cost/ and not src/models.ts is reachable from src/internal.ts #BUG-358/hook-graph", () => {
     const seen = reachable(ENTRY);
     // The walker found the graph at all (through the dynamic import of the adapters).
     for (const f of ["src/events.ts", "src/adapters/index.ts", "src/adapters/claude-code.ts"]) expect(seen.has(join(ROOT, f))).toBe(true);

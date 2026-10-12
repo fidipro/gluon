@@ -21,7 +21,7 @@ describe("configPath", () => {
     expect(configPath({ XDG_CONFIG_HOME: "D:\\cfg", APPDATA: "C:\\a" }, "win32", "C:\\Users\\me")).toBe("D:\\cfg\\gluon\\config.yaml");
   });
 
-  test("BUG-620/variants: a relative XDG_CONFIG_HOME or XDG_STATE_HOME is ignored, on every platform", () => {
+  test("a relative XDG_CONFIG_HOME or XDG_STATE_HOME is ignored, on every platform", () => {
     expect(configPath({ XDG_CONFIG_HOME: "rel" }, "linux", "/home/me")).toBe("/home/me/.config/gluon/config.yaml");
     expect(configPath({ XDG_CONFIG_HOME: "." }, "darwin", "/Users/me")).toBe("/Users/me/.config/gluon/config.yaml");
     expect(configPath({ XDG_CONFIG_HOME: "rel", APPDATA: "C:\\a" }, "win32", "C:\\Users\\me")).toBe("C:\\a\\gluon\\config.yaml");
