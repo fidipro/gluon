@@ -32,7 +32,7 @@ Inside the frame you lose inline images, OSC 8 hyperlinks, and the agents' outpu
 
 ## Save and resume sessions
 
-Gluon saves what it takes to reopen a run, as a *workspace* with a six-character id. A workspace holds each session's name, agent, model, effort, mode, directory, the spec it started with (keys masked) and the agent's own session id. The intake chat is not saved.
+Gluon saves what it takes to reopen a run, as a *workspace* with a six-character id. A workspace holds each session's name, agent, model, effort, mode, permissions, directory, the spec it started with (keys masked) and the agent's own session id. The intake chat is not saved.
 
 The header names the workspace (`workspace abc123`) once you launch a session. When you quit, Gluon prints `Resume this session: gluon resume abc123`.
 

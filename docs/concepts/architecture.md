@@ -243,7 +243,7 @@ line mode and the cursor and exits 128 plus the signal's number.
 ### Saved sessions and resume
 
 A **workspace** is one Gluon run in a repository: an id (`gluon resume abc123`), a name, the
-directory, and a record per session (name, harness, model, effort, spec, mode and the
+directory, and a record per session (name, harness, model, effort, spec, mode, permissions and the
 harness's own resume id). The intake chat is not saved. It is one private file per workspace
 next to the config (`src/workspaces.ts`), written whole on every change. Quitting or a crash ends
 the agents but keeps the record. `gluon resume` refuses a workspace another live Gluon has open.
