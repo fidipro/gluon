@@ -14,7 +14,7 @@ import { SLOW, stopAll } from "./harness.ts";
 setDefaultTimeout(90_000 * SLOW);
 afterAll(stopAll);
 
-test("BUG-408/launch-modes: Codex started in Plan mode at 100 columns (the line wraps in its composer) gets `/plan Read the session brief in <file> and start.` typed, then its Enter apart; the file holds the spec, and the spec is not in argv @full", async () => {
+test("Codex started in Plan mode at 100 columns (the line wraps in its composer) gets `/plan Read the session brief in <file> and start.` typed, then its Enter apart; the file holds the spec, and the spec is not in argv @full", async () => {
   // 100 columns: the line (a temp path in it) wraps in the composer.
   const app = await gluon(100, 30, {}, undefined, ["codex"]);
   // The demo brain proposes build for this task; ctrl+t twice: explore, then plan.
@@ -40,7 +40,7 @@ test("BUG-408/launch-modes: Codex started in Plan mode at 100 columns (the line 
   expect(app.agentLog()).not.toContain(spec.slice(0, 40));
 });
 
-test("BUG-411/launch-modes: Grok Build started in Plan mode gets the same line typed in its composer box, then its Enter apart; its border shows ` · plan` and no note is posted @full", async () => {
+test("Grok Build started in Plan mode gets the same line typed in its composer box, then its Enter apart; its border shows ` · plan` and no note is posted @full", async () => {
   const app = await gluon(100, 30, {}, undefined, ["grok"]);
   await launch(app, "fix the thing", [KEYS.ctrlT, KEYS.ctrlT]);
   const end = performance.now() + 20_000 * SLOW;

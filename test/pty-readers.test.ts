@@ -208,17 +208,17 @@ const EXPECTED: Partial<Record<Harness, Record<string, [string | null, string | 
 for (const [harness, states] of Object.entries(EXPECTED) as [Harness, Record<string, [string | null, string | null]>][]) {
   describe(`${harness} reader`, () => {
     const f = fixture(harness);
-    test(`covers every captured state of ${harness} ${f.version}`, () => {
+    test(`clear-compact/reads-line: covers every captured state of ${harness} ${f.version}`, () => {
       expect(f.states.map((s) => s.name).sort()).toEqual(Object.keys(states).sort());
     });
     for (const [name, [input, selected]] of Object.entries(states))
-      test(`${name.startsWith("frame-") ? "BUG-191: " : ""}${name}: input ${JSON.stringify(input)}, menu ${selected}`, async () => {
+      test(`clear-compact/reads-line: ${name}: input ${JSON.stringify(input)}, menu ${selected}`, async () => {
         const screen = await screenOf(f, name);
         expect(READERS[harness].inputLine(screen)).toBe(input);
         expect(READERS[harness].selectedCommand(screen)).toBe(selected);
         screen.dispose();
       });
-    test("a blank screen: no input box, no menu", () => {
+    test("clear-compact/reads-line: a blank screen: no input box, no menu", () => {
       const screen = createScreen(f.cols, f.rows);
       expect(READERS[harness].inputLine(screen)).toBeNull();
       expect(READERS[harness].selectedCommand(screen)).toBeNull();
@@ -226,7 +226,7 @@ for (const [harness, states] of Object.entries(EXPECTED) as [Harness, Record<str
   });
 }
 
-test("BUG-244/GLUON-40: Claude Code's own dialog waiting for a pick (the first run's trust question) is read as such; no other captured screen is", async () => {
+test("session-state/own-dialog: Claude Code's own dialog waiting for a pick (the first run's trust question) is read as such; no other captured screen is #BUG-244/GLUON-40", async () => {
   const f = fixture("claude-code");
   const waiting: string[] = [];
   for (const st of f.states) {
@@ -245,7 +245,7 @@ test("BUG-244/GLUON-40: Claude Code's own dialog waiting for a pick (the first r
 });
 
 // Claude Code 2.1.296 indents the menu's items four spaces and marks the highlighted one `  ❯ /name`.
-test("BUG-718/menu-mark: Claude Code's highlighted menu item is read from its `❯` mark (2.1.296), and from its colour alone in 2.1.286's layout", async () => {
+test("clear-compact/reads-line: Claude Code's highlighted menu item is read from its `❯` mark (2.1.296), and from its colour alone in 2.1.286's layout #BUG-718/menu-mark", async () => {
   const r = READERS["claude-code"];
   const f = fixture("claude-code");
   for (const [name, item] of [["c-down2", "/clear"], ["slash", "/add-dir"], ["help", "/help"]] as const) {
@@ -276,7 +276,7 @@ test("BUG-718/menu-mark: Claude Code's highlighted menu item is read from its `�
 });
 
 // Claude Code 2.1.296 shows a faint `Try "…"` in the empty box, starting under the cursor.
-test("BUG-719/placeholder: Claude Code's faint placeholder in the empty input box is not input; typed text before the cursor is", async () => {
+test("clear-compact/reads-line: Claude Code's faint placeholder in the empty input box is not input; typed text before the cursor is #BUG-719/placeholder", async () => {
   const r = READERS["claude-code"];
   const idle = await screenOf(fixture("claude-code"), "idle-placeholder");
   // Claude draws a no-break space after the `❯`.
@@ -298,7 +298,7 @@ test("BUG-719/placeholder: Claude Code's faint placeholder in the empty input bo
 });
 
 // QA-live-01 / F10: Claude Code sends no hook when Esc cuts a turn off; its own row says so (`interrupted`, display only).
-test("BUG-609/QA-live-01: Claude Code's `Interrupted · What should Claude do instead?` as the last transcript row above the idle input box is read; no other captured screen is", async () => {
+test("session-state/interrupted: Claude Code's `Interrupted · What should Claude do instead?` as the last transcript row above the idle input box is read; no other captured screen is #BUG-609/QA-live-01", async () => {
   const r = READERS["claude-code"];
   const f = fixture("claude-code");
   const cut: string[] = [];
@@ -341,7 +341,7 @@ test("BUG-609/QA-live-01: Claude Code's `Interrupted · What should Claude do in
 });
 
 // Launch modes: Gluon types `/plan …` into Codex and checks it took (`planMode`): the footer's `Plan mode` in magenta, or the history's line.
-test("Codex's planMode: the Plan mode footer or its history line; no other captured state without one, nor default mode's footer", async () => {
+test("frame/brief-line: Codex's planMode: the Plan mode footer or its history line; no other captured state without one, nor default mode's footer", async () => {
   const f = fixture("codex");
   const plan: string[] = [];
   for (const st of f.states) {
@@ -370,7 +370,7 @@ test("Codex's planMode: the Plan mode footer or its history line; no other captu
 // Issue #40: Codex asks the user things that aren't its composer, and no hook reports them: the folder
 // trust question and the hooks' review come before any hook runs; a `request_user_input` question only
 // fires PreToolUse (Working); an approval's PermissionRequest can be overtaken by the async PreToolUse.
-test("issue-40: Codex's own dialogs waiting for a pick (folder trust, hook review, approvals, a question, the model picker) are read as such; no other captured screen is", async () => {
+test("session-state/own-dialog: Codex's own dialogs waiting for a pick (folder trust, hook review, approvals, a question, the model picker) are read as such; no other captured screen is #issue-40", async () => {
   const f = fixture("codex");
   const waiting: string[] = [];
   for (const st of f.states) {
@@ -411,7 +411,7 @@ test("issue-40: Codex's own dialogs waiting for a pick (folder trust, hook revie
 });
 
 // QA-live-01: Codex sends no hook when Esc cuts a turn off either; its history line says so (`interrupted`, display only).
-test("BUG-609/QA-live-01: Codex's `■ Conversation interrupted` as the last history row above the composer is read; no other captured screen is", async () => {
+test("session-state/interrupted: Codex's `■ Conversation interrupted` as the last history row above the composer is read; no other captured screen is #BUG-609/QA-live-01", async () => {
   const r = READERS.codex;
   const f = fixture("codex");
   const cut: string[] = [];
@@ -456,7 +456,7 @@ test("BUG-609/QA-live-01: Codex's `■ Conversation interrupted` as the last his
 });
 
 // A narrow frame wraps the marker onto two or three rows: the reader joins them (`logicalRow`) before matching.
-test("BUG-609/QA-live-01: the interruption markers are read when a narrow terminal (40 and 30 columns) wraps them over several rows", async () => {
+test("session-state/interrupted: the interruption markers are read when a narrow terminal (40 and 30 columns) wraps them over several rows #BUG-609/QA-live-01", async () => {
   for (const cols of [40, 30]) {
     const rule = "─".repeat(cols);
     const claude = (mark: string, below = "") => `❯ Write an essay\r\n  ⎿ \u00a0${mark}\r\n${below}${rule}\r\n❯ \r\n${rule}\r\n  ⏸ manual mode on`;
@@ -493,7 +493,7 @@ test("BUG-609/QA-live-01: the interruption markers are read when a narrow termin
 });
 
 // Launch modes: Gluon types `/plan …` into Grok Build and checks it took (`planMode`): the composer's bottom border names the mode.
-test("Grok Build's planMode: ` · plan` in the box's bottom border; no other captured state (auto-review and the normal mode name another or none)", async () => {
+test("frame/brief-line: Grok Build's planMode: ` · plan` in the box's bottom border; no other captured state (auto-review and the normal mode name another or none)", async () => {
   const f = fixture("grok-build");
   const plan: string[] = [];
   for (const st of f.states) {
@@ -531,7 +531,7 @@ describe("Grok Build reader: the box, not the cursor", () => {
     return s;
   };
 
-  test("BUG-411/launch-modes: the cursor is anywhere (hidden at 0,0 while the start screen draws, or mid-frame on another row): the input is still the box's", async () => {
+  test("clear-compact/reads-line: the cursor is anywhere (hidden at 0,0 while the start screen draws, or mid-frame on another row): the input is still the box's #BUG-411/launch-modes", async () => {
     for (const at of ["\x1b[1;1H", "\x1b[12;40H", "\x1b[7;8H"]) {
       const s = await draw(box(["/plan Read the brief"]), at);
       expect(r.inputLine(s)).toBe("/plan Read the brief");
@@ -539,7 +539,7 @@ describe("Grok Build reader: the box, not the cursor", () => {
     }
   });
 
-  test("an empty box is an empty line (no placeholder); a screen with no composer is null (null: it can't tell, the first line waits)", async () => {
+  test("clear-compact/reads-line: an empty box is an empty line (no placeholder); a screen with no composer is null (null: it can't tell, the first line waits)", async () => {
     const empty = await draw(box([""]));
     expect(r.inputLine(empty)).toBe("");
     empty.dispose();
@@ -554,7 +554,7 @@ describe("Grok Build reader: the box, not the cursor", () => {
     for (const s of [empty, welcome, half, none]) s.dispose();
   });
 
-  test("a completion ghost (grey 108,108,108 after the typed part) is not input; the typed part is", async () => {
+  test("clear-compact/reads-line: a completion ghost (grey 108,108,108 after the typed part) is not input; the typed part is", async () => {
     const s = await draw(box([`/c${GREY}lear\x1b[39m`]));
     expect(r.inputLine(s)).toBe("/c");
     s.dispose();
@@ -564,13 +564,13 @@ describe("Grok Build reader: the box, not the cursor", () => {
     typed.dispose();
   });
 
-  test("rows under the first are the same line wrapped: joined by a newline, the `│   ` indent and the right border dropped", async () => {
+  test("clear-compact/reads-line: rows under the first are the same line wrapped: joined by a newline, the `│   ` indent and the right border dropped", async () => {
     const s = await draw(box(["first words wrap", "and go on", "to a third"]));
     expect(r.inputLine(s)).toBe("first words wrap\nand go on\nto a third");
     s.dispose();
   });
 
-  test("the lowest composer wins (a past prompt drawn like one stays above it)", async () => {
+  test("clear-compact/reads-line: the lowest composer wins (a past prompt drawn like one stays above it)", async () => {
     const s = createScreen(60, 14);
     await s.write(`\x1b[1;1H${box(["old prompt"])}\x1b[8;1H${box(["new"])}`);
     expect(r.inputLine(s)).toBe("new");
@@ -609,7 +609,7 @@ describe("Kimi Code reader", () => {
   };
   const box = (rows: string[], bottom = true) => [" ╭" + "─".repeat(60) + "╮", ...rows.map((t, i) => ` │ ${i ? " " : ">"} ${t.padEnd(55)}│`), ...(bottom ? [" ╰" + "─".repeat(60) + "╯"] : [])].join("\r\n");
 
-  test("the folder-trust question and Kimi's selection prompts (plan approval, a command to approve) and `question` panel are choices the user must make (display only); no other captured screen is", async () => {
+  test("session-state/own-dialog: the folder-trust question and Kimi's selection prompts (plan approval, a command to approve) and `question` panel are choices the user must make (display only); no other captured screen is", async () => {
     const f = fixture("kimi-code");
     const waiting: string[] = [];
     for (const st of f.states) {
@@ -626,7 +626,7 @@ describe("Kimi Code reader", () => {
     }
   });
 
-  test("BUG-674/F04: Kimi is ready (it has applied its model) once the banner's `Model:` line or the footer shows; its composer drawn before that, with or without text in it, and the error screen are not", async () => {
+  test("frame/brief-line: Kimi is ready (it has applied its model) once the banner's `Model:` line or the footer shows; its composer drawn before that, with or without text in it, and the error screen are not #BUG-674/F04", async () => {
     const f = fixture("kimi-code");
     const ready: string[] = [];
     for (const st of f.states) {
@@ -642,7 +642,7 @@ describe("Kimi Code reader", () => {
     early.dispose();
   });
 
-  test("BUG-674/F04: the model marker is the banner's `Model:` row or the footer under the composer; a composer alone, an empty model or the word quoted outside the banner is not it", async () => {
+  test("frame/brief-line: the model marker is the banner's `Model:` row or the footer under the composer; a composer alone, an empty model or the word quoted outside the banner is not it #BUG-674/F04", async () => {
     const banner = ["", "  Welcome to Kimi Code!", "  Directory: ~/repo", "  Session:", "  Model:     moonshotai/kimi-k2.7-code", "  Version:   2.1.1"].map((t) => ` │${t.padEnd(68)}│`);
     const welcome = [" ╭" + "─".repeat(68) + "╮", ...banner, " ╰" + "─".repeat(68) + "╯"].join("\r\n");
     const footer = " moonshotai/kimi-k2.7-code thinking  ~/repo  master";
@@ -675,7 +675,7 @@ describe("Kimi Code reader", () => {
   const ALTERNATIVES = prompt("Ready to build with this plan?", [""], ["Usage section (Recommended)", "API reference section", "Installation + Usage section", "Reject", "Revise"]);
   const COMMAND = prompt("Run this command?", ["", "   cwd: ~/repo", "   $ git status && git log --oneline -5"], ["Approve once", "Approve for this session", "Reject", "Reject with feedback"]);
 
-  test("BUG-611/QA-live-03: Kimi's plan-mode approval (Ready to build with this plan? Approve / Reject / Revise, seen live on 2.1.1) is a choice the user must make: the row reads awaiting, not Working", async () => {
+  test("session-state/own-dialog: Kimi's plan-mode approval (Ready to build with this plan? Approve / Reject / Revise, seen live on 2.1.1) is a choice the user must make: the row reads awaiting, not Working #BUG-611/QA-live-03", async () => {
     // Live: Kimi waited on this prompt and Gluon's info row said Working for over a minute (no hooks, and `awaitsChoice` knew only the trust dialog).
     const f = fixture("kimi-code");
     const captured = await screenOf(f, "frame-plan-approval");
@@ -694,7 +694,7 @@ describe("Kimi Code reader", () => {
     withComposer.dispose();
   });
 
-  test("BUG-611/alternatives: the plan approval that offers alternatives (five options, `1/2/3/4/5 choose`, seen live on 2.1.1) reads awaiting", async () => {
+  test("session-state/own-dialog: the plan approval that offers alternatives (five options, `1/2/3/4/5 choose`, seen live on 2.1.1) reads awaiting #BUG-611/alternatives", async () => {
     const f = fixture("kimi-code");
     const captured = await screenOf(f, "frame-plan-alternatives");
     expect(r.inputLine(captured)).toBeNull();
@@ -707,7 +707,7 @@ describe("Kimi Code reader", () => {
     }
   });
 
-  test("BUG-611/command-approval: `Run this command?` (Approve once … Reject with feedback, seen live on 2.1.1), also with a wrapped command and after plan mode ended, reads awaiting", async () => {
+  test("session-state/own-dialog: `Run this command?` (Approve once … Reject with feedback, seen live on 2.1.1), also with a wrapped command and after plan mode ended, reads awaiting #BUG-611/command-approval", async () => {
     const f = fixture("kimi-code");
     for (const name of ["frame-cmd-approval", "frame-cmd-approval-wrapped"]) {
       const captured = await screenOf(f, name);
@@ -720,7 +720,7 @@ describe("Kimi Code reader", () => {
     s.dispose();
   });
 
-  test("BUG-611/not-a-prompt: a numbered list quoted in the transcript, a list without its hints, hints that don't match the options, a composer, or a prompt out of shape is not awaiting", async () => {
+  test("session-state/own-dialog: a numbered list quoted in the transcript, a list without its hints, hints that don't match the options, a composer, or a prompt out of shape is not awaiting #BUG-611/not-a-prompt", async () => {
     const quoted = [" ● Kimi wrote:", "   1. Approve", "   2. Reject", "   3. Revise", "", hintsOf(3)].join("\r\n");
     const optionsOnly = prompt("Run this command?", [""], ["Approve once", "Reject"]).replace(/\r\n {3}↑\/↓ select[^\r]*/, "");
     const cases: [string, string][] = [
@@ -769,7 +769,7 @@ describe("Kimi Code reader", () => {
     [" ● Need ask whether the plan includes tests.", "", " question  Tests  Submit", "", ...(over.title ?? [" ? Should the plan include a minimal test?"]), "", ...qOptions(labels, over.marked), "", over.hints ?? QHINTS, "", ...(over.below ?? FOOTER)].join("\r\n");
   const QUESTION = question(["README only", "README + minimal test", "Other"]);
 
-  test("BUG-663/QA-live-04: Kimi's `question` panel (a tab bar, `[1] README only` / `[2] README + minimal test` / `[3] Other`, `↑↓ select  1-3 / ↵ choose  ←/→/tab switch  esc cancel`, seen live on 2.1.1) is a choice the user must make: the row reads awaiting, not Working", async () => {
+  test("session-state/own-dialog: Kimi's `question` panel (a tab bar, `[1] README only` / `[2] README + minimal test` / `[3] Other`, `↑↓ select  1-3 / ↵ choose  ←/→/tab switch  esc cancel`, seen live on 2.1.1) is a choice the user must make: the row reads awaiting, not Working #BUG-663/QA-live-04", async () => {
     // Live: the panel waited for over four minutes and Gluon's row said Working: `awaitsChoice` knew `1. Approve`-style prompts under rules, not `[n]` options.
     const f = fixture("kimi-code");
     for (const name of ["frame-question-panel", "frame-question-panel-wrapped", "frame-question-panel-described"]) {
@@ -796,7 +796,7 @@ describe("Kimi Code reader", () => {
     withComposer.dispose();
   });
 
-  test("BUG-663/variants: two to nine options, a question and an option wrapped on a narrow terminal, a blank row or none above the hints, no footer, a rule under it: all read awaiting", async () => {
+  test("session-state/own-dialog: two to nine options, a question and an option wrapped on a narrow terminal, a blank row or none above the hints, no footer, a rule under it: all read awaiting #BUG-663/variants", async () => {
     const hints = (n: number) => ` ↑↓ select  1-${n} / ↵ choose  ←/→/tab switch  esc cancel`;
     const labels = (n: number) => Array.from({ length: n }, (_, i) => `option ${i + 1}`);
     const cases: [string, string][] = [
@@ -817,7 +817,7 @@ describe("Kimi Code reader", () => {
     }
   });
 
-  test("BUG-663/not-a-prompt: `[1]` lists and hint-like words in the agent's own output, options without their hints or the hints without options, a count that doesn't match, a composer, or a panel out of shape is not awaiting", async () => {
+  test("session-state/own-dialog: `[1]` lists and hint-like words in the agent's own output, options without their hints or the hints without options, a count that doesn't match, a composer, or a panel out of shape is not awaiting #BUG-663/not-a-prompt", async () => {
     const quoted = [" ● Kimi wrote:", "   [1] README only", "   [2] README + minimal test", "   [3] Other", "", QHINTS].join("\r\n");
     const references = [" ● See the references:", "", " ? Which one", "", "   [1] Smith 2020", "   [2] Jones 2021", "   [3] Lee 2022", "", " ↑↓ select  1-3 / ↵ choose  esc cancel is what the docs say"].join("\r\n");
     const noHints = question(["a", "b", "c"]).replace(`\r\n\r\n${QHINTS}`, "");
@@ -861,7 +861,7 @@ describe("Kimi Code reader", () => {
     ok.dispose();
   });
 
-  test("a screen with no composer is null (the first line waits); a box missing its bottom border is a frame half drawn; the welcome box has no `>` row", async () => {
+  test("clear-compact/reads-line: a screen with no composer is null (the first line waits); a box missing its bottom border is a frame half drawn; the welcome box has no `>` row", async () => {
     const welcome = await draw(" ╭" + "─".repeat(60) + "╮\r\n │  Welcome to Kimi Code!" + " ".repeat(37) + "│\r\n ╰" + "─".repeat(60) + "╯");
     expect(r.inputLine(welcome)).toBeNull();
     const half = await draw(box(["hi"], false));
@@ -872,7 +872,7 @@ describe("Kimi Code reader", () => {
     for (const s of [welcome, half, ok]) s.dispose();
   });
 
-  test("the grey hint after a whole command is not input; the same words in the text colour are the user's", async () => {
+  test("clear-compact/reads-line: the grey hint after a whole command is not input; the same words in the text colour are the user's", async () => {
     const HINT = "\x1b[38;2;136;136;136m";
     const s = await draw(box([`/compact${HINT}  <instruction>\x1b[39m`]));
     expect(r.inputLine(s)).toBe("/compact");
@@ -882,7 +882,7 @@ describe("Kimi Code reader", () => {
     typed.dispose();
   });
 
-  test("a menu whose highlight can't be found (no arrow, or two) is \"\": Enter may run any item; no menu is null", async () => {
+  test("pty/unsure-forward: a menu whose highlight can't be found (no arrow, or two) is \"\": Enter may run any item; no menu is null", async () => {
     const menu = (rows: string[]) => `${box(["/c"])}\r\n${rows.map((t) => ` │ ${t.padEnd(59)}│`).join("\r\n")}`;
     const none = await draw(menu(["    compact       Compact", "    copy          Copy"]));
     expect(r.selectedCommand(none)).toBe("");

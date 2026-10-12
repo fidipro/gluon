@@ -24,7 +24,7 @@ Inside a session every key is the agent's, except the home key and a few arrow-k
 
 When a session ends, whatever ended it (the agent exits, or you said yes to ending it), it closes: you are back on the sessions home and its row is gone. An agent that exited with an error leaves a line in the chat.
 
-A typed `/clear` or `/new` asks "ends this session in Gluon, end it?" in the bottom bar, and `/compact` asks "End this session instead of compacting?". Enter says yes. Esc or Ctrl+C sends nothing: the command stays typed so you can edit it, and the session goes on. Claude Code, Codex and Grok Build ask the same before compacting on their own. You can change these questions in the `handoff` settings below.
+A typed `/clear` or `/new` asks "`/clear` ends this session in Gluon — end it?" in the bottom bar, and `/compact` asks "End this session instead of compacting?". Enter says yes. Esc or Ctrl+C sends nothing: the command stays typed so you can edit it, and the session goes on. Claude Code, Codex and Grok Build ask the same before compacting on their own. You can change these questions in the `handoff` settings below.
 
 :::note
 Inside the frame you lose inline images, OSC 8 hyperlinks, and the agents' output in your terminal's own scrollback after Gluon quits, because Gluon draws on the alternate screen. Where no pseudo-terminal can be had, sessions run one at a time, each with your terminal directly.

@@ -77,16 +77,16 @@ describe("interceptor on captured screens", () => {
     ["frame-turn-idle", ["codex"], null],
   ];
   for (const [name, harnesses, want] of cases)
-    for (const h of harnesses) test(`${name.startsWith("frame-") ? "BUG-191: " : ""}${h} ${name} → ${want}`, async () => expect(await onFixture(h, name)).toBe(want));
+    for (const h of harnesses) test(`clear-compact/asks: ${h} ${name} → ${want}`, async () => expect(await onFixture(h, name)).toBe(want));
 
-  test("settings off: nothing is held for that setting", async () => {
+  test("clear-compact/settings: settings off: nothing is held for that setting", async () => {
     expect(await onFixture("claude-code", "clear", { clear: false, compact: true })).toBeNull();
     expect(await onFixture("claude-code", "compact", { clear: true, compact: false })).toBeNull();
     expect(await onFixture("codex", "compact", { clear: false, compact: true })).toBe("compact");
     expect(await onFixture("codex", "cl", { clear: false, compact: false })).toBeNull();
   });
 
-  test("OpenCode: Tab on the menu runs the item, so that Tab is held", async () => {
+  test("clear-compact/asks: OpenCode: Tab on the menu runs the item, so that Tab is held", async () => {
     const f = fixture("opencode");
     const screen = await screenOf(f, "cl");
     const i = createInterceptor({ harness: "opencode", ...ON });
@@ -101,14 +101,14 @@ describe("interceptor on captured screens", () => {
     for (const k of keysOf(["/", "c", "l", "tab"])) expect(k2.key(k, cc)).toBeNull();
   });
 
-  test("Antigravity: Tab completes the item (it doesn't run it), so only the Enter after it is held", async () => {
+  test("clear-compact/asks: Antigravity: Tab completes the item (it doesn't run it), so only the Enter after it is held", async () => {
     const f = fixture("antigravity");
     const i = createInterceptor({ harness: "antigravity", ...ON });
     for (const k of keysOf(["/", "c", "l", "tab"])) expect(i.key(k, await screenOf(f, "cl"))).toBeNull();
     expect(i.key(NAMED.enter!, await screenOf(f, "cl-tab"))).toBe("clear");
   });
 
-  test("Antigravity: /compact is never held, even with the compact setting alone on", async () => {
+  test("clear-compact/asks: Antigravity: /compact is never held, even with the compact setting alone on", async () => {
     for (const name of ["compact", "compact-args", "compact-long"])
       expect(await onFixture("antigravity", name, { clear: false, compact: true })).toBeNull();
     expect(await onFixture("antigravity", "clear", { clear: false, compact: true })).toBeNull();
@@ -134,7 +134,7 @@ describe("interceptor on captured screens", () => {
     }
   });
 
-  test("Ctrl+C and the return key reset the line", async () => {
+  test("clear-compact/asks: Ctrl+C and the return key reset the line", async () => {
     const screen = await screenOf(fixture("claude-code"), "clear");
     for (const k of ["ctrlc", "ctrlc_kitty"]) {
       const i = createInterceptor({ harness: "claude-code", ...ON });
@@ -144,7 +144,7 @@ describe("interceptor on captured screens", () => {
     expect(enter(i, [...keysOf([..."/clear"]), { name: "return-key", raw: "\x1d" }], screen)).toBeNull();
   });
 
-  test("BUG-147: Esc that closes the slash menu keeps the typed / line", async () => {
+  test("clear-compact/asks: Esc that closes the slash menu keeps the typed / line #BUG-147", async () => {
     // After Esc the menu is gone and the typed line stays: the screen of `/cl` + Tab shows that.
     for (const h of ["claude-code", "codex", "antigravity"] as const) {
       const f = fixture(h);
@@ -163,7 +163,7 @@ describe("interceptor on captured screens", () => {
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf([..."/clear", "esc"]), createScreen(80, 24))).toBeNull();
   });
 
-  test("BUG-150: /clear and Enter in one chunk still asks: a screen behind the keys falls back to the typed line", async () => {
+  test("clear-compact/asks: /clear and Enter in one chunk still asks: a screen behind the keys falls back to the typed line #BUG-150", async () => {
     for (const h of ["claude-code", "codex", "opencode", "antigravity"] as const) {
       const f = fixture(h);
       // Nothing echoed yet, or only part of it (a menu then highlights something else).
@@ -182,7 +182,7 @@ describe("interceptor on captured screens", () => {
     }
   });
 
-  test("BUG-205/live: a line erased by the user's keys, then a typed /clear, asks; the screen says what is left", async () => {
+  test("clear-compact/asks: a line erased by the user's keys, then a typed /clear, asks; the screen says what is left #BUG-205/live", async () => {
     const ctrlU: Key = { name: "other", raw: "\x15" };
     const end: Key = { name: "other", raw: "\x1b[F" };
     for (const h of ["claude-code", "codex", "opencode", "antigravity"] as const) {
@@ -205,7 +205,7 @@ describe("interceptor on captured screens", () => {
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf([..."abc", "backspace", "backspace", "backspace", ..."/clear"]), createScreen(80, 24))).toBeNull();
   });
 
-  test("BUG-205/keys: erases() knows Backspace, Delete, Ctrl+U/W/K/H, Alt+Backspace in every encoding, not a release", () => {
+  test("clear-compact/asks: erases() knows Backspace, Delete, Ctrl+U/W/K/H, Alt+Backspace in every encoding, not a release #BUG-205/keys", () => {
     const k = (raw: string, name: Key["name"] = "other"): Key => ({ name, raw });
     for (const raw of ["\x15", "\x17", "\x0b", "\x1b\x7f", "\x1b\x08", "\x1b[3~", "\x1b[3;5~", "\x1b[117;5u", "\x1b[119;5u", "\x1b[127;3u", "\x1b[85;22;21;1;8;1_", "\x1b[46;83;0;1;0;1_"]) expect(erases(k(raw))).toBe(true);
     expect(erases(k("\x7f", "backspace"))).toBe(true);
@@ -216,7 +216,7 @@ describe("interceptor on captured screens", () => {
     expect([...d.feed("\x15\x17\x1b[3~\x7f"), ...d.flush()].map(erases)).toEqual([true, true, true, true]);
   });
 
-  test("state starts over after every Enter", async () => {
+  test("clear-compact/asks: state starts over after every Enter", async () => {
     const f = fixture("codex");
     const i = createInterceptor({ harness: "codex", ...ON });
     const hello = await screenOf(f, "hello");
@@ -229,7 +229,7 @@ describe("interceptor on captured screens", () => {
 
 describe("interceptor without a readable screen", () => {
   const blank = () => createScreen(80, 24);
-  test("a bare command typed key by key counts", () => {
+  test("clear-compact/asks: a bare command typed key by key counts", () => {
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf([..."/clear"]), blank())).toBe("clear");
     expect(enter(createInterceptor({ harness: "codex", ...ON }), keysOf([..."/compact"]), blank())).toBe("compact");
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf([..."/reset"]), blank())).toBe("clear");
@@ -248,7 +248,7 @@ describe("interceptor without a readable screen", () => {
     ])
       expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf(keys), blank())).toBeNull();
   });
-  test("Grok Build's reader reads its composer box (not the cursor); with its menu open, Enter runs the highlighted item", async () => {
+  test("clear-compact/asks: Grok Build's reader reads its composer box (not the cursor); with its menu open, Enter runs the highlighted item", async () => {
     const s = createScreen(40, 8);
     const box = (input: string) => `\x1b[2J\x1b[1;1H╭${"─".repeat(36)}╮\r\n│ ❯ ${input.padEnd(33)}│\r\n╰${"─".repeat(14)} Grok 4.7 (low) ─╯`;
     await s.write(`${box("/clear")}\x1b[8;1H`);
@@ -330,7 +330,7 @@ describe("BUG-148: a /compact with long instructions that wraps still asks", () 
     { name: "other", raw: "\x1b[13;28;13;1;16;1_" }, // Shift+Enter, win32-input-mode
   ];
 
-  test("rows the agent wrapped are one line: typed key by key, it asks", async () => {
+  test("clear-compact/asks: rows the agent wrapped are one line: typed key by key, it asks #BUG-148", async () => {
     for (const [h, screen] of [
       ["claude-code", await claudeWrapped()],
       ["codex", await codexWrapped()],
@@ -340,7 +340,7 @@ describe("BUG-148: a /compact with long instructions that wraps still asks", () 
     }
   });
 
-  test("a real multi-line input never counts: a key put the newline there, or history brought it back", async () => {
+  test("clear-compact/asks: a real multi-line input never counts: a key put the newline there, or history brought it back #BUG-148", async () => {
     for (const [h, screen] of [
       ["claude-code", await claudeWrapped()],
       ["codex", await codexWrapped()],
@@ -357,7 +357,7 @@ describe("BUG-148: a /compact with long instructions that wraps still asks", () 
     expect(enter(createInterceptor({ harness: "claude-code", ...ON }), keysOf([..."/compact x\\"]), s)).toBeNull();
   });
 
-  test("a line wrapped over rows reads as one line: the terminal's soft wrap (Claude Code), Grok's box rows", async () => {
+  test("clear-compact/asks: a line wrapped over rows reads as one line: the terminal's soft wrap (Claude Code), Grok's box rows #BUG-148", async () => {
     // Claude Code's box with its input wrapped by the terminal: no indent on the wrapped row.
     const c = createScreen(30, 8);
     await c.write(`\x1b[2;1H${"─".repeat(29)}\r\n❯ ${LONG}\r\n${"─".repeat(29)}\x1b[4;27H`);
@@ -381,7 +381,7 @@ describe("the typed line, untouched since the last Enter (lineAfter)", () => {
   /** Untouched after `s`, from an untouched line (`from` true) or one another key touched. */
   const after = (s: string, from = true) => line(s, from ? 0 : TOUCHED) === 0;
 
-  test("BUG-195/line: Enter empties it; any other key touches it until the next Enter; a key-up changes nothing", () => {
+  test("tabs/arrows: Enter empties it; any other key touches it until the next Enter; a key-up changes nothing #BUG-195/line", () => {
     expect(after("")).toBe(true);
     expect(after("\r", false)).toBe(true);
     for (const s of ["a", "\x1b[A", "\x1b[D", "\x1b[200~x\x1b[201~", "\n", "\x1b[13;2u"]) expect(after(s)).toBe(false);
@@ -394,7 +394,7 @@ describe("the typed line, untouched since the last Enter (lineAfter)", () => {
     expect(after("\x1b[65;30;97;0;0;1_", false)).toBe(false);
   });
 
-  test("BUG-268/GLUON-50: printables and as many Backspaces leave the line untouched; any other key keeps it touched until Enter", () => {
+  test("tabs/arrows: printables and as many Backspaces leave the line untouched; any other key keeps it touched until Enter #BUG-268/GLUON-50", () => {
     // `BBB` and three Backspaces: untouched again (legacy DEL, Ctrl+H, kitty Backspace, win32).
     expect(after("BBB\x7f\x7f\x7f")).toBe(true);
     expect(after("BBB\x7f\x7f")).toBe(false);
@@ -420,7 +420,7 @@ describe("the typed line, untouched since the last Enter (lineAfter)", () => {
     expect(line("a\x1b[97;1:3u")).toBe(1);
   });
 
-  test("BUG-209/line: a win32 modifier alone (Ctrl down before Ctrl+\\, Shift) leaves the line as it was", () => {
+  test("tabs/arrows: a win32 modifier alone (Ctrl down before Ctrl+\\, Shift) leaves the line as it was #BUG-209/line", () => {
     expect(after("\x1b[17;29;0;1;8;1_")).toBe(true);
     expect(after("\x1b[16;42;0;1;16;1_\x1b[16;42;0;0;0;1_")).toBe(true);
     expect(after("\x1b[17;29;0;1;8;1_", false)).toBe(false);
@@ -428,7 +428,7 @@ describe("the typed line, untouched since the last Enter (lineAfter)", () => {
     expect(after("\x1b[85;22;21;1;8;1_")).toBe(false);
   });
 
-  test("BUG-211/line: Esc and Ctrl+C (interrupting the agent) leave an untouched line untouched, and a touched one touched — legacy, kitty, win32", () => {
+  test("tabs/arrows: Esc and Ctrl+C (interrupting the agent) leave an untouched line untouched, and a touched one touched — legacy, kitty, win32 #BUG-211/line", () => {
     const escs = ["\x1b", "\x1b[27u", "\x1b[27;1:1u", "\x1b[27;1;27;1;0;1_"];
     const ctrlCs = ["\x03", "\x1b[99;5u", "\x1b[99;69u", "\x1b[67;46;3;1;8;1_"];
     for (const s of [...escs, ...ctrlCs]) {

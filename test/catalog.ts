@@ -156,7 +156,7 @@ export const CATALOG: Record<string, Feature> = {
       layout: b("given a session started, then the frame shows the tab strip at the top, an info line, a box with the session's triple in its top border holding the agent's own UI (its terminal exactly the box's interior), and the keys bar at the bottom; from 24 rows a blank row over the box"),
       "info-line": b("the info line shows the triple (with its mode and permissions), elapsed time, cost, context, files changed and the state, amber where it needs the user; unknown figures are left out; short of columns the figures go first and the state last, the triple cut but never dropped while it fits", ["e2e", "seam"]),
       "agent-screen": b("the agent's output (colours, emoji, CJK) is drawn in the box cell for cell with its cursor, the border never moved; a session off screen keeps running and, opened, shows what it printed meanwhile", ["e2e", "seam"]),
-      "terminal-queries": b("given the agent asks the terminal something (DA1, cursor position, colours), then Gluon's screen model answers it and only the agent sees the answer"),
+      "terminal-queries": b("given the agent asks the terminal something (DA1, cursor position, colours), then Gluon's screen model answers it and only the agent sees the answer", ["e2e", "seam"]),
       "keys-to-agent": b("every key but the home key and the switch arrows goes to the agent as the terminal sent it (ctrl+c, alt+pgup/pgdn too); a paste goes whole and in order (1 MB too; its own end marker ends it), never as Gluon's keys; a terminal reply or focus report reaches it only if it asked", ["e2e", "seam"]),
       "key-protocols": b("given any key protocol (VT, win32-input-mode, kitty CSI u) or a key split across reads (SSH), then the home view and Gluon's own keys read the keys they are; esc and a key in a later read are esc and that key, not alt+key", ["e2e", "seam"]),
       "mouse-to-agent": b("given an agent that asked for the mouse, then its reports reach it in its encoding, moved into its screen; a press outside its box is dropped, a release or drag after a press it got is held at the edge; below 20×6 it gets none", ["e2e", "seam"]),
@@ -174,6 +174,17 @@ export const CATALOG: Record<string, Feature> = {
       "brief-line": b("given an agent that takes its brief as a typed line (Kimi Code; Codex and Grok Build's `/plan`), then Gluon types it once its input box shows, its Enter apart, once; if the user typed first or the box never shows, Gluon says the line and never retries", ["seam", "e2e"]),
     },
   },
+  "session-state": {
+    says: "a session's state and latest activity on its row and info line (docs/guides/sessions.md, docs/concepts/architecture.md)",
+    entries: {
+      hooks: b("given an agent with hooks, then its state is what they said (working, awaiting, turn finished) however idle or busy its screen looks; a finished turn reads awaiting input, never done", ["seam"]),
+      activity: b("the latest activity is the agent's tool line while it runs; a turn's end says `Turn finished`, which the next turn's working clears; an answered question never leaves its tool line behind", ["seam"]),
+      "screen-fallback": b("given an agent without hooks, then its input box on a screen quiet for `QUIET_AWAIT_MS` reads awaiting, output reads working, and a quiet screen with no input box (thinking) stays working", ["seam"]),
+      "own-dialog": b("given the agent's own dialog waiting for a pick (folder trust, approvals, a plan approval, a question panel, a model picker), then it reads awaiting, on every harness that draws one; a look-alike in its output (a numbered list, hint-like words) doesn't", ["seam"]),
+      interrupted: b("given a turn interrupted with Esc (its screen says so: `Interrupted`, `■ Conversation interrupted`, wrapped too), then the row goes back to awaiting after the quiet period although its hook said working; the words inside what the agent printed don't", ["seam"]),
+      "not-work": b("output that isn't work (a redraw after Gluon's resize, late or ConPTY's at once, a key's echo, output that only sets terminal modes) doesn't make an idle session Working; real output after it does", ["seam"]),
+    },
+  },
   tabs: {
     says: "moving between sessions (docs/guides/keyboard.md, docs/getting-started/quickstart.md)",
     entries: {
@@ -183,15 +194,18 @@ export const CATALOG: Record<string, Feature> = {
       click: b("a click on a tab shows it, on `◆ gluon` home, on `‹N`/`N›` the nearest hidden tab, whether or not the agent asked for the mouse; exactly where the strip draws them", ["e2e", "seam"]),
       bar: b("the bottom bar names the keys that work now: ←/→ only while an arrow would switch (another tab, an untouched line), the home key, and the other sessions' counts; short of columns the words shorten, the counts go, then the switch keys; the home key stays", ["e2e", "seam"]),
       "keys-follow": b("keys in the same burst as the → or Enter that opens a session reach that session's agent in order, never the hidden home composer; the home key twice among them goes home"),
-      "back-event": b("the agent's `back` (`/gluon`, or its offer when the work looks done) shows home; the agent keeps running"),
+      "back-event": b("the agent's `back` (`/gluon`, or its offer when the work looks done) shows home; the agent keeps running", ["e2e", "seam"]),
     },
   },
   "clear-compact": {
     says: "`/clear`, `/new` and `/compact` ask first (docs/guides/sessions.md, docs/concepts/architecture.md)",
     entries: {
-      asks: b("given a typed `/clear` or `/new` (`/compact`), when Enter is pressed (on the agent's slash-menu item too, after edits or Tab, typed as kitty CSI-u keys, longer than 64 characters, after composed input), then the bottom bar asks `… ends this session in Gluon — end it?` (`End this session instead of compacting?`); a paste never asks; per harness (Antigravity has no `/compact`)"),
+      asks: b("given a typed `/clear` or `/new` (`/compact`), when Enter is pressed (on the agent's slash-menu item too, after edits or Tab, typed as kitty CSI-u keys, longer than 64 characters, after composed input), then the bottom bar asks `… ends this session in Gluon — end it?` (`End this session instead of compacting?`); a paste never asks; per harness (Antigravity has no `/compact`)", ["e2e", "seam"]),
       answer: b("Enter says yes (the session ends; keys typed right after go to the home composer); esc or ctrl+c sends nothing, the command stays typed and the line touched; other keys and pastes are dropped while it is up", ["e2e", "seam"]),
       bar: b("the question says what happens in Gluon; short of columns it keeps the command and what a yes does, its keys shrink then go; never `End G…`; a cut leaves no blank before its `…`", ["seam"]),
+      "reads-line": b("given any harness's screen as its release draws it (captured), then Gluon reads the typed line (rows the agent wrapped joined; a placeholder, a completion ghost or a grey hint is not input) and the slash menu's highlighted item; a screen it can't read for sure (no box, no highlight, two) is unsure", ["seam"]),
+      settings: b("given `on_clear` / `on_compact` set to go on as the agent's own, then that command's Enter is never held and nothing asks", ["seam"]),
+      "auto-compact": b("given Claude Code, Codex or Grok Build about to compact on its own (its `PreCompact` hook waits), then Gluon asks the same question; yes ends the session, no (or no answer) lets it compact", ["seam"]),
     },
   },
   "session-end": {
@@ -200,6 +214,7 @@ export const CATALOG: Record<string, Feature> = {
       closes: b("given an agent that exits (before drawing anything too), then its session closes: home shows, its row is gone, the other sessions stay, and the chat says how it ended (`exited (code 3)`); its End question, if up, goes with it", ["e2e", "seam"]),
       "on-exit-quit": b("given `on_exit: quit`, when the last session's agent exits, then Gluon exits with the agent's code"),
       signals: b("SIGTERM, SIGHUP or SIGINT to Gluon ends every agent (a grace, then SIGKILL) and gives the terminal back (normal screen, mouse and focus off, line mode, cursor); a second signal while it waits gives it back at once; in the setup menus a signal restores line mode and the cursor and exits 128 + n"),
+      "agent-ends": b("when a session is ended (Delete, a yes at its question, quitting), then its agent gets SIGTERM, then SIGKILL after the grace; nothing is written to it after it exits, and keys for it are dropped", ["seam"]),
     },
   },
   "whole-app": {

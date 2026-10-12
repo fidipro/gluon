@@ -551,7 +551,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("CLEARED");
   });
 
-  test("BUG-147/F32: Esc that closes the slash menu keeps the typed / line @full", async () => {
+  test("F32: Esc that closes the slash menu keeps the typed / line @full", async () => {
     const app = await tui();
     const menu = () => app.lines().some((l) => /^│ {2}❯ \/clear +│$/.test(l));
     await app.type("/clear");
@@ -565,7 +565,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("CLEARED");
   });
 
-  test("BUG-150/F30: /clear and Enter in one chunk still asks @full", async () => {
+  test("F30: /clear and Enter in one chunk still asks @full", async () => {
     const app = await tui();
     app.write("/clear\r");
     await app.waitFor(END_BAR);
@@ -580,7 +580,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toContain("enter yes");
   });
 
-  test("BUG-234/F31: Esc sends nothing — /clear stays typed and the session goes on; Enter on it asks again (/new too) @full", async () => {
+  test("F31: Esc sends nothing — /clear stays typed and the session goes on; Enter on it asks again (/new too) @full", async () => {
     const app = await tui();
     await app.type("/clear");
     await app.press(KEY.enter);
@@ -621,7 +621,7 @@ describe("the question at the agent's /clear and /compact (issue #13 v2)", () =>
     expect(app.screen()).not.toMatch(/CLEARED|COMPACTED/);
   });
 
-  test("BUG-234/F33: a typed /compact asks each time; Esc sends nothing (no compaction, no hook asks), Enter ends without compacting @full", async () => {
+  test("F33: a typed /compact asks each time; Esc sends nothing (no compaction, no hook asks), Enter ends without compacting @full", async () => {
     const log = answerLog("f33");
     // As a PreCompact hook would, were the agent to compact.
     const app = await tui({ FAKE_HOOK: signal("compact", "c33", "--wait", "1500"), FAKE_ANSWER_LOG: log });

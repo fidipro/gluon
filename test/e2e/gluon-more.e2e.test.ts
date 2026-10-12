@@ -224,7 +224,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
   });
 
   // ConPTY repaints at once after a resize; the agent's own, late redraw is still owed (`isRedraw`'s `late`).
-  test.skipIf(!WIN)("frame/resize: on Windows too an idle session's row doesn't read Working when the agent redraws a while after a resize (ConPTY's immediate repaint ends the BUG-242 wait) #BUG-669/QA-win-02 @full", async () => {
+  test.skipIf(!WIN)("frame/resize: on Windows too an idle session's row doesn't read Working when the agent redraws a while after a resize (ConPTY's immediate repaint ends the BUG-242 wait) #QA-win-02 @full", async () => {
     // ConPTY's repaint isn't every time (a loaded machine skips it): up to three tries before the row is called clean.
     const seen: string[] = [];
     for (let i = 0; i < 3 && !seen.length; i++) seen.push(...(await workingAfterResize(1500)));
