@@ -27,7 +27,6 @@
   "test/e2e/tables-refresh.e2e.test.ts": 5,
   "test/effort.test.ts": 18,
   "test/figures.test.ts": 54,
-  "test/forge.test.ts": 24,
   "test/gluon-qa-frame.test.ts": 1,
   "test/gluon.test.ts": 3,
   "test/grok.test.ts": 32,
@@ -44,14 +43,14 @@
   "test/pty-session.test.ts": 3,
   "test/refresh.test.ts": 57,
   "test/route-schema.test.ts": 4,
-  "test/rules.test.ts": 17,
+  "test/rules.test.ts": 4,
   "test/secrets.test.ts": 45,
   "test/session.test.ts": 54,
   "test/signin.test.tsx": 3,
   "test/status-login.test.ts": 17,
   "test/status.test.ts": 23,
   "test/tables-hardening.test.ts": 29,
-  "test/tools.test.ts": 89,
+  "test/tools.test.ts": 4,
   "test/usage.test.ts": 1,
   "test/windows.test.ts": 1
  },
@@ -117,9 +116,6 @@
    "src/cost/ledger.ts",
    "src/cost/report.ts",
    "src/cost/table-schema.ts"
-  ],
-  "test/forge.test.ts": [
-   "src/agent/forge.ts"
   ],
   "test/gluon.test.ts": [
    "src/gluon.ts"
@@ -226,9 +222,7 @@
    "src/openrouter-billed.ts"
   ],
   "test/tools.test.ts": [
-   "src/agent/git.ts",
-   "src/agent/prompt.ts",
-   "src/agent/scan.ts"
+   "src/agent/prompt.ts"
   ],
   "test/usage.test.ts": [
    "src/usage.ts"

@@ -44,7 +44,7 @@ describe("issue #41: forge", () => {
     expect((t.input_schema as { properties: { action: { enum: string[] } } }).properties.action.enum).toEqual(["issue_view", "issue_list", "pr_view", "pr_list"]);
   });
 
-  test("remote URLs: github and gitlab only", () => {
+  test("repo-tools/forge-hosts: remote URLs: github and gitlab only", () => {
     expect(parseForgeRepo("git@github.com:o/r.git")).toEqual({ host: "github.com", path: "o/r" });
     expect(parseForgeRepo("https://github.com/o/r")).toEqual({ host: "github.com", path: "o/r" });
     expect(parseForgeRepo("ssh://git@gitlab.com:22/g/sub/r.git\n")).toEqual({ host: "gitlab.com", path: "g/sub/r" });
@@ -54,7 +54,7 @@ describe("issue #41: forge", () => {
     expect(parseForgeRepo("https://github.com/../r")).toBeNull();
   });
 
-  test("argv is view / list only; a gh view names its --json fields (issues #63, #64)", () => {
+  test("repo-tools/forge: argv is view / list only; a gh view names its --json fields (issues #63, #64)", () => {
     expect(forgeArgv("gh", "github.com", "issue_view", "o/r", { number: 4, count: 20 })).toEqual(["gh", "issue", "view", "4", "-R", "o/r", "--json", expect.stringContaining("comments")]);
     // a gh view without --json fails on the sunset `projectCards` (issues #63, #64)
     for (const a of ["issue_view", "pr_view"] as const) expect(forgeArgv("gh", "github.com", a, "o/r", { number: 4, count: 20 })).toContain("--json");
@@ -63,20 +63,20 @@ describe("issue #41: forge", () => {
     expect(forgeArgv("glab", "gitlab.com", "issue_list", "g/r", { state: "closed", count: 3 })).toEqual(["glab", "issue", "list", "-R", "g/r", "--closed", "--per-page", "3"]);
   });
 
-  test.skipIf(!posix)("reads the origin's host with the matching CLI, in a neutral cwd", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: reads the origin's host with the matching CLI, in a neutral cwd", async () => {
     const calls = fakes("#4 the title\nbody");
     expect(await runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_view", number: 4 })).toBe("#4 the title\nbody");
     expect(await runRepoTool(origin("https://gitlab.com/g/s/r.git"), "forge", { action: "pr_list", state: "open", count: 2 })).toContain("the title");
     expect(calls()).toEqual([expect.stringMatching(/^gh issue view 4 -R o\/r --json .*comments/), "glab mr list -R g/s/r --per-page 2"]);
   });
 
-  test.skipIf(!posix)("a secret in the output is masked", async () => {
+  test.skipIf(!posix)("repo-tools/forge: a secret in the output is masked", async () => {
     fakes("token ghp_abcdefghijklmnopqrstuvwxyz0123456789 here");
     const out = await runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_view", number: 1 });
     expect(out).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz0123456789");
   });
 
-  test.skipIf(!posix)("bad input never reaches a CLI", async () => {
+  test.skipIf(!posix)("repo-tools/forge: bad input never reaches a CLI", async () => {
     const calls = fakes("x");
     const d = origin("git@github.com:o/r.git");
     for (const input of [{ action: "issue_comment", number: 1 }, { action: "issue_view" }, { action: "issue_view", number: "1; rm" }, { action: "issue_list", state: "--web" }, { action: "issue_list", repo: "-R/x" }, { action: "issue_list", repo: "https://evil.example/o/r" }])
@@ -85,12 +85,12 @@ describe("issue #41: forge", () => {
     expect(calls()).toEqual([]);
   });
 
-  test.skipIf(!posix)("a CLI failure is a tool error naming the sign-in", async () => {
+  test.skipIf(!posix)("repo-tools/forge: a CLI failure is a tool error naming the sign-in", async () => {
     fakes("", "HTTP 404: Not Found");
     await expect(runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_view", number: 9 })).rejects.toThrow("gh auth login");
   });
 
-  test.skipIf(!posix)("no gh installed: a clear error", async () => {
+  test.skipIf(!posix)("repo-tools/forge: no gh installed: a clear error", async () => {
     process.env.PATH = "/nonexistent";
     await expect(runRepoTool(tmpdir(), "forge", { action: "issue_list", repo: "o/r" })).rejects.toThrow("gh is not installed");
   });
@@ -128,7 +128,7 @@ const setHosts = (v: Record<string, string>) => {
 const HOSTILE = { GH_HOST: "github.corp.example", GITLAB_HOST: "https://gitlab.corp.example", GL_HOST: "gitlab.corp.example", GITLAB_URI: "https://gitlab.corp.example", GITLAB_API_HOST: "gitlab.corp.example" };
 
 // The fakes are `#!/bin/sh` scripts, which Windows can't run: skipped there, as the BUG-592 tests below.
-test.skipIf(!posix)("BUG-592/QA-brain-10: gh and glab are told which host (github.com / gitlab.com), whatever GH_HOST / GITLAB_HOST the user's environment holds: a hostile origin must not reach the user's company instance", async () => {
+test.skipIf(!posix)("repo-tools/forge-hosts: gh and glab are told which host (github.com / gitlab.com), whatever GH_HOST / GITLAB_HOST the user's environment holds: a hostile origin must not reach the user's company instance #BUG-592/QA-brain-10", async () => {
   setHosts({ GH_HOST: "github.corp.example", GITLAB_HOST: "https://gitlab.corp.example" });
   const calls = loggingFakes("x");
   await runRepoTool(origin("git@github.com:victim/secret-repo.git"), "forge", { action: "issue_list" });
@@ -141,14 +141,14 @@ test.skipIf(!posix)("BUG-592/QA-brain-10: gh and glab are told which host (githu
 });
 
 describe("BUG-592: the forge CLIs run with the origin's host, and the user's variables stay", () => {
-  test.skipIf(!posix)("a gitlab.com origin: every GitLab host variable of the CLI names gitlab.com, the GitHub one is left alone", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: a gitlab.com origin: every GitLab host variable of the CLI names gitlab.com, the GitHub one is left alone", async () => {
     setHosts(HOSTILE);
     const calls = loggingFakes("x");
     await runRepoTool(origin("https://gitlab.com/g/sub/r.git"), "forge", { action: "pr_list" });
     expect(calls()).toEqual(["glab GH_HOST=github.corp.example GITLAB_HOST=gitlab.com GL_HOST=gitlab.com GITLAB_URI=gitlab.com GITLAB_API_HOST=gitlab.com :: mr list -R g/sub/r --per-page 20"]);
   });
 
-  test.skipIf(!posix)("a github.com origin: GH_HOST is github.com (also for a `repo` given without a host), the GitLab variables are left alone", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: a github.com origin: GH_HOST is github.com (also for a `repo` given without a host), the GitLab variables are left alone", async () => {
     setHosts(HOSTILE);
     const calls = loggingFakes("x");
     const dir = origin("https://github.com/o/r.git");
@@ -172,7 +172,7 @@ describe("BUG-592: the forge CLIs run with the origin's host, and the user's var
   }
   const TOKENS = { GITLAB_TOKEN: "glpat-corp", GITLAB_ACCESS_TOKEN: "glpat-corp2", OAUTH_TOKEN: "oauth-corp", GITLAB_API_PROTOCOL: "http" };
 
-  test.skipIf(!posix)("a token of the user's other GitLab host is not sent to gitlab.com: the host variables name the other host, the token variables are dropped", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: a token of the user's other GitLab host is not sent to gitlab.com: the host variables name the other host, the token variables are dropped", async () => {
     for (const host of [{ GITLAB_HOST: "https://gitlab.corp.example" } as Record<string, string>, { GL_HOST: "gitlab.corp.example" }, { GITLAB_URI: "http://GitLab.Corp.Example:8443/x" }]) {
       setHosts({ ...TOKENS, ...host });
       const out = tokenGlab();
@@ -182,7 +182,7 @@ describe("BUG-592: the forge CLIs run with the origin's host, and the user's var
     }
   });
 
-  test.skipIf(!posix)("without a host variable, or one that names gitlab.com, the user's GitLab token is kept", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: without a host variable, or one that names gitlab.com, the user's GitLab token is kept", async () => {
     for (const host of [{} as Record<string, string>, { GITLAB_HOST: "gitlab.com" }, { GITLAB_HOST: "https://www.gitlab.com/" }, { GL_HOST: "gitlab.com:443" }]) {
       setHosts({ ...TOKENS, ...host });
       const out = tokenGlab();
@@ -191,7 +191,7 @@ describe("BUG-592: the forge CLIs run with the origin's host, and the user's var
     }
   });
 
-  test.skipIf(!posix)("the variables are the child's: the process environment keeps the user's own", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: the variables are the child's: the process environment keeps the user's own", async () => {
     setHosts(HOSTILE);
     loggingFakes("x");
     await runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" });
@@ -208,7 +208,7 @@ function wrapperGh(seconds: number) {
   process.env.PATH = `${dir}:${PATH}`;
 }
 
-test.skipIf(!posix)("BUG-654/QA-brain-11: Esc while forge runs ends the tool call at once, also when the CLI started a child that still holds its output", async () => {
+test.skipIf(!posix)("repo-tools/stops: Esc while forge runs ends the tool call at once, also when the CLI started a child that still holds its output #BUG-654/QA-brain-11", async () => {
   wrapperGh(2);
   const ac = new AbortController();
   const started = Date.now();
@@ -245,7 +245,7 @@ const gone = async (pid: number) => {
 };
 
 describe("BUG-654/variants: forge abort", () => {
-  test.skipIf(!posix)("BUG-654/variants: Esc kills the CLI's child too, not only the CLI", async () => {
+  test.skipIf(!posix)("repo-tools/stops: Esc kills the CLI's child too, not only the CLI #BUG-654/variants", async () => {
     const childPid = pidGh(false);
     const ac = new AbortController();
     const p = runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" }, ac.signal).catch((e: Error) => e);
@@ -260,7 +260,7 @@ describe("BUG-654/variants: forge abort", () => {
     }
   });
 
-  test.skipIf(!posix)("BUG-654/variants: the CLI already gone but its child still holds the pipe: Esc still ends the call at once", async () => {
+  test.skipIf(!posix)("repo-tools/stops: the CLI already gone but its child still holds the pipe: Esc still ends the call at once #BUG-654/variants", async () => {
     const childPid = pidGh(true);
     const ac = new AbortController();
     const p = runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" }, ac.signal).catch((e: Error) => e);
@@ -276,7 +276,7 @@ describe("BUG-654/variants: forge abort", () => {
     }
   });
 
-  test.skipIf(!posix)("BUG-654/variants: a call that ends by itself, with a signal given, still returns its output", async () => {
+  test.skipIf(!posix)("repo-tools/stops: a call that ends by itself, with a signal given, still returns its output #BUG-654/variants", async () => {
     fakes("hello\\n");
     expect(await runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" }, new AbortController().signal)).toBe("hello");
   });
@@ -284,7 +284,7 @@ describe("BUG-654/variants: forge abort", () => {
 
 
 describe("QA: forge", () => {
-  test.skipIf(!posix)("a hostile origin that names another host, a lookalike, a path, a flag or a second line never starts gh or glab", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: a hostile origin that names another host, a lookalike, a path, a flag or a second line never starts gh or glab", async () => {
     const calls = loggingFakes("x");
     for (const url of ["https://github.com.evil.example/o/r", "https://evil.example/github.com/o/r", "https://github.com@evil.example/o/r", "git@evil.example:o/r.git", "https://github.com/o/r/extra", "https://github.com/--web/r", "https://gitlab.com/g/-/r", "/srv/git/github.com/o/r", "ssh://git@gitlab.corp.example/g/r"]) {
       await expect(runRepoTool(origin(url), "forge", { action: "issue_list" })).rejects.toThrow("not on github.com or gitlab.com");
@@ -292,7 +292,7 @@ describe("QA: forge", () => {
     expect(calls()).toEqual([]);
   });
 
-  test.skipIf(!posix)("`repo` is checked as the origin is: another host, a lookalike, a flag or a path is refused on GitHub; without a host it takes the origin's", async () => {
+  test.skipIf(!posix)("repo-tools/forge-hosts: `repo` is checked as the origin is: another host, a lookalike, a flag or a path is refused on GitHub; without a host it takes the origin's", async () => {
     const calls = loggingFakes("x");
     const gh = origin("git@github.com:o/r.git");
     for (const repo of ["github.com.evil.example/o/r", "evil.example/o/r", "https://evil.example/o/r", "o/r --web", "o/r;id", "../r", "o/../r", "-R/x", "o", "o/r/extra"])
@@ -303,7 +303,7 @@ describe("QA: forge", () => {
     expect(calls()).toEqual([expect.stringMatching(/^glab .* :: mr list -R grp\/sub\/proj --per-page 20$/)]);
   });
 
-  test.skipIf(!posix)("no input makes a write: only the four view and list actions exist, and every argv word that isn't data is fixed", async () => {
+  test.skipIf(!posix)("repo-tools/forge: no input makes a write: only the four view and list actions exist, and every argv word that isn't data is fixed", async () => {
     const calls = loggingFakes("x");
     const d = origin("git@github.com:o/r.git");
     for (const action of ["issue_create", "issue_comment", "issue_close", "pr_merge", "pr_create", "pr_review", "pr_checkout", "api", "repo_delete", "issue_view; rm -rf /", "ISSUE_VIEW", "", null, 5]) {
@@ -315,7 +315,7 @@ describe("QA: forge", () => {
     expect(calls().map((l) => l.split(" :: ")[1])).toEqual(["issue list -R o/r --state closed --limit 3", expect.stringMatching(/^pr view 7 -R o\/r --json number,title,state,isDraft/)]);
   });
 
-  test.skipIf(!posix)("the count and number are bounded; a non-integer or huge number is refused", async () => {
+  test.skipIf(!posix)("repo-tools/forge: the count and number are bounded; a non-integer or huge number is refused", async () => {
     const calls = loggingFakes("x");
     const d = origin("git@github.com:o/r.git");
     for (const n of [0, -1, 1.5, 1e9, Number.NaN, Number.POSITIVE_INFINITY, "7", null]) await expect(runRepoTool(d, "forge", { action: "issue_view", number: n })).rejects.toThrow("number must be a positive integer");
@@ -325,7 +325,7 @@ describe("QA: forge", () => {
     expect(calls().map((l) => l.split("--limit ")[1])).toEqual(["50", "1", "20"]);
   });
 
-  test.skipIf(!posix)("secrets are masked on stdout and in the error from stderr; NUL bytes and a huge output are cut", async () => {
+  test.skipIf(!posix)("repo-tools/forge: secrets are masked on stdout and in the error from stderr; NUL bytes and a huge output are cut", async () => {
     loggingFakes(`token ghp_abcdefghijklmnopqrstuvwxyz0123456789 and sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789\\0end\\n${"x".repeat(40_000)}`);
     const d = origin("git@github.com:o/r.git");
     const out = await runRepoTool(d, "forge", { action: "issue_view", number: 1 });
@@ -341,12 +341,12 @@ describe("QA: forge", () => {
     expect(err).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz0123456789");
   });
 
-  test.skipIf(!posix)("an empty answer says so", async () => {
+  test.skipIf(!posix)("repo-tools/forge: an empty answer says so", async () => {
     loggingFakes("");
     expect(await runRepoTool(origin("git@github.com:o/r.git"), "forge", { action: "issue_list" })).toBe("(nothing found)");
   });
 
-  test.skipIf(!posix)("an abort while the CLI itself runs kills it and rejects", async () => {
+  test.skipIf(!posix)("repo-tools/stops: an abort while the CLI itself runs kills it and rejects", async () => {
     const dir = mkdtempSync(join(tmpdir(), "forge-exec-"));
     dirs.push(dir);
     writeFileSync(join(dir, "gh"), "#!/bin/sh\nexec sleep 30\n");
