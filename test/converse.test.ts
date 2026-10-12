@@ -51,13 +51,13 @@ function fake(events: unknown[], response?: unknown) {
   return { client, calls };
 }
 
-test("tools convert to Converse tool specs", () => {
+test("brain/requests: tools convert to Converse tool specs", () => {
   const t = toConverseTools(TOOLS);
   expect(t.map((x) => x.toolSpec?.name)).toEqual(TOOLS.map((x) => x.name));
   expect(t[1]!.toolSpec).toMatchObject({ name: "grep", inputSchema: { json: TOOLS[1]!.input_schema } });
 });
 
-test("messages convert with tool ids preserved, errors marked, blanks dropped and roles merged", () => {
+test("brain/requests: messages convert with tool ids preserved, errors marked, blanks dropped and roles merged", () => {
   expect(toConverseMessages(history)).toEqual([
     { role: "user", content: [{ text: "fix the bug" }] },
     {
@@ -85,7 +85,7 @@ test("messages convert with tool ids preserved, errors marked, blanks dropped an
   expect(merged).toEqual([{ role: "user", content: [{ text: "a" }, { text: "b" }] }]);
 });
 
-test("output converts back; stop reasons map to Anthropic's", () => {
+test("brain/streams: output converts back; stop reasons map to Anthropic's", () => {
   const out = fromConverseOutput(
     { role: "assistant", content: [{ text: "Asking." }, { toolUse: { toolUseId: "tooluse_1", name: "ask_user", input: { question: "Q?" } } }] },
     "tool_use",
@@ -116,7 +116,7 @@ const streamEvents = [
   { metadata: { usage: { inputTokens: 100, outputTokens: 20 } } },
 ];
 
-test("the stream folds into one message with usage", async () => {
+test("brain/streams: the stream folds into one message with usage", async () => {
   const deltas: string[] = [];
   const s = await readConverseStream(iterate(streamEvents) as any, (d) => deltas.push(d));
   expect(deltas.join("")).toBe("Let me look.");
@@ -129,7 +129,7 @@ test("the stream folds into one message with usage", async () => {
   ]);
 });
 
-test("the client sends system, tools and messages and returns Anthropic content", async () => {
+test("brain/requests: the client sends system, tools and messages and returns Anthropic content", async () => {
   const { client, calls } = fake(streamEvents);
   const brain = converseClient({ model: "us.openai.gpt-6-sol", client });
   const signal = new AbortController().signal;
@@ -143,13 +143,13 @@ test("the client sends system, tools and messages and returns Anthropic content"
   expect(calls[0]!.options.abortSignal).toBe(signal);
 });
 
-test("a stream error event is thrown", async () => {
+test("brain/streams: a stream error event is thrown", async () => {
   const { client } = fake([{ throttlingException: { name: "ThrottlingException", message: "slow down" } }]);
   const brain = converseClient({ model: "m", client });
   await expect(brain({ system: "", messages: [{ role: "user", content: "x" }], tools: [], signal: new AbortController().signal }, () => {})).rejects.toThrow("slow down");
 });
 
-test("an abort stops the stream", async () => {
+test("brain/streams: an abort stops the stream", async () => {
   const ctl = new AbortController();
   const { client } = fake(streamEvents);
   const brain = converseClient({ model: "m", client });
@@ -162,7 +162,7 @@ test("an abort stops the stream", async () => {
   expect(seen).toEqual(["Let me "]);
 });
 
-test("probe returns usage and readable errors", async () => {
+test("connections/check-method: probe returns usage and readable errors", async () => {
   const ok = fake([], { usage: { inputTokens: 8, outputTokens: 3 } });
   expect(await probeConverse({ model: "us.openai.gpt-6-sol", client: ok.client })).toEqual({ ok: true, usage: { input: 8, output: 3 } });
   expect(ok.calls[0]!.input.inferenceConfig.maxTokens).toBeLessThanOrEqual(16);

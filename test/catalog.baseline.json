@@ -1,95 +1,27 @@
 {
  "untagged": {
-  "test/brain-clients.test.ts": 30,
-  "test/brain.test.ts": 39,
-  "test/choices.test.ts": 31,
-  "test/codex.test.ts": 39,
-  "test/converse.test.ts": 8,
-  "test/doctor.test.ts": 1,
   "test/e2e/gluon.e2e.test.ts": 4,
   "test/e2e/perf-smoke.e2e.test.ts": 1,
-  "test/effort.test.ts": 18,
   "test/gluon-qa-frame.test.ts": 1,
   "test/gluon.test.ts": 3,
-  "test/openai.test.ts": 25,
   "test/perf/typing.perf.test.ts": 1,
-  "test/pty-session.test.ts": 3,
-  "test/route-schema.test.ts": 4,
-  "test/rules.test.ts": 4,
-  "test/session.test.ts": 54,
-  "test/tools.test.ts": 4,
-  "test/windows.test.ts": 1
+  "test/pty-session.test.ts": 3
  },
  "pastSeams": {
   "test/adapters-claude-codex.test.ts": [
    "src/pty/types.ts"
   ],
-  "test/brain-clients.test.ts": [
-   "src/agent/subscription.ts",
-   "src/brain.ts"
-  ],
-  "test/brain.test.ts": [
-   "src/agent/effort.ts",
-   "src/brain.ts",
-   "src/verify.ts"
-  ],
-  "test/choices.test.ts": [
-   "src/agent/choices.ts",
-   "src/agent/prompt.ts"
-  ],
-  "test/codex.test.ts": [
-   "src/brain.ts"
-  ],
-  "test/doctor.test.ts": [
-   "src/brain.ts"
-  ],
-  "test/effort.test.ts": [
-   "src/agent/effort.ts",
-   "src/agent/subscription.ts",
-   "src/brain.ts"
-  ],
   "test/gluon.test.ts": [
    "src/gluon.ts"
-  ],
-  "test/intake.test.ts": [
-   "src/agent/choices.ts",
-   "src/agent/prompt.ts"
-  ],
-  "test/kimi-code.test.ts": [
-   "src/agent/choices.ts",
-   "src/agent/prompt.ts"
-  ],
-  "test/modes.test.ts": [
-   "src/agent/prompt.ts"
-  ],
-  "test/openai.test.ts": [
-   "src/brain.ts"
   ],
   "test/opencode-plan.test.ts": [
    "src/gluon.ts"
   ],
-  "test/openrouter-billed.test.ts": [
-   "src/brain.ts"
-  ],
   "test/platform.test.ts": [
    "src/auth.ts"
   ],
-  "test/route.test.ts": [
-   "src/agent/prompt.ts"
-  ],
   "test/rules.test.ts": [
-   "src/agent/prompt.ts",
-   "src/agent/subscription.ts",
    "src/auth.ts"
-  ],
-  "test/session.test.ts": [
-   "src/ui/editor.ts"
-  ],
-  "test/tools.test.ts": [
-   "src/agent/prompt.ts"
-  ],
-  "test/windows.test.ts": [
-   "src/agent/subscription.ts"
   ]
  }
 }

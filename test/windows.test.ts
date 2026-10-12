@@ -140,7 +140,7 @@ describe("the rest of native Windows", () => {
     for (const f of ["status.ts", "agent/codex.ts", "agent/tools.ts"]) expect([f, /\b(proc|child)\.kill\(\)/.test(readFileSync(join(import.meta.dir, "../src", f), "utf8"))]).toEqual([f, false]);
   });
 
-  test("the Claude-plan brain needs claude.exe on Windows, with the native installer named", () => {
+  test("brain/claude-plan: the Claude-plan brain needs claude.exe on Windows, with the native installer named", () => {
     expect(claudeExecutable("win32", () => "C:\\Users\\me\\.local\\bin\\claude.exe")).toBe("C:\\Users\\me\\.local\\bin\\claude.exe");
     expect(() => claudeExecutable("win32", () => "C:\\npm\\claude.cmd")).toThrow("native claude.exe");
     expect(() => claudeExecutable("win32", () => "C:\\npm\\claude.cmd")).toThrow("install.ps1");

@@ -519,7 +519,7 @@ test("subscriptions/plan-brain-official-only: on the plan, questions, proposals 
   }
 });
 
-test("BUG-85/10: when `claude` stops mid-session, the next message restarts it and says the brain forgot", async () => {
+test("brain/claude-plan: when `claude` stops mid-session, the next message restarts it and says the brain forgot #BUG-85/10", async () => {
   let starts = 0;
   const run = (({ prompt }: Parameters<typeof sdkQuery>[0]) => {
     starts++;
@@ -563,7 +563,7 @@ describe("the plan brain's start-up (the SDK loads lazily)", () => {
     return { log, brain: subscriptionBrain("claude-sonnet-5-5", ROOT, run) };
   }
 
-  test("an abort while the SDK loads still interrupts the query", async () => {
+  test("brain/claude-plan: an abort while the SDK loads still interrupts the query", async () => {
     const { log, brain } = fake();
     const ac = new AbortController();
     void brain.send("hello", "sys", noHooks, ac.signal).catch(() => {});
@@ -573,7 +573,7 @@ describe("the plan brain's start-up (the SDK loads lazily)", () => {
     brain.close?.();
   });
 
-  test("close() while the SDK loads leaves no live query, and a later send starts a fresh one", async () => {
+  test("brain/claude-plan: close() while the SDK loads leaves no live query, and a later send starts a fresh one", async () => {
     const { log, brain } = fake();
     const first = brain.send("hello", "sys", noHooks, new AbortController().signal);
     first.catch(() => {});
@@ -587,7 +587,7 @@ describe("the plan brain's start-up (the SDK loads lazily)", () => {
     brain.close?.();
   });
 
-  test("two sends before the query exists share one query", async () => {
+  test("brain/claude-plan: two sends before the query exists share one query", async () => {
     const { log, brain } = fake();
     void brain.send("one", "sys", noHooks, new AbortController().signal).catch(() => {});
     void brain.send("two", "sys", noHooks, new AbortController().signal).catch(() => {});

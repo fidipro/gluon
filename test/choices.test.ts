@@ -20,7 +20,7 @@ const R: Routed = { mode: "build", recommended: { harness: "claude-code", model:
 const routed = (patch: Partial<Routed>): Routed => ({ ...R, ...patch });
 
 describe("the session name", () => {
-  test("is slugged: kebab-case, lowercase, ASCII, at most 24 characters cut at a word", () => {
+  test("intake/name: is slugged: kebab-case, lowercase, ASCII, at most 24 characters cut at a word", () => {
     expect(slugName("pty-return-flow")).toBe("pty-return-flow");
     expect(slugName("  Flaky Launcher_Test!! ")).toBe("flaky-launcher-test");
     expect(slugName("Café résumé")).toBe("cafe-resume");
@@ -29,7 +29,7 @@ describe("the session name", () => {
     for (const raw of ["add a resume flag so a finished session can be reopened", "x".repeat(40), "a-".repeat(30)]) expect(slugName(raw)!.length).toBeLessThanOrEqual(24);
   });
 
-  test("BUG-198/C: starts with Gluon-, capital G, at most 24 characters in all, never prefixed twice", () => {
+  test("intake/name: starts with Gluon-, capital G, at most 24 characters in all, never prefixed twice #BUG-198/C", () => {
     expect(sessionName("flaky-launcher")).toBe("Gluon-flaky-launcher");
     // Cut at a word to fit after the prefix.
     expect(sessionName("flaky-launcher-test-fix")).toBe("Gluon-flaky-launcher");
@@ -43,7 +43,7 @@ describe("the session name", () => {
     }
   });
 
-  test("BUG-202/C: strips every leading gluon-, from the brain's slug or the spec's first line", () => {
+  test("intake/name: strips every leading gluon-, from the brain's slug or the spec's first line #BUG-202/C", () => {
     expect(sessionName("gluon-gluon-fix")).toBe("Gluon-fix");
     expect(sessionName("Gluon--GLUON-gluon-tabs")).toBe("Gluon-tabs");
     expect(sessionName("gluon-gluon")).toBe("Gluon-session");
@@ -52,7 +52,7 @@ describe("the session name", () => {
     expect(sessionName("fix-gluon-tabs")).toBe("Gluon-fix-gluon-tabs");
   });
 
-  test("BUG-219/C: a name another session has gets -2, then -3 …, still within MAX_NAME", () => {
+  test("intake/name: a name another session has gets -2, then -3 …, still within MAX_NAME #BUG-219/C", () => {
     expect(numberedName("Gluon-fix-add-bug", [])).toBe("Gluon-fix-add-bug");
     expect(numberedName("Gluon-fix-add-bug", ["Gluon-other"])).toBe("Gluon-fix-add-bug");
     expect(numberedName("Gluon-fix-add-bug", ["Gluon-fix-add-bug"])).toBe("Gluon-fix-add-bug-2");
@@ -71,11 +71,11 @@ describe("the session name", () => {
     expect(taken.at(-1)).toBe("Gluon-supercalifragil-13");
   });
 
-  test("is null when nothing is left", () => {
+  test("intake/name: is null when nothing is left", () => {
     for (const raw of ["", "  ", "---", "שלום", 42, null, undefined, {}]) expect(slugName(raw)).toBeNull();
   });
 
-  test("falls back to a name from the spec's first line, without filler words, short enough for the prefix", () => {
+  test("intake/name: falls back to a name from the spec's first line, without filler words, short enough for the prefix", () => {
     expect(nameFromSpec("Fix the flaky launcher test.\n\nMore.")).toBe("fix-flaky-launcher");
     expect(nameFromSpec("\n# Add a resume flag so a finished session can be reopened")).toBe("add-resume-flag");
     expect(nameFromSpec("- **Refactor** `src/pty/proxy.ts` into sessions")).toBe("refactor-src-pty");
@@ -87,7 +87,7 @@ describe("the session name", () => {
 });
 
 describe("propose_launch's input", () => {
-  test("the schema takes the intake's fields only: no agent fields; route carries the agents", () => {
+  test("intake/proposal-checked: the schema takes the intake's fields only: no agent fields; route carries the agents", () => {
     const schema = TOOLS.find((t) => t.name === "propose_launch")!.input_schema as { properties: Record<string, unknown>; required: string[] };
     expect(Object.keys(schema.properties)).toEqual(["name", "spec", "types", "reason"]);
     expect(schema.required).toEqual(["name", "spec", "types", "reason"]);
@@ -96,7 +96,7 @@ describe("propose_launch's input", () => {
     expect(route.required).toEqual(["types"]);
   });
 
-  test("the Claude-plan brain's MCP tools (zod from the schemas) take the intake's input and refuse a step out of range", () => {
+  test("brain/claude-plan: the Claude-plan brain's MCP tools (zod from the schemas) take the intake's input and refuse a step out of range", () => {
     // As `subscriptionBrain` builds them: the SDK wraps the shape in an object.
     const zod = (name: string) => z.object((z.fromJSONSchema(TOOLS.find((t) => t.name === name)!.input_schema as never) as z.ZodObject).shape);
     const propose = { ...main, name: "flaky" };
@@ -109,7 +109,7 @@ describe("propose_launch's input", () => {
     expect(zod("route").safeParse({ types: [] }).success).toBe(false);
   });
 
-  test("the proposal is route's: the recommended agent, the alternatives and the mode come from it, the types from the call", () => {
+  test("intake/route-then-propose: the proposal is route's: the recommended agent, the alternatives and the mode come from it, the types from the call", () => {
     expect(parseProposal(config, main, R)).toEqual({ name: "Gluon-fix-flaky-launcher", choices: [{ harness: "claude-code", model: "sonnet", effort: "medium" }], spec: main.spec, reason: "fits", types: ["debug"], why: R.why });
     const more = routed({ alternatives: [{ harness: "codex", model: "gpt-6.1-sol", effort: "medium" }], types: ["debug", "test"] });
     const p = parseProposal(config, { ...main, types: ["test", "bogus", 7, "test"] }, more) as Proposal;
@@ -122,7 +122,7 @@ describe("propose_launch's input", () => {
     expect((parseProposal(config, { ...main, harness: "codex", model: "gpt-6-luna", effort: "low", alternatives: [{ harness: "codex", model: "gpt-6-luna", effort: "low" }] }, R) as Proposal).choices).toEqual([R.recommended]);
   });
 
-  test("launch modes: the proposal's mode is route's: explore or plan; build is none; alternatives don't carry one", () => {
+  test("intake/route-then-propose: launch modes: the proposal's mode is route's: explore or plan; build is none; alternatives don't carry one", () => {
     expect(parseProposal(config, main, R)).not.toHaveProperty("mode");
     expect((parseProposal(config, main, routed({ mode: "explore" })) as Proposal).mode).toBe("explore");
     expect((parseProposal(config, main, routed({ mode: "plan" })) as Proposal).mode).toBe("plan");
@@ -131,7 +131,7 @@ describe("propose_launch's input", () => {
     expect((parseProposal(config, main, routed({ mode: "plan", alternatives: [{ harness: "codex", model: "gpt-6-luna", effort: "medium" }] })) as Proposal).choices.every((c) => !("mode" in c))).toBe(true);
   });
 
-  test("the intake's prompt says what the spec is, how routing works, and tells each mode's route; the agents come from the block", () => {
+  test("intake/prompt: the intake's prompt says what the spec is, how routing works, and tells each mode's route; the agents come from the block", () => {
     const prompt = systemPrompt(config, { cwd: "/r", isRepo: true, branch: "main", topLevel: [] });
     expect(prompt).toContain("You are Gluon's intake agent");
     expect(prompt).toContain("**Route.** Call route with the types.");
@@ -142,7 +142,7 @@ describe("propose_launch's input", () => {
     expect(prompt).toContain("Path: /r (git, branch main)");
   });
 
-  test("launch modes: pickChoice carries the proposal's mode; an override wins, and build drops it", () => {
+  test("intake/confirm-first: launch modes: pickChoice carries the proposal's mode; an override wins, and build drops it", () => {
     const proposal = parseProposal(config, main, routed({ mode: "explore" })) as Proposal;
     expect(pickChoice(config, proposal)).toMatchObject({ mode: "explore" });
     expect(pickChoice(config, proposal, 0, { mode: "plan" })).toMatchObject({ mode: "plan" });
@@ -151,14 +151,14 @@ describe("propose_launch's input", () => {
     expect(pickChoice(config, parseProposal(config, main, R) as Proposal)).not.toHaveProperty("mode");
   });
 
-  test("launch modes: ctrl+t cycles build, explore, plan, build", () => {
+  test("agent-choice/mode: launch modes: ctrl+t cycles build, explore, plan, build", () => {
     expect(cycleMode(undefined)).toBe("explore");
     expect(cycleMode("build")).toBe("explore");
     expect(cycleMode("explore")).toBe("plan");
     expect(cycleMode("plan")).toBe("build");
   });
 
-  test("BUG-672/F08: ctrl+t skips a mode the harness can't run: on Kimi Code it never lands on explore; an agent that runs every mode cycles as before", () => {
+  test("agent-choice/mode-unsupported: ctrl+t skips a mode the harness can't run: on Kimi Code it never lands on explore; an agent that runs every mode cycles as before #BUG-672/F08", () => {
     expect(cycleMode(undefined, "kimi-code")).toBe("plan");
     expect(cycleMode("build", "kimi-code")).toBe("plan");
     expect(cycleMode("plan", "kimi-code")).toBe("build");
@@ -168,7 +168,7 @@ describe("propose_launch's input", () => {
     expect(cycleMode("explore", "codex")).toBe("plan");
   });
 
-  test("BUG-198/C: the name is slugged, or derived from the spec when invalid, and starts with Gluon-", () => {
+  test("intake/name: the name is slugged, or derived from the spec when invalid, and starts with Gluon- #BUG-198/C", () => {
     expect((parseProposal(config, { ...main, name: "Flaky Launcher" }, R) as Proposal).name).toBe("Gluon-flaky-launcher");
     expect((parseProposal(config, { ...main, name: "Flaky Launcher Test" }, R) as Proposal).name).toBe("Gluon-flaky-launcher");
     expect((parseProposal(config, { ...main, name: "Gluon Tabs" }, R) as Proposal).name).toBe("Gluon-tabs");
@@ -176,13 +176,13 @@ describe("propose_launch's input", () => {
     expect((parseProposal(config, { ...main, name: 7 }, R) as Proposal).name).toBe("Gluon-fix-flaky-launcher");
   });
 
-  test("a recommended agent that can't be launched is an error, an empty spec too", () => {
+  test("intake/proposal-checked: a recommended agent that can't be launched is an error, an empty spec too", () => {
     expect(parseProposal(config, main, routed({ recommended: { harness: "pi" as never, model: "x" } }))).toContain('unknown harness "pi"');
     expect(parseProposal(config, main, routed({ recommended: { harness: "claude-code", model: "sonnet" } }))).toContain("needs an effort");
     expect(parseProposal(config, { ...main, spec: " " }, R)).toBe("spec is empty");
   });
 
-  test("alternatives: invalid ones and repeats dropped, at most two kept, in order", () => {
+  test("intake/proposal-checked: alternatives: invalid ones and repeats dropped, at most two kept, in order", () => {
     const p = parseProposal(kimiOnOpenRouter, main, routed({
       alternatives: [
         { harness: "claude-code", model: "sonnet", effort: "medium" }, // the recommended again
@@ -206,14 +206,14 @@ describe("propose_launch's input", () => {
 describe("picking an option", () => {
   const proposal = parseProposal(config, { ...main, name: "flaky" }, routed({ alternatives: [{ harness: "codex", model: "gpt-6-luna", effort: "medium" }, { harness: "opencode", model: "deepseek-flash", effort: "max" }] })) as Proposal;
 
-  test("by index, with the shared spec and reason", () => {
+  test("intake/confirm-first: by index, with the shared spec and reason", () => {
     expect(pickChoice(config, proposal)).toEqual({ harness: "claude-code", model: "sonnet", effort: "medium", spec: main.spec, reason: "fits" });
     expect(pickChoice(config, proposal, 1)).toEqual({ harness: "codex", model: "gpt-6-luna", effort: "medium", spec: main.spec, reason: "fits" });
     expect(pickChoice(config, proposal, 2)).toEqual({ harness: "opencode", model: "deepseek-flash", effort: "max", spec: main.spec, reason: "fits" });
     expect(pickChoice(config, proposal, 3)).toBe("no option 4");
   });
 
-  test("an override changes model or effort, validated again for that agent", () => {
+  test("agent-choice/model-effort: an override changes model or effort, validated again for that agent", () => {
     expect(pickChoice(config, proposal, 0, { model: "opus", effort: "high" })).toMatchObject({ harness: "claude-code", model: "opus", effort: "high" });
     expect(pickChoice(config, proposal, 1, { effort: "xhigh" })).toMatchObject({ harness: "codex", model: "gpt-6-luna", effort: "xhigh" });
     expect(pickChoice(config, proposal, 1, { model: "sonnet" })).toContain('has no model "sonnet"');
@@ -232,7 +232,7 @@ describe("Tab adjust", () => {
   const claude: AgentTriple = { harness: "claude-code", model: "sonnet", effort: "medium" };
   const ids = agents.find((a) => a.harness === "claude-code")!.models.map((m) => m.id);
 
-  test("cycleModel moves through the agent's models, both ways, wrapping; the effort stays where the new model takes it, else it is that model's default (a model that takes none: none)", () => {
+  test("agent-choice/model-effort: cycleModel moves through the agent's models, both ways, wrapping; the effort stays where the new model takes it, else it is that model's default (a model that takes none: none)", () => {
     expect(ids).toEqual(["haiku", "sonnet", "opus", "fable"]);
     expect(cycleModel(claude, agents)).toEqual({ ...claude, model: "opus" });
     expect(cycleModel(claude, agents, -1)).toEqual({ ...claude, model: "haiku" });
@@ -253,7 +253,7 @@ describe("Tab adjust", () => {
     expect(cycleModel(oc("muse-spark-1.3-contributor", "high"), agents)).toEqual(oc("deepseek-flash", "high"));
   });
 
-  test("cycleEffort moves through the model's efforts, wrapping; none for a model that takes none", () => {
+  test("agent-choice/model-effort: cycleEffort moves through the model's efforts, wrapping; none for a model that takes none", () => {
     expect(cycleEffort(claude, agents)).toEqual({ ...claude, effort: "high" });
     expect(cycleEffort(claude, agents, -1)).toEqual({ ...claude, effort: "low" });
     expect(cycleEffort({ ...claude, effort: "max" }, agents)).toEqual({ ...claude, effort: "low" });
@@ -266,7 +266,7 @@ describe("Tab adjust", () => {
     expect(cycleEffort({ ...flash, effort: "max" }, agents)).toEqual({ ...flash, effort: "low" });
   });
 
-  test("an agent not offered, or with one model, stays as it is", () => {
+  test("agent-choice/model-effort: an agent not offered, or with one model, stays as it is", () => {
     const one = agents.map((a) => (a.harness === "grok-build" ? { ...a, models: a.models.slice(0, 1) } : a));
     const grok = { harness: "grok-build" as const, model: one.find((a) => a.harness === "grok-build")!.models[0]!.id, effort: "low" as const };
     expect(cycleModel(grok, one)).toEqual(grok);
@@ -274,7 +274,7 @@ describe("Tab adjust", () => {
     expect(cycleEffort(claude, [])).toEqual(claude);
   });
 
-  test("every adjusted option of an offered agent can be picked", () => {
+  test("agent-choice/model-effort: every adjusted option of an offered agent can be picked", () => {
     // The offered agents (`offeredAgents`): here, the Claude plan's own models.
     const offered = { ...config, agents: agents.map((a) => (a.harness === "claude-code" ? { ...a, models: a.models.filter((m) => ["haiku", "sonnet", "opus", "fable"].includes(m.id)) } : a)) };
     const proposal: Proposal = { name: "x", choices: [claude], spec: "s", reason: "r" };
@@ -310,7 +310,7 @@ describe("the demo brain", () => {
     return pending;
   };
 
-  test("routes, then proposes a named session with route's alternatives, the recommended one first", async () => {
+  test("demo/scripted-intake: routes, then proposes a named session with route's alternatives, the recommended one first", async () => {
     const p = await play("Fix the flaky launcher test");
     expect(p.name).toBe("Gluon-fix-flaky-launcher");
     expect(p.choices[0]).toEqual({ harness: "claude-code", model: "sonnet", effort: "high" });
@@ -320,13 +320,13 @@ describe("the demo brain", () => {
     expect(p.why?.at(-1)).toContain("→ claude-code/sonnet@high");
   }, 15_000);
 
-  test("launch modes: explore when the developer asks to understand, plan when they ask for a plan, else none", async () => {
+  test("demo/scripted-intake: launch modes: explore when the developer asks to understand, plan when they ask for a plan, else none", async () => {
     expect(await play("explain how the launcher picks a model")).toMatchObject({ mode: "explore", types: ["understand"] });
     expect(await play("design the tab strip, plan first")).toMatchObject({ mode: "plan" });
     expect(await play("rename a helper")).not.toHaveProperty("mode");
   }, 15_000);
 
-  test("a reply goes through route again: cheaper is a level lower; with one agent it stays on it", async () => {
+  test("demo/scripted-intake: a reply goes through route again: cheaper is a level lower; with one agent it stays on it", async () => {
     const p = await play("rename a helper", config, ["cheaper please"]);
     expect(p.choices[0]).toMatchObject({ harness: "opencode", model: "deepseek-flash" });
     const only = { ...config, agents: agents.filter((a) => a.harness === "claude-code") };
@@ -345,14 +345,14 @@ describe("QA: parseProposal on odd input", () => {
     return p;
   };
 
-  test("a spec that isn't text, or is only blanks, is refused with 'spec is empty'; the agent fields of the input are never read", () => {
+  test("intake/proposal-checked: a spec that isn't text, or is only blanks, is refused with 'spec is empty'; the agent fields of the input are never read", () => {
     for (const spec of [undefined, null, 5, ["a"], { text: "a" }, "", " \n\t "]) expect(parseProposal(config, { ...main, spec }, R)).toBe("spec is empty");
     const p = ok({ ...main, harness: "codex", model: "gpt-6-astra", effort: "max", mode: "plan", choices: [{ harness: "grok-build", model: "grok-4.7" }] });
     expect(p.choices[0]).toEqual({ harness: "claude-code", model: "sonnet", effort: "medium" });
     expect(p.mode).toBeUndefined();
   });
 
-  test("the route's recommended agent is checked again: an effort a model doesn't take, a missing one, an unknown model or harness are errors that name the problem; a bad alternative is dropped", () => {
+  test("intake/proposal-checked: the route's recommended agent is checked again: an effort a model doesn't take, a missing one, an unknown model or harness are errors that name the problem; a bad alternative is dropped", () => {
     expect(parseProposal(config, main, routed({ recommended: { harness: "claude-code", model: "sonnet" } }))).toContain("needs an effort");
     expect(parseProposal(kimiOnOpenRouter, main, routed({ recommended: { harness: "kimi-code", model: "kimi-k2.7-code", effort: "high" } }))).toContain("takes no effort");
     expect(parseProposal(config, main, routed({ recommended: { harness: "claude-code", model: "nonesuch", effort: "low" } }))).toContain('has no model "nonesuch"');
@@ -361,7 +361,7 @@ describe("QA: parseProposal on odd input", () => {
     expect(p.choices.map((c) => `${c.harness}/${c.model}`)).toEqual(["claude-code/sonnet", "codex/gpt-6.1-sol"]);
   });
 
-  test("a missing reason is kept empty; a reason that isn't text too; the name falls back to the spec, then to 'session'; types the route wasn't given are dropped", () => {
+  test("intake/proposal-checked: a missing reason is kept empty; a reason that isn't text too; the name falls back to the spec, then to 'session'; types the route wasn't given are dropped", () => {
     expect(ok({ spec: "Fix the flaky launcher test." }).reason).toBe("");
     expect(ok({ spec: "Fix the flaky launcher test.", reason: 5 }).reason).toBe("");
     expect(ok({ spec: "Fix the flaky launcher test.", name: { a: 1 } }).name).toBe("Gluon-fix-flaky-launcher");
@@ -370,13 +370,13 @@ describe("QA: parseProposal on odd input", () => {
     expect(ok({ ...main, types: "debug" }).types).toEqual(R.types);
   });
 
-  test("BUG-639/QA-brain-12: a spec too big to be saved with its session (the workspace file drops a spec over 1 000 000 characters) is refused when proposed, not launched into a session that can't be resumed", () => {
+  test("intake/proposal-checked: a spec too big to be saved with its session (the workspace file drops a spec over 1 000 000 characters) is refused when proposed, not launched into a session that can't be resumed #BUG-639/QA-brain-12", () => {
     const p = parseProposal(config, { ...main, spec: "x".repeat(1_000_001) }, R);
     expect(typeof p).toBe("string");
     expect(p).toContain("1,000,001 characters");
   });
 
-  test("BUG-639/variants: a spec of exactly the saved limit is proposed; the limit is the workspace reader's own", () => {
+  test("intake/proposal-checked: a spec of exactly the saved limit is proposed; the limit is the workspace reader's own #BUG-639/variants", () => {
     expect(typeof parseProposal(config, { ...main, spec: "x".repeat(MAX_SPEC) }, R)).toBe("object");
     expect(typeof parseProposal(config, { ...main, spec: ` ${"x".repeat(MAX_SPEC)} ` }, R)).toBe("object");
   });

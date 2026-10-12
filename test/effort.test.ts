@@ -41,14 +41,14 @@ async function* iterate<T>(items: T[]) {
 }
 
 describe("mapping Gluon's effort to each API", () => {
-  test("Claude models: all five from Opus 4.7 / Sonnet 5 / Haiku 5.5 on, no xhigh on 4.6, low–high on Opus 4.5, none on Haiku 4.5 and Sonnet 4.5", () => {
+  test("brain/effort: Claude models: all five from Opus 4.7 / Sonnet 5 / Haiku 5.5 on, no xhigh on 4.6, low–high on Opus 4.5, none on Haiku 4.5 and Sonnet 4.5", () => {
     for (const m of ["claude-sonnet-5-5", "global.anthropic.claude-sonnet-5-5", "anthropic/claude-sonnet-5.5", "claude-opus-4-7", "claude-fable-5-1", "sonnet", "opus", "haiku", "claude-haiku-5-5", "global.anthropic.claude-haiku-5-5", "anthropic/claude-haiku-5.5"]) expect([m, claudeEfforts(m)]).toEqual([m, ["low", "medium", "high", "xhigh", "max"]]);
     expect(claudeEfforts("us.anthropic.claude-sonnet-4-6")).toEqual(["low", "medium", "high", "max"]);
     expect(claudeEfforts("claude-opus-4-5-20251101")).toEqual(["low", "medium", "high"]);
     for (const m of ["claude-sonnet-4-5", "claude-haiku-4-5", "claude-3-7-sonnet", "gpt-6-sol"]) expect([m, claudeEfforts(m)]).toEqual([m, []]);
   });
 
-  test("OpenAI models: reasoning models only, GPT-6 all five", () => {
+  test("brain/effort: OpenAI models: reasoning models only, GPT-6 all five", () => {
     expect(openaiEfforts("gpt-6-sol")).toEqual(["low", "medium", "high", "xhigh", "max"]);
     expect(openaiEfforts("us.openai.gpt-6-sol")).toEqual(["low", "medium", "high", "xhigh", "max"]);
     expect(openaiEfforts("openai/gpt-5.2")).toEqual(["low", "medium", "high", "xhigh"]);
@@ -58,7 +58,7 @@ describe("mapping Gluon's effort to each API", () => {
     for (const m of ["gpt-4o", "gpt-4.1", "llama-4"]) expect([m, openaiEfforts(m)]).toEqual([m, []]);
   });
 
-  test("clamping goes to the nearest supported level, the cheaper on a tie, never off the ladder", () => {
+  test("brain/effort: clamping goes to the nearest supported level, the cheaper on a tie, never off the ladder", () => {
     expect(clampEffort("medium", ["low", "medium", "high"])).toBe("medium");
     expect(clampEffort("max", ["low", "medium", "high"])).toBe("high");
     expect(clampEffort("xhigh", ["low", "medium", "high", "max"])).toBe("high");
@@ -69,12 +69,12 @@ describe("mapping Gluon's effort to each API", () => {
     expect(clampEffort("medium", [])).toBeNull();
   });
 
-  test(`a step without effort sends ${BRAIN_EFFORT_DEFAULT}; every default step sends it in its API's name`, () => {
+  test(`brain/effort: a step without effort sends ${BRAIN_EFFORT_DEFAULT}; every default step sends it in its API's name`, () => {
     expect(BRAIN_EFFORT_DEFAULT).toBe("medium");
     expect(DEFAULT_ORDER.map((s) => sentEffort(s))).toEqual(DEFAULT_ORDER.map(() => "medium"));
   });
 
-  test("per route: the API's own names, clamped to the model; nothing where the model takes none", () => {
+  test("brain/effort: per route: the API's own names, clamped to the model; nothing where the model takes none", () => {
     const sent = (route: BrainStep["route"], model: string, effort?: BrainStep["effort"]) => sentEffort({ route, model, ...(effort ? { effort } : {}) });
     expect(sent("anthropic-api", "claude-opus-4-7", "xhigh")).toBe("xhigh");
     expect(sent("anthropic-api", "claude-haiku-4-5")).toBeNull();
@@ -95,7 +95,7 @@ describe("mapping Gluon's effort to each API", () => {
     expect(sentEffort({ route: "chatgpt-plan", model: "gpt-6-luna" }, [])).toBeNull();
   });
 
-  test("Codex's catalog: supported_reasoning_levels by slug, as presets or plain names", () => {
+  test("brain/effort: Codex's catalog: supported_reasoning_levels by slug, as presets or plain names", () => {
     const json = JSON.stringify({ models: [{ slug: "a", supported_reasoning_levels: [{ effort: "low", description: "x" }, { effort: "high", description: "y" }] }, { slug: "b", supported_reasoning_levels: ["medium"] }, { slug: "c" }] });
     expect(codexReasoningLevels(json)).toEqual({ a: ["low", "high"], b: ["medium"] });
     expect(codexReasoningLevels("not json")).toEqual({});
@@ -108,25 +108,25 @@ describe("brain.order: effort per step", () => {
     return loadConfig();
   };
 
-  test("an optional effort per step, kept; unset stays unset (the default applies when sending)", () => {
+  test("brain/effort: an optional effort per step, kept; unset stays unset (the default applies when sending)", () => {
     const c = load("brain:\n  order:\n    - { route: claude-plan, model: claude-sonnet-5-5, effort: high }\n    - { route: chatgpt-plan, model: gpt-6-luna }\n");
     expect(c.brain.order).toEqual([{ route: "claude-plan", model: "claude-sonnet-5-5", effort: "high" }, { route: "chatgpt-plan", model: "gpt-6-luna" }]);
     expect(sentEffort(c.brain.order[1]!)).toBe("medium");
   });
 
-  test("a name that isn't an effort, or a level the model doesn't take, is a clear ConfigError", () => {
+  test("brain/effort: a name that isn't an effort, or a level the model doesn't take, is a clear ConfigError", () => {
     expect(() => load("brain:\n  order:\n    - { route: claude-plan, model: claude-sonnet-5-5, effort: turbo }\n")).toThrow('brain.order[0].effort must be one of low, medium, high, xhigh, max (got "turbo")');
     expect(() => load("brain:\n  order:\n    - { route: bedrock, model: us.anthropic.claude-sonnet-4-6, effort: xhigh }\n")).toThrow("brain.order[0].effort: us.anthropic.claude-sonnet-4-6 on bedrock takes low, medium, high, max (got xhigh)");
     expect(() => load("brain:\n  order:\n    - { route: anthropic-api, model: claude-haiku-4-5, effort: low }\n")).toThrow("brain.order[0].effort: claude-haiku-4-5 on anthropic-api takes no effort setting; remove effort (got low)");
     expect(() => load("brain:\n  order:\n    - { route: openrouter, model: deepseek/deepseek-v4, effort: low }\n")).toThrow("takes no effort setting");
   });
 
-  test("the ChatGPT plan takes any level (Codex's catalog clamps it when the brain starts)", () => {
+  test("brain/effort: the ChatGPT plan takes any level (Codex's catalog clamps it when the brain starts)", () => {
     expect(stepEfforts({ route: "chatgpt-plan", model: "gpt-6-luna" })).toBeNull();
     expect(load("brain:\n  order:\n    - { route: chatgpt-plan, model: gpt-6-luna, effort: max }\n").brain.order[0]!.effort).toBe("max");
   });
 
-  test("brain.active is saved with its effort and matches only the same step", () => {
+  test("brain/effort: brain.active is saved with its effort and matches only the same step", () => {
     const order: BrainStep[] = [{ route: "claude-plan", model: "claude-sonnet-5-5" }, { route: "claude-plan", model: "claude-sonnet-5-5", effort: "high" }];
     const config = { ...defaults(), brain: { order, active: null } };
     expect(activeValue(config, 0)).toEqual({ route: "claude-plan", model: "claude-sonnet-5-5" });
@@ -138,7 +138,7 @@ describe("brain.order: effort per step", () => {
 });
 
 describe("each client sends the effort", () => {
-  test("Anthropic Messages (API key, Bedrock Claude): output_config.effort; nothing when null", async () => {
+  test("brain/effort: Anthropic Messages (API key, Bedrock Claude): output_config.effort; nothing when null", async () => {
     const bodies: any[] = [];
     const client = {
       messages: {
@@ -154,7 +154,7 @@ describe("each client sends the effort", () => {
     expect(bodies[1]).not.toHaveProperty("output_config");
   });
 
-  test("OpenAI Responses and OpenRouter Chat Completions: reasoning.effort; nothing when null", async () => {
+  test("brain/effort: OpenAI Responses and OpenRouter Chat Completions: reasoning.effort; nothing when null", async () => {
     const bodies: any[] = [];
     const create = async (body: any) => {
       bodies.push(body);
@@ -169,7 +169,7 @@ describe("each client sends the effort", () => {
     expect(bodies[2]).not.toHaveProperty("reasoning");
   });
 
-  test("Bedrock ConverseStream: outputConfig.effort; nothing when null", async () => {
+  test("brain/effort: Bedrock ConverseStream: outputConfig.effort; nothing when null", async () => {
     const inputs: any[] = [];
     const client: ConverseLike = {
       send: async (command) => {
@@ -183,7 +183,7 @@ describe("each client sends the effort", () => {
     expect(inputs[1]).not.toHaveProperty("outputConfig");
   });
 
-  test("Claude plan: the Agent SDK's own effort option, nothing else added; none when null", async () => {
+  test("brain/effort: Claude plan: the Agent SDK's own effort option, nothing else added; none when null", async () => {
     expect(subscriptionOptions("claude-sonnet-5-5", ROOT, "sys", {}, "medium").effort).toBe("medium");
     expect(subscriptionOptions("claude-haiku-4-5", ROOT, "sys", {})).not.toHaveProperty("effort");
     const seen: unknown[] = [];
@@ -202,7 +202,7 @@ describe("each client sends the effort", () => {
 });
 
 describe("shownEffort", () => {
-  test("is the effort sent: `medium` by default, nothing when the model takes none", () => {
+  test("brain/effort: is the effort sent: `medium` by default, nothing when the model takes none", () => {
     expect(shownEffort(DEFAULT_ORDER[0]!)).toBe("medium");
     expect(shownEffort({ route: "bedrock", model: "us.anthropic.claude-sonnet-4-6", effort: "max" })).toBe("max");
     expect(shownEffort({ route: "anthropic-api", model: "claude-haiku-4-5" })).toBeNull();
@@ -222,7 +222,7 @@ describe("QA: effort clamping, exhaustively", () => {
     openrouter: ["anthropic/claude-sonnet-5.5", "anthropic/claude-sonnet-4.6", "anthropic/claude-haiku-4.5", "openai/gpt-6.1-sol", "openai/gpt-5", "deepseek/deepseek-v4", "moonshotai/kimi-k3"],
   };
 
-  test("what is sent is a level the model takes (in the API's names), the nearest to the wanted one, the cheaper on a tie; nothing for a model that takes none", () => {
+  test("brain/effort: what is sent is a level the model takes (in the API's names), the nearest to the wanted one, the cheaper on a tie; nothing for a model that takes none", () => {
     let checked = 0;
     for (const [route, models] of Object.entries(MODELS) as [BrainStep["route"], string[]][]) {
       for (const model of models) {
@@ -251,7 +251,7 @@ describe("QA: effort clamping, exhaustively", () => {
     expect(checked).toBeGreaterThan(100);
   });
 
-  test("the ChatGPT plan: any level of the catalog's own, clamped; a catalog that lists levels off the ladder, or none, sends the nearest on it, or nothing", () => {
+  test("brain/effort: the ChatGPT plan: any level of the catalog's own, clamped; a catalog that lists levels off the ladder, or none, sends the nearest on it, or nothing", () => {
     const s = (effort: BrainStep["effort"], levels?: string[]) => sentEffort({ route: "chatgpt-plan", model: "gpt-6-luna", ...(effort ? { effort } : {}) }, levels);
     for (const wanted of LADDER) {
       expect(s(wanted, ["none", "low", "medium", "high", "xhigh", "ultra"])).toBe(wanted === "max" ? "xhigh" : wanted);
@@ -262,7 +262,7 @@ describe("QA: effort clamping, exhaustively", () => {
     }
   });
 
-  test("the catalog's Claude models take exactly the efforts the brain's table says for each id they run under (plan alias, API, Bedrock, OpenRouter)", async () => {
+  test("brain/effort: the catalog's Claude models take exactly the efforts the brain's table says for each id they run under (plan alias, API, Bedrock, OpenRouter)", async () => {
     const { DEFAULT_MODELS } = await import("../src/harnesses.ts");
     for (const m of DEFAULT_MODELS["claude-code"]) {
       for (const [conn, id] of Object.entries(m.ids)) {

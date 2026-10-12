@@ -77,9 +77,9 @@ export const CATALOG: Record<string, Feature> = {
   composer: {
     says: "the chat box at the bottom of home (docs/guides/keyboard.md)",
     entries: {
-      editing: b("when typing, backspace, delete, ←→, home/end and ctrl+a/e/u/w are pressed, then they edit at the cursor"),
-      graphemes: b("when the cursor moves, backspace deletes or text is inserted, then an emoji or a combined character is one character"),
-      newline: b("when alt+enter, ctrl+j or shift+enter (any encoding) is pressed, then a newline is inserted, never text; ↑↓ move between the lines"),
+      editing: b("when typing, backspace, delete, ←→, home/end and ctrl+a/e/u/w are pressed, then they edit at the cursor", ["e2e", "seam"]),
+      graphemes: b("when the cursor moves, backspace deletes or text is inserted, then an emoji or a combined character is one character", ["e2e", "seam"]),
+      newline: b("when alt+enter, ctrl+j or shift+enter (any encoding) is pressed, then a newline is inserted, never text; ↑↓ move between the lines", ["e2e", "seam"]),
       wrap: b("given a draft wider than the composer, then it wraps at words, a word longer than a row is broken there, and the cursor stays where the user types"),
       "tall-draft": b("given a draft taller than the composer's rows, then the rows around the cursor show, with how many more"),
       paste: b("when text is pasted, then it is taken whole, keeps its line breaks (CRLF, CR), indentation and tabs, drops escape sequences and control characters as typing does, and never sends by itself"),
@@ -116,8 +116,8 @@ export const CATALOG: Record<string, Feature> = {
       "recommended-mark": b("given a proposal, then `· recommended` marks the first option only while it is the intake agent's own"),
       start: b("when Enter is pressed on an option, then that harness × model × effort starts (with its mode and permissions) in Gluon's frame; ↑↓ wrap through the options"),
       "model-effort": b("when Tab or Shift+Tab is pressed, then the highlighted option's model or effort cycles, the others keep theirs; the hint names each key only when the highlighted agent has another", ["e2e", "seam"]),
-      mode: b("when ctrl+t is pressed at the choice, then build → explore → plan cycles for every option, shown on each row (a proposal's own mode shown from the start), and Enter starts in it; with no choice open ctrl+t does nothing"),
-      "mode-unsupported": b("given a mode the highlighted agent can't run, then ctrl+t skips it (explore for Kimi Code), and Enter on an agent that can't run the chosen mode is refused with its advice first, nothing started"),
+      mode: b("when ctrl+t is pressed at the choice, then build → explore → plan cycles for every option, shown on each row (a proposal's own mode shown from the start), and Enter starts in it; with no choice open ctrl+t does nothing", ["e2e", "seam"]),
+      "mode-unsupported": b("given a mode the highlighted agent can't run, then ctrl+t skips it (explore for Kimi Code), and Enter on an agent that can't run the chosen mode is refused with its advice first, nothing started", ["e2e", "seam"]),
       permissions: b("when ctrl+p is pressed, then the highlighted agent's permissions cycle (its own first), shown on its row and started with; an agent with none, or explore/plan, says why and changes nothing; the hint names ctrl+p only where it acts"),
       "keep-talking": b("when `keep talking` + Enter or esc is pressed, then the choice closes (`Tell the intake agent what to change`) and ↑↓ move on the list again"),
       "typed-reply": b("when text is typed at the choice (starting with a digit too; not just spaces), then it is a reply that gets a revised proposal; a lone digit + Enter picks that option"),
@@ -147,7 +147,7 @@ export const CATALOG: Record<string, Feature> = {
   demo: {
     says: "Gluon's demo mode (`gluon --demo`, docs/getting-started/quickstart.md)",
     entries: {
-      "scripted-intake": b("given `gluon --demo`, then the whole UI runs with a scripted intake agent whose spec is built from the task and the repository, with no API call"),
+      "scripted-intake": b("given `gluon --demo`, then the whole UI runs with a scripted intake agent whose spec is built from the task and the repository, with no API call", ["e2e", "seam"]),
     },
   },
   frame: {
@@ -217,6 +217,35 @@ export const CATALOG: Record<string, Feature> = {
       "agent-ends": b("when a session is ended (Delete, a yes at its question, quitting), then its agent gets SIGTERM, then SIGKILL after the grace; nothing is written to it after it exits, and keys for it are dropped", ["seam", "e2e"]),
     },
   },
+  brain: {
+    says: "where the intake agent runs: the brain order, its clients and the plans (docs/concepts/architecture.md \"The intake agent\", docs/guides/connections.md)",
+    entries: {
+      "first-working-step": b("the intake agent runs on the first step of `brain.order` that is connected (a plan step: its harness on the plan; a key step: the key) and answers a check, saved as `brain.active` with its effort; a step no longer connected is dropped from it; with nothing connected no step is found and nothing is probed; `gluon doctor` probes every connected step", ["seam"]),
+      fallback: b("if the model becomes unavailable mid-chat (the provider's own wording for a missing or refused model, an id it doesn't know, access denied), the chat moves to the next working step and says so, the next brain getting a valid history (a loop brain a fresh one); with no next step the error is shown as before with its hint; a rate limit, an outage, a bad key, a plan limit, a too-long prompt, a connection error, an interrupt or a stream error never moves it; an error keeps its HTTP status and the provider's message", ["seam"]),
+      effort: b("every call sends the step's effort explicitly, in its route's own field (`output_config.effort`, `reasoning.effort`, `outputConfig.effort`, the Agent SDK's option, Codex's `turn/start`), clamped to the nearest level the model takes (the cheaper on a tie), nothing for a model that takes none; a step without one runs at medium; the ChatGPT plan's levels come from Codex's catalog; a name that isn't an effort, or a level the model doesn't take, is a config error; the header shows what is sent", ["seam"]),
+      labels: b("the step in use is named as a person reads it: the model's name from any provider's id (Bedrock's too) and where it runs; a long provider error keeps the part that matters", ["seam"]),
+      requests: b("each route's request is what its provider takes: the prompt (cached where the API caches), Gluon's tools in its own format (route's schema whole on every route), the model, the token cap and the effort, nothing invented; Bedrock signed for the configured region", ["seam"]),
+      streams: b("a reply streams its words as they come and returns its tool calls with the input their pieces make (none: empty; not JSON: an input the tool refuses); a cut-off reply says so (max tokens); a stream that errors, ends early or isn't one rejects with the provider's message; an abort stops it at once", ["seam"]),
+      "claude-plan": b("on the Claude plan the intake agent runs only through the user's own `claude` (Agent SDK, `claude.exe` on Windows) with Gluon's tools as in-process MCP tools (every schema converts; a bad input refused) and its prompt unchanged; a sub-agent's events aren't its words; a failed result says why; `claude` ending mid-turn: the next message starts it again and says it forgot; not installed: the first message says so; Esc interrupts the query; a model that is gone moves the order on; an abort or close while the SDK loads leaves no live query", ["seam"]),
+      "chatgpt-plan": b("on the ChatGPT plan through the user's own `codex app-server`: exploring, questions and proposals look as on any brain; approval requests are denied; Esc sends `turn/interrupt`; a failed turn, a codex without the experimental API, not signed in (or not with ChatGPT), a model the plan doesn't offer are each said plainly, once; `app-server` stopping mid-chat: the next message restarts it and says it forgot; its check is one tiny turn", ["seam"]),
+      "chatgpt-plan-features": b("every Codex feature Gluon hasn't checked is turned off (only the names this codex lists; the tool-giving ones always), the catalog's own tools are cleared and the thread has no environment, agents, `request_user_input` or skills; a feature that stays on, an MCP server codex keeps, or a catalog field Gluon hasn't checked is a warning (the check passes, `gluon doctor` says what and why), never a refusal; a features list in a shape Gluon can't read is refused as such; a codex that fails to start after Gluon turned features off is told which; a refusal points at `gluon doctor`, never at retrying", ["seam"]),
+      "chatgpt-plan-foreign-tools": b("a tool or item of Codex's own that gets through is interrupted (never killed), the model is told in a next turn of the same thread to use Gluon's tools, and its answer reaches the developer; a question waiting on the developer is interrupted only once answered; names codex sends are cleaned and capped; past `MAX_INTERRUPTS` the answer finishes as it is, with a warning; the check notes it and passes", ["seam"]),
+    },
+  },
+  intake: {
+    says: "the intake agent's tool loop: questions, the spec and the proposal (docs/concepts/architecture.md \"The intake chat\", docs/getting-started/quickstart.md)",
+    entries: {
+      "confirm-first": b("nothing launches until the developer confirms an option; a reply goes back to the intake agent; confirm starts the option picked (by index, adjusted) with the proposal's name, mode (a ctrl+t override wins; build is none) and routing data; the spec launched is the intake agent's, trimmed, with no line about returning to Gluon added", ["seam"]),
+      "route-then-propose": b("`propose_launch` can offer only `route`'s last result (its agents, mode and why); without a route it's an error saying to call `route`; a message from the developer after a route needs a new one; a reply goes through `route` again", ["seam"]),
+      "proposal-checked": b("an invalid proposal goes back to the intake agent as an error, never shown; after two invalid tries the turn stops and the next message keeps the conversation valid; checked: a launchable recommended agent (a known harness and model, an effort it takes), a spec of text, not blank, no bigger than a workspace saves, at most two valid, distinct alternatives; the input's agent fields are never read, types route wasn't given are dropped", ["seam"]),
+      name: b("a session's name is `Gluon-` and a kebab-case ASCII slug, at most 24 characters cut at a word, never prefixed twice; when the intake agent gives none or an invalid one, it comes from the spec's first line without filler words (else `session`); a name another session has gets `-2`, `-3`…", ["seam"]),
+      questions: b("`ask_user` asks at most one batch per proposal round (enforced in code), at most four questions (the first and three next) of at most eight options each, trimmed, its own \"Other\" option dropped; they come one at a time and the answers go back together after the last; a bad next question is refused with a reason; an answer typed while a series is open answers the one shown, and one to `keep talking` is a reply; a loop brain asking two at once gets one answered, the other skipped", ["seam"]),
+      "turn-limits": b("a turn stops after too many model calls, or a loop brain that goes on, with a notice shown once; past the repo-tool budget (twelve) the rest are answered with a budget error and shown as skipped; a tool call whose input isn't an object is answered as a bad call; the next message is clean", ["seam"]),
+      "empty-reply": b("a reply with no words and no tool call (blank, thinking only, after tool calls, after the developer's answer, on a plan brain too) tells the developer and leaves the history so every later request is valid on every route; mid-turn it rewinds the whole turn", ["seam"]),
+      "failed-turn": b("an error in the middle of a stream keeps the words shown, masks a key in its message, and the next message goes on from a valid history; Esc while a repo tool runs ends the turn with the Interrupted notice and drops the unanswered call", ["seam"]),
+      prompt: b("the intake agent's system prompt says what the spec is (asks for the outcome behind a symptom, keeps unasked scope out of Assumptions, writes only what it saw as Context), how routing works and each mode's route, that an answer it gives itself only read the code (offering a session to verify it), and nothing of worktrees; its slots are routing.yaml's notes, the types, the agents offered and the repository", ["seam"]),
+    },
+  },
   routing: {
     says: "which agent, model and effort runs a session (docs/guides/routing.md, docs/concepts/architecture.md \"Routing: routing.yaml and route\", docs/reference/routing-yaml.md)",
     entries: {
@@ -278,6 +307,8 @@ export const CATALOG: Record<string, Feature> = {
       "opencode-providers": b("OpenCode takes a checklist of providers and `Add another`: its plan through OpenCode's own login, OpenRouter by its key, both together (a launch gets only its model's key, the plan none); Esc at `Done / Add another` goes back, never Done, and leaving keeps the previous connection"),
       reachable: b("a check's results are kept with their date: a model found unreachable is left out, one never checked is offered; only a definitive answer (signed out, a key rejected, a model not listed or refused) changes them, a passing failure (timeout, network, limit, 5xx) shows ✗ with its reason and keeps the last results; Bedrock's refused models are named and the rest still offered", ["e2e", "seam"]),
       "check-at-end": b("after the last screen, with any agent connected, Gluon checks every model of every connection and the intake agent's order, prints a summary and starts; with nothing chosen nothing is checked, no config is written, and it says what to do"),
+      "aws-setup": b("Bedrock uses one AWS profile and region for the intake agent, the checks and the launches; with no region configured or in the environment, the profile's region from the AWS config (not us-east-1); the profile goes to the SDK's credential chain, never into the environment", ["seam"]),
+      "check-method": b("a check asks each connection the true, cheap way: a subscription through the agent's own binary, a key through the provider's model listing (OpenRouter's key endpoint, since its listing is public; the OpenCode plan's public listing, no key sent), Bedrock a tiny call that returns its usage and a readable error; a listing counts an alias by its dated snapshot, agy's by its own id plus an effort", ["seam"]),
     },
   },
   launch: {
@@ -291,6 +322,7 @@ export const CATALOG: Record<string, Feature> = {
       "windows-shim": b("given a harness installed as an npm `.cmd` shim, then the native exe behind it runs when there is one (inside the shim's own `node_modules`, for this machine's arch: Claude Code, OpenCode, Codex's platform package); otherwise its arguments pass `assertShimArgs` (nothing cmd.exe acts on: refused naming the character, no file left) and the spec goes in a private file named by a one-line prompt, as it does on an exe for a spec too long for a command line; a temp path cmd.exe would act on goes by its 8.3 short name", ["seam"], ["windows"]),
       "self-command": b("given a launch, then the harness's hooks and plugin reach this Gluon through `GLUON_SELF`; on Windows a `.cmd` wrapper that quotes every word, doubles `%` and turns delayed expansion off runs Gluon with exactly its words from cmd.exe, PowerShell and `Bun.spawn`, whatever its path holds; a word it can't quote is refused", ["seam"], ["windows"]),
       "private-dirs": b("a launch's private directories (events, adapter files, a typed line's spec, the neutral cwd) are 0700 outside the repository and go when the agent ends; a stale one (its Gluon gone, or a day old) is swept, never a running Gluon's", ["seam", "e2e"]),
+      "model-effort": b("given a harness × model × effort, then the harness starts with its own options for them before the spec (`--model`/`--effort`, `-m` + `model_reasoning_effort`, `--model=<id>-<effort>`, `--reasoning-effort`; OpenCode through its inline config), the model's concrete id; an effort the model doesn't take is refused before the launch", ["seam"]),
     },
   },
   modes: {
@@ -373,7 +405,7 @@ export const CATALOG: Record<string, Feature> = {
     says: "the config file (docs/guides/connections.md \"Know where things live\", docs/reference/config.md)",
     entries: {
       refused: b("a config that is no valid config (not YAML, not a mapping, a wrong type, an unknown harness, route or provider, a first version's `auth:` with a malformed `connections:`, a path that can't be read) is refused naming the key and what is allowed (or that it's unreadable), exit 2, no stack trace"),
-      "defaults-and-migration": b("an empty config uses the defaults; a first version's config is migrated (on disk; in memory with one warning when the file can't be written, the output and exit code as usual); a key no longer read (`models:`) is ignored with one notice"),
+      "defaults-and-migration": b("an empty config uses the defaults; a first version's config is migrated (on disk; in memory with one warning when the file can't be written, the output and exit code as usual); a key no longer read (`models:`) is ignored with one notice", ["e2e", "seam"]),
       paths: b("the config is at `GLUON_CONFIG` (made absolute at start) or under `XDG_CONFIG_HOME` (a relative one ignored, as the XDG spec says), else `%APPDATA%\\gluon` on Windows, `~/.config/gluon` elsewhere; the keys and `routing.yaml` go next to it, never into the repository Gluon runs in; the state (the ledger, the tables) under `XDG_STATE_HOME` (a relative one ignored), `%LOCALAPPDATA%\\gluon` on Windows, else `~/.local/state/gluon`", ["e2e", "seam"]),
       "written-in-place": b("when Gluon writes the config (setup, connect, doctor, the intake), then only the keys it sets change: the user's comments and other values are kept", ["seam"]),
     },
@@ -561,6 +593,7 @@ export const CATALOG: Record<string, Feature> = {
       "only-next-to-config": rule("the keys are read only from the `.env` next to the config (a saved key beats the environment); a dev key file is used only when handed in, and named as the source; nothing comes from Gluon's own source directory"),
       "env-file": b("the `.env` next to the config is read as dotenv reads it: assignments, `export`, quotes, CRLF, spaces around `=`; a value's trailing whitespace is not part of the key, spaces inside quotes are; comments, blank lines and junk are not assignments; an empty value is no key; any line is read in linear time", ["seam"]),
       saved: b("saving a key replaces only that name's lines of the `.env` (a name that is a prefix of another leaves the other alone), keeps every other line, and is in effect at once; the file is 0600 whatever the umask, a fresh config's directory made too; a symlink planted at the `.env` is replaced, never followed; uninstall drops only Gluon's own key lines", ["seam"]),
+      "only-to-their-provider": rule("the intake agent's clients on an OpenAI, Anthropic or Bedrock key (and their checks) use the provider's endpoint, never `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_BEDROCK_BASE_URL` or `AWS_ENDPOINT_URL*` (China's regions under `amazonaws.com.cn`); `ANTHROPIC_AUTH_TOKEN` is not sent next to the key; on OpenRouter the OpenAI organization, project and custom headers stay home, Gluon's own go; on its own route a custom header or a Bedrock bearer token is warned about, never stripped", ["code", "seam"]),
     },
   },
   pty: {

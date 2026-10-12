@@ -513,7 +513,7 @@ describe("issue #17: git_status, git_log, git_diff", () => {
     expect(statSync(index).mtimeMs).not.toBe(old.getTime());
   });
 
-  test("every tool's schema converts for the Claude-plan MCP server", () => {
+  test("brain/claude-plan: every tool's schema converts for the Claude-plan MCP server", () => {
     for (const t of TOOLS) expect(Object.keys((z.fromJSONSchema(t.input_schema as never) as z.ZodObject).shape)).toEqual(Object.keys(t.input_schema.properties ?? {}));
   });
 });
@@ -999,19 +999,19 @@ describe("the project's AGENTS.md / CLAUDE.md in the brain's prompt", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).toContain("If the developer named a harness or model, in this message or an earlier one, pass it as `pinned`. Route keeps it and adds no alternatives.");
   });
-  test("BUG-713/check-not-guess: the intake asks for the outcome behind a symptom, keeps unasked scope out of Assumptions, and writes only what it saw as Context", () => {
+  test("intake/prompt: the intake asks for the outcome behind a symptom, keeps unasked scope out of Assumptions, and writes only what it saw as Context #BUG-713/check-not-guess", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).toContain("   - the `ask` items of the likely types in <types>\n   - the outcome they want, when the request names only a symptom (\"search is messy\", \"the numbers look wrong\")\n");
     expect(p).toContain("Don't widen the scope yourself, in the spec's Assumptions either (e.g. an unrelated bug you noticed, a cleanup): ask, or leave it out.");
     expect(p).toContain("- For a bug, give your diagnosis as a hypothesis, with what you saw that supports it. Leave out suspects you have no evidence for.\n- Context holds only what you saw in the repository. If a quick lookup would settle something, look; anything you still assume goes in Assumptions.\n");
     expect(p).not.toContain("Don't widen the scope yourself (e.g. an unrelated bug you noticed)");
   });
-  test("BUG-715/answered-itself: an answer the intake gives itself says it only read the code and offers a session to verify it", () => {
+  test("intake/prompt: an answer the intake gives itself says it only read the code and offers a session to verify it #BUG-715/answered-itself", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     const role = p.slice(0, p.indexOf("# How you work"));
     expect(role).toContain("If you answer a question yourself, say that you only read the code, and offer a session to verify it.");
   });
-  test("BUG-710/worktree-removed: the intake neither decides nor mentions a worktree: no prompt section, no propose_launch field", () => {
+  test("intake/prompt: the intake neither decides nor mentions a worktree: no prompt section, no propose_launch field #BUG-710/worktree-removed", () => {
     const p = systemPrompt(defaults(), repoContext(dir()));
     expect(p).not.toMatch(/worktree/i);
     const propose = TOOLS.find((t) => t.name === "propose_launch")!;

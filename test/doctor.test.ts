@@ -177,7 +177,7 @@ describe("stepLine and awsLabel", () => {
   });
 });
 
-test("chooseBrain with nothing connected finds no step and probes none (the seam off the network)", async () => {
+test("brain/first-working-step: chooseBrain with nothing connected finds no step and probes none (the seam off the network)", async () => {
   if (!POSIX) return;
   const d = setup("", {}, []);
   const { active, steps } = await chooseBrain(loadConfig(), d, { all: true });

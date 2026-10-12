@@ -60,7 +60,7 @@ function fake(events: unknown[], final?: unknown) {
   return { client, calls };
 }
 
-test("tools convert to function tools with the same names and schemas", () => {
+test("brain/requests: tools convert to function tools with the same names and schemas", () => {
   const r = toResponsesTools(TOOLS);
   expect(r.map((t) => t.name)).toEqual(TOOLS.map((t) => t.name));
   expect(r[1]).toMatchObject({ type: "function", name: "grep", strict: false, parameters: TOOLS[1]!.input_schema });
@@ -69,7 +69,7 @@ test("tools convert to function tools with the same names and schemas", () => {
   for (const t of TOOLS) expect(t.name).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
 });
 
-test("Responses input: text, function calls and outputs keep their ids; errors are marked", () => {
+test("brain/requests: Responses input: text, function calls and outputs keep their ids; errors are marked", () => {
   expect(toResponsesInput(history)).toEqual([
     { role: "user", content: "fix the bug" },
     { role: "assistant", content: "Looking." },
@@ -81,7 +81,7 @@ test("Responses input: text, function calls and outputs keep their ids; errors a
   ]);
 });
 
-test("Responses output: text and tool calls come back Anthropic-shaped", () => {
+test("brain/streams: Responses output: text and tool calls come back Anthropic-shaped", () => {
   const out = fromResponsesOutput({
     status: "completed",
     incomplete_details: null,
@@ -100,7 +100,7 @@ test("Responses output: text and tool calls come back Anthropic-shaped", () => {
   expect(fromResponsesOutput({ status: "incomplete", incomplete_details: { reason: "max_output_tokens" }, output: [] }).stop_reason).toBe("max_tokens");
 });
 
-test("Chat messages: system first, assistant tool_calls, tool messages, then the user's text", () => {
+test("brain/requests: Chat messages: system first, assistant tool_calls, tool messages, then the user's text", () => {
   expect(toChatMessages("sys", history)).toEqual([
     { role: "system", content: "sys" },
     { role: "user", content: "fix the bug" },
@@ -121,7 +121,7 @@ test("Chat messages: system first, assistant tool_calls, tool messages, then the
   expect(msg).toMatchObject({ role: "assistant", content: null });
 });
 
-test("Chat stream chunks assemble into text and tool calls; finish reasons map", () => {
+test("brain/streams: Chat stream chunks assemble into text and tool calls; finish reasons map", () => {
   const chunk = (delta: object, finish_reason: string | null = null) => ({ id: "x", object: "chat.completion.chunk", created: 0, model: "m", choices: [{ index: 0, delta, finish_reason }] }) as any;
   const done = assembleChatChunks([
     chunk({ content: "Hi " }),
@@ -142,7 +142,7 @@ test("Chat stream chunks assemble into text and tool calls; finish reasons map",
   expect(fromChatCompletion(assembleChatChunks([chunk({ content: "ok" }, "stop")])).stop_reason).toBe("end_turn");
 });
 
-test("responses mode streams text and returns the completed response", async () => {
+test("brain/streams: responses mode streams text and returns the completed response", async () => {
   const response = {
     status: "completed",
     incomplete_details: null,
@@ -169,13 +169,13 @@ test("responses mode streams text and returns the completed response", async () 
   expect(calls[0]!.options.signal).toBe(signal);
 });
 
-test("responses mode surfaces a failed response", async () => {
+test("brain/streams: responses mode surfaces a failed response", async () => {
   const { client } = fake([{ type: "response.failed", response: { error: { message: "boom" } } }]);
   const brain = openaiClient({ apiKey: "k", model: "m", mode: "responses", client });
   await expect(brain({ system: "", messages: [{ role: "user", content: "x" }], tools: [], signal: new AbortController().signal }, () => {})).rejects.toThrow("boom");
 });
 
-test("chat mode streams text and tool calls", async () => {
+test("brain/streams: chat mode streams text and tool calls", async () => {
   const chunk = (delta: object, finish_reason: string | null = null) => ({ choices: [{ index: 0, delta, finish_reason }] });
   const { client, calls } = fake([
     chunk({ content: "On it." }),
@@ -197,7 +197,7 @@ test("chat mode streams text and tool calls", async () => {
   expect(calls[0]!.body.stream).toBe(true);
 });
 
-test("an abort stops the stream", async () => {
+test("brain/streams: an abort stops the stream", async () => {
   const ctl = new AbortController();
   const { client } = fake([{ choices: [{ index: 0, delta: { content: "a" }, finish_reason: null }] }, { choices: [{ index: 0, delta: { content: "b" }, finish_reason: null }] }]);
   const brain = openaiClient({ apiKey: "k", model: "m", mode: "chat", client });
@@ -210,7 +210,7 @@ test("an abort stops the stream", async () => {
   expect(seen).toEqual(["a"]);
 });
 
-test("probe returns usage, and classifies errors without leaking the key", async () => {
+test("connections/check-method: probe returns usage, and classifies errors without leaking the key", async () => {
   const ok = fake([], { status: "completed", usage: { input_tokens: 9, output_tokens: 5 } });
   expect(await probeOpenAI({ apiKey: "k", model: "gpt-6-sol", mode: "responses", client: ok.client })).toEqual({ ok: true, usage: { input: 9, output: 5 } });
   expect(ok.calls[0]!.body.max_output_tokens).toBeLessThanOrEqual(16);
@@ -272,20 +272,20 @@ describe("the brain's API clients and the environment's base URLs", () => {
   const never = (urls: string[], ...allowed: string[]) => expect(urls.filter((u) => !allowed.some((a) => u.startsWith(a)))).toEqual([]);
 
   describe("BUG-590: OpenAI", () => {
-    test("BUG-590/QA-sec-16: the OpenAI-key brain sends its saved key and the conversation to OpenAI's endpoint only, whatever OPENAI_BASE_URL says (a direnv/.envrc of the repository can set it; the SDK reads it by default)", async () => {
+    test("keys/only-to-their-provider: the OpenAI-key brain sends its saved key and the conversation to OpenAI's endpoint only, whatever OPENAI_BASE_URL says (a direnv/.envrc of the repository can set it; the SDK reads it by default) #BUG-590/QA-sec-16", async () => {
       const urls = await hosts({ OPENAI_BASE_URL: "https://attacker.example/v1" }, () => probeOpenAI({ apiKey: "sk-proj-SAVEDKEYSAVEDKEYSAVEDKEY", model: "gpt-6-sol", mode: "responses" }));
       expect(urls.length).toBeGreaterThan(0);
       expect(urls.filter((u) => !u.startsWith("https://api.openai.com/"))).toEqual([]);
     });
 
-    test("the conversation too: Responses and Chat Completions clients, with OPENAI_BASE_URL and OPENAI_API_BASE set", async () => {
+    test("keys/only-to-their-provider: the conversation too: Responses and Chat Completions clients, with OPENAI_BASE_URL and OPENAI_API_BASE set #BUG-590", async () => {
       for (const mode of ["responses", "chat"] as const) {
         const urls = await hosts({ OPENAI_BASE_URL: `${HOSTILE}/v1`, OPENAI_API_BASE: `${HOSTILE}/v1` }, () => openaiClient({ apiKey: "sk-proj-SAVEDKEYSAVEDKEYSAVEDKEY", model: "gpt-6-sol", mode })(turn(), () => {}));
         expect([mode, urls]).toEqual([mode, [mode === "responses" ? "https://api.openai.com/v1/responses" : "https://api.openai.com/v1/chat/completions"]]);
       }
     });
 
-    test("the brain's own steps: the probe and the client of the OpenAI-key route", async () => {
+    test("keys/only-to-their-provider: the brain's own steps: the probe and the client of the OpenAI-key route #BUG-590", async () => {
       const step = { route: "openai-api" as const, model: "gpt-6-sol" };
       const env = { ...probeEnv, OPENAI_API_KEY: "sk-proj-SAVEDKEYSAVEDKEYSAVEDKEY", OPENAI_BASE_URL: `${HOSTILE}/v1` };
       const probed = await hosts(env, () => probeStep(defaults(), step, process.cwd()));
@@ -294,7 +294,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
       never([...probed, ...asked], "https://api.openai.com/v1/");
     });
 
-    test("the OpenRouter route keeps OpenRouter's endpoint, whatever OPENAI_BASE_URL says", async () => {
+    test("keys/only-to-their-provider: the OpenRouter route keeps OpenRouter's endpoint, whatever OPENAI_BASE_URL says #BUG-590", async () => {
       const step = { route: "openrouter" as const, model: "anthropic/claude-sonnet-5.5" };
       const env = { ...probeEnv, OPENROUTER_API_KEY: OR_KEY, OPENAI_BASE_URL: `${HOSTILE}/v1` };
       const probed = await hosts(env, () => probeStep(defaults(), step, process.cwd()));
@@ -306,14 +306,14 @@ describe("the brain's API clients and the environment's base URLs", () => {
 
   describe("BUG-591: Anthropic and Bedrock", () => {
     const brain = (key = "sk-ant-SAVEDKEYSAVEDKEY00000") => import("../src/agent/clients.ts").then(({ anthropicBrain }) => anthropicBrain(key, "claude-sonnet-5-5"));
-    test("BUG-591/QA-sec-17: …and the Anthropic-key brain to api.anthropic.com only, whatever ANTHROPIC_BASE_URL says", async () => {
+    test("keys/only-to-their-provider: the Anthropic-key brain sends its saved key and the conversation to api.anthropic.com only, whatever ANTHROPIC_BASE_URL says #BUG-591/QA-sec-17", async () => {
       const b = await brain();
       const urls = await hosts({ ANTHROPIC_BASE_URL: "https://attacker.example" }, () => b({ system: "s", messages: [{ role: "user", content: "hi" }], tools: [] } as never, () => {}));
       expect(urls.length).toBeGreaterThan(0);
       expect(urls.filter((u) => !u.startsWith("https://api.anthropic.com/"))).toEqual([]);
     });
 
-    test("the probe of the Anthropic-key route and the client built by the brain's step", async () => {
+    test("keys/only-to-their-provider: the probe of the Anthropic-key route and the client built by the brain's step #BUG-591", async () => {
       const step = { route: "anthropic-api" as const, model: "claude-sonnet-5-5" };
       const env = { ...probeEnv, ANTHROPIC_API_KEY: "sk-ant-SAVEDKEYSAVEDKEY00000", ANTHROPIC_BASE_URL: HOSTILE };
       const probed = await hosts(env, () => probeStep(defaults(), step, process.cwd()));
@@ -322,7 +322,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
       never([...probed, ...asked], "https://api.anthropic.com/");
     });
 
-    test("Claude on Bedrock: the region's runtime endpoint, whatever ANTHROPIC_BEDROCK_BASE_URL says (the SDK signs the request for that host and takes the variable by default)", async () => {
+    test("keys/only-to-their-provider: Claude on Bedrock: the region's runtime endpoint, whatever ANTHROPIC_BEDROCK_BASE_URL says (the SDK signs the request for that host and takes the variable by default) #BUG-591", async () => {
       const aws = { AWS_ACCESS_KEY_ID: "AKIATESTTESTTESTTEST", AWS_SECRET_ACCESS_KEY: "test-secret-test-secret-test-secret-12", AWS_REGION: "eu-west-1", ANTHROPIC_BEDROCK_BASE_URL: HOSTILE };
       const { bedrockClaudeBrain } = await import("../src/agent/clients.ts");
       const config = { ...defaults(), bedrock: { region: "eu-west-1" } };
@@ -333,7 +333,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
       expect(other.map((u) => new URL(u).host)).toEqual(["bedrock-runtime.us-west-2.amazonaws.com"]);
     });
 
-    test("Converse (the AWS SDK): AWS_ENDPOINT_URL and AWS_ENDPOINT_URL_BEDROCK_RUNTIME don't move the request off the region's endpoint", async () => {
+    test("keys/only-to-their-provider: Converse (the AWS SDK): AWS_ENDPOINT_URL and AWS_ENDPOINT_URL_BEDROCK_RUNTIME don't move the request off the region's endpoint #BUG-591", async () => {
       const seen: string[] = [];
       const requestHandler = { handle: async (r: { hostname: string }) => (seen.push(r.hostname), Promise.reject(new Error("stop"))), destroy() {} };
       const saved = { a: process.env.AWS_ENDPOINT_URL, b: process.env.AWS_ENDPOINT_URL_BEDROCK_RUNTIME, k: process.env.AWS_ACCESS_KEY_ID, s: process.env.AWS_SECRET_ACCESS_KEY };
@@ -351,7 +351,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
       expect(seen).toEqual(["bedrock-runtime.eu-west-1.amazonaws.com"]);
     });
 
-    test("China's regions: the runtime endpoint is under amazonaws.com.cn", async () => {
+    test("keys/only-to-their-provider: China's regions: the runtime endpoint is under amazonaws.com.cn #BUG-591", async () => {
       expect(bedrockRuntimeBase("cn-north-1")).toBe("https://bedrock-runtime.cn-north-1.amazonaws.com.cn");
       expect(bedrockRuntimeBase("cn-northwest-1")).toBe("https://bedrock-runtime.cn-northwest-1.amazonaws.com.cn");
       expect(bedrockRuntimeBase("us-gov-west-1")).toBe("https://bedrock-runtime.us-gov-west-1.amazonaws.com");
@@ -366,7 +366,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
     const TOKEN = { ANTHROPIC_AUTH_TOKEN: "sk-ant-oat-ENVTOKENENVTOKEN" };
     const AWS = { AWS_ACCESS_KEY_ID: "AKIATESTTESTTESTTEST", AWS_SECRET_ACCESS_KEY: "test-secret-test-secret-test-secret-12" };
 
-    test("ANTHROPIC_AUTH_TOKEN is not sent as a bearer token next to the saved key (the brain and its probe)", async () => {
+    test("keys/only-to-their-provider: ANTHROPIC_AUTH_TOKEN is not sent as a bearer token next to the saved key (the brain and its probe) #BUG-591", async () => {
       const step = { route: "anthropic-api" as const, model: "claude-sonnet-5-5" };
       const env = { ...probeEnv, ...TOKEN, ANTHROPIC_API_KEY: "sk-ant-SAVEDKEYSAVEDKEY00000" };
       const probed = await requests(env, () => probeStep(defaults(), step, process.cwd()));
@@ -375,7 +375,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
       for (const r of [...probed, ...asked]) expect([r.headers["x-api-key"], r.headers.authorization]).toEqual(["sk-ant-SAVEDKEYSAVEDKEY00000", undefined]);
     });
 
-    test("Claude on Bedrock: the request is signed, ANTHROPIC_AUTH_TOKEN is not sent", async () => {
+    test("keys/only-to-their-provider: Claude on Bedrock: the request is signed, ANTHROPIC_AUTH_TOKEN is not sent #BUG-591", async () => {
       const { bedrockClaudeBrain } = await import("../src/agent/clients.ts");
       const sent = await requests({ ...AWS, ...TOKEN, AWS_REGION: "eu-west-1" }, () => bedrockClaudeBrain({ ...defaults(), bedrock: { region: "eu-west-1" } }, "global.anthropic.claude-sonnet-5-5")(turn(), () => {}));
       expect(sent).toHaveLength(1);
@@ -386,7 +386,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
     const FOREIGN = { OPENAI_ORG_ID: "org-HOMEORG", OPENAI_PROJECT_ID: "proj_HOMEPROJECT", OPENAI_CUSTOM_HEADERS: "X-Corp-Proxy: secret-corp-value\nx-trace-id : abc\nnot a header line" };
     const headersOf = (r: { headers: Record<string, string> }) => JSON.stringify(r.headers);
 
-    test("OpenRouter: the OpenAI organization, project and custom headers of the environment stay home; Gluon's own headers go", async () => {
+    test("keys/only-to-their-provider: OpenRouter: the OpenAI organization, project and custom headers of the environment stay home; Gluon's own headers go #BUG-591", async () => {
       const step = { route: "openrouter" as const, model: "anthropic/claude-sonnet-5.5" };
       const env = { ...probeEnv, ...FOREIGN, OPENROUTER_API_KEY: OR_KEY };
       const probed = await requests(env, () => probeStep(defaults(), step, process.cwd()));
@@ -399,7 +399,7 @@ describe("the brain's API clients and the environment's base URLs", () => {
       }
     });
 
-    test("the OpenAI route keeps them: they are the user's own choice of billing and proxy", async () => {
+    test("keys/only-to-their-provider: the OpenAI route keeps them: they are the user's own choice of billing and proxy #BUG-591", async () => {
       const step = { route: "openai-api" as const, model: "gpt-6-sol" };
       const env = { ...probeEnv, ...FOREIGN, OPENAI_API_KEY: "sk-proj-SAVEDKEYSAVEDKEYSAVEDKEY" };
       const asked = await requests(env, () => (brainFor(defaults(), step, process.cwd()) as ModelClient)(turn(), () => {}));
@@ -407,12 +407,12 @@ describe("the brain's API clients and the environment's base URLs", () => {
       expect([asked[0]!.headers["openai-organization"], asked[0]!.headers["openai-project"], asked[0]!.headers["x-corp-proxy"], asked[0]!.headers["x-trace-id"]]).toEqual(["org-HOMEORG", "proj_HOMEPROJECT", "secret-corp-value", "abc"]);
     });
 
-    test("the header names of a custom-headers variable, as the SDKs read it", () => {
+    test("keys/only-to-their-provider: the header names of a custom-headers variable, as the SDKs read it #BUG-591", () => {
       expect(customHeaderNames("A-B: 1\n  c : 2\nnone\n: x\nD:e:f")).toEqual(["A-B", "c", "D"]);
       expect(customHeaderNames(undefined)).toEqual([]);
     });
 
-    test("told, never stripped: custom headers and a Bedrock bearer token are warned about on their own route only", () => {
+    test("keys/only-to-their-provider: told, never stripped: custom headers and a Bedrock bearer token are warned about on their own route only #BUG-591", () => {
       const keys = ["ANTHROPIC_CUSTOM_HEADERS", "OPENAI_CUSTOM_HEADERS", "AWS_BEARER_TOKEN_BEDROCK"];
       const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
       try {

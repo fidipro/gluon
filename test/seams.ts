@@ -39,7 +39,7 @@ export const SEAMS: Record<string, Seam> = {
   },
   keys: {
     says: "the terminal's bytes → keys → what Gluon does with each (forward, home, a menu), the terminal modes it asks for and a drag's selection",
-    modules: ["src/pty/keys.ts", "src/pty/compositor.ts", "src/pty/modes.ts", "src/pty/selection.ts"],
+    modules: ["src/pty/keys.ts", "src/pty/compositor.ts", "src/pty/modes.ts", "src/pty/selection.ts", "src/ui/editor.ts"],
   },
   session: {
     says: "an agent's PTY output, its hooks' events and the user's keys → what reaches the agent, its state and activity, the launch's first line, the /clear and compaction question",
@@ -47,11 +47,11 @@ export const SEAMS: Record<string, Seam> = {
   },
   brain: {
     says: "the user's messages, with a model client → the intake's questions, its spec and its classification",
-    modules: ["src/agent/session.ts"],
+    modules: ["src/agent/session.ts", "src/agent/prompt.ts", "src/agent/choices.ts"],
   },
   "brain-clients": {
     says: "Gluon's requests → each provider's wire format (against the loopback model API)",
-    modules: ["src/agent/clients.ts", "src/agent/openai.ts", "src/agent/bedrock-converse.ts", "src/agent/codex.ts"],
+    modules: ["src/agent/clients.ts", "src/agent/openai.ts", "src/agent/bedrock-converse.ts", "src/agent/codex.ts", "src/agent/subscription.ts", "src/agent/effort.ts"],
   },
   "repo-tools": {
     says: "a tool call → its result: read-only, inside the repository, secret files refused; the secret-file rule, the hardened git argv and the forge CLIs' fixed argv",
@@ -124,6 +124,10 @@ export const SEAMS: Record<string, Seam> = {
   openrouter: {
     says: "OpenRouter's /key usage answers over time, with the registry and brain files → the billed figure (settled or not, and why) and the live k",
     modules: ["src/openrouter-billed.ts", "src/cost/billed.ts"],
+  },
+  checks: {
+    says: "the config's connections and `brain.order`, with the providers' answers → which models each connection reaches (recorded with a date), the brain step in use and its client, and whether an error means the model is unavailable",
+    modules: ["src/brain.ts", "src/verify.ts"],
   },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",
