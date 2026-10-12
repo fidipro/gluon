@@ -53,7 +53,7 @@ describe("Gluon: what reaches the agent", () => {
 });
 
 describe("Gluon: the fake Codex, Antigravity and Grok Build in the frame", () => {
-  test("GLUON-22, GLUON-31: three Codex sessions — ←/→ walk the ring through home on an untouched line, so do the home key's prefix and ←/→, a click on a tab shows it; Alt+←/→ are dropped; Codex gets none of these keys, CSI and SS3 arrows alike (REPORT #4, BUG-279, BUG-280) @full", async () => {
+  test("tabs/arrows: three Codex sessions — ←/→ walk the ring through home on an untouched line, so do the home key's prefix and ←/→, a click on a tab shows it; Alt+←/→ are dropped; Codex gets none of these keys, CSI and SS3 arrows alike (REPORT #4, BUG-279, BUG-280) #GLUON-22 #GLUON-31 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["codex"]);
     await openSessions(app, ["codex", "codex", "codex"]);
     await at(app, 3);
@@ -129,7 +129,7 @@ describe("Gluon: Kimi Code in the frame", () => {
   const opts = { yaml: "handoff:\n  on_clear: ask\nconnections:\n  kimi-code: { auth: api, provider: openrouter }\n", env: { OPENROUTER_API_KEY: "sk-or-v1-test-0123456789abcdef" } };
   const asks = (s: string) => /^ \? (\/\S+ ends this session|End (this )?session\?)/.test(s.split("\n").at(-1)!);
 
-  test("Kimi Code's reader (the fake, a box with its menu below): a typed /clear and /compact ask, and so does Enter on its menu's `new (clear)`; the brief's first line was typed meanwhile @full", async () => {
+  test("clear-compact/asks: Kimi Code's reader (the fake, a box with its menu below): a typed /clear and /compact ask, and so does Enter on its menu's `new (clear)`; the brief's first line was typed meanwhile @full", async () => {
     const app = await launchAs("kimi", opts);
     await app.waitFor((s) => s.replace(/[│\s]+/g, "").includes("GOT<Readthesessionbriefin"));
     await app.type("/clear");
@@ -157,7 +157,7 @@ describe("Gluon: Kimi Code in the frame", () => {
 });
 
 describe("Gluon: scrollback and the mouse", () => {
-  test("GLUON-25: Shift+PgUp/PgDn page the frame's scrollback, the wheel scrolls 3 rows; Esc or q go back to the live screen; a typed key leaves scroll mode and reaches the agent @full", async () => {
+  test("frame/scrollback: Shift+PgUp/PgDn page the frame's scrollback, the wheel scrolls 3 rows; Esc or q go back to the live screen; a typed key leaves scroll mode and reaches the agent #GLUON-25 @full", async () => {
     const app = await launchAs("claude");
     await say(app, "!lines 60", "LINE 60");
     const m = mark(app);
@@ -215,16 +215,16 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     }
   }
 
-  test("GLUON-29: a resize while the sessions are idle doesn't make them Working (REPORT #1) @full", async () => {
+  test("frame/resize: a resize while the sessions are idle doesn't make them Working (REPORT #1) #GLUON-29 @full", async () => {
     expect(await workingAfterResize(0)).toEqual([]);
   });
 
-  test.skipIf(WIN)("BUG-242/GLUON-36: nor does the agent's redraw when it comes a while after the resize, as a TUI that debounces it (REPORT #1) @full", async () => {
+  test.skipIf(WIN)("frame/resize: nor does the agent's redraw when it comes a while after the resize, as a TUI that debounces it (REPORT #1) #BUG-242/GLUON-36 @full", async () => {
     expect(await workingAfterResize(1500)).toEqual([]);
   });
 
   // ConPTY repaints at once after a resize; the agent's own, late redraw is still owed (`isRedraw`'s `late`).
-  test.skipIf(!WIN)("BUG-669/QA-win-02: on Windows too an idle session's row doesn't read Working when the agent redraws a while after a resize (ConPTY's immediate repaint ends the BUG-242 wait) @full", async () => {
+  test.skipIf(!WIN)("frame/resize: on Windows too an idle session's row doesn't read Working when the agent redraws a while after a resize (ConPTY's immediate repaint ends the BUG-242 wait) #BUG-669/QA-win-02 @full", async () => {
     // ConPTY's repaint isn't every time (a loaded machine skips it): up to three tries before the row is called clean.
     const seen: string[] = [];
     for (let i = 0; i < 3 && !seen.length; i++) seen.push(...(await workingAfterResize(1500)));
@@ -355,7 +355,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(shownTab(app)).toContain("two-task");
   });
 
-  test("mouse/drag-copy: a drag over the spec in the home chat copies its text (OSC 52) without the box's edges, highlights it and says so on the last row, and picks no option; a key ends the selection #BUG-286/GLUON-61 @full", async () => {
+  test("mouse/drag-copy: a drag over the spec in the home chat copies its text (OSC 52) without the box's edges, highlights it and says so on the last row, and picks no option; a key ends the selection #GLUON-61 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await toChoice(app, "fix the add bug");
     const top = app.row("spec — what the agent will get");
@@ -383,7 +383,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(reversed(top + 1)).toBe(false);
   });
 
-  test("BUG-235/GLUON-37: keys in the same burst as the → or Enter that opens a session reach its agent, in order, not the hidden home composer @full", async () => {
+  test("tabs/keys-follow: keys in the same burst as the → or Enter that opens a session reach its agent, in order, not the hidden home composer #BUG-235/GLUON-37 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "fix the add bug");
     for (const [opener, text] of [[KEYS.right, "zq7"], [KEYS.enter, "x8w"]] as const) {
@@ -399,7 +399,7 @@ describe("Gluon: the live-QA findings (qa/gluon-followups-live/REPORT.md)", () =
     expect(app.screen()).toMatch(/› describe another session/);
   });
 
-  test("BUG-273/GLUON-57: keys in the same read as the Enter that starts a session from the agent choice reach its agent, in order, not the hidden home composer; the home key twice among them goes home @full", async () => {
+  test("tabs/keys-follow: keys in the same read as the Enter that starts a session from the agent choice reach its agent, in order, not the hidden home composer; the home key twice among them goes home #BUG-273/GLUON-57 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await toChoice(app, "fix the add bug");
     const m = mark(app);
@@ -458,7 +458,7 @@ describe("Gluon: view changes on the wire", () => {
     for (const re of drawn) expect({ what, drawn: re.test(plain(clearing[0]!)) ? re.source : plain(clearing[0]!) }).toEqual({ what, drawn: re.source });
   }
 
-  test.skipIf(WIN)("BUG-243/GLUON-39: each view change — session → session, session → home, home → session — is one synchronized update holding the clear and the whole new view, and nothing erases outside it (QA NF-2) @full", async () => {
+  test.skipIf(WIN)("frame/one-update: each view change — session → session, session → home, home → session — is one synchronized update holding the clear and the whole new view, and nothing erases outside it (QA NF-2) #BUG-243/GLUON-39 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await openSessions(app, ["claude", "claude"]);
     await at(app, 2);
@@ -480,7 +480,7 @@ describe("Gluon: view changes on the wire", () => {
     oneUpdate(app, "home → session", [/◆ gluon/, /ctrl\+\\ sessions/, /claude code × /]);
   });
 
-  test.skipIf(WIN)("BUG-261/GLUON-43: the sessions home's question and the hint naming its keys come and go in one synchronized update, and the last row is never painted outside one @full", async () => {
+  test.skipIf(WIN)("frame/one-update: the sessions home's question and the hint naming its keys come and go in one synchronized update, and the last row is never painted outside one #BUG-261/GLUON-43 @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await launch(app, "one task");
     await home(app);
@@ -514,7 +514,7 @@ describe("Gluon: switching sessions (issue #47)", () => {
   const logs = (app: App) => app.inputLogs().map((a) => a.bytes);
   const barIs = (app: App, re: RegExp) => app.waitFor(() => re.test(bar(app)));
 
-  test.skipIf(WIN)("BUG-279/GLUON: ←/→ switch in every state through the home key's prefix — a typed line, the question up, scrolled back; Esc or another key cancels it, time doesn't (BUG-706); going home takes the home key twice @full", async () => {
+  test.skipIf(WIN)("tabs/home-key: ←/→ switch in every state through the home key's prefix — a typed line, the question up, scrolled back; Esc or another key cancels it, time doesn't (BUG-706); going home takes the home key twice @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await openSessions(app, ["claude", "claude", "claude"]);
     await at(app, 3);
@@ -597,7 +597,7 @@ describe("Gluon: switching sessions (issue #47)", () => {
   /** The home view is up. */
   const viewOfHome = (app: App) => HOME_VIEW.test(app.screen());
 
-  test("BUG-281/GLUON: the bar names ←/→ only while the line is untouched and there is another tab, the prefix bar while the home key waits — in its shorter forms when narrow; Esc on the prefix keeps the question @full", async () => {
+  test("tabs/bar: the bar names ←/→ only while the line is untouched and there is another tab, the prefix bar while the home key waits — in its shorter forms when narrow; Esc on the prefix keeps the question @full", async () => {
     const app = await gluon(100, 30, {}, undefined, ["claude"]);
     await openSessions(app, ["claude", "claude"]);
     await at(app, 2);

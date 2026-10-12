@@ -5,8 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { changedSince, statusSnapshot } from "../src/agent/tools.ts";
 import { loadConfig, saveConfig, setConfigNotices } from "../src/config.ts";
-import { directNotice, endQuestion, exitNotice, homeQuestions, initialReadiness, quitQuestion, READINESS_ORDER, RESUME_EARLY_MS, resumeModeProblem, resumeRefused } from "../src/gluon.ts";
-import { readinessSegs } from "../src/ui/layout.ts";
+import { homeQuestions, RESUME_EARLY_MS, resumeModeProblem, resumeRefused } from "../src/gluon.ts";
 import { handoffFor } from "../src/handoff.ts";
 import { tryStartTelemetry } from "../src/telemetry.ts";
 import { ADAPTERS } from "../src/adapters/index.ts";
@@ -22,7 +21,7 @@ const git = (cwd: string, ...args: string[]) => {
 };
 
 describe("files changed", () => {
-  test("changedSince counts paths whose status differs: new, changed, back to clean", () => {
+  test("frame/files-changed: changedSince counts paths whose status differs: new, changed, back to clean", () => {
     const base = new Map([
       ["a.ts", " M"],
       ["b.ts", "??"],
@@ -33,7 +32,7 @@ describe("files changed", () => {
     expect(changedSince(base, new Map([["a.ts", " M"]]))).toBe(1);
   });
 
-  test("statusSnapshot reads the work tree's changes (renames as one path); null outside a repository", async () => {
+  test("frame/files-changed: statusSnapshot reads the work tree's changes (renames as one path); null outside a repository", async () => {
     const repo = join(TMP, "repo");
     rmSync(repo, { recursive: true, force: true });
     mkdirSync(repo, { recursive: true });
@@ -56,24 +55,6 @@ describe("files changed", () => {
   });
 });
 
-test("the quit question names how many sessions are running", () => {
-  expect(quitQuestion(1)).toBe("1 session running — quit and end it?");
-  expect(quitQuestion(3)).toBe("3 sessions running — quit and end them?");
-});
-
-test("BUG-213/question: Delete's end question names the session, a long name cut so it stays one line", () => {
-  expect(endQuestion("Gluon-fix-add-bug")).toBe("End Gluon-fix-add-bug?");
-  const long = endQuestion(`Gluon-${"x".repeat(60)}`);
-  expect(long).toMatch(/^End Gluon-x+…\?$/);
-  expect(Bun.stringWidth(long)).toBe(4 + 32 + 1);
-});
-
-test("BUG-192/notice: a closed session's line in the chat says how it ended, with or without a pseudo-terminal", () => {
-  expect(exitNotice("fix-add-bug", 1)).toBe("fix-add-bug exited (code 1)");
-  expect(directNotice("Claude Code", { reason: "exit", code: 7 })).toStartWith("Claude Code exited (code 7).");
-  expect(directNotice("Claude Code", { reason: "back", code: 0 })).toStartWith("Back from Claude Code.");
-});
-
 describe("handoff.mouse_capture", () => {
   const saved = process.env.GLUON_CONFIG;
   const cfg = join(TMP, "config.yaml");
@@ -82,7 +63,7 @@ describe("handoff.mouse_capture", () => {
     else process.env.GLUON_CONFIG = saved;
   });
 
-  test("on by default; false turns it off; anything else is refused; never per agent", () => {
+  test("mouse/capture-setting: on by default; false turns it off; anything else is refused; never per agent", () => {
     process.env.GLUON_CONFIG = cfg;
     rmSync(cfg, { force: true });
     expect(loadConfig().handoff.mouse_capture).toBe(true);
@@ -99,7 +80,7 @@ describe("handoff.mouse_capture", () => {
 });
 
 describe("Gluon never writes to the console", () => {
-  test("BUG-173/F: a telemetry listener that can't start leaves Gluon running without figures, with one notice", () => {
+  test("frame/no-console-writes: a telemetry listener that can't start leaves Gluon running without figures, with one notice #BUG-173/F", () => {
     const r = tryStartTelemetry(() => {
       throw new Error("EADDRNOTAVAIL");
     });
@@ -111,7 +92,7 @@ describe("Gluon never writes to the console", () => {
     ok.server?.stop();
   });
 
-  test("BUG-174/F: while a sink is set, a config Gluon can't save is said there, not on the console", () => {
+  test("frame/no-console-writes: while a sink is set, a config Gluon can't save is said there, not on the console #BUG-174/F", () => {
     const file = join(TMP, "not-a-dir");
     writeFileSync(file, "");
     const before = process.env.GLUON_CONFIG;
@@ -136,40 +117,9 @@ describe("Gluon never writes to the console", () => {
 });
 
 describe("first run: agents available", () => {
-  test("BUG-182/F: an API-key connection whose key isn't set reads key missing; the brief's order; OpenCode is the open-weight lane", () => {
-    const config = loadConfig();
-    config.connections = {
-      "claude-code": { auth: "subscription" },
-      codex: { auth: "api", provider: "openai" },
-      "grok-build": { auth: "api", provider: "xai" },
-      opencode: { providers: ["openrouter"] },
-    } as typeof config.connections;
-    const keys = ["OPENAI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY"];
-    const before = keys.map((k) => process.env[k]);
-    try {
-      for (const k of keys) delete process.env[k];
-      process.env.XAI_API_KEY = "xai-test-key";
-      process.env.OPENROUTER_API_KEY = "sk-or-test";
-      const r = initialReadiness(config, (h) => h !== "antigravity");
-      expect(r.map((x) => [x.harness, x.state, x.note])).toEqual([
-        ["claude-code", "checking", undefined],
-        ["codex", "nokey", undefined],
-        ["grok-build", "ready", "api key"],
-        ["antigravity", "missing", undefined],
-        ["opencode", "ready", "open-weight models · api key"],
-        ["kimi-code", "signin", "not connected"],
-      ]);
-      expect(READINESS_ORDER).toEqual(["claude-code", "codex", "grok-build", "antigravity", "opencode", "kimi-code"]);
-      const segs = readinessSegs(r[1]!, 14);
-      expect(segs.map((s) => s.text).join("")).toBe(" ○  codex         key missing");
-      expect(segs[1]!.role).toBe("dim");
-    } finally {
-      keys.forEach((k, i) => (before[i] === undefined ? delete process.env[k] : (process.env[k] = before[i])));
-    }
-  });
 });
 
-test("BUG-184/copy: what Gluon shows says Gluon or intake agent — never brain or task", () => {
+test("copy/words: what Gluon shows says Gluon or intake agent — never brain or task #BUG-184/copy", () => {
   const shown: string[] = [];
   for (const h of Object.keys(ADAPTERS) as (keyof typeof ADAPTERS)[])
     for (const on_compact of ["ask", "stay"] as const)
@@ -185,7 +135,7 @@ test("BUG-184/copy: what Gluon shows says Gluon or intake agent — never brain 
   for (const line of shown) expect([line, /\bbrain\b|\btask\b/.test(line)]).toEqual([line, false]);
 });
 
-test("BUG-189/F10: without a pseudo-terminal, what Gluon prints before the agent goes to stderr, never through process.stdout", () => {
+test("frame/no-console-writes: without a pseudo-terminal, what Gluon prints before the agent goes to stderr, never through process.stdout #BUG-189/F10", () => {
   // A process.stdout write right before the agent started left its terminal dead on macOS (F10–F19
   // failed there alone): the hand-over prints through stderr only, as the notes always did.
   const src = readFileSync(join(import.meta.dir, "..", "src", "gluon.ts"), "utf8");

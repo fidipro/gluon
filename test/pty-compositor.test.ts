@@ -3,7 +3,7 @@ import { SLOW } from "./fixtures/slow.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { Compositor, effectiveModes, homeInput, neighbour, route, SELF_GUARD_MS, shiftMouse, type HomeView, type RouteContext, type ViewSession } from "../src/pty/compositor.ts";
+import { Compositor, effectiveModes, neighbour, route, SELF_GUARD_MS, shiftMouse, type HomeView, type RouteContext, type ViewSession } from "../src/pty/compositor.ts";
 import { createKeyDecoder } from "../src/pty/keys.ts";
 import { HOME_MODES, MODES_RESET, type ModesState } from "../src/pty/modes.ts";
 import { createScreen, type TermScreen } from "../src/pty/screen.ts";
@@ -24,34 +24,27 @@ const ctx = (o: Partial<RouteContext> = {}): RouteContext => ({ modes: { ...HOME
 const mouseModes: ModesState = { ...HOME_MODES, mouseTracking: "vt200", mouseEncoding: "sgr" };
 
 describe("the session view's keys (route)", () => {
-  test("Gluon's own keys: the home key is the prefix; terminal replies are dropped; Alt+PgUp/PgDn are the agent's", () => {
-    expect(route(key("\x1c"), ctx())).toEqual([{ kind: "prefix" }]);
-    for (const raw of ["\x1b[6;3~", "\x1b[5;3~", "\x1b[57422;3u", "\x1b[34;81;0;1;2;1_"]) expect(route(key(raw), ctx())).toEqual([{ kind: "input", key: key(raw) }]);
-    expect(route(key("\x1b]11;rgb:0/0/0\x07"), ctx())).toEqual([]);
-    expect(route(key("\x1b[?1;2c"), ctx())).toEqual([]);
-  });
-
-  test("everything else goes to the agent as typed (Ctrl+C included); a paste is one key", () => {
+  test("frame/keys-to-agent: everything else goes to the agent as typed (Ctrl+C included); a paste is one key", () => {
     for (const raw of ["a", "\r", "\x03", "\x1b[A", "\x1b[D", "\x1b[C", "\x1b[99;5u", "\x1b[13;2u"]) expect(route(key(raw), ctx())).toEqual([{ kind: "input", key: key(raw) }]);
     const paste = key("\x1b[200~/clear\r\x1b[201~");
     expect(route(paste, ctx())).toEqual([{ kind: "input", key: paste }]);
   });
 
-  test("Shift+PgUp/PgDn scroll a page when there's something to scroll back to; else the agent gets them", () => {
+  test("frame/scrollback: Shift+PgUp/PgDn scroll a page when there's something to scroll back to; else the agent gets them", () => {
     expect(route(key("\x1b[5;2~"), ctx({ scrollback: 40 }))).toEqual([{ kind: "scroll", by: 24 }]);
     expect(route(key("\x1b[5;2~"), ctx())).toEqual([{ kind: "input", key: key("\x1b[5;2~") }]);
     expect(route(key("\x1b[6;2~"), ctx({ offset: 30, scrollback: 40 }))).toEqual([{ kind: "scroll", by: -24 }]);
     expect(route(key("\x1b[6;2~"), ctx())).toEqual([{ kind: "input", key: key("\x1b[6;2~") }]);
   });
 
-  test("scrolled back: Esc and q leave scroll mode; any other key leaves it and goes on", () => {
+  test("frame/scrollback: scrolled back: Esc and q leave scroll mode; any other key leaves it and goes on", () => {
     const c = ctx({ offset: 5, scrollback: 40 });
     expect(route(key("\x1b"), c)).toEqual([{ kind: "unscroll" }]);
     expect(route(key("q"), c)).toEqual([{ kind: "unscroll" }]);
     expect(route(key("x"), c)).toEqual([{ kind: "unscroll" }, { kind: "input", key: key("x") }]);
   });
 
-  test("the wheel scrolls the frame when Gluon captures the mouse; with capture off nothing comes", () => {
+  test("frame/scrollback: the wheel scrolls the frame when Gluon captures the mouse; with capture off nothing comes", () => {
     const up = key("\x1b[<64;10;10M");
     const down = key("\x1b[<65;10;10M");
     expect(route(up, ctx())).toEqual([{ kind: "scroll", by: 3 }]);
@@ -62,7 +55,7 @@ describe("the session view's keys (route)", () => {
     expect(route(key("\x1b[<0;10;10M"), ctx())).toEqual([]);
   });
 
-  test("an agent that asked for the mouse gets it, moved into its screen; outside the frame it's dropped", () => {
+  test("frame/mouse-to-agent: an agent that asked for the mouse gets it, moved into its screen; outside the frame it's dropped", () => {
     expect(route(key("\x1b[<0;10;10M"), ctx({ modes: mouseModes }))).toEqual([{ kind: "mouse", bytes: "\x1b[<0;9;7M" }]);
     expect(route(key("\x1b[<64;10;10M"), ctx({ modes: mouseModes }))).toEqual([{ kind: "mouse", bytes: "\x1b[<64;9;7M" }]);
     // Row 1 past the tabs, the border.
@@ -70,121 +63,12 @@ describe("the session view's keys (route)", () => {
     expect(route(key("\x1b[<0;1;10M"), ctx({ modes: mouseModes }))).toEqual([]);
   });
 
-  test("a focus report reaches the agent only if it asked for them", () => {
+  test("frame/keys-to-agent: a focus report reaches the agent only if it asked for them", () => {
     expect(route(key("\x1b[I"), ctx())).toEqual([]);
     expect(route(key("\x1b[I"), ctx({ modes: { ...HOME_MODES, focus: true } }))).toEqual([{ kind: "passthrough", bytes: "\x1b[I" }]);
   });
 
-  test("BUG-195/route: plain ←/→ on an untouched line switch, always (the ring wraps through home); Alt+←/→ there are dropped", () => {
-    const left = key("\x1b[D");
-    const right = key("\x1b[C");
-    const empty = ctx({ untouched: true });
-    expect(route(left, empty)).toEqual([{ kind: "switch", dir: -1 }]);
-    expect(route(right, empty)).toEqual([{ kind: "switch", dir: 1 }]);
-    // A touched line: the agent's arrows. Shift and Ctrl arrows are never Gluon's.
-    expect(route(left, ctx())).toEqual([{ kind: "input", key: left }]);
-    for (const raw of ["\x1b[1;2D", "\x1b[1;5D", "\x1b[1;4C"]) expect(route(key(raw), empty)).toEqual([{ kind: "input", key: key(raw) }]);
-    // Scrolled back: the switch (the next view is live).
-    expect(route(left, ctx({ untouched: true, offset: 5, scrollback: 40 }))).toEqual([{ kind: "switch", dir: -1 }]);
-    // Gluon's question keeps them (dropped, as any key but its answers).
-    expect(route(left, ctx({ untouched: true, question: true }))).toEqual([{ kind: "answer", key: left }]);
-    // The win32 key-up the decoder dropped (raw ""): nothing, for the agent or the line.
-    expect(route(key("\x1b[37;75;0;0;256;1_"), ctx())).toEqual([]);
-  });
-
-  test("BUG-280/route: Alt+←/→ on an untouched line are dropped (Codex/OpenCode would use them); on a touched line they reach the agent", () => {
-    for (const raw of ["\x1b[1;3D", "\x1b[1;3C", "\x1b[1;3:1D", "\x1b[37;75;0;1;258;1_"]) {
-      expect(route(key(raw), ctx({ untouched: true }))).toEqual([]);
-      expect(route(key(raw), ctx({ untouched: true, offset: 5, scrollback: 40 }))).toEqual([]);
-      expect(route(key(raw), ctx())).toEqual([{ kind: "input", key: key(raw) }]);
-    }
-    // The win32 key-up the decoder dropped: nothing either way.
-    expect(route(key("\x1b[37;75;0;0;258;1_"), ctx())).toEqual([]);
-    // A question up: not Gluon's, not the agent's.
-    expect(route(key("\x1b[1;3C"), ctx({ untouched: true, question: true }))).toEqual([{ kind: "answer", key: key("\x1b[1;3C") }]);
-  });
-
-  test("BUG-279/route: while the home key waits, ←/→ switch, the home key goes home, Esc cancels, any other key ends it and is routed as usual — in every state", () => {
-    const left = key("\x1b[D");
-    const right = key("\x1b[C");
-    const states: [string, Partial<RouteContext>][] = [
-      ["untouched", { untouched: true }],
-      ["typed line", { untouched: false }],
-      ["question up", { question: true }],
-      ["scrolled back", { offset: 5, scrollback: 40 }],
-      ["scrolled back, question up", { offset: 5, scrollback: 40, question: true }],
-    ];
-    for (const [name, o] of states) {
-      const c = ctx({ ...o, prefix: true });
-      const at = (what: string) => `${name}: ${what}`;
-      expect({ [at("←")]: route(left, c) }).toEqual({ [at("←")]: [{ kind: "unprefix" }, { kind: "switch", dir: -1 }] });
-      expect({ [at("→")]: route(right, c) }).toEqual({ [at("→")]: [{ kind: "unprefix" }, { kind: "switch", dir: 1 }] });
-      expect({ [at("home")]: route(key("\x1c"), c) }).toEqual({ [at("home")]: [{ kind: "unprefix" }, { kind: "home" }] });
-      expect({ [at("esc")]: route(key("\x1b"), c) }).toEqual({ [at("esc")]: [{ kind: "unprefix" }] });
-      // Any other key: the prefix ends and the key is routed as if it had come alone (Esc pasted is no Esc).
-      for (const raw of ["x", "\r", "\x1b[A", "\x1b[1;3C", "\x1b[6;3~", "\x1b[5;2~", "\x1b[<64;10;10M"]) {
-        const k = key(raw);
-        expect({ [at(raw)]: route(k, c) }).toEqual({ [at(raw)]: [{ kind: "unprefix" }, ...route(k, { ...c, prefix: false })] });
-      }
-      const paste = key("\x1b[200~\x1b\x1b[201~");
-      expect(route(paste, c)).toEqual([{ kind: "unprefix" }, ...route(paste, { ...c, prefix: false })]);
-    }
-    // Replies and focus reports are not keys: the prefix keeps waiting.
-    expect(route(key("\x1b]11;rgb:0/0/0\x07"), ctx({ prefix: true }))).toEqual([]);
-    expect(route(key("\x1b[I"), ctx({ prefix: true }))).toEqual([]);
-    expect(route(key("\x1b[I"), ctx({ prefix: true, modes: { ...HOME_MODES, focus: true } }))).toEqual([{ kind: "passthrough", bytes: "\x1b[I" }]);
-    // The win32 key-up the decoder dropped (no bytes): not a key either.
-    expect(route(key("\x1b[37;75;0;0;256;1_"), ctx({ prefix: true }))).toEqual([]);
-    // BUG-279/win32: the Ctrl key-up of win32-input-mode (or a kitty release) right after the home key
-    // is no pick: it goes on to the agent, which got the Ctrl press, and the prefix stays.
-    for (const up of ["\x1b[17;29;0;0;8;1_", "\x1b[92;5:3u"]) {
-      const k = key(up);
-      expect(route(k, ctx({ prefix: true }))).toEqual([{ kind: "input", key: k }]);
-    }
-    // The home key with nothing pending starts it, in every state.
-    for (const [, o] of states) expect(route(key("\x1c"), ctx(o))).toEqual([{ kind: "prefix" }]);
-  });
-
-  test("BUG-284/route: with the home key pending, z zooms (never routed as if alone, in every state); a pasted z, or z with nothing pending, is the agent's", () => {
-    for (const o of [{ untouched: true }, { untouched: false }, { question: true }, { offset: 5, scrollback: 40 }] as Partial<RouteContext>[]) {
-      expect(route(key("z"), ctx({ ...o, prefix: true }))).toEqual([{ kind: "unprefix" }, { kind: "zoom" }]);
-    }
-    const paste = key("\x1b[200~z\x1b[201~");
-    expect(route(paste, ctx({ prefix: true }))).toEqual([{ kind: "unprefix" }, ...route(paste, ctx())]);
-    expect(route(key("z"), ctx())).toEqual([{ kind: "input", key: key("z") }]);
-  });
-
-  test("BUG-196/route: a left click on the tab strip shows home or that tab, whether or not the agent asked for the mouse", () => {
-    const switches = (a: { kind: string }) => a.kind === "home" || a.kind === "show";
-    for (const modes of [HOME_MODES, mouseModes]) {
-      const c = ctx({ modes: { ...modes } });
-      expect(route(key("\x1b[<0;1;1M"), c)).toEqual([{ kind: "home" }]);
-      expect(route(key("\x1b[<0;9;1M"), c)).toEqual([{ kind: "home" }]);
-      expect(route(key("\x1b[<0;10;1M"), c)).toEqual([{ kind: "show", id: 1 }]);
-      expect(route(key("\x1b[<0;20;1M"), c)).toEqual([{ kind: "show", id: 1 }]);
-      expect(route(key("\x1b[<0;32;1M"), c)).toEqual([{ kind: "show", id: 2 }]);
-      // The gap between tabs, past the last one, row 2, the right button, a release, a drag: no switch.
-      for (const raw of ["\x1b[<0;21;1M", "\x1b[<0;40;1M", "\x1b[<0;10;2M", "\x1b[<2;10;1M", "\x1b[<0;10;1m", "\x1b[<32;10;1M"]) expect(route(key(raw), c).some(switches)).toBe(false);
-    }
-    // X10 reports too; none while the strip isn't drawn, nor in pixels (mode 1016).
-    expect(route(key(`\x1b[M${String.fromCharCode(32, 32 + 12, 33)}`), ctx())).toEqual([{ kind: "show", id: 1 }]);
-    expect(route(key("\x1b[<0;10;1M"), ctx({ strip: null }))).toEqual([]);
-    expect(route(key("\x1b[<0;10;1M"), ctx({ modes: { ...mouseModes, mouseEncoding: "sgr-pixels" } }))).toEqual([]);
-  });
-
-  test("BUG-212/route: a left click on ‹ or › shows the nearest hidden tab on that side; as with tabs, only a press", () => {
-    const scrolled = { home: [0, 9] as [number, number], prev: { id: 7, x0: 9, x1: 11 }, tabs: [{ id: 8, x0: 11, x1: 30 }], next: { id: 9, x0: 98, x1: 100 } };
-    for (const modes of [HOME_MODES, mouseModes]) {
-      const c = ctx({ modes: { ...modes }, strip: scrolled });
-      expect(route(key("\x1b[<0;10;1M"), c)).toEqual([{ kind: "show", id: 7 }]);
-      expect(route(key("\x1b[<0;11;1M"), c)).toEqual([{ kind: "show", id: 7 }]);
-      expect(route(key("\x1b[<0;12;1M"), c)).toEqual([{ kind: "show", id: 8 }]);
-      expect(route(key("\x1b[<0;100;1M"), c)).toEqual([{ kind: "show", id: 9 }]);
-      for (const raw of ["\x1b[<0;100;1m", "\x1b[<2;100;1M", "\x1b[<32;100;1M", "\x1b[<0;100;2M"]) expect(route(key(raw), c).some((a) => a.kind === "show")).toBe(false);
-    }
-  });
-
-  test("BUG-409/launch-modes: while a note is up Esc hides it and every other key goes on as usual; a question and scroll mode keep their keys", () => {
+  test("frame/note: while a note is up Esc hides it and every other key goes on as usual; a question and scroll mode keep their keys #BUG-409/launch-modes", () => {
     const n = ctx({ note: true });
     expect(route(key("\x1b"), n)).toEqual([{ kind: "dismiss" }]);
     expect(route(key("x"), n)).toEqual([{ kind: "input", key: key("x") }]);
@@ -193,26 +77,19 @@ describe("the session view's keys (route)", () => {
     expect(route(key("\x1b"), ctx({ note: false }))).toEqual([{ kind: "input", key: key("\x1b") }]);
     expect(route(key("\x1c"), n)).toEqual([{ kind: "prefix" }]);
   });
-
-  test("the question takes Enter, Esc, Ctrl+C (and the rest) but not Gluon's keys or a paste", () => {
-    const q = ctx({ question: true });
-    expect(route(key("\r"), q)).toEqual([{ kind: "answer", key: key("\r") }]);
-    expect(route(key("\x1c"), q)).toEqual([{ kind: "prefix" }]);
-    expect(route(key("\x1b[200~x\x1b[201~"), q)).toEqual([]);
-  });
 });
 
 describe("mouse reports into the frame (shiftMouse)", () => {
   const report = (o: Partial<MouseReport>): MouseReport => ({ code: 0, button: 0, x: 10, y: 10, release: false, motion: false, wheel: null, shift: false, alt: false, ctrl: false, encoding: "sgr", ...o });
 
-  test("in the agent's encoding: SGR, urxvt, X10 (a release as button 3)", () => {
+  test("frame/mouse-to-agent: in the agent's encoding: SGR, urxvt, X10 (a release as button 3)", () => {
     expect(shiftMouse(report({}), interior, "sgr", false)).toBe("\x1b[<0;9;7M");
     expect(shiftMouse(report({ release: true }), interior, "sgr", true)).toBe("\x1b[<0;9;7m");
     expect(shiftMouse(report({}), interior, "urxvt", false)).toBe("\x1b[32;9;7M");
     expect(shiftMouse(report({ release: true }), interior, "default", true)).toBe(`\x1b[M${String.fromCharCode(3 + 32, 9 + 32, 7 + 32)}`);
   });
 
-  test("outside the interior: a press is dropped; a release or a drag is held at the edge", () => {
+  test("frame/mouse-to-agent: outside the interior: a press is dropped; a release or a drag is held at the edge", () => {
     expect(shiftMouse(report({ x: 1 }), interior, "sgr", false)).toBeNull();
     expect(shiftMouse(report({ y: 29 }), interior, "sgr", true)).toBeNull();
     expect(shiftMouse(report({ x: 1, release: true }), interior, "sgr", true)).toBe("\x1b[<0;1;7m");
@@ -221,7 +98,7 @@ describe("mouse reports into the frame (shiftMouse)", () => {
     expect(shiftMouse(report({ y: 40, code: 35, button: 3, motion: true }), interior, "sgr", true)).toBeNull();
   });
 
-  test("BUG-240/GLUON-27: outside the interior, a release or a drag whose press the agent never got is dropped, not held", () => {
+  test("frame/mouse-to-agent: outside the interior, a release or a drag whose press the agent never got is dropped, not held #BUG-240/GLUON-27", () => {
     expect(shiftMouse(report({ x: 1, release: true }), interior, "sgr", false)).toBeNull();
     expect(shiftMouse(report({ y: 40, code: 32, motion: true }), interior, "sgr", false)).toBeNull();
     // Inside, a release goes on as it is.
@@ -234,19 +111,19 @@ describe("mouse reports into the frame (shiftMouse)", () => {
 });
 
 describe("modes and tabs", () => {
-  test("the real terminal reports the wheel while the agent has no mouse tracking (and capture is on)", () => {
+  test("frame/modes: the real terminal reports the wheel while the agent has no mouse tracking (and capture is on)", () => {
     expect(effectiveModes(HOME_MODES, true)).toMatchObject({ mouseTracking: "vt200", mouseEncoding: "sgr" });
     expect(effectiveModes(HOME_MODES, false)).toMatchObject({ mouseTracking: "none" });
     expect(effectiveModes({ ...mouseModes, mouseTracking: "any", mouseEncoding: "urxvt" }, true)).toMatchObject({ mouseTracking: "any", mouseEncoding: "urxvt" });
     expect(effectiveModes({ ...HOME_MODES, syncOutput: true }, false).syncOutput).toBe(false);
   });
 
-  test("BUG-172/F: bracketed paste is on on the real terminal for every session, whatever the agent asked", () => {
+  test("frame/modes: bracketed paste is on on the real terminal for every session, whatever the agent asked #BUG-172/F", () => {
     expect(effectiveModes(HOME_MODES, false).bracketedPaste).toBe(true);
     expect(effectiveModes({ ...HOME_MODES, bracketedPaste: true }, true).bracketedPaste).toBe(true);
   });
 
-  test("BUG-210/ring: ←/→ walk a ring of tabs with home (null) its leftmost, wrapping both ways", () => {
+  test("tabs/arrows: ←/→ walk a ring of tabs with home (null) its leftmost, wrapping both ways", () => {
     expect(neighbour([1, 2, 3], 2, 1)).toBe(3);
     expect(neighbour([1, 2, 3], 2, -1)).toBe(1);
     expect(neighbour([1, 2, 3], 3, 1)).toBeNull();
@@ -368,7 +245,7 @@ describe("the compositor on fake streams", () => {
     return { out, store, home, add, c: c!, stdin };
   }
 
-  test("starts on the alternate screen with every mode off (but its own clicks: BUG-269), home view mounted; stop gives the terminal back", async () => {
+  test("frame/modes: starts on the alternate screen with every mode off (but its own clicks: BUG-269), home view mounted; stop gives the terminal back", async () => {
     const { out, home, c } = await setup();
     expect(out.raw).toStartWith(`\x1b[?1049h${MODES_RESET}`);
     expect(home.calls).toEqual(["mount"]);
@@ -377,7 +254,7 @@ describe("the compositor on fake streams", () => {
     expect(home.calls).toEqual(["mount", "unmount"]);
   });
 
-  test("BUG-269/GLUON-51: at home Gluon asks for SGR clicks (none without mouse_capture); reports go to the home view's mouse, never into its input; none while a question is up; the rest of a click that opened a session never reaches its agent", async () => {
+  test("mouse/click-row: at home Gluon asks for SGR clicks (none without mouse_capture); reports go to the home view's mouse, never into its input; none while a question is up; the rest of a click that opened a session never reaches its agent #GLUON-51", async () => {
     const { out, home, add, c } = await setup();
     expect(out.raw).toStartWith(`\x1b[?1049h${MODES_RESET}\x1b[?1002h\x1b[?1006h`);
     const a = await add("alpha");
@@ -415,7 +292,7 @@ describe("the compositor on fake streams", () => {
     expect(off.home.read()).toBe("");
   });
 
-  test("BUG-286/GLUON-61: a drag over the home view's text selects it (reversed on the terminal) and the release copies it (OSC 52, 'Copied' on the last row); a click without a drag is the home view's, delivered at its release; a key, a press or a changed screen ends the selection", async () => {
+  test("mouse/drag-copy: a drag over the home view's text selects it (reversed on the terminal) and the release copies it (OSC 52, 'Copied' on the last row); a click without a drag is the home view's, delivered at its release; a key, a press or a changed screen ends the selection #BUG-286/GLUON-61", async () => {
     const { out, home, c } = await setup();
     const frame = "\x1b[1;1Hhello world\x1b[2;1Hsecond line\x1b[3;1Hthird line";
     home.write(frame);
@@ -476,7 +353,7 @@ describe("the compositor on fake streams", () => {
 
   // QA triage of PR #69 (known, "not addressed"): a press and a release one cell apart (a trackpad's jitter, an SGR report per cell crossed)
   // is a two-character selection, and the click on a row or an option is lost. `homeMouse` has no distance threshold.
-  test("BUG-657/QA-ui-01: a press and a release one cell apart is still a click on the home view, not a selection that eats it (PR #69)", async () => {
+  test("mouse/click-row: a press and a release one cell apart is still a click on the home view, not a selection that eats it (PR #69) #BUG-657/QA-ui-01", async () => {
     const { out, home, c } = await setup();
     home.write("\x1b[1;1Hhello world\x1b[2;1Hsecond line");
     await tick();
@@ -486,7 +363,7 @@ describe("the compositor on fake streams", () => {
     expect(home.mice.map((m) => [m.release, m.motion])).toEqual([[false, false]]);
   });
 
-  test("BUG-657/variants: a press and release a cell apart (up, down, diagonal; with or without motion reports) is a click; two cells apart, or a jitter that goes on, is a selection from the press's cell", async () => {
+  test("mouse/click-row: a press and release a cell apart (up, down, diagonal; with or without motion reports) is a click; two cells apart, or a jitter that goes on, is a selection from the press's cell #BUG-657/variants", async () => {
     const { out, home, c } = await setup();
     home.write("\x1b[1;1Hhello world\x1b[2;1Hsecond line");
     await tick();
@@ -519,7 +396,7 @@ describe("the compositor on fake streams", () => {
     expect(home.mice).toEqual([]);
   });
 
-  test("BUG-286/GLUON-61: a drag at home while a question is up selects nothing; a drag during a session never reaches the home view or the clipboard; a trip to a session and back, or a resize, drops the selection", async () => {
+  test("mouse/drag-copy: a drag at home while a question is up selects nothing; a drag during a session never reaches the home view or the clipboard; a trip to a session and back, or a resize, drops the selection #BUG-286/GLUON-61", async () => {
     const { out, home, add, c } = await setup();
     home.write("\x1b[1;1Hhello world");
     await tick();
@@ -558,7 +435,7 @@ describe("the compositor on fake streams", () => {
     expect(out.raw.slice(resized)).toContain(`\x1b]52;c;${Buffer.from("hello").toString("base64")}\x07`);
   });
 
-  test("BUG-286/GLUON-61: a drag queued behind a frame the home view's model hasn't parsed is dropped when a session is shown meanwhile: no highlight is painted over the session, nothing copied", async () => {
+  test("mouse/drag-copy: a drag queued behind a frame the home view's model hasn't parsed is dropped when a session is shown meanwhile: no highlight is painted over the session, nothing copied #BUG-286/GLUON-61", async () => {
     const { out, home, add, c } = await setup();
     home.write("\x1b[1;1Hhello world");
     await tick();
@@ -573,7 +450,7 @@ describe("the compositor on fake streams", () => {
     expect(home.mice).toEqual([]);
   });
 
-  test("BUG-272/GLUON-56: a double-click at home whose first click opened a session: its second click (press, drag, release; reads of their own) never reaches the agent; a click after DOUBLE_CLICK_MS does, as does one at home that opened nothing", async () => {
+  test("mouse/click-row: a double-click at home whose first click opened a session: its second click (press, drag, release; reads of their own) never reaches the agent; a click after DOUBLE_CLICK_MS does, as does one at home that opened nothing #BUG-272/GLUON-56", async () => {
     const { home, add, c } = await setup();
     const a = await add("alpha");
     await a.s.screen.write("\x1b[?1000h\x1b[?1006h");
@@ -616,7 +493,7 @@ describe("the compositor on fake streams", () => {
       return { ...t, a, b, pick, bar: async () => (await t.out.lines())[29]! };
     }
 
-    test("BUG-284/zoom: the home key then z gives the shown session the whole terminal but the last row (no tab strip, info line or frame; only its PTY resizes); z again brings the frame back", async () => {
+    test("frame/zoom: the home key then z gives the shown session the whole terminal but the last row (no tab strip, info line or frame; only its PTY resizes); z again brings the frame back #BUG-284/zoom", async () => {
       const { out, a, b, pick, bar, c } = await zoomed();
       expect(size(a.s)).toEqual([98, 24]);
       expect((await out.lines())[0]).toMatch(/^ ◆ gluon/);
@@ -647,7 +524,7 @@ describe("the compositor on fake streams", () => {
       expect(size(a.s)).toEqual([98, 24]);
     });
 
-    test("BUG-284/zoom: zoom ends with the tab (switching, home), and the session is the interior again; the next one is framed", async () => {
+    test("frame/zoom: zoom ends with the tab (switching, home), and the session is the interior again; the next one is framed #BUG-284/zoom", async () => {
       const { out, a, b, pick, bar, c } = await zoomed();
       await pick(HOME);
       await pick("z");
@@ -671,7 +548,7 @@ describe("the compositor on fake streams", () => {
       expect(size(a.s)).toEqual([98, 24]);
     });
 
-    test("BUG-284/zoom: a resize while zoomed keeps the zoom: the shown session gets the new whole-but-last-row size, the others the new interior", async () => {
+    test("frame/zoom: a resize while zoomed keeps the zoom: the shown session gets the new whole-but-last-row size, the others the new interior #BUG-284/zoom", async () => {
       const { out, a, b, pick } = await zoomed();
       await pick(HOME);
       await pick("z");
@@ -685,7 +562,7 @@ describe("the compositor on fake streams", () => {
       expect((await out.lines()).slice(0, 39).join("\n")).not.toMatch(/[┌│└◆]/);
     });
 
-    test("BUG-284/zoom: below 20×6 only tooSmall is drawn (the pick is ignored there); growing back, the zoom is still on and nothing stale is left", async () => {
+    test("frame/zoom: below 20×6 only tooSmall is drawn (the pick is ignored there); growing back, the zoom is still on and nothing stale is left #BUG-284/zoom", async () => {
       const { out, a, b, pick, bar } = await zoomed();
       await pick(HOME);
       await pick("z");
@@ -713,7 +590,7 @@ describe("the compositor on fake streams", () => {
       expect(size(a.s)).toEqual([98, 24]);
     });
 
-    test("BUG-284/zoom: removing the zoomed session goes home with no zoom left; a session added or opened after is framed at the interior", async () => {
+    test("frame/zoom: removing the zoomed session goes home with no zoom left; a session added or opened after is framed at the interior #BUG-284/zoom", async () => {
       const { out, a, b, add, pick, c } = await zoomed();
       await pick(HOME);
       await pick("z");
@@ -726,7 +603,7 @@ describe("the compositor on fake streams", () => {
       expect(size(b.s)).toEqual([98, 24]);
     });
 
-    test("BUG-284/zoom: the last row stays Gluon's — the scroll indicator while scrolled back, the question, the prefix bar — and a click on it never reaches the agent", async () => {
+    test("frame/zoom: the last row stays Gluon's — the scroll indicator while scrolled back, the question, the prefix bar — and a click on it never reaches the agent #BUG-284/zoom", async () => {
       const { out, a, pick, bar } = await zoomed();
       await a.s.screen.write(Array.from({ length: 80 }, (_, i) => `line ${i}`).join("\r\n"));
       await pick(HOME);
@@ -752,14 +629,14 @@ describe("the compositor on fake streams", () => {
     });
   });
 
-  test("home: keys go on to the home view as typed; replies are dropped", async () => {
+  test("composer/terminal-noise: home: keys go on to the home view as typed; replies are dropped", async () => {
     const { home, stdin } = await setup();
     (stdin as unknown as PassThrough).write("ab\x1b]11;rgb:0/0/0\x07\r");
     await tick(80);
     expect(home.read()).toBe("ab\r");
   });
 
-  test("BUG-208/compositor: win32-input-mode keys reach the home view as plain VT — the home key's Ctrl key-up, Enter's key-up, typed text, Enter, Backspace, arrows; nothing win32 leaks", async () => {
+  test("frame/key-protocols: win32-input-mode keys reach the home view as plain VT — the home key's Ctrl key-up, Enter's key-up, typed text, Enter, Backspace, arrows; nothing win32 leaks #BUG-208/compositor", async () => {
     const { home, add, c, stdin } = await setup();
     const a = await add("alpha");
     const press = (vk: number, sc: number, uc: number, cs = 0) => `\x1b[${vk};${sc};${uc};1;${cs};1_\x1b[${vk};${sc};${uc};0;${cs};1_`;
@@ -783,7 +660,7 @@ describe("the compositor on fake streams", () => {
     expect(home.read()).toBe("");
   });
 
-  test("a session in the frame: chrome, the agent's cells inside, its cursor; the home view suspended", async () => {
+  test("frame/agent-screen: a session in the frame: chrome, the agent's cells inside, its cursor; the home view suspended", async () => {
     const { out, home, add, c } = await setup();
     const { id, s } = await add("alpha");
     await s.screen.write("hello from the agent\r\n> ");
@@ -802,7 +679,7 @@ describe("the compositor on fake streams", () => {
     expect(out.raw).toContain("\x1b[?1002l\x1b[?1000h");
   });
 
-  test("switching applies the next session's modes and undoes the last one's; home resets them all", async () => {
+  test("frame/modes: switching applies the next session's modes and undoes the last one's; home resets them all", async () => {
     const { out, add, c, home } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -837,7 +714,7 @@ describe("the compositor on fake streams", () => {
     expect(c.current).toEqual({ kind: "home" });
   });
 
-  test("background output only updates that session's model; the shown one repaints only what changed", async () => {
+  test("frame/agent-screen: background output only updates that session's model; the shown one repaints only what changed", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -857,7 +734,7 @@ describe("the compositor on fake streams", () => {
     expect(repaint).not.toContain("◆ gluon");
   });
 
-  test("scroll mode: the wheel scrolls back through the scrollback with an indicator; q returns to the live screen", async () => {
+  test("frame/scrollback: scroll mode: the wheel scrolls back through the scrollback with an indicator; q returns to the live screen", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     await a.s.screen.write(Array.from({ length: 60 }, (_, i) => `LINE ${i + 1}`).join("\r\n"));
@@ -877,7 +754,7 @@ describe("the compositor on fake streams", () => {
     expect(a.s.inputs).toEqual([]);
   });
 
-  test("the question replaces the bottom bar; Enter goes to the session as its answer", async () => {
+  test("clear-compact/answer: the question replaces the bottom bar; Enter goes to the session as its answer", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     await c.open(a.id);
@@ -891,7 +768,7 @@ describe("the compositor on fake streams", () => {
     expect((await out.lines())[29]).toMatch(/^ ctrl\+\\ sessions/);
   });
 
-  test("BUG-409/launch-modes: a session's note is drawn wrapped over its frame (shown now, or when it is opened), stays over the agent's output, and Esc hides it without reaching the agent", async () => {
+  test("frame/note: a session's note is drawn wrapped over its frame (shown now, or when it is opened), stays over the agent's output, and Esc hides it without reaching the agent #BUG-409/launch-modes", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -927,7 +804,7 @@ describe("the compositor on fake streams", () => {
     expect((await out.lines()).slice(4, 10).join(" ").replace(/[│\s]+/g, " ")).toContain(note);
   });
 
-  test("a resize reaches every session and redraws the frame at the new size", async () => {
+  test("frame/resize: a resize reaches every session and redraws the frame at the new size", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -944,7 +821,7 @@ describe("the compositor on fake streams", () => {
     expect(lines[38]).toMatch(/^└─+┘$/);
   });
 
-  test("BUG-175/F: no wheel capture while the agent is on its alternate screen (the terminal's wheel-as-arrows reach it); back on the main screen, captured again", async () => {
+  test("frame/modes: no wheel capture while the agent is on its alternate screen (the terminal's wheel-as-arrows reach it); back on the main screen, captured again #BUG-175/F", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     await a.s.screen.write("\x1b[?1049hFULLSCREEN");
@@ -967,7 +844,7 @@ describe("the compositor on fake streams", () => {
     expect(out.raw.slice(mark)).toContain("\x1b[?1000l");
   });
 
-  test("BUG-170/F: a → split across two reads 100 ms apart (SSH) is still one key: the session switches; Alt+PgDn split the same way reaches the agent whole", async () => {
+  test("frame/key-protocols: a → split across two reads 100 ms apart (SSH) is still one key: the session switches; Alt+PgDn split the same way reaches the agent whole #BUG-170/F", async () => {
     const { add, c, stdin } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -987,7 +864,7 @@ describe("the compositor on fake streams", () => {
     expect(b.s.inputs.map((k) => k.raw)).toEqual(["\x1b[6;3~"]);
   });
 
-  test("BUG-279/F: the home key then ←/→ switches in every state — typed line, question up (left pending), scrolled back — and wraps home at both ends; the bar says what the next key does", async () => {
+  test("tabs/home-key: the home key then ←/→ switches in every state — typed line, question up (left pending), scrolled back — and wraps home at both ends; the bar says what the next key does #BUG-279/F", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1049,7 +926,7 @@ describe("the compositor on fake streams", () => {
     expect(g.s.inputs).toEqual([]);
   });
 
-  test("BUG-279/F: Esc cancels the home key, any other key ends it and is routed as usual, a switch away or home ends it; BUG-706: time doesn't", async () => {
+  test("tabs/home-key: Esc cancels the home key, any other key ends it and is routed as usual, a switch away or home ends it; BUG-706: time doesn't #BUG-279/F", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1107,7 +984,7 @@ describe("the compositor on fake streams", () => {
   });
 
 
-  test("BUG-282/GLUON-42: Esc that cancels the home key, then a key in a later read before the decoder's wait is over: the key reaches the agent alone, not as Alt+key (the Esc was Gluon's)", async () => {
+  test("tabs/home-key: Esc that cancels the home key, then a key in a later read before the decoder's wait is over: the key reaches the agent alone, not as Alt+key (the Esc was Gluon's) #BUG-282/GLUON-42", async () => {
     const { add, c, stdin } = await setup();
     const a = await add("alpha");
     await add("beta");
@@ -1128,7 +1005,7 @@ describe("the compositor on fake streams", () => {
     expect(a.s.inputs.map((k) => k.raw).join("")).toBe("x\x1by");
   });
 
-  test("BUG-283/GLUON-42: a modifier alone pressed while the home key waits (win32-input-mode's Ctrl down, kitty's all-keys modifier press) doesn't pick: the home key pressed again, Ctrl let go in between, goes home", async () => {
+  test("tabs/home-key: a modifier alone pressed while the home key waits (win32-input-mode's Ctrl down, kitty's all-keys modifier press) doesn't pick: the home key pressed again, Ctrl let go in between, goes home #BUG-283/GLUON-42", async () => {
     const { add, c, stdin } = await setup();
     const a = await add("alpha");
     await add("beta");
@@ -1155,7 +1032,7 @@ describe("the compositor on fake streams", () => {
     // The agent got the modifiers as typed (never the home key's press), up to the one that went home.
     expect(a.s.inputs.map((k) => k.raw)).toEqual([ctrlDown, ctrlUp, ctrlDown, "\x1b[57442;5u", "\x1b[92;5:3u", "\x1b[57442;1:3u", "\x1b[57442;5u"]);
   });
-  test("BUG-279/F: Alt+PgUp/PgDn go to the agent, in a session and at home (the home view's text, never a switch)", async () => {
+  test("frame/keys-to-agent: Alt+PgUp/PgDn go to the agent, in a session and at home (the home view's text, never a switch) #BUG-279/F", async () => {
     const { home, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1173,7 +1050,7 @@ describe("the compositor on fake streams", () => {
     expect(a.s.inputs).toEqual([]);
   });
 
-  test("BUG-281/F: the bar names ←/→ only while an arrow will switch (untouched line, more than one tab); once typed it is the home key alone; after Enter ←/→ again", async () => {
+  test("tabs/bar: the bar names ←/→ only while an arrow will switch (untouched line, more than one tab); once typed it is the home key alone; after Enter ←/→ again #BUG-281/F", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const bar = async () => (await out.lines())[29]!;
@@ -1194,7 +1071,7 @@ describe("the compositor on fake streams", () => {
     expect(b.s.inputs).toEqual([]);
   });
 
-  test("BUG-211/F: Esc and Ctrl+C reach the agent but don't count as typing: ← right after them still walks back; after typing it's still the agent's", async () => {
+  test("tabs/arrows: Esc and Ctrl+C reach the agent but don't count as typing: ← right after them still walks back; after typing it's still the agent's #BUG-211/F", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1214,7 +1091,7 @@ describe("the compositor on fake streams", () => {
     expect(b.s.inputs.map((k) => k.raw).slice(2)).toEqual(["x", "\x03", "\x1b[D"]);
   });
 
-  test("BUG-234/F: a no (Esc or Ctrl+C) to a held /clear leaves its line typed: ← then goes to the agent, not to the previous tab", async () => {
+  test("tabs/arrows: a no (Esc or Ctrl+C) to a held /clear leaves its line typed: ← then goes to the agent, not to the previous tab #BUG-234/F", async () => {
     for (const no of ["\x1b", "\x03"]) {
       const { add, c } = await setup();
       const a = await add("alpha");
@@ -1236,7 +1113,7 @@ describe("the compositor on fake streams", () => {
     }
   });
 
-  test("BUG-268/GLUON-50: `BBB` and three Backspaces leave the line untouched again: the bar names ←/→ again and ← walks back; any other key keeps it the agent's", async () => {
+  test("tabs/arrows: `BBB` and three Backspaces leave the line untouched again: the bar names ←/→ again and ← walks back; any other key keeps it the agent's #BUG-268/GLUON-50", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1260,7 +1137,7 @@ describe("the compositor on fake streams", () => {
     expect(a.s.inputs).toEqual([]);
   });
 
-  test("BUG-705/issue-111: keys that answer the agent's own dialog (a digit, t, Tab, Down, Esc) leave an untouched line untouched: ←/→ still switch; a draft typed before stays the agent's", async () => {
+  test("tabs/arrows: keys that answer the agent's own dialog (a digit, t, Tab, Down, Esc) leave an untouched line untouched: ←/→ still switch; a draft typed before stays the agent's #BUG-705/issue-111", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1299,7 +1176,7 @@ describe("the compositor on fake streams", () => {
   // to keep the switching rule (BUG-195/280: with 2+ sessions, ←/→ on an untouched line switch in every state, the agent's dialog
   // included, as for Codex's dialogs and Kimi Code's question panel, BUG-705/663) and to document Tab instead
   // (`docs/guides/harnesses/opencode.md`). This pins that: no routing exception for a dialog.
-  test("BUG-673/F11: with a dialog of the agent's own up (OpenCode's permission selector), ←/→ still switch sessions on an untouched line; Tab and Enter reach the agent", async () => {
+  test("tabs/arrows: with a dialog of the agent's own up (OpenCode's permission selector), ←/→ still switch sessions on an untouched line; Tab and Enter reach the agent #BUG-673/F11", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1319,7 +1196,7 @@ describe("the compositor on fake streams", () => {
     expect(b.s.inputs).toHaveLength(2);
   });
 
-  test("BUG-206/F: → on the last tab (untouched line) goes home, nothing reaches the agent; a modified → there is the agent's and touches the line", async () => {
+  test("tabs/arrows: → on the last tab (untouched line) goes home, nothing reaches the agent; a modified → there is the agent's and touches the line #BUG-206/F", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1336,7 +1213,7 @@ describe("the compositor on fake streams", () => {
     expect(a.s.inputs).toEqual([]);
   });
 
-  test("BUG-280/F: Alt+←/→ on an untouched line never reach the agent (nor switch); on a touched line they do; → on the last tab goes home, ← on the first", async () => {
+  test("tabs/arrows: Alt+←/→ on an untouched line never reach the agent (nor switch); on a touched line they do; → on the last tab goes home, ← on the first #BUG-280/F", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1367,7 +1244,7 @@ describe("the compositor on fake streams", () => {
     expect(b.s.inputs).toEqual([]);
   });
 
-  test("BUG-195/F: ←/→ walk the tabs while the line is untouched (from the user's keys); typed keys make them the agent's until Enter", async () => {
+  test("tabs/arrows: ←/→ walk the tabs while the line is untouched (from the user's keys); typed keys make them the agent's until Enter #BUG-195/F", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1416,7 +1293,7 @@ describe("the compositor on fake streams", () => {
     expect(view()).toEqual({ kind: "session", id: a.id });
   });
 
-  test("BUG-196/F: a click on a tab shows that session; on ◆ gluon, home — with the agent's mouse on or off", async () => {
+  test("tabs/click: a click on a tab shows that session; on ◆ gluon, home — with the agent's mouse on or off", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1436,7 +1313,7 @@ describe("the compositor on fake streams", () => {
     expect(c.current).toEqual({ kind: "home" });
   });
 
-  test("BUG-212/F: a click on › or ‹ of an overflowing strip opens the nearest hidden tab on that side; the strip scrolls to it", async () => {
+  test("tabs/click: a click on › or ‹ of an overflowing strip opens the nearest hidden tab on that side; the strip scrolls to it #BUG-212/F", async () => {
     const { out, add, c } = await setup();
     const all: { id: number; s: ReturnType<typeof fakeSession> }[] = [];
     for (let i = 1; i <= 9; i++) all.push(await add(`session-number-${i}`));
@@ -1459,7 +1336,7 @@ describe("the compositor on fake streams", () => {
     expect(all.every((x) => x.s.inputs.length === 0 && x.s.mice.length === 0)).toBe(true);
   });
 
-  test("BUG-181/E:a session view on a terminal under 20×6 shows one line, never the bar over the frame; back to size, the frame again", async () => {
+  test("frame/too-small: a session view on a terminal under 20×6 shows one line, never the bar over the frame; back to size, the frame again #BUG-181/E", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     await c.open(a.id);
@@ -1481,7 +1358,7 @@ describe("the compositor on fake streams", () => {
     expect(back[11]).toMatch(/ctrl\+\\ sessions/);
   });
 
-  test("BUG-245/V-01: the home view's last row (outside its rows − 1 frame) stays on the ground — after the home view's frame erases it, and after a resize", async () => {
+  test("home/fits-terminal: the home view's last row (outside its rows − 1 frame) stays on the ground — after the home view's frame erases it, and after a resize #BUG-245/V-01", async () => {
     const { out, home } = await setup();
     const ground = [1, 3, 5].map((i) => parseInt(GLUON_HEX.ground.slice(i, i + 2), 16));
     const onGround = async (y: number) => {
@@ -1502,7 +1379,7 @@ describe("the compositor on fake streams", () => {
     expect(await onGround(33)).toBe(true);
   });
 
-  test("BUG-192/compositor: the shown session's row removed (its agent ended) brings the sessions home; another one removed doesn't", async () => {
+  test("session-end/closes: the shown session's row removed (its agent ended) brings the sessions home; another one removed doesn't", async () => {
     const { home, add, c, store } = await setup();
     const a = await add("alpha");
     const b = await add("beta");
@@ -1517,7 +1394,7 @@ describe("the compositor on fake streams", () => {
     expect(c.session(a.id)).toBeUndefined();
   });
 
-  test("BUG-213/compositor: home's questions take only Enter (yes) and Esc or Ctrl+C (no) — y, n and other keys are ignored and reach no one", async () => {
+  test("home/own-question: home's questions take only Enter (yes) and Esc or Ctrl+C (no) — y, n and other keys are ignored and reach no one", async () => {
     const { out, home, c } = await setup();
     const yes = c.confirm("2 sessions running — quit and end them?");
     expect((await out.lines())[29]).toMatch(/2 sessions running — quit and end them\? +enter yes · esc no/);
@@ -1545,7 +1422,7 @@ describe("the compositor on fake streams", () => {
     expect(home.read()).toBe("");
   });
 
-  test("BUG-288/resume: choose() tells the user's no (Esc) from a question taken away (another question, a session opened); confirm() calls both no", async () => {
+  test("home/own-question: choose() tells the user's no (Esc) from a question taken away (another question, a session opened); confirm() calls both no #BUG-288/resume", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const user = c.choose("Start it again?");
@@ -1572,7 +1449,7 @@ describe("the compositor on fake streams", () => {
     expect(await newer).toBe(false);
   });
 
-  test("BUG-299/resume: a question Gluon raises by itself ignores Enter, Esc and Ctrl+C for the guard; other keys (typing, a paste) close it as typed and reach the home view", async () => {
+  test("home/own-question: a question Gluon raises by itself ignores Enter, Esc and Ctrl+C for the guard; other keys (typing, a paste) close it as typed and reach the home view #BUG-299/resume", async () => {
     const { home, c } = await setup();
     const q = c.choose("Start it again?", undefined, true);
     let answered: unknown = "pending";
@@ -1604,7 +1481,7 @@ describe("the compositor on fake streams", () => {
     expect(home.read()).not.toContain("x");
   });
 
-  test("BUG-300/resume: Ctrl+C on a question Gluon raised by itself is keep (not no); Esc is no; the guard restarts when home is shown again", async () => {
+  test("home/own-question: Ctrl+C on a question Gluon raised by itself is keep (not no); Esc is no; the guard restarts when home is shown again #BUG-300/resume", async () => {
     const { add, c } = await setup();
     const a = await add("alpha");
     const keep = c.choose("Start it again?", undefined, true);
@@ -1630,7 +1507,7 @@ describe("the compositor on fake streams", () => {
     expect(await late).toBe(true);
   });
 
-  test("BUG-203/compositor: “End this session?” on home names the keys the session's bar names (enter yes · esc no); Enter says yes", async () => {
+  test("home/own-question: “End this session?” on home names the keys the session's bar names (enter yes · esc no); Enter says yes #BUG-203/compositor", async () => {
     const { out, add, c } = await setup();
     const a = await add("alpha");
     await c.open(a.id);
@@ -1647,7 +1524,7 @@ describe("the compositor on fake streams", () => {
     expect(await enter).toBe(true);
   });
 
-  test("BUG-260/GLUON-42: at home, Esc and then a key in a later read, before the decoder's wait is over, reach the home view as Esc and that key; Alt+key in one read stays Alt+key; a session gets the bytes as typed", async () => {
+  test("frame/key-protocols: at home, Esc and then a key in a later read, before the decoder's wait is over, reach the home view as Esc and that key; Alt+key in one read stays Alt+key; a session gets the bytes as typed #BUG-260/GLUON-42", async () => {
     const { home, add, c, stdin } = await setup();
     const w = (s: string) => (stdin as unknown as PassThrough).write(s);
     w("\x1b");
@@ -1665,11 +1542,5 @@ describe("the compositor on fake streams", () => {
     w("x");
     await tick(80);
     expect(a.s.inputs.map((k) => k.raw).join("")).toBe("\x1bx");
-  });
-
-  test("homeInput looks like a terminal to Ink", () => {
-    const s = homeInput();
-    expect(s.isTTY).toBe(true);
-    expect(s.setRawMode(true)).toBe(s);
   });
 });

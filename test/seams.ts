@@ -26,8 +26,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/pty/readers/index.ts", "src/pty/screen.ts"],
   },
   keys: {
-    says: "the terminal's bytes → keys → what Gluon does with each (forward, home, a menu)",
-    modules: ["src/pty/keys.ts", "src/pty/compositor.ts"],
+    says: "the terminal's bytes → keys → what Gluon does with each (forward, home, a menu), the terminal modes it asks for and a drag's selection",
+    modules: ["src/pty/keys.ts", "src/pty/compositor.ts", "src/pty/modes.ts", "src/pty/selection.ts"],
   },
   brain: {
     says: "the user's messages, with a model client → the intake's questions, its spec and its classification",
@@ -54,8 +54,12 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/config.ts", "src/sessions.ts", "src/cost/ledger-file.ts"],
   },
   "text-layout": {
-    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn",
-    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts"],
+    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars",
+    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts", "src/ui/layout.ts", "src/pty/chrome.ts"],
+  },
+  polling: {
+    says: "a work tree and an events directory over time → the files changed and the events read, and the processes and listings each poll costs",
+    modules: ["src/files-poll.ts", "src/events.ts"],
   },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off",
@@ -83,6 +87,7 @@ export const REPO_TESTS = [
   "test/docs-site.test.ts",
   "test/fakes.test.ts",
   "test/fakes-readers.test.ts",
+  "test/gluon-matrix.test.ts",
   "test/harness-cache.test.ts",
   "test/live-script.test.ts",
   "test/live-stage.test.ts",
@@ -98,6 +103,7 @@ export const REPO_TESTS = [
   "test/test-style.test.ts",
   "test/test-value.test.ts",
   "test/windows-test.test.ts",
+  "test/e2e/scoped.e2e.test.ts",
 ];
 
 const SEAM_MODULES = new Set(Object.values(SEAMS).flatMap((s) => s.modules));

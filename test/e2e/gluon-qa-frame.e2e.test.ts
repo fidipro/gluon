@@ -1,8 +1,8 @@
 /**
  * QA attacks on Gluon's frame and the PTY layer (campaign section B1): the interceptor per harness
  * fake, pastes (huge, hostile, during a question), resize storms, quitting and signals, the terminal
- * a crashing agent leaves behind, the mouse at the edges. A case that shows a product bug is
- * `test.failing("BUG-CANDIDATE/QA-frame-nn: …")` (`test/e2e/README.md`); the findings are in
+ * a crashing agent leaves behind, the mouse at the edges. A case that shows a product bug is a
+ * failing test titled `BUG-CANDIDATE/QA-frame-nn: …` (`test/e2e/README.md`); the findings are in
  * `qa/findings/frame.md`.
  */
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -57,7 +57,7 @@ const WANT: Record<string, "clear" | "compact" | "forwarded"> = { "/clear": "cle
 
 describe("interception: a typed command, per harness fake", () => {
   for (const fake of FAKES5)
-    test(`QA-frame/intercept: ${fake}: typed /clear, /new, /compact ask (agy: no /compact); edits, Tab and a menu Enter still ask; a paste never does @full`, async () => {
+    test(`clear-compact/asks: ${fake}: typed /clear, /new, /compact ask (agy: no /compact); edits, Tab and a menu Enter still ask; a paste never does #QA-frame/intercept @full`, async () => {
       const app = await launchAs(fake, { yaml: YAML });
       // 1. each command typed, then Enter.
       for (const cmd of ["/clear", "/new", "/compact"]) {
@@ -122,7 +122,7 @@ describe("interception: a typed command, per harness fake", () => {
 });
 
 describe("interception: edges", () => {
-  test("QA-frame/intercept-64: a command line longer than the interceptor's 64-character memory still asks, from the screen @full", async () => {
+  test("clear-compact/asks: a command line longer than the interceptor's 64-character memory still asks, from the screen #QA-frame/intercept-64 @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     for (const n of [50, 55, 56, 57, 64, 120]) {
       const line = `/compact ${"x".repeat(n)}`;
@@ -140,7 +140,7 @@ describe("interception: edges", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/intercept-kitty: an agent that asked for every key as CSI u (kitty): /clear typed as `CSI 99 u` keys and its Enter as `CSI 13 u` still asks @full", async () => {
+  test("clear-compact/asks: an agent that asked for every key as CSI u (kitty): /clear typed as `CSI 99 u` keys and its Enter as `CSI 13 u` still asks #QA-frame/intercept-kitty @full", async () => {
     const app = await launchAs("claude", { yaml: YAML, env: { FAKE_KITTY: "1" } });
     const csiu = (s: string) => [...s].map((c) => `\x1b[${c.codePointAt(0)}u`).join("");
     for (const cmd of ["/clear", "/compact"]) {
@@ -152,7 +152,7 @@ describe("interception: edges", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/intercept-ime: composed input — a combining accent, a ZWJ emoji, then a typed /clear still asks; the pre-edit text never starts a command @full", async () => {
+  test("clear-compact/asks: composed input — a combining accent, a ZWJ emoji, then a typed /clear still asks; the pre-edit text never starts a command #QA-frame/intercept-ime @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     // An IME commits whole strings in one write.
     app.write("é\u{1F468}‍\u{1F469}‍\u{1F467}");
@@ -186,7 +186,7 @@ async function bigPaste(app: App, text: string, chunk = 16_384) {
 
 describe("pastes", () => {
   // Not on Windows: the fake TUI itself reads at about 1.5 KB/s through a ConPTY (measured without Gluon: 32 KB in 20 s), so 1 MB never ends; real agents are not the fake.
-  test.skipIf(WIN)("QA-frame/paste-1mb-session: a 1 MB paste into a session reaches the agent whole, in order, and Gluon stays responsive @full", async () => {
+  test.skipIf(WIN)("frame/keys-to-agent: a 1 MB paste into a session reaches the agent whole, in order, and Gluon stays responsive #QA-frame/paste-1mb-session @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     const body = Array.from({ length: 20_000 }, (_, i) => `line ${i} ${"x".repeat(40)}`).join("\n").slice(0, 1_000_000);
     const t0 = performance.now();
@@ -222,7 +222,7 @@ describe("pastes", () => {
     expect(app.screen()).not.toMatch(/\[20[01]~/);
   });
 
-  test.skipIf(WIN)("QA-frame/paste-end-marker-injection: text pasted with its own end marker (`ESC [ 201 ~`) ends the paste there; what follows is read as keys (the terminal's to strip, not Gluon's) @full", async () => {
+  test.skipIf(WIN)("frame/keys-to-agent: text pasted with its own end marker (`ESC [ 201 ~`) ends the paste there; what follows is read as keys (the terminal's to strip, not Gluon's) #QA-frame/paste-end-marker-injection @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     await home(app);
     // `A`, then a marker inside the paste, then the home key's bytes and a `B` typed as keys: home is already shown, so the keys type at the composer.
@@ -231,7 +231,7 @@ describe("pastes", () => {
     assertInvariants(app);
   });
 
-  test.skipIf(WIN)("QA-frame/paste-nested-start: a second paste start inside a paste, an unterminated paste, then keys: the user can still get home and quit @full", async () => {
+  test.skipIf(WIN)("frame/keys-to-agent: a second paste start inside a paste, an unterminated paste, then keys: the user can still get home and quit #QA-frame/paste-nested-start @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     app.write("\x1b[200~one\x1b[200~two\x1b[201~");
     await app.settle(300);
@@ -250,7 +250,7 @@ describe("pastes", () => {
 const sizeLine = (app: App) => [...app.screen().matchAll(/SIZE (\d+)x(\d+)/g)].at(-1)?.slice(1).map(Number);
 
 describe("resize", () => {
-  test("QA-frame/resize-storm: 50 resizes in 1 s leave the frame whole, the final size drawn and every agent told the last one @full", async () => {
+  test("frame/resize: 50 resizes in 1 s leave the frame whole, the final size drawn and every agent told the last one #QA-frame/resize-storm @full", async () => {
     const app = await gluon(100, 30, {}, YAML, ["claude", "opencode"]);
     await openSessions(app, ["claude", "opencode"]);
     let seed = 7;
@@ -272,7 +272,7 @@ describe("resize", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/resize-tiny: below 20×6 only `too small` is drawn, at every edge; coming back redraws the frame whole and the agent gets the size @full", async () => {
+  test("frame/too-small: below 20×6 only `too small` is drawn, at every edge; coming back redraws the frame whole and the agent gets the size #QA-frame/resize-tiny @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     for (const [c, r] of [[20, 6], [19, 6], [20, 5], [19, 5], [1, 1], [100, 30], [60, 20]] as const) {
       app.resize(c, r);
@@ -310,7 +310,7 @@ describe("resize", () => {
     assertInvariants(app);
   });
 
-  test("QA-frame/resize-selecting: a resize in the middle of a drag selection at home: no crash, the view whole, the release harmless @full", async () => {
+  test("mouse/drag-copy: a resize in the middle of a drag selection at home: no crash, the view whole, the release harmless #QA-frame/resize-selecting @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     await home(app);
     app.write(mouseReports({ op: "press", button: "left", x: 5, y: 5 })[0]!);
@@ -355,7 +355,7 @@ function expectRestored(app: App) {
 
 describe.skipIf(WIN)("signals and quitting", () => {
   for (const [sig, code] of [["SIGTERM", 143], ["SIGHUP", 129], ["SIGINT", 130]] as const)
-    test(`QA-frame/signal-${sig}-ignoring-agent: ${sig} to Gluon with an agent that ignores SIGTERM: exit ${code} in about the kill grace, the agent SIGKILLed, the terminal restored @full`, async () => {
+    test(`session-end/signals: ${sig} to Gluon with an agent that ignores SIGTERM: exit ${code} in about the kill grace, the agent SIGKILLed, the terminal restored #QA-frame/signal-${sig}-ignoring-agent @full`, async () => {
       const pf = pidFile(sig);
       const app = await launchAs("claude", { yaml: YAML, env: { FAKE_HANG: "ignore-term", FAKE_PID_FILE: pf } });
       const pid = Number(readFileSync(pf, "utf8"));
@@ -370,7 +370,7 @@ describe.skipIf(WIN)("signals and quitting", () => {
     });
 
   // `shutdown` (src/gluon.ts): a second signal while the first waits for the agents (`SIGNAL_GRACE_MS`) goes through `compositor.abort()` before it exits.
-  test("BUG-666/QA-frame-02: a second SIGTERM while the first still waits for an agent that ignores it: the terminal is restored all the same (normal screen, mouse and focus reports off, line mode) @full", async () => {
+  test("session-end/signals: a second SIGTERM while the first still waits for an agent that ignores it: the terminal is restored all the same (normal screen, mouse and focus reports off, line mode) #BUG-666/QA-frame-02 @full", async () => {
     const pf = pidFile("twice");
     const app = await launchAs("claude", { yaml: YAML, env: { FAKE_HANG: "ignore-term", FAKE_PID_FILE: pf } });
     const pid = Number(readFileSync(pf, "utf8"));
@@ -384,7 +384,7 @@ describe.skipIf(WIN)("signals and quitting", () => {
     expectRestored(app);
   });
 
-  test("QA-frame/signal-hup-then-term: SIGHUP then SIGINT (a closing terminal) leaves no agent behind @full", async () => {
+  test("session-end/signals: SIGHUP then SIGINT (a closing terminal) leaves no agent behind #QA-frame/signal-hup-then-term @full", async () => {
     const pf = pidFile("hupint");
     const app = await launchAs("claude", { yaml: YAML, env: { FAKE_HANG: "ignore-term", FAKE_PID_FILE: pf } });
     const pid = Number(readFileSync(pf, "utf8"));
@@ -395,7 +395,7 @@ describe.skipIf(WIN)("signals and quitting", () => {
     expect(await until(() => !alive(pid), 2500)).toBe(true);
   });
 
-  test("QA-frame/quit-ignoring-agent: Ctrl+C twice at home with an agent that ignores SIGTERM, then y: Gluon exits 130 within the grace, the agent gone, the terminal restored @full", async () => {
+  test("home/quit: Ctrl+C twice at home with an agent that ignores SIGTERM, then y: Gluon exits 130 within the grace, the agent gone, the terminal restored #QA-frame/quit-ignoring-agent @full", async () => {
     const pf = pidFile("quit");
     const app = await launchAs("claude", { yaml: YAML, env: { FAKE_HANG: "ignore-term", FAKE_PID_FILE: pf } });
     const pid = Number(readFileSync(pf, "utf8"));
@@ -411,7 +411,7 @@ describe.skipIf(WIN)("signals and quitting", () => {
     expectRestored(app);
   });
 
-  test("QA-frame/ctrl-c-held-at-home: Ctrl+C held down at home (key repeat) toggles the quit question harmlessly: no exit, no key into the composer, and Esc leaves it @full", async () => {
+  test("home/quit: Ctrl+C held down at home (key repeat) toggles the quit question harmlessly: no exit, no key into the composer, and Esc leaves it #QA-frame/ctrl-c-held-at-home @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     await home(app);
     for (let i = 0; i < 9; i++) {
@@ -430,7 +430,7 @@ describe.skipIf(WIN)("signals and quitting", () => {
 
 describe.skipIf(WIN)("a crashing agent leaves the terminal as it found it", () => {
   for (const fake of ["claude", "opencode"] as const)
-    test(`QA-frame/crash-modes-${fake}: the agent turned on mouse, focus and kitty (alt screen too), floods, and is killed with SIGKILL mid-output: home shows, no mode left on the real terminal @full`, async () => {
+    test(`frame/modes: the agent turned on mouse, focus and kitty (alt screen too), floods, and is killed with SIGKILL mid-output: home shows, no mode left on the real terminal #QA-frame/crash-modes-${fake} @full`, async () => {
       const pf = pidFile(`crash-${fake}`);
       const app = await launchAs(fake, { yaml: YAML, env: { FAKE_ALT: "1", FAKE_PID_FILE: pf } });
       const pid = Number(readFileSync(pf, "utf8"));
@@ -470,7 +470,7 @@ function shownTab(app: App): string {
 const bar = (app: App) => app.lines().at(-1) ?? "";
 
 describe("tabs", () => {
-  test("QA-frame/tabs-16: 16 sessions: the strip scrolls (‹n n›), ← and → walk the whole ring through home, a click on a marker reaches the hidden neighbour, home lists them all @full", async () => {
+  test("tabs/strip: 16 sessions: the strip scrolls (‹n n›), ← and → walk the whole ring through home, a click on a marker reaches the hidden neighbour, home lists them all #QA-frame/tabs-16 @full", async () => {
     const app = await gluon(100, 30, {}, YAML, ["claude", "opencode"]);
     await openSessions(app, Array.from({ length: 16 }, (_, i) => (i % 2 ? "opencode" : "claude")));
     expect(shownTab(app)).toContain("-16");
@@ -505,7 +505,7 @@ describe.skipIf(WIN)("the home key's prefix", () => {
   // One prefix key end to end; the others are the same code with another byte (test/pty-keys.test.ts pins each byte).
   for (const key of ["ctrl+\\"] as const) {
     const byte = { "ctrl+\\": KEYS.ctrlBackslash, "ctrl+]": KEYS.ctrlBracket, "ctrl+^": KEYS.ctrlCaret, "ctrl+_": KEYS.ctrlUnderscore }[key];
-    test(`QA-frame/prefix-${key}: the prefix has no timeout (BUG-706); an unknown key after it goes to the agent and never the key itself; twice goes home @full`, async () => {
+    test(`tabs/home-key: the prefix has no timeout (BUG-706); an unknown key after it goes to the agent and never the key itself; twice goes home #QA-frame/prefix-${key} @full`, async () => {
       const app = await launchAs("claude", { yaml: `${YAML}  key: ${key}\n` });
       const m = app.inputLog().length;
       // Prefix, then nothing: it stays (BUG-706, #113); Esc ends it.
@@ -537,7 +537,7 @@ describe.skipIf(WIN)("the home key's prefix", () => {
 
 describe("the mouse", () => {
 
-  test("QA-frame/mouse-alt-agent-with-mouse: an alternate-screen agent that asked for the mouse: a click on the tab strip still switches, a click inside reaches the agent @full", async () => {
+  test("tabs/click: an alternate-screen agent that asked for the mouse: a click on the tab strip still switches, a click inside reaches the agent #QA-frame/mouse-alt-agent-with-mouse @full", async () => {
     const app = await gluon(100, 30, { FAKE_ALT: "1" }, YAML, ["claude", "opencode"]);
     await openSessions(app, ["claude", "opencode"]);
     await app.type("!mouse");
@@ -566,7 +566,7 @@ describe("the mouse", () => {
 });
 
 describe("the matrix's `na` reasons that could be cells after all", () => {
-  test.skipIf(WIN)("QA-frame/na-home-kitty: kitty-protocol keys that reach the home view anyway (a terminal that keeps sending them after the agent's flags were popped) read as the keys they are @full", async () => {
+  test.skipIf(WIN)("frame/key-protocols: kitty-protocol keys that reach the home view anyway (a terminal that keeps sending them after the agent's flags were popped) read as the keys they are #QA-frame/na-home-kitty @full", async () => {
     const app = await gluon(100, 30, {}, YAML);
     await app.press(KEYS.kittyA);
     await app.waitFor(/› a/);
@@ -577,7 +577,7 @@ describe("the matrix's `na` reasons that could be cells after all", () => {
     assertInvariants(app);
   });
 
-  test.skipIf(WIN)("QA-frame/na-tiny-mouse: below 20×6 a mouse-tracking agent gets no mouse report, and the wheel scrolls nothing visible @full", async () => {
+  test.skipIf(WIN)("frame/mouse-to-agent: below 20×6 a mouse-tracking agent gets no mouse report, and the wheel scrolls nothing visible #QA-frame/na-tiny-mouse @full", async () => {
     const app = await launchAs("claude", { yaml: YAML });
     await app.type("!mouse");
     await app.press(KEYS.enter);
@@ -596,7 +596,7 @@ describe("the matrix's `na` reasons that could be cells after all", () => {
     assertInvariants(app);
   });
 
-  test.skipIf(WIN)("QA-frame/na-alt-kitty-enter-menu: an agent that pushed the kitty flags with a slash menu open: `/clear` typed as CSI-u keys and a CSI-u Enter on the menu's highlighted item still asks @full", async () => {
+  test.skipIf(WIN)("clear-compact/asks: an agent that pushed the kitty flags with a slash menu open: `/clear` typed as CSI-u keys and a CSI-u Enter on the menu's highlighted item still asks #QA-frame/na-alt-kitty-enter-menu @full", async () => {
     const app = await launchAs("claude", { yaml: YAML, env: { FAKE_KITTY: "1" } });
     await app.press("\x1b[47u");
     await app.waitFor("/compact");
@@ -610,7 +610,7 @@ describe("small items of issue #35", () => {
 
 describe.skipIf(WIN)("matrix `na`: setup menus are outside the frame, but signals still reach them", () => {
   for (const sig of ["SIGTERM", "SIGHUP"] as const)
-    test(`BUG-667/QA-frame-05: QA-frame/na-menu-signal-${sig}: ${sig} to Gluon while the onboarding checklist is up ends it and leaves the terminal in line mode, cursor shown @full`, async () => {
+    test(`session-end/signals: ${sig} to Gluon while the onboarding checklist is up ends it and leaves the terminal in line mode, cursor shown #BUG-667/QA-frame-05 #QA-frame/na-menu-signal-${sig} @full`, async () => {
       const app = new App({ cwd: repo.tiny(), args: [], env: { GLUON_CONFIG: freshConfig(`qa-menu-${sig}`), ANTHROPIC_API_KEY: undefined }, agents: ["claude"], noDemo: true, rows: 40, cols: 110 });
       await app.waitFor("Connect your coding agents");
       app.mark();
@@ -639,7 +639,7 @@ describe.skipIf(WIN)("an agent that exits at once", () => {
     // The alternate screen, mouse tracking (SGR), focus reports, kitty flags and no bracketed paste cleanup, then a crash.
     ["modes", "\\033[?1049h\\033[?1000h\\033[?1006h\\033[?1004h\\033[>1u\\033[?2004h\\033[?25l half a screen"],
   ] as const)
-    test(`QA-frame/exits-at-once-${tag}: an agent that exits (code 3) before drawing anything: the session closes, home shows with the exit named, the real terminal is left as it was @full`, async () => {
+    test(`session-end/closes: an agent that exits (code 3) before drawing anything: the session closes, home shows with the exit named, the real terminal is left as it was #QA-frame/exits-at-once-${tag} @full`, async () => {
       const app = await gluon(100, 30, { PATH: brokenClaude(tag, body, 3) }, YAML, ["claude"]);
       await toChoice(app, "dead task");
       await app.press(KEYS.enter);

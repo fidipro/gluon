@@ -33,7 +33,7 @@ async function drawn(bytes: string, cols: number): Promise<string> {
 
 describe("the tab strip: many tabs, every width, awkward names", () => {
   for (const [kind, name] of Object.entries(NAMES))
-    test(`QA-frame/strip-${kind}: 1 to 40 tabs at 20 to 200 columns: spans stay inside the row, in order, never overlap; the shown tab is in view; ‹ › name the right neighbours`, () => {
+    test(`tabs/strip: QA-frame/strip-${kind}: 1 to 40 tabs at 20 to 200 columns: spans stay inside the row, in order, never overlap; the shown tab is in view; ‹ › name the right neighbours`, () => {
       for (const n of [1, 2, 5, 9, 10, 15, 16, 40]) {
         const ss = tabs(Array.from({ length: n }, (_, i) => name(i + 1)));
         for (const cols of [20, 21, 30, 40, 60, 80, 100, 137, 200]) {
@@ -57,7 +57,7 @@ describe("the tab strip: many tabs, every width, awkward names", () => {
       }
     });
 
-  test("QA-frame/strip-draw: the strip drawn is exactly `cols` cells wide, a tab's name starts where its span says, no cell of the row is lost to a wide or composed character @full", async () => {
+  test("tabs/strip: QA-frame/strip-draw: the strip drawn is exactly `cols` cells wide, a tab's name starts where its span says, no cell of the row is lost to a wide or composed character @full", async () => {
     // Not `zwj`: a family emoji is one cluster of 2 cells to `sw` but 8 to a terminal without grapheme clustering (xterm's headless one is such);
     // session names are ASCII slugs (`sessionName`), so it never comes up.
     for (const [kind, name] of Object.entries(NAMES).filter(([k]) => k !== "zwj")) {
@@ -76,7 +76,7 @@ describe("the tab strip: many tabs, every width, awkward names", () => {
     }
   });
 
-  test("QA-frame/strip-click: a left press on every cell of row 1 picks what the drawn strip shows there — ◆ gluon, a tab, ‹ ›, or nothing on a gap — for 1 to 16 tabs @full", () => {
+  test("tabs/click: QA-frame/strip-click: a left press on every cell of row 1 picks what the drawn strip shows there — ◆ gluon, a tab, ‹ ›, or nothing on a gap — for 1 to 16 tabs @full", () => {
     const decoder = (x: number) => {
       const d = createKeyDecoder("ctrl+\\");
       return d.feed(`\x1b[<0;${x};1M`)[0]!;
@@ -173,7 +173,7 @@ const CASES: { name: string; harness: Harness; line: string }[] = [
 // `bash -c "sleep …; exec …"` in `slowSession`: no bash on Windows (PATH holds WSL's launcher, not a shell for the fake).
 describe.skipIf(!hasPty || process.platform === "win32")("QA-frame/first-line: the agent's composer is slow, redraws, or the user types first (real PTY, the fake TUIs) @full", () => {
   for (const c of CASES) {
-    test(`${c.name}: a composer that takes 2 s to appear gets the line once, then its Enter apart; no note`, async () => {
+    test(`frame/brief-line: ${c.name}: a composer that takes 2 s to appear gets the line once, then its Enter apart; no note`, async () => {
       const log = join(TMP, `slow-${c.name}.log`);
       const { s, notes } = slowSession({ ...c, delayS: 2, log });
       try {
@@ -188,7 +188,7 @@ describe.skipIf(!hasPty || process.platform === "win32")("QA-frame/first-line: t
       }
     });
 
-    test(`${c.name}: the user types while the agent is still starting: nothing of the line is typed, the user is told it, and it is never retried when the composer shows`, async () => {
+    test(`frame/brief-line: ${c.name}: the user types while the agent is still starting: nothing of the line is typed, the user is told it, and it is never retried when the composer shows`, async () => {
       const log = join(TMP, `user-${c.name}.log`);
       const { s, notes } = slowSession({ ...c, delayS: 2, log });
       try {
@@ -209,7 +209,7 @@ describe.skipIf(!hasPty || process.platform === "win32")("QA-frame/first-line: t
       }
     });
 
-    test(`${c.name}: a resize (the composer redraws) between the text and its Enter: the Enter still comes once, the line is not typed twice`, async () => {
+    test(`frame/brief-line: ${c.name}: a resize (the composer redraws) between the text and its Enter: the Enter still comes once, the line is not typed twice`, async () => {
       const log = join(TMP, `redraw-${c.name}.log`);
       const { s, notes } = slowSession({ ...c, delayS: 1, log, timing: { pauseMs: 800 } });
       try {
@@ -227,7 +227,7 @@ describe.skipIf(!hasPty || process.platform === "win32")("QA-frame/first-line: t
       }
     });
 
-    test(`${c.name}: a composer that never shows within the wait: the user is told the line, and a composer that shows later is left alone`, async () => {
+    test(`frame/brief-line: ${c.name}: a composer that never shows within the wait: the user is told the line, and a composer that shows later is left alone`, async () => {
       const log = join(TMP, `late-${c.name}.log`);
       const { s, notes } = slowSession({ ...c, delayS: 3, log, timing: { waitMs: 800 } });
       try {
@@ -247,7 +247,7 @@ describe("matrix `na`: pixel mouse reports (mode 1016) that no fake asks for", (
   const ev = (x: number, y: number) => ({ code: 0, button: 0, x, y, release: false, motion: false, wheel: null, shift: false, alt: false, ctrl: false, encoding: "sgr" as const });
   const interior = { top: 3, left: 1, cols: 98, rows: 24 };
 
-  test("QA-frame/pixels-control: in cells (SGR) a click in the middle of the interior reaches the agent, moved by the frame's offset", () => {
+  test("frame/mouse-to-agent: QA-frame/pixels-control: in cells (SGR) a click in the middle of the interior reaches the agent, moved by the frame's offset", () => {
     expect(shiftMouse(ev(50, 15), interior, "sgr", false)).toBe("\x1b[<0;49;12M");
   });
 

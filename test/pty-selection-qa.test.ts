@@ -80,7 +80,7 @@ describe("QA: the home selection on fake streams", () => {
 
   const drag = (x1: number, y1: number, x2: number, y2: number) => `\x1b[<0;${x1};${y1}M\x1b[<32;${x2};${y2}M\x1b[<0;${x2};${y2}m`;
 
-  test("BUG-286/last row: the text the model has on the last row is what the terminal shows (an expired toast must not be copied or painted back)", async () => {
+  test("mouse/drag-copy: the text the model has on the last row is what the terminal shows (an expired toast must not be copied or painted back) #BUG-286", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -99,7 +99,7 @@ describe("QA: the home selection on fake streams", () => {
     expect((await out.lines())[29]!.trim()).toBe("");
   });
 
-  test("BUG-286/toast colours: the toast's text cells sit on the ground like the rest of the last row", async () => {
+  test("mouse/drag-copy: the toast's text cells sit on the ground like the rest of the last row #BUG-286", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -111,7 +111,7 @@ describe("QA: the home selection on fake streams", () => {
     expect([row[1]!.bgMode, row[1]!.bg]).toEqual([row[60]!.bgMode, row[60]!.bg]);
   });
 
-  test("BUG-286/frame in the same turn: a drag handled before the model parsed the frame Ink just wrote copies and paints the old text", async () => {
+  test("mouse/drag-copy: a drag handled before the model parsed the frame Ink just wrote copies and paints the old text #BUG-286", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -123,7 +123,7 @@ describe("QA: the home selection on fake streams", () => {
     expect((await out.lines())[0]).toStartWith("HELLO world");
   });
 
-  test("BUG-286/mid-drag change: text changing under a drag in progress (a spinner) must not end the drag; the release still copies", async () => {
+  test("mouse/drag-copy: text changing under a drag in progress (a spinner) must not end the drag; the release still copies #BUG-286", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -137,7 +137,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(got[0]).toContain("second LINE");
   });
 
-  test("BUG-286/release without motion: a press released on another cell is a drag, not a click on the press's cell (a terminal that coalesces or never sends motion)", async () => {
+  test("mouse/drag-copy: a press released on another cell is a drag, not a click on the press's cell (a terminal that coalesces or never sends motion) #BUG-286", async () => {
     const { home, c } = await setup();
     home.write(frame);
     await tick();
@@ -145,7 +145,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(home.mice).toEqual([]);
   });
 
-  test("BUG-286/release cell: the selection ends where the button was released, not at the last motion report", async () => {
+  test("mouse/drag-copy: the selection ends where the button was released, not at the last motion report #BUG-286", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -154,14 +154,14 @@ describe("QA: the home selection on fake streams", () => {
     expect(copied(out.raw.slice(mark))).toEqual(["hello wo"]);
   });
 
-  test("BUG-286/chat gutter: copyText: a chat row's gutter, glyph and the page's padding are left out of a whole-row copy (the home view pads 2 columns each side)", async () => {
+  test("mouse/drag-copy: copyText: a chat row's gutter, glyph and the page's padding are left out of a whole-row copy (the home view pads 2 columns each side) #BUG-286", async () => {
     const s = createScreen(100, 4);
     await s.write("\x1b[1;1H   ◆  A focused change with a clear test path; Sonnet at medium effort is the cheapest reliable\x1b[2;1H      fit. I'd start it with:\x1b[3;1H   ›  fix the add bug");
     const text = copyText(spans(s, { anchor: { x: 0, y: 0 }, head: { x: 99, y: 2 } }));
     expect(text).toBe("A focused change with a clear test path; Sonnet at medium effort is the cheapest reliable\nfit. I'd start it with:\nfix the add bug");
   });
 
-  test("BUG-286/osc52: whatever the text holds (BEL, ESC, ST, newlines, wide chars) the sequence has one terminator and a base64 body", () => {
+  test("mouse/drag-copy: whatever the text holds (BEL, ESC, ST, newlines, wide chars) the sequence has one terminator and a base64 body #BUG-286/osc52", () => {
     for (const text of ["a\x07b", "x\x1b\\y", "\x1b]52;c;?\x07", "日本語 😀\né", ""]) {
       const seq = osc52(text);
       expect(seq).toMatch(/^\x1b\]52;c;[A-Za-z0-9+/]*={0,2}\x07$/);
@@ -169,7 +169,7 @@ describe("QA: the home selection on fake streams", () => {
     }
   });
 
-  test("BUG-286/buttons: a right or middle drag selects nothing, paints nothing and copies nothing", async () => {
+  test("mouse/drag-copy: a right or middle drag selects nothing, paints nothing and copies nothing #BUG-286/buttons", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -179,7 +179,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(out.raw.slice(mark)).not.toContain(";7m");
   });
 
-  test("BUG-286/bounds: a drag far past the window's edge is held at the last cell; a drag backwards and up selects the same cells", async () => {
+  test("mouse/drag-copy: a drag far past the window's edge is held at the last cell; a drag backwards and up selects the same cells #BUG-286/bounds", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -191,7 +191,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(copied(out.raw.slice(mark))).toEqual(["world\nsecond line\nthird"]);
   });
 
-  test("BUG-286/split reads: a report split anywhere across reads selects as a whole one", async () => {
+  test("mouse/drag-copy: a report split anywhere across reads selects as a whole one #BUG-286", async () => {
     const { out, home, stdin } = await setup();
     home.write(frame);
     await tick();
@@ -205,7 +205,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(home.mice).toEqual([]);
   });
 
-  test("BUG-286/wide: a selection over wide, combining and coloured text paints and unpaints exactly the cells that were there", async () => {
+  test("mouse/drag-copy: a selection over wide, combining and coloured text paints and unpaints exactly the cells that were there #BUG-286/wide", async () => {
     const { out, home, c } = await setup();
     home.write("\x1b[1;1H\x1b[1;32mab日本語 \x1b[0m😀\x1b[44m x \x1b[0me\u0301 end\x1b[2;1Hsecond");
     await tick();
@@ -227,7 +227,7 @@ describe("QA: the home selection on fake streams", () => {
     }
   });
 
-  test("BUG-286/clicks: two quick clicks reach the home view as two presses, each on its own cell and in order, at their releases", async () => {
+  test("mouse/click-row: two quick clicks reach the home view as two presses, each on its own cell and in order, at their releases #BUG-286/clicks", async () => {
     const { home, c } = await setup();
     c.dispatch(keys("\x1b[<0;12;9M"));
     expect(home.mice).toEqual([]);
@@ -235,7 +235,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(home.mice.map((m) => [m.x, m.y, m.release])).toEqual([[12, 9, false], [12, 9, false]]);
   });
 
-  test("BUG-286/toast: it clears by itself and never clobbers a question that came meanwhile", async () => {
+  test("mouse/drag-copy: the toast clears by itself and never clobbers a question that came meanwhile #BUG-286/toast", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -250,7 +250,7 @@ describe("QA: the home selection on fake streams", () => {
     expect((await out.lines())[29]!.trim()).toBe("");
   });
 
-  test("BUG-286/stop: nothing is written after stop() with a selection and a toast pending", async () => {
+  test("mouse/drag-copy: nothing is written after stop() with a selection and a toast pending #BUG-286/stop", async () => {
     const { out, home, c } = await setup();
     home.write(frame);
     await tick();
@@ -262,7 +262,7 @@ describe("QA: the home selection on fake streams", () => {
     expect(out.raw.length).toBe(n);
   });
 
-  test("BUG-286/session: an agent that tracks the mouse still gets a drag moved into its frame; the home view gets none of it", async () => {
+  test("mouse/drag-copy: an agent that tracks the mouse still gets a drag moved into its frame; the home view gets none of it #BUG-286/session", async () => {
     const { out, home, c, store } = await setup();
     const screen = createScreen(98, 25, { scrollback: 200 });
     await screen.write("\x1b[?1002h\x1b[?1006h");

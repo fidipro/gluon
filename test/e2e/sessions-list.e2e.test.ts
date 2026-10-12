@@ -167,7 +167,7 @@ describe("the rows", () => {
     expect(app.lines().at(-2)).toMatch(/^ {3}› describe another session/);
   });
 
-  test("home/header-counts: the header counts the sessions by state — `no sessions yet` before the first, `1 awaiting input · 1 working · 1 drafting` with a chat drafted — and once every session ended and the chat is discarded, `no sessions running` @full", async () => {
+  test("home/header-counts: the header counts the sessions by state — `no sessions yet` before the first, `1 awaiting input · 1 working · 1 drafting` with a chat drafted — and once every session ended and the chat is discarded, `no sessions running` #BUG-222 @full", async () => {
     const app = await gluon(100, 30);
     expect(counts(app.screen())).toContain("no sessions yet");
     await awaiting(app, "alpha task");
@@ -267,7 +267,7 @@ describe("moving over the list", () => {
     expect(HOME_VIEW.test(app.screen())).toBe(true);
   });
 
-  test("sessions-list/selection-after-remove: after a row goes the next row is selected — the next in its group, the next group's after its group's last, the previous one after the list's last row — never the first @full", async () => {
+  test("sessions-list/selection-after-remove: after a row goes the next row is selected — the next in its group, the next group's after its group's last, the previous one after the list's last row — never the first #BUG-220 @full", async () => {
     const app = await gluon(100, 34);
     for (const t of ["alpha task", "bravo task", "charlie task"]) await awaiting(app, t);
     await draft(app, "delta thing");

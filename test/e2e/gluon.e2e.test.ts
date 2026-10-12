@@ -68,7 +68,7 @@ async function home(app: App) {
 const sizes = (app: App) => [...app.screen().matchAll(/SIZE (\d+)x(\d+)/g)].map((m) => `${m[1]}x${m[2]}`);
 
 describe("Gluon: a session in the frame", () => {
-  test("GLUON-1: a launch opens the frame — tab strip, info line, the triple in the border; the PTY is the interior; keys reach the agent @full", async () => {
+  test("frame/layout: a launch opens the frame — tab strip, info line, the triple in the border; the PTY is the interior; keys reach the agent #GLUON-1 @full", async () => {
     const app = await gluon();
     await launch(app, "alpha task");
     const lines = app.lines();
@@ -88,7 +88,7 @@ describe("Gluon: a session in the frame", () => {
     expect(app.lines().find((l) => l.includes("GOT <hello>"))).toMatch(/^│GOT <hello> +│$/);
   });
 
-  test.skipIf(WIN)("GLUON-2: emoji and CJK are drawn in the interior without moving the border @full", async () => {
+  test.skipIf(WIN)("frame/agent-screen: emoji and CJK are drawn in the interior without moving the border #GLUON-2 @full", async () => {
     const app = await gluon();
     await launch(app, "wide task");
     await say(app, "!wide", "WIDE");
@@ -105,7 +105,7 @@ describe("Gluon: a session in the frame", () => {
     expect(line.getCell(99)!.getChars()).toBe("│");
   });
 
-  test("GLUON-3: the home key shows home while the agent keeps running; reopening shows what it printed meanwhile @full", async () => {
+  test("frame/agent-screen: the home key shows home while the agent keeps running; reopening shows what it printed meanwhile #GLUON-3 @full", async () => {
     const app = await gluon();
     await launch(app, "tick task");
     await say(app, "!tick", "TICK 1");
@@ -119,7 +119,7 @@ describe("Gluon: a session in the frame", () => {
     expect(ticks()).toBeGreaterThanOrEqual(5);
   });
 
-  test("GLUON-4: the screen model answers the agent's queries (DA1), and only the agent sees the answer @full", async () => {
+  test("frame/terminal-queries: the screen model answers the agent's queries (DA1), and only the agent sees the answer #GLUON-4 @full", async () => {
     const app = await gluon();
     await launch(app, "query task");
     app.mark();
@@ -128,7 +128,7 @@ describe("Gluon: a session in the frame", () => {
     if (!WIN) expect(app.since()).not.toContain("\x1b[c");
   });
 
-  test("BUG-201/GLUON-5: keys typed right after the yes to “/clear ends this session in Gluon — end it?” go to the sessions home's composer, also in the same read as the Enter @full", async () => {
+  test("clear-compact/answer: keys typed right after the yes to “/clear ends this session in Gluon — end it?” go to the sessions home's composer, also in the same read as the Enter #BUG-201/GLUON-5 @full", async () => {
     // The agent takes its time over /clear: the session would still be up meanwhile.
     const app = await gluon({ FAKE_CLEAR_DELAY_MS: "3000" });
     for (const [task, keys] of [["first task", ["\rhello"]], ["second task", ["\r", "world"]]] as const) {
@@ -144,7 +144,7 @@ describe("Gluon: a session in the frame", () => {
     }
   });
 
-  test("BUG-192/GLUON-6: an agent that exits closes its session: the sessions home shows, its row gone, the other sessions kept; the chat says how it ended @full", async () => {
+  test("session-end/closes: an agent that exits closes its session: the sessions home shows, its row gone, the other sessions kept; the chat says how it ended #BUG-192/GLUON-6 @full", async () => {
     const app = await gluon({ FAKE_EXIT: "7" });
     await launch(app, "stay task");
     await home(app);
@@ -161,7 +161,7 @@ describe("Gluon: a session in the frame", () => {
     expect(app.screen()).not.toContain("exit-task");
   });
 
-  test("GLUON-7: `back` from inside the agent shows home; the agent keeps running @full", async () => {
+  test("tabs/back-event: `back` from inside the agent shows home; the agent keeps running #GLUON-7 @full", async () => {
     const app = await gluon();
     await launch(app, "back task");
     await app.type("!event back");
@@ -295,7 +295,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     }
   });
 
-  test("GLUON-19: on_exit: quit — Gluon exits with the agent's code when it was the last session @full", async () => {
+  test("session-end/on-exit-quit: on_exit: quit — Gluon exits with the agent's code when it was the last session #GLUON-19 @full", async () => {
     const app = await gluon({ FAKE_EXIT: "5" }, {}, "handoff:\n  on_exit: quit\n");
     await launch(app, "last task");
     await app.type("/exit");
@@ -305,7 +305,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
 });
 
 describe("Gluon: several sessions", () => {
-  test("GLUON-9: three sessions — → / ← on an untouched line move between the tabs (wrapping through home, BUG-210); a resize reaches every session's PTY @full", async () => {
+  test("tabs/arrows: three sessions — → / ← on an untouched line move between the tabs (wrapping through home, BUG-210); a resize reaches every session's PTY #GLUON-9 @full", async () => {
     const app = await gluon();
     for (const name of ["one", "two", "three"]) {
       await launch(app, `${name} task`);
@@ -373,7 +373,7 @@ describe("Gluon: several sessions", () => {
 });
 
 describe.skipIf(WIN)("Gluon: the mouse", () => {
-  test("GLUON-11: with no mouse tracking in the agent, Gluon reports the wheel and scrolls the frame back; Esc returns @full", async () => {
+  test("frame/scrollback: with no mouse tracking in the agent, Gluon reports the wheel and scrolls the frame back; Esc returns #GLUON-11 @full", async () => {
     const app = await gluon();
     await launch(app, "scroll task");
     // Gluon asks the real terminal for the wheel (SGR reports) while the agent hasn't (at home already: BUG-269).
@@ -390,7 +390,7 @@ describe.skipIf(WIN)("Gluon: the mouse", () => {
     expect(app.screen()).toContain("LINE 60");
   });
 
-  test("BUG-196/GLUON: a click on a tab shows that session, on ◆ gluon the home view — with the strip scrolled (‹ ›) and no mouse asked for @full", async () => {
+  test("tabs/click: a click on a tab shows that session, on ◆ gluon the home view — with the strip scrolled (‹ ›) and no mouse asked for #BUG-196/GLUON @full", async () => {
     // 70 columns: two of the three tabs (`Gluon-…-long-task`) fit beside `◆ gluon`.
     const app = await gluon({}, { cols: 70, rows: 30 });
     for (const name of ["first", "second", "third"]) {
@@ -447,7 +447,7 @@ describe("Gluon: quitting", () => {
     if (!WIN) expect(app.since()).toContain("\x1b[?25h");
   });
 
-  test.skipIf(WIN)("GLUON-14: SIGTERM ends every agent, restores the terminal and exits 143 @full", async () => {
+  test.skipIf(WIN)("session-end/signals: SIGTERM ends every agent, restores the terminal and exits 143 #GLUON-14 @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-14`);
     rmSync(pidFile, { force: true });
     const app = await gluon({ FAKE_PID_FILE: pidFile });
@@ -482,7 +482,7 @@ describe("Gluon: quitting", () => {
 
 describe("Gluon: QA findings", () => {
 
-  test("BUG-262/GLUON-44: an agent that exits while its “End …?” question is up at home takes the question with it — the bar and its hint go with the row, and keys reach the home view again @full", async () => {
+  test("session-end/closes: an agent that exits while its “End …?” question is up at home takes the question with it — the bar and its hint go with the row, and keys reach the home view again #BUG-262/GLUON-44 @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-262`);
     rmSync(pidFile, { force: true });
     const app = await gluon({ FAKE_PID_FILE: pidFile });
@@ -500,7 +500,7 @@ describe("Gluon: QA findings", () => {
     await app.waitFor("› abc");
   });
 
-  test("sessions-list/remove: Delete on a live row asks “End Gluon-turn-task?”; Esc keeps it, y and n do nothing, Enter ends the agent (SIGTERM) and its row goes #BUG-164/GLUON-yes #BUG-213/GLUON @full", async () => {
+  test("sessions-list/remove: Delete on a live row asks “End Gluon-turn-task?”; Esc keeps it, y and n do nothing, Enter ends the agent (SIGTERM) and its row goes #BUG-164/GLUON-yes #BUG-213/GLUON #BUG-213/question @full", async () => {
     const pidFile = join(tmpdir(), `gluon-pid-${process.pid}-164y`);
     rmSync(pidFile, { force: true });
     const app = await gluon({ FAKE_PID_FILE: pidFile });
@@ -605,7 +605,7 @@ describe("Gluon: QA findings", () => {
     expect(app.screen()).not.toContain("Starting");
   });
 
-  test("BUG-183/awaiting: a row waiting on Gluon's own question shows that question as its activity @full", async () => {
+  test("sessions-list/row-live: a row waiting on Gluon's own question shows that question as its activity #BUG-183/awaiting @full", async () => {
     const app = await gluon();
     await launch(app, "ask task");
     await app.type("/clear");
@@ -724,7 +724,7 @@ describe("Gluon: zoom", () => {
     expect(app.lines().at(-1)).toMatch(/^ ctrl\+\\ sessions/);
   }
 
-  test("BUG-284/zoom: on 80×24 the PTY is 78×18 framed, 80×23 zoomed (Claude Code's plan dialog: 0 plan lines framed, 2 zoomed); the last row stays Gluon's; z again brings the frame back @full", async () => {
+  test("frame/zoom: on 80×24 the PTY is 78×18 framed, 80×23 zoomed (Claude Code's plan dialog: 0 plan lines framed, 2 zoomed); the last row stays Gluon's; z again brings the frame back @full", async () => {
     await zoomsAt(80, 24);
   });
 

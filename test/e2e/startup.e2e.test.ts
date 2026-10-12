@@ -1,6 +1,9 @@
 /** A. Startup and environment: header, repo kinds, terminal, theme, the terminal probe. */
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { freshConfig, repo, WIN } from "./fixtures.ts";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { cleanDir, freshConfig, repo, WIN } from "./fixtures.ts";
 import { App, cli, KEY, SLOW, start, stopAll, toLaunch, toProposal } from "./harness.ts";
 
 setDefaultTimeout(30_000 * SLOW);
@@ -25,6 +28,18 @@ describe("header", () => {
     const where = lines.find((l) => l.includes("tiny · main"))!;
     for (const l of lines) expect(Bun.stringWidth(l)).toBeLessThanOrEqual(cols);
     expect(where.indexOf("tiny")).toBe(title.indexOf("Gluon"));
+  });
+
+  test("home/header: the repo is named owner/name from its remote, never its host or the credentials in its URL", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gluon-remote-"));
+    for (const args of [["init", "-q"], ["remote", "add", "origin", "https://user:ghp_secret0123@github.example/acme/widget.git"]]) expect(Bun.spawnSync(["git", ...args], { cwd: dir }).exitCode).toBe(0);
+    try {
+      const app = await start({ cwd: dir });
+      await app.waitFor(/──⢎──● +acme\/widget · /);
+      expect(app.screen()).not.toMatch(/ghp_secret|github\.example|user:/);
+    } finally {
+      cleanDir(dir);
+    }
   });
 
   test("home/header: a repo with no commits still shows its branch #BUG-35", async () => {
