@@ -79,7 +79,7 @@ const SYNTHETIC: Record<string, string> = {
 const HEAVY_MS = 30_000;
 
 describe("painter: the frame's interior shows the screen model cell for cell", () => {
-  test("every captured harness screen, painted at an offset, over a border pattern @full", async () => {
+  test("frame/agent-screen: every captured harness screen, painted at an offset, over a border pattern @full", async () => {
     const fixtures = loadFixtures();
     expect(fixtures.length).toBeGreaterThanOrEqual(4);
     for (const f of fixtures)
@@ -93,7 +93,7 @@ describe("painter: the frame's interior shows the screen model cell for cell", (
       }
   }, HEAVY_MS);
 
-  test("emoji, CJK, combining marks, colours and every attribute", async () => {
+  test("frame/agent-screen: emoji, CJK, combining marks, colours and every attribute", async () => {
     for (const [name, ansi] of Object.entries(SYNTHETIC)) {
       const src = createScreen(12, 5);
       await src.write(ansi);
@@ -103,7 +103,7 @@ describe("painter: the frame's interior shows the screen model cell for cell", (
     }
   });
 
-  test("a screen wider and taller than the rectangle is clipped; a cut wide character is a space", async () => {
+  test("frame/agent-screen: a screen wider and taller than the rectangle is clipped; a cut wide character is a space", async () => {
     const src = createScreen(20, 8);
     await src.write("abcdefghi中jklmnopqr\r\n\x1b[41m" + "x".repeat(20) + "\x1b[0m\r\nrow 3\r\n\r\n\r\n\r\n\r\nlast row");
     const w = 10;
@@ -119,7 +119,7 @@ describe("painter: the frame's interior shows the screen model cell for cell", (
     for (const s of [outer, pristine, src]) s.dispose();
   });
 
-  test("a screen smaller than the rectangle leaves blanks, not the old pattern", async () => {
+  test("frame/agent-screen: a screen smaller than the rectangle leaves blanks, not the old pattern", async () => {
     const src = createScreen(6, 2);
     await src.write("hi\r\nyo");
     const w = 9;
@@ -134,7 +134,7 @@ describe("painter: the frame's interior shows the screen model cell for cell", (
 });
 
 describe("painter: damage", () => {
-  test("a later paint writes only the rows that changed; no change writes nothing", async () => {
+  test("frame/agent-screen: a later paint writes only the rows that changed; no change writes nothing", async () => {
     const src = createScreen(16, 6);
     await src.write("one\r\ntwo\r\nthree 中\r\nfour\r\nfive\x1b[1;1H");
     const { outer, painter, bytes } = await roundTrip(src, "first");
@@ -159,7 +159,7 @@ describe("painter: damage", () => {
     src.dispose();
   });
 
-  test("invalidate and force repaint every row; resize moves the rectangle", async () => {
+  test("frame/agent-screen: invalidate and force repaint every row; resize moves the rectangle", async () => {
     const src = createScreen(8, 3);
     await src.write("a\r\nb\r\nc");
     const painter = createPainter({ top: TOP, left: LEFT, cols: 8, rows: 3 });
@@ -178,7 +178,7 @@ describe("painter: damage", () => {
   // The painter moves the cursor after a wide character so a terminal that draws it narrower
   // can't shift the rest of the row; but the cell it skips keeps whatever the terminal had there.
   // Seen with a ZWJ family emoji in a session: `GOT <👨‍x👩‍c👧m …>` (the old row's letters).
-  test("BUG-166/E: a terminal that draws a wide character narrower shows no stale cell after it", async () => {
+  test("frame/agent-screen: a terminal that draws a wide character narrower shows no stale cell after it #BUG-166/E", async () => {
     const src = createScreen(12, 1);
     const painter = createPainter({ top: 0, left: 0, cols: 12, rows: 1 });
     // Unicode 6 widths (no unicode11 addon): this terminal draws 🙂 in one cell.
@@ -193,7 +193,7 @@ describe("painter: damage", () => {
     src.dispose();
   });
 
-  test("the cursor goes to the harness's cursor plus the offset", async () => {
+  test("frame/agent-screen: the cursor goes to the harness's cursor plus the offset", async () => {
     const src = createScreen(10, 4);
     await src.write("x\x1b[3;7H");
     const out = createPainter({ top: TOP, left: LEFT, cols: 10, rows: 4 }).paint(src);
@@ -203,7 +203,7 @@ describe("painter: damage", () => {
 });
 
 describe("painter: scrolled back", () => {
-  test("shows history rows, hides the cursor, and comes back to the live screen", async () => {
+  test("frame/scrollback: shows history rows, hides the cursor, and comes back to the live screen", async () => {
     const src = createScreen(10, 4, { scrollback: 100 });
     await src.write(Array.from({ length: 20 }, (_, i) => `\x1b[3${i % 8}mL${i}`).join("\r\n"));
     expect(src.scrollbackLength()).toBe(16);
@@ -224,7 +224,7 @@ describe("painter: scrolled back", () => {
 });
 
 describe("painter: synchronized output", () => {
-  test("syncPending follows the session's ?2026", async () => {
+  test("frame/agent-screen: syncPending follows the session's ?2026", async () => {
     const src = createScreen(10, 2);
     expect(syncPending(src)).toBe(false);
     await src.write("\x1b[?2026h");

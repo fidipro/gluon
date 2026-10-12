@@ -117,7 +117,7 @@ describe.concurrent("what reaches the agent's PTY", () => {
     expect(new Set(kinds)).toEqual(new Set(['"user"', '"reply"', '"mouse"', '"launch"']));
   });
 
-  test("nothing is written after the agent exits; keys are dropped", async () => {
+  test("session-end/agent-ends: nothing is written after the agent exits; keys are dropped", async () => {
     const { s, pty } = session();
     pty.exit(0);
     await s.exited;
@@ -149,7 +149,7 @@ describe.concurrent("the launch's first line", () => {
     return { ...r, notes, at };
   };
 
-  test("types the text, then after a pause its Enter, once: not before the composer and bracketed paste, then the Plan mode check passes", async () => {
+  test("frame/brief-line: types the text, then after a pause its Enter, once: not before the composer and bracketed paste, then the Plan mode check passes", async () => {
     const { s, pty, sent, notes, at } = codex();
     // Nothing yet: no screen, then a composer without bracketed paste (the TUI isn't set up).
     await settle(100);
@@ -174,7 +174,7 @@ describe.concurrent("the launch's first line", () => {
     s.dispose();
   });
 
-  test("a user's key before the composer: nothing is typed; the user is told the line", async () => {
+  test("frame/brief-line: a user's key before the composer: nothing is typed; the user is told the line", async () => {
     const { s, pty, notes } = codex();
     pty.print(ON);
     for (const k of keys("h")) s.input(k);
@@ -191,7 +191,7 @@ describe.concurrent("the launch's first line", () => {
     s.dispose();
   });
 
-  test("BUG-705/issue-111: `awaitsChoice` is true on each captured Codex dialog (folder trust, hooks review, approval) and false on the idle composer: the compositor reads it per key", async () => {
+  test("session-state/own-dialog: `awaitsChoice` is true on each captured Codex dialog (folder trust, hooks review, approval) and false on the idle composer: the compositor reads it per key #BUG-705/issue-111", async () => {
     const f = fixture("codex");
     for (const name of ["frame-folder-trust", "frame-hook-review", "frame-approve-command"]) {
       const st = state(f, name);
@@ -206,7 +206,7 @@ describe.concurrent("the launch's first line", () => {
     }
   });
 
-  test("a mouse report counts as the user's; an answer to the agent's own dialog (folder trust) does not", async () => {
+  test("frame/brief-line: a mouse report counts as the user's; an answer to the agent's own dialog (folder trust) does not", async () => {
     const f = fixture("codex");
     const trust = state(f, "frame-folder-trust");
     const size = sizeOf(f, trust);
@@ -229,7 +229,7 @@ describe.concurrent("the launch's first line", () => {
     mouse.s.dispose();
   });
 
-  test("a user's key after the text, before its Enter: no Enter; told to clear the line first", async () => {
+  test("frame/brief-line: a user's key after the text, before its Enter: no Enter; told to clear the line first", async () => {
     const { s, pty, notes } = codex({ firstLineTiming: { ...FAST, pauseMs: 150 } });
     pty.print(ON + composer());
     await until(() => pty.writes.length === 1);
@@ -242,7 +242,7 @@ describe.concurrent("the launch's first line", () => {
     s.dispose();
   });
 
-  test("BUG-408/launch-modes: a line the composer word-wraps over two rows (the space at the break dropped) has landed: its Enter is sent", async () => {
+  test("frame/brief-line: a line the composer word-wraps over two rows (the space at the break dropped) has landed: its Enter is sent #BUG-408/launch-modes", async () => {
     const { s, pty, notes } = codex();
     pty.print(ON + composer());
     await until(() => pty.writes.length === 1);
@@ -256,7 +256,7 @@ describe.concurrent("the launch's first line", () => {
     s.dispose();
   });
 
-  test("the text never shows on the composer: no Enter, the line is given", async () => {
+  test("frame/brief-line: the text never shows on the composer: no Enter, the line is given", async () => {
     const { s, pty, notes } = codex();
     pty.print(ON + composer());
     await until(() => notes.length === 1);
@@ -268,7 +268,7 @@ describe.concurrent("the launch's first line", () => {
     s.dispose();
   });
 
-  test("no composer within the wait (a dialog of the agent's own stays up): nothing is typed, the line is given", async () => {
+  test("frame/brief-line: no composer within the wait (a dialog of the agent's own stays up): nothing is typed, the line is given", async () => {
     const f = fixture("codex");
     const trust = state(f, "frame-folder-trust");
     const { s, pty, notes } = codex({ ...sizeOf(f, trust) });
@@ -285,7 +285,7 @@ describe.concurrent("the launch's first line", () => {
   // rows are not (hidden under the note), and the highlighted row is drawn inverse like the other dialogs'. The capture shows no
   // composer, yet the live run typed the line: the sequence that did is not captured, so these cases give the gate the dialog
   // together with an empty composer (a screen the reader would call ready) and the dialog arriving after the text.
-  describe("BUG-670/F05: Codex's update dialog", () => {
+  describe("Codex's update dialog", () => {
     const SIZE = { cols: 100, rows: 24 };
     const DIALOG =
       "\x1b[2;3H\x1b[2K\x1b[1m\u2728 Update available!\x1b[0m 0.160.0 -> 0.160.1" +
@@ -295,7 +295,7 @@ describe.concurrent("the launch's first line", () => {
     /** Codex's composer on row 12, under the dialog's rows. */
     const lower = (text = "") => `\x1b[12;1H\x1b[2K\x1b[1m\u203a \x1b[0m${text || "\x1b[2mAsk Codex to do anything\x1b[0m\x1b[12;3H"}\x1b[12;${3 + text.length}H`;
 
-    test("the line is not typed while the dialog is up, even with an empty composer on screen; it is, once the dialog is gone", async () => {
+    test("frame/brief-line: the line is not typed while the dialog is up, even with an empty composer on screen; it is, once the dialog is gone #BUG-670/F05", async () => {
       const { s, pty, notes } = codex({ ...SIZE });
       pty.print(ON + DIALOG + lower());
       await settle(250 * SLOW);
@@ -309,7 +309,7 @@ describe.concurrent("the launch's first line", () => {
       s.dispose();
     });
 
-    test("a dialog that stays up past the wait: nothing is typed, and the user is told the line and why", async () => {
+    test("frame/brief-line: a dialog that stays up past the wait: nothing is typed, and the user is told the line and why #BUG-670/F05", async () => {
       const { s, pty, notes } = codex({ ...SIZE });
       pty.print(ON + DIALOG + lower());
       await until(() => notes.length === 1);
@@ -319,7 +319,7 @@ describe.concurrent("the launch's first line", () => {
       s.dispose();
     });
 
-    test("a dialog that opens after the text went in: the Enter is never sent (it would pick \"Update now\")", async () => {
+    test("frame/brief-line: a dialog that opens after the text went in: the Enter is never sent (it would pick \"Update now\") #BUG-670/F05", async () => {
       const { s, pty, notes } = codex({ ...SIZE });
       pty.print(ON + composer());
       await until(() => pty.writes.length === 1);
@@ -333,7 +333,7 @@ describe.concurrent("the launch's first line", () => {
     });
   });
 
-  test("Plan mode not shown after the Enter: the user is told", async () => {
+  test("frame/brief-line: Plan mode not shown after the Enter: the user is told", async () => {
     const { s, pty, notes } = codex();
     pty.print(ON + composer());
     await until(() => pty.writes.length === 1);
@@ -345,7 +345,7 @@ describe.concurrent("the launch's first line", () => {
     s.dispose();
   });
 
-  test("a session with no first line types nothing, and one that ends before its composer says nothing", async () => {
+  test("frame/brief-line: a session with no first line types nothing, and one that ends before its composer says nothing", async () => {
     const plain = session({ harness: "codex" });
     plain.pty.print(ON + composer());
     await settle(100);
@@ -363,7 +363,7 @@ describe.concurrent("the launch's first line", () => {
 // Grok Build's `/plan …` the same way (`--permission-mode plan` does nothing in its TUI). Its screens are the captured ones
 // (`grok-build/1.0.46.json`, 120x40): the start screen's big box is no composer (and the cursor, hidden while it draws, says
 // nothing), the box under it is; the text typed in one burst lands, and the mode shows as ` · plan` in the box's border.
-describe.concurrent("BUG-411/launch-modes: the launch's first line: Grok Build", () => {
+describe.concurrent("the launch's first line: Grok Build", () => {
   const LINE = "/plan Read the session brief in /tmp/x/session.md and start.";
   // The deadlines the test's own steps have to meet scale with the machine (63 tests run at once; timers tick every 15 ms on Windows); the pause stays.
   const FAST = { waitMs: 400 * SLOW, pauseMs: 60, landMs: 300 * SLOW, planMs: 300 * SLOW };
@@ -381,7 +381,7 @@ describe.concurrent("BUG-411/launch-modes: the launch's first line: Grok Build",
     return "\x1b[?25l" + idle.rows.slice(0, 20).map((r, y) => `\x1b[${y + 1};1H${r.text}`).join("") + "\x1b[8;40H";
   };
 
-  test("types the line once the composer's box is drawn (not at the start screen), then its Enter after the pause; plan mode shows: no note", async () => {
+  test("frame/brief-line: types the line once the composer's box is drawn (not at the start screen), then its Enter after the pause; plan mode shows: no note #BUG-411/launch-modes", async () => {
     const { s, pty, notes } = grok();
     pty.print(ON + drawing());
     await settle(150);
@@ -399,7 +399,7 @@ describe.concurrent("BUG-411/launch-modes: the launch's first line: Grok Build",
     s.dispose();
   });
 
-  test("the text never shows in the box, or plan mode never shows: the user is told, naming Grok Build and the line", async () => {
+  test("frame/brief-line: the text never shows in the box, or plan mode never shows: the user is told, naming Grok Build and the line #BUG-411/launch-modes", async () => {
     const lost = grok();
     lost.pty.print(ON + state(f, "idle").ansi);
     await until(() => lost.notes.length === 1);
@@ -424,7 +424,7 @@ describe.concurrent("BUG-411/launch-modes: the launch's first line: Grok Build",
 
 // Kimi Code's brief the same way. Kimi draws its composer before it has applied its env model (the welcome banner's
 // `Model:` line and the footer come 0.1 to 1 s later): a line sent into that early composer can draw `Error: LLM not set` (F04).
-describe.concurrent("BUG-674/F04: the launch's first line: Kimi Code waits for its model", () => {
+describe.concurrent("the launch's first line: Kimi Code waits for its model", () => {
   const LINE = "Read the session brief in /tmp/x/session.md and start.";
   const FAST = { waitMs: 400 * SLOW, pauseMs: 60, landMs: 300 * SLOW, planMs: 300 * SLOW };
   const ON = "\x1b[?2004h";
@@ -437,7 +437,7 @@ describe.concurrent("BUG-674/F04: the launch's first line: Kimi Code waits for i
     return { ...r, notes };
   };
 
-  test("the early composer (empty, bracketed paste on, no banner or footer yet) gets nothing; once the model shows the line is typed, then its Enter", async () => {
+  test("frame/brief-line: the early composer (empty, bracketed paste on, no banner or footer yet) gets nothing; once the model shows the line is typed, then its Enter #BUG-674/F04", async () => {
     const { s, pty, notes } = kimi();
     pty.print(ON + state(f, "frame-early-composer").ansi);
     await settle(200);
@@ -456,7 +456,7 @@ describe.concurrent("BUG-674/F04: the launch's first line: Kimi Code waits for i
     expect(notes).toEqual([]);
   });
 
-  test("the user can type into the early composer at any time: their keys go through and Gluon types nothing then; the line is given to them", async () => {
+  test("frame/brief-line: the user can type into the early composer at any time: their keys go through and Gluon types nothing then; the line is given to them #BUG-674/F04", async () => {
     const { s, pty, notes } = kimi();
     pty.print(ON + state(f, "frame-early-composer").ansi);
     await settle(100);
@@ -472,7 +472,7 @@ describe.concurrent("BUG-674/F04: the launch's first line: Kimi Code waits for i
     s.dispose();
   });
 
-  test("a model that never shows: nothing is typed and, at the wait's end, the user is told the line to type", async () => {
+  test("frame/brief-line: a model that never shows: nothing is typed and, at the wait's end, the user is told the line to type #BUG-674/F04", async () => {
     const { s, pty, notes } = kimi({ waitMs: 300 * SLOW });
     pty.print(ON + state(f, "frame-early-composer").ansi);
     await until(() => notes.length === 1);
@@ -484,7 +484,7 @@ describe.concurrent("BUG-674/F04: the launch's first line: Kimi Code waits for i
 });
 
 describe.concurrent("the question (/clear ends this session in Gluon — end it?)", () => {
-  test("BUG-234/F31: a typed /clear holds its Enter: Esc never sends it (the line stays typed, the next Enter asks again); Enter lets the agent clear, then ends it", async () => {
+  test("clear-compact/answer: a typed /clear holds its Enter: Esc never sends it (the line stays typed, the next Enter asks again); Enter lets the agent clear, then ends it #BUG-234/F31", async () => {
     const { s, pty } = session();
     const asked: (string | null)[] = [];
     s.onQuestion((q) => asked.push(q));
@@ -515,7 +515,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     expect(asked).toEqual([END_QUESTION, null, END_QUESTION, null]);
   });
 
-  test("BUG-270/GLUON-53: the question says what the command does in Gluon — `/clear ends this session in Gluon — end it?`, `/new …` for /new; /compact keeps its own", async () => {
+  test("clear-compact/asks: the question says what the command does in Gluon — `/clear ends this session in Gluon — end it?`, `/new …` for /new; /compact keeps its own #BUG-270/GLUON-53", async () => {
     expect(END_QUESTION).toBe("/clear ends this session in Gluon — end it?");
     for (const [typed, q] of [
       ["/new", "/new ends this session in Gluon — end it?"],
@@ -531,7 +531,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     }
   });
 
-  test("BUG-311/resume: onSessionId fires once with the first valid session event; later ones are ignored; a late subscriber is called at once; unsubscribing works", async () => {
+  test("frame/events-read: onSessionId fires once with the first valid session event; later ones are ignored; a late subscriber is called at once; unsubscribing works #BUG-311/resume", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir, harness: "codex" });
     expect(s.sessionId).toBeUndefined();
@@ -554,7 +554,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     s.dispose();
   });
 
-  test("BUG-337/fork: onMainSession fires with every change of the hook's session id (a fork or a new thread), not for a repeat; a late subscriber gets the latest; the resume id stays the first", async () => {
+  test("frame/events-read: onMainSession fires with every change of the hook's session id (a fork or a new thread), not for a repeat; a late subscriber gets the latest; the resume id stays the first #BUG-337/fork", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir, harness: "codex" });
     const main: string[] = [];
@@ -574,7 +574,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     s.dispose();
   });
 
-  test("BUG-311/resume: an invalid session event never sets the id (the next valid one does); a throwing subscriber breaks nothing", async () => {
+  test("frame/events-read: an invalid session event never sets the id (the next valid one does); a throwing subscriber breaks nothing #BUG-311/resume", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir, harness: "opencode" });
     const got: string[] = [];
@@ -592,7 +592,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     s.dispose();
   });
 
-  test("BUG-176/F: after a yes, a slow agent gets its time: nothing ended before it reacts; its hooks' status keeps it going; at most settleMaxMs @full", async () => {
+  test("clear-compact/answer: after a yes, a slow agent gets its time: nothing ended before it reacts; its hooks' status keeps it going; at most settleMaxMs #BUG-176/F @full", async () => {
     const { dir } = createEventsDir(TMP);
     const { s, pty } = session({ events: dir });
     for (const k of keys("/clear")) s.input(k);
@@ -624,7 +624,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     await until(() => quiet.pty.kills.length > 0, 2000);
   }, 15_000);
 
-  test("Ctrl+C is no in every keyboard protocol (plain, kitty, win32-input-mode); a paste never answers", async () => {
+  test("clear-compact/answer: Ctrl+C is no in every keyboard protocol (plain, kitty, win32-input-mode); a paste never answers", async () => {
     for (const ctrlC of ["\x03", "\x1b[99;5u", "\x1b[67;46;3;1;8;1_"]) {
       const { s, pty } = session();
       for (const k of keys("/clear")) s.input(k);
@@ -643,7 +643,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     }
   });
 
-  test("BUG-234/F25: a typed /compact's no never sends the Enter: nothing compacts, no marker is left, the next Enter asks again", async () => {
+  test("clear-compact/answer: a typed /compact's no never sends the Enter: nothing compacts, no marker is left, the next Enter asks again #BUG-234/F25", async () => {
     const { dir } = createEventsDir(TMP);
     const { s, pty } = session({ events: dir });
     for (const k of keys("/compact")) s.input(k);
@@ -662,7 +662,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     expect(pty.writes.join("")).toBe("/compact");
   });
 
-  test("an unanswered compaction question is no", async () => {
+  test("clear-compact/auto-compact: an unanswered compaction question is no", async () => {
     const { dir } = createEventsDir(TMP);
     const pty = fakePty();
     const s = new AgentSession({ argv: ["agent"], env: {}, harness: "claude-code", settings: handoffFor(handoffDefaults(), "claude-code"), cols: 60, rows: 12, spawn: pty.spawn, events: dir, compactTimeoutMs: 100 });
@@ -674,7 +674,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
     s.dispose();
   });
 
-  test("BUG-172/F: a paste reaches an agent without bracketed paste as its bytes, no markers; with it, as pasted", async () => {
+  test("frame/keys-to-agent: a paste reaches an agent without bracketed paste as its bytes, no markers; with it, as pasted #BUG-172/F", async () => {
     const { s, pty } = session({ settings: { on_clear: "stay" } });
     for (const k of keys("\x1b[200~/clear\x1c\r\x1b[201~")) s.input(k);
     await until(() => pty.writes.join("") === "/clear\x1c\r");
@@ -700,7 +700,7 @@ describe.concurrent("the question (/clear ends this session in Gluon — end it?
 });
 
 describe.concurrent("events", () => {
-  test("back shows home (the agent keeps running); a status sets the state; a waiting compaction asks, no is answered", async () => {
+  test("tabs/back-event: back shows home (the agent keeps running); a status sets the state; a waiting compaction asks, no is answered", async () => {
     const { dir } = createEventsDir(TMP);
     const { s, pty } = session({ events: dir });
     let backs = 0;
@@ -728,8 +728,8 @@ describe.concurrent("events", () => {
   });
 });
 
-describe.concurrent("BUG-187/live: a turn's end after a tool line", () => {
-  test("Stop (done) after a tool line says the turn finished; a done with an activity of its own keeps it", async () => {
+describe.concurrent("a turn's end after a tool line", () => {
+  test("session-state/activity: Stop (done) after a tool line says the turn finished; a done with an activity of its own keeps it #BUG-187/live", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const status = (st: { state?: "working" | "awaiting" | "done"; activity?: string }) => writeEvent(dir, { name: "status", status: st });
@@ -748,10 +748,10 @@ describe.concurrent("BUG-187/live: a turn's end after a tool line", () => {
   });
 });
 
-describe.concurrent("BUG-214/live: a row's activity never stays on an answered question", () => {
+describe.concurrent("a row's activity never stays on an answered question", () => {
   const PERMISSION = "Claude needs your permission to use Bash";
 
-  test("Claude Code's permission prompt, answered: the tool line again while it runs, Turn finished at Stop", async () => {
+  test("session-state/activity: Claude Code's permission prompt, answered: the tool line again while it runs, Turn finished at Stop #BUG-214/live", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const status = (st: { state?: "working" | "awaiting" | "done"; activity?: string }) => writeEvent(dir, { name: "status", status: st });
@@ -776,7 +776,7 @@ describe.concurrent("BUG-214/live: a row's activity never stays on an answered q
     s.dispose();
   });
 
-  test("a question with no tool line before it: answered, no activity (the row says Working); its idle notification (done) after: Turn finished", async () => {
+  test("session-state/activity: a question with no tool line before it: answered, no activity (the row says Working); its idle notification (done) after: Turn finished #BUG-214/live", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const status = (st: { state?: "working" | "awaiting" | "done"; activity?: string }) => writeEvent(dir, { name: "status", status: st });
@@ -800,8 +800,8 @@ describe.concurrent("BUG-214/live: a row's activity never stays on an answered q
   });
 });
 
-describe.concurrent("BUG-610/QA-frame-03: a new turn is not the last turn's end", () => {
-  test("a turn's end says Turn finished; the next turn's working (no tool line yet) clears it; its own tool line shows; Stop again: Turn finished", async () => {
+describe.concurrent("a new turn is not the last turn's end", () => {
+  test("session-state/activity: a turn's end says Turn finished; the next turn's working (no tool line yet) clears it; its own tool line shows; Stop again: Turn finished #BUG-610/QA-frame-03", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const status = (st: { state?: "working" | "awaiting" | "done"; activity?: string }) => writeEvent(dir, { name: "status", status: st });
@@ -822,7 +822,7 @@ describe.concurrent("BUG-610/QA-frame-03: a new turn is not the last turn's end"
     s.dispose();
   });
 
-  test("an agent's own activity kept by a working event with none, and a Turn finished after an awaiting (a question) still cleared by the next working", async () => {
+  test("session-state/activity: an agent's own activity kept by a working event with none, and a Turn finished after an awaiting (a question) still cleared by the next working #BUG-610/QA-frame-03", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const status = (st: { state?: "working" | "awaiting" | "done"; activity?: string }) => writeEvent(dir, { name: "status", status: st });
@@ -841,7 +841,7 @@ describe.concurrent("BUG-610/QA-frame-03: a new turn is not the last turn's end"
 });
 
 describe.concurrent("status fallback (an agent without hooks)", () => {
-  test("quiet output with the input line on screen → awaiting; output again → working; exit → done", async () => {
+  test("session-state/screen-fallback: quiet output with the input line on screen → awaiting; output again → working; exit → done", async () => {
     let now = 0;
     const { s, pty } = session({ now: () => now, tickMs: 10 });
     const states: string[] = [];
@@ -860,7 +860,7 @@ describe.concurrent("status fallback (an agent without hooks)", () => {
     expect(states).toEqual(["awaiting", "working", "done"]);
   });
 
-  test("BUG-663/QA-live-04: Kimi Code's `question` panel (no composer, no hooks) on a quiet screen → awaiting, and `awaitsChoice` says so (the compositor reads it per key); a `[1]` list quoted in its output stays Working", async () => {
+  test("session-state/own-dialog: Kimi Code's `question` panel (no composer, no hooks) on a quiet screen → awaiting, and `awaitsChoice` says so (the compositor reads it per key); a `[1]` list quoted in its output stays Working #BUG-663/QA-live-04", async () => {
     // Captured live on Kimi Code 2.1.1 (the fixture's notes). Live: the row said Working for over four minutes.
     const f = fixture("kimi-code");
     for (const name of ["frame-question-panel", "frame-question-panel-wrapped", "frame-question-panel-described"]) {
@@ -886,7 +886,7 @@ describe.concurrent("status fallback (an agent without hooks)", () => {
     quoted.s.dispose();
   });
 
-  test("a key's echo is not work; a hook's state wins over output", async () => {
+  test("session-state/not-work: a key's echo is not work; a hook's state wins over output", async () => {
     let now = 0;
     const { dir } = createEventsDir(TMP);
     const { s, pty } = session({ now: () => now, tickMs: 10, events: dir });
@@ -910,8 +910,8 @@ describe.concurrent("status fallback (an agent without hooks)", () => {
   });
 });
 
-describe.concurrent("BUG-204/live: an idle agent with hooks isn't Working for good after output", () => {
-  test("a redraw after Gluon's resize is not work; other output long after the hook is, until it goes quiet", async () => {
+describe.concurrent("an idle agent with hooks isn't Working for good after output", () => {
+  test("session-state/not-work: a redraw after Gluon's resize is not work; other output long after the hook is, until it goes quiet #BUG-204/live", async () => {
     let now = 0;
     const { dir } = createEventsDir(TMP);
     const { s, pty } = session({ now: () => now, tickMs: 10, events: dir });
@@ -965,7 +965,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
     codex: `\x1b[2J\x1b[H• Ran cat notes.txt\r\n  └ ${CODEX_MARK}\r\n    more of the file${codexBox}`,
   };
   for (const [harness, screen] of interrupted) {
-    test(`BUG-609/QA-live-01: ${harness}, a turn interrupted with Esc (the hook said working, no Stop followed, the screen is idle and says Interrupted): the row goes back to awaiting after the quiet period, not Working for good`, async () => {
+    test(`session-state/interrupted: ${harness}, a turn interrupted with Esc (the hook said working, no Stop followed, the screen is idle and says Interrupted): the row goes back to awaiting after the quiet period, not Working for good #BUG-609/QA-live-01`, async () => {
       // Control: the same screen with no hook ever seen reads as awaiting (the screen fallback works).
       let now = 0;
       const a = session({ harness, now: () => now, tickMs: 10 });
@@ -987,7 +987,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
       b.s.dispose();
     });
 
-    test(`BUG-609/QA-live-01: ${harness}, no marker on the idle screen: the hook's Working and its tool line stay (BUG-204); the marker ends them, the stale tool line goes, and a later redraw's guess falls back to awaiting`, async () => {
+    test(`session-state/interrupted: ${harness}, no marker on the idle screen: the hook's Working and its tool line stay (BUG-204); the marker ends them, the stale tool line goes, and a later redraw's guess falls back to awaiting #BUG-609/QA-live-01`, async () => {
       let now = 0;
       const { dir } = createEventsDir(TMP);
       const { s, pty } = session({ harness, now: () => now, tickMs: 10, events: dir });
@@ -1014,7 +1014,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
       s.dispose();
     });
 
-    test(`BUG-609/QA-live-01: ${harness}, a hook says working after the marker was drawn (a new turn): Working stays, quiet or not; the marker drawn after that hook ends it again`, async () => {
+    test(`session-state/interrupted: ${harness}, a hook says working after the marker was drawn (a new turn): Working stays, quiet or not; the marker drawn after that hook ends it again #BUG-609/QA-live-01`, async () => {
       let now = 0;
       const { dir } = createEventsDir(TMP);
       const { s, pty } = session({ harness, now: () => now, tickMs: 10, events: dir });
@@ -1040,7 +1040,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
       s.dispose();
     });
 
-    test(`BUG-609/QA-live-01: ${harness}, the marker's words inside what the agent printed (a file's text, with more output under them): the hook's Working is not ended`, async () => {
+    test(`session-state/interrupted: ${harness}, the marker's words inside what the agent printed (a file's text, with more output under them): the hook's Working is not ended #BUG-609/QA-live-01`, async () => {
       let now = 0;
       const { dir } = createEventsDir(TMP);
       const { s, pty } = session({ harness, now: () => now, tickMs: 10, events: dir });
@@ -1059,7 +1059,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
     ["claude-code", "frame-interrupted"],
     ["codex", "frame-turn-idle"],
   ] as const) {
-    test(`BUG-609/QA-live-01: ${harness}, the captured interrupted screen (${name}) ends a hook's Working and its tool line`, async () => {
+    test(`session-state/interrupted: ${harness}, the captured interrupted screen (${name}) ends a hook's Working and its tool line #BUG-609/QA-live-01`, async () => {
       const f = fixture(harness);
       const st = state(f, name);
       let now = 0;
@@ -1077,7 +1077,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
   }
 
   for (const cols of [40, 30]) {
-    test(`BUG-609/QA-live-01: at ${cols} columns the marker wraps over two rows (Claude Code's, Codex's): a hook's Working still ends`, async () => {
+    test(`session-state/interrupted: at ${cols} columns the marker wraps over two rows (Claude Code's, Codex's): a hook's Working still ends #BUG-609/QA-live-01`, async () => {
       const rule = "─".repeat(cols);
       const screens: [Harness, string][] = [
         ["claude-code", `\x1b[2J\x1b[H❯ Write an essay\r\n  ⎿ \u00a0Interrupted · What should Claude do instead?\r\n${rule}\r\n❯ \r\n${rule}\r\n  ⏸ manual mode on\x1b[6;3H`],
@@ -1099,7 +1099,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
     });
   }
 
-  test("BUG-609/QA-live-01 (F10): the captured context-limit screen (frame-precompact: the limit is in the history, PreCompact runs under it): a hook's Working is not ended", async () => {
+  test("session-state/interrupted: the captured context-limit screen (frame-precompact: the limit is in the history, PreCompact runs under it): a hook's Working is not ended #BUG-609/QA-live-01 (F10)", async () => {
     const f = fixture("claude-code");
     const st = state(f, "frame-precompact");
     let now = 0;
@@ -1116,7 +1116,7 @@ describe.concurrent("QA live: Esc during a turn", () => {
   });
 });
 
-describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work either; real work still is", () => {
+describe.concurrent("a late redraw after a resize isn't work either; real work still is", () => {
   /** An idle agent without hooks (its prompt on screen, quiet): awaiting. */
   async function idle() {
     let now = 0;
@@ -1128,7 +1128,7 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
     return { ...b, at: (ms: number) => (now += ms) };
   }
 
-  test("two resizes, each redrawn 1.5 s late (a TUI that debounces SIGWINCH): still awaiting; output after the redraw went quiet is work", async () => {
+  test("session-state/not-work: two resizes, each redrawn 1.5 s late (a TUI that debounces SIGWINCH): still awaiting; output after the redraw went quiet is work", async () => {
     const { s, pty, at } = await idle();
     s.resize(80, 20);
     at(200);
@@ -1144,7 +1144,7 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
     s.dispose();
   });
 
-  test("a redraw that never comes: output past REDRAW_WAIT_MS is work; output that goes on past it is work", async () => {
+  test("session-state/not-work: a redraw that never comes: output past REDRAW_WAIT_MS is work; output that goes on past it is work", async () => {
     const a = await idle();
     a.s.resize(80, 20);
     a.at(REDRAW_WAIT_MS + 1);
@@ -1162,7 +1162,7 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
     b.s.dispose();
   });
 
-  test("BUG-669/QA-win-02: ConPTY repaints at once, the agent redraws 1.5 s later: still awaiting; real work after that is work", async () => {
+  test("session-state/not-work: ConPTY repaints at once, the agent redraws 1.5 s later: still awaiting; real work after that is work #BUG-669/QA-win-02", async () => {
     const { s, pty, at } = await idle();
     s.resize(80, 20);
     at(50);
@@ -1178,7 +1178,7 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
     s.dispose();
   });
 
-  test("BUG-669/QA-win-02: output past the window after ConPTY's repaint is work", async () => {
+  test("session-state/not-work: output past the window after ConPTY's repaint is work #BUG-669/QA-win-02", async () => {
     const a = await idle();
     a.s.resize(80, 20);
     a.at(50);
@@ -1189,7 +1189,7 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
     a.s.dispose();
   });
 
-  test("BUG-669/QA-win-02: a key typed after ConPTY's repaint (before the agent's redraw): what the agent prints next is its answer", async () => {
+  test("session-state/not-work: a key typed after ConPTY's repaint (before the agent's redraw): what the agent prints next is its answer #BUG-669/QA-win-02", async () => {
     const { s, pty, at } = await idle();
     s.resize(80, 20);
     at(50);
@@ -1202,7 +1202,7 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
     s.dispose();
   });
 
-  test("a key typed after the redraw came: what the agent prints next is its answer, not the redraw", async () => {
+  test("session-state/not-work: a key typed after the redraw came: what the agent prints next is its answer, not the redraw", async () => {
     const { s, pty, at } = await idle();
     s.resize(80, 20);
     at(1500);
@@ -1216,8 +1216,8 @@ describe.concurrent("BUG-242/GLUON-36: a late redraw after a resize isn't work e
   });
 });
 
-describe.concurrent("BUG-244/GLUON-40: Claude Code's first-run trust question reads as awaiting the user, not Working", () => {
-  test("its dialog (captured from 2.1.288) on screen and the output quiet: awaiting; a screen with neither an input box nor the dialog stays Working", async () => {
+describe.concurrent("Claude Code's first-run trust question reads as awaiting the user, not Working", () => {
+  test("session-state/own-dialog: its dialog (captured from 2.1.288) on screen and the output quiet: awaiting; a screen with neither an input box nor the dialog stays Working #BUG-244", async () => {
     let now = 0;
     const st = state(fixture("claude-code"), "frame-trust-dialog");
     const { s, pty } = session({ now: () => now, tickMs: 10 });
@@ -1238,9 +1238,9 @@ describe.concurrent("BUG-244/GLUON-40: Claude Code's first-run trust question re
   });
 });
 
-describe.concurrent("issue-40: Codex's own dialogs (captured from 0.159.3) read as awaiting the user, not Working", () => {
+describe.concurrent("Codex's own dialogs (captured from 0.159.3) read as awaiting the user, not Working", () => {
   for (const name of ["frame-folder-trust", "frame-hook-review", "frame-approve-command", "frame-plan-question", "frame-plan-question-notes"]) {
-    test(`${name} on screen and the output quiet: awaiting; before that, Working`, async () => {
+    test(`session-state/own-dialog: ${name} on screen and the output quiet: awaiting; before that, Working #issue-40`, async () => {
       let now = 0;
       const st = state(fixture("codex"), name);
       const { s, pty } = session({ harness: "codex", now: () => now, tickMs: 10 });
@@ -1254,7 +1254,7 @@ describe.concurrent("issue-40: Codex's own dialogs (captured from 0.159.3) read 
     });
   }
 
-  test("a screen that only looks like one (the options, no key hints) stays Working", async () => {
+  test("session-state/own-dialog: a screen that only looks like one (the options, no key hints) stays Working #issue-40", async () => {
     let now = 0;
     const { s, pty } = session({ harness: "codex", now: () => now, tickMs: 10 });
     pty.print("\x1b[2J\x1b[H\x1b[1;7m› 1. Yes, proceed (y)\x1b[0m\r\n  2. No");
@@ -1266,7 +1266,7 @@ describe.concurrent("issue-40: Codex's own dialogs (captured from 0.159.3) read 
   });
 });
 
-describe.concurrent("issue-40: the screen fallback and the hooks, for every harness", () => {
+describe.concurrent("the screen fallback and the hooks, for every harness", () => {
   /** Each harness's idle input box as captured. */
   type Drawn = { ansi: string; cols: number; rows: number };
   const captured = (h: Harness, name: string): Drawn => {
@@ -1284,7 +1284,7 @@ describe.concurrent("issue-40: the screen fallback and the hooks, for every harn
   ];
 
   for (const [harness, name, screen] of IDLE) {
-    test(`${harness} (${name}), no hooks: its input box on screen reads awaiting only once the output has been quiet ${QUIET_AWAIT_MS} ms`, async () => {
+    test(`session-state/screen-fallback: ${harness} (${name}), no hooks: its input box on screen reads awaiting only once the output has been quiet ${QUIET_AWAIT_MS} ms #issue-40`, async () => {
       let now = 0;
       const { cols, rows, ansi } = screen();
       const { s, pty } = session({ harness, now: () => now, tickMs: 10 });
@@ -1308,7 +1308,7 @@ describe.concurrent("issue-40: the screen fallback and the hooks, for every harn
   }
 
   // Antigravity 1.3.3 under tmux re-sends `ESC[?2004h ESC[>4;2m` every 2 s while idle: it stayed Working for good.
-  test("BUG-721/agy-tmux: output that only sets terminal modes is not work and doesn't restart the quiet; drawn output still is", async () => {
+  test("session-state/not-work: output that only sets terminal modes is not work and doesn't restart the quiet; drawn output still is #BUG-721/agy-tmux", async () => {
     let now = 0;
     const { cols, rows, ansi } = captured("antigravity", "idle");
     const { s, pty } = session({ harness: "antigravity", now: () => now, tickMs: 10 });
@@ -1335,7 +1335,7 @@ describe.concurrent("issue-40: the screen fallback and the hooks, for every harn
   });
 
   for (const harness of ["claude-code", "codex", "opencode", "antigravity"] as const) {
-    test(`${harness}, no hooks: a quiet screen with no input box on it (it is thinking) stays Working`, async () => {
+    test(`session-state/screen-fallback: ${harness}, no hooks: a quiet screen with no input box on it (it is thinking) stays Working #issue-40`, async () => {
       let now = 0;
       const { s, pty } = session({ harness, now: () => now, tickMs: 10 });
       pty.print("\x1b[2J\x1b[HThinking… (12s · esc to interrupt)");
@@ -1348,7 +1348,7 @@ describe.concurrent("issue-40: the screen fallback and the hooks, for every harn
   }
 
   for (const harness of ["claude-code", "codex", "opencode", "grok-build", "antigravity"] as const) {
-    test(`${harness}, with hooks: what a hook said stands, however idle the screen looks (BUG-204)`, async () => {
+    test(`session-state/hooks: ${harness}, with hooks: what a hook said stands, however idle the screen looks #BUG-204 #issue-40`, async () => {
       let now = 0;
       const { dir } = createEventsDir(TMP);
       const { s, pty } = session({ harness, now: () => now, tickMs: 10, events: dir });
@@ -1368,7 +1368,7 @@ describe.concurrent("issue-40: the screen fallback and the hooks, for every harn
 });
 
 describe.concurrent("lifecycle", () => {
-  test("resize reaches the PTY and the model; end() is SIGTERM, then SIGKILL after the grace", async () => {
+  test("session-end/agent-ends: resize reaches the PTY and the model; end() is SIGTERM, then SIGKILL after the grace", async () => {
     const { s, pty } = session({ dieOnTerm: false });
     s.resize(80, 20);
     expect(pty.sizes).toEqual([[80, 20]]);
@@ -1383,14 +1383,14 @@ describe.concurrent("lifecycle", () => {
 
 // Windows CI hung 28 minutes in the lifecycle test above: end() waits for the SIGKILL timer, and an
 // unref'd timer there never fired on Windows. finish() clears it at the exit, so it stays referenced.
-test("BUG-190/W: end()'s SIGKILL timer is kept referenced", () => {
+test("session-end/agent-ends: end()'s SIGKILL timer is kept referenced #BUG-190/W", () => {
   const src = readFileSync(join(import.meta.dir, "../src/pty/session.ts"), "utf8");
   expect(src).toContain('this.killTimer = setTimeout(() => this.proc.kill("SIGKILL"), grace);');
   expect(src).not.toMatch(/killTimer\.unref/);
 });
 
 describe("OpenCode's step records reach Gluon whole (issue #39)", () => {
-  test("BUG-344/steps-not-coalesced: status events that carry `steps` are never merged into one another or into the state: a burst written in the same millisecond is delivered record by record, in order, each once", async () => {
+  test("frame/events-read: status events that carry `steps` are never merged into one another or into the state: a burst written in the same millisecond is delivered record by record, in order, each once #BUG-344/steps-not-coalesced", async () => {
     const { dir } = createEventsDir(TMP);
     const { s } = session({ events: dir });
     const got: number[] = [];

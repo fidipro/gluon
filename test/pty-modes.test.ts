@@ -16,13 +16,13 @@ const kitty = async (s: TermScreen, seq: string) => {
 };
 
 describe("modes: what a session set", () => {
-  test("a fresh screen has the home modes", async () => {
+  test("frame/modes: a fresh screen has the home modes", async () => {
     const s = await fed();
     expect(s.modes()).toEqual(HOME_MODES);
     s.dispose();
   });
 
-  test("reads xterm's modes and the ones xterm doesn't expose", async () => {
+  test("frame/modes: reads xterm's modes and the ones xterm doesn't expose", async () => {
     const s = await fed("\x1b[?1h\x1b=\x1b[?2004h\x1b[?1004h\x1b[?1002h\x1b[?1006h\x1b[>5u\x1b[4 q\x1b[?9001h");
     expect(s.modes()).toEqual(
       state({ cursorKeys: true, keypad: true, bracketedPaste: true, focus: true, mouseTracking: "drag", mouseEncoding: "sgr", kittyFlags: 5, cursorShape: 4, win32Input: true }),
@@ -30,7 +30,7 @@ describe("modes: what a session set", () => {
     s.dispose();
   });
 
-  test("xterm still handles what the handlers watched", async () => {
+  test("frame/modes: xterm still handles what the handlers watched", async () => {
     const s = await fed();
     const replies: string[] = [];
     s.onReply((r) => replies.push(r));
@@ -40,7 +40,7 @@ describe("modes: what a session set", () => {
     s.dispose();
   });
 
-  test("mouse encoding: the last one set wins; turning off the active one goes back to the default", async () => {
+  test("frame/modes: mouse encoding: the last one set wins; turning off the active one goes back to the default", async () => {
     const s = await fed("\x1b[?1006h\x1b[?1015h");
     expect(s.modes().mouseEncoding).toBe("urxvt");
     await s.write("\x1b[?1006l");
@@ -52,7 +52,7 @@ describe("modes: what a session set", () => {
     s.dispose();
   });
 
-  test("kitty flags: push, pop (past the bottom too), set, or, and-not", async () => {
+  test("frame/modes: kitty flags: push, pop (past the bottom too), set, or, and-not", async () => {
     const s = await fed();
     expect(await kitty(s, "\x1b[>1u")).toBe(1);
     expect(await kitty(s, "\x1b[>3u")).toBe(3);
@@ -70,7 +70,7 @@ describe("modes: what a session set", () => {
     s.dispose();
   });
 
-  test("kitty flags: one stack per screen, as kitty keeps", async () => {
+  test("frame/modes: kitty flags: one stack per screen, as kitty keeps", async () => {
     const s = await fed("\x1b[>1u");
     expect(await kitty(s, "\x1b[?1049h")).toBe(0);
     expect(await kitty(s, "\x1b[>7u")).toBe(7);
@@ -79,7 +79,7 @@ describe("modes: what a session set", () => {
     s.dispose();
   });
 
-  test("RIS resets every mode", async () => {
+  test("frame/modes: RIS resets every mode", async () => {
     const s = await fed("\x1b[?1h\x1b[?2004h\x1b[?1003h\x1b[?1006h\x1b[>5u\x1b[2 q\x1b[?9001h\x1b[?25l");
     await s.write("\x1bc");
     expect(s.modes()).toEqual(HOME_MODES);
@@ -94,7 +94,7 @@ describe("modes: switching the real terminal between sessions", () => {
   const C = state({ bracketedPaste: true, mouseTracking: "x10", mouseEncoding: "utf8", cursorShape: 2 });
   const STATES = [HOME_MODES, A, B, C, state({ kittyFlags: 3 }), state({ mouseEncoding: "sgr-pixels" })];
 
-  test("the bytes for each change", () => {
+  test("frame/modes: the bytes for each change", () => {
     expect(modeTransition(HOME_MODES, A)).toBe("\x1b[?1h\x1b[?2004h\x1b[?1000h\x1b[?1006h\x1b[>1u\x1b[6 q");
     expect(modeTransition(A, HOME_MODES)).toBe("\x1b[?1l\x1b[?2004l\x1b[?1000l\x1b[?1006l\x1b[<u\x1b[0 q");
     expect(modeTransition(A, B)).toBe("\x1b[?1l\x1b=\x1b[?2004l\x1b[?1004h\x1b[?1000l\x1b[?1003h\x1b[?1006l\x1b[?1015h\x1b[=27;1u\x1b[0 q\x1b[?9001h");
@@ -103,7 +103,7 @@ describe("modes: switching the real terminal between sessions", () => {
     expect(modeTransition(HOME_MODES, state({ syncOutput: true }))).toBe("");
   });
 
-  test("a terminal in one session's modes, sent a transition, is in the other's", async () => {
+  test("frame/modes: a terminal in one session's modes, sent a transition, is in the other's", async () => {
     for (const from of STATES)
       for (const to of STATES) {
         const t = await fed(modeTransition(HOME_MODES, from));
@@ -114,7 +114,7 @@ describe("modes: switching the real terminal between sessions", () => {
       }
   });
 
-  test("MODES_RESET brings any of them home and shows the cursor", async () => {
+  test("frame/modes: MODES_RESET brings any of them home and shows the cursor", async () => {
     for (const s of STATES) {
       const t = await fed(modeTransition(HOME_MODES, s), "\x1b[?25l");
       await t.write(MODES_RESET);

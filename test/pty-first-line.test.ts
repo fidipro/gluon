@@ -29,7 +29,7 @@ async function until(ok: () => boolean, ms = 15_000 * SLOW) {
   expect(ok()).toBe(true);
 }
 
-test.skipIf(!hasPty)("the first line reaches a Codex-shaped TUI as the text, then, apart, its Enter: it runs, the agent shows Plan mode, and nobody is told anything", async () => {
+test.skipIf(!hasPty)("frame/brief-line: the first line reaches a Codex-shaped TUI as the text, then, apart, its Enter: it runs, the agent shows Plan mode, and nobody is told anything", async () => {
   const log = join(TMP, "input.log");
   const s = new AgentSession({
     argv: [process.execPath, "--no-env-file", join(import.meta.dir, "fixtures/fake-tui.ts")],

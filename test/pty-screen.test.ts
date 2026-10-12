@@ -20,7 +20,7 @@ async function roundTrip(s: Screen) {
 const HEAVY_MS = 30_000;
 
 describe("screen model", () => {
-  test("reads text, attributes and the cursor", async () => {
+  test("frame/agent-screen: reads text, attributes and the cursor", async () => {
     const s = createScreen(20, 4);
     await s.write("ab\x1b[7mcd\x1b[0m \x1b[1;31mE\x1b[0m\x1b[38;2;1;2;3mR\x1b[48;5;200mG\x1b[0m\r\n> x");
     const l = s.line(0);
@@ -35,7 +35,7 @@ describe("screen model", () => {
     s.dispose();
   });
 
-  test("keeps only the visible screen and follows a resize", async () => {
+  test("frame/agent-screen: keeps only the visible screen and follows a resize", async () => {
     const s = createScreen(10, 3);
     await s.write("1\r\n2\r\n3\r\n4");
     expect([0, 1, 2].map((y) => s.line(y).text)).toEqual(["2", "3", "4"]);
@@ -44,7 +44,7 @@ describe("screen model", () => {
     s.dispose();
   });
 
-  test("serialize round-trips text, every attribute, wide characters and the cursor", async () => {
+  test("frame/agent-screen: serialize round-trips text, every attribute, wide characters and the cursor", async () => {
     const s = createScreen(24, 6);
     await s.write("\x1b[1mbold\x1b[2mdim\x1b[0m\x1b[3mit\x1b[4mul\x1b[5mbl\x1b[0m\r\n");
     await s.write("\x1b[7minv\x1b[8mhid\x1b[9mst\x1b[53mov\x1b[0m\r\n");
@@ -56,7 +56,7 @@ describe("screen model", () => {
     s.dispose();
   });
 
-  test("serialize restores a hidden cursor and insert mode", async () => {
+  test("frame/agent-screen: serialize restores a hidden cursor and insert mode", async () => {
     const s = createScreen(10, 2);
     await s.write("hi\x1b[?25l\x1b[4h");
     const out = s.serialize();
@@ -69,7 +69,7 @@ describe("screen model", () => {
     s.dispose();
   });
 
-  test("the redraw of a captured screen shows what the harness's own output showed", async () => {
+  test("frame/agent-screen: the redraw of a captured screen shows what the harness's own output showed", async () => {
     for (const f of loadFixtures())
       for (const state of f.states) {
         const s = await screenOf(f, state);
@@ -81,7 +81,7 @@ describe("screen model", () => {
       }
   }, HEAVY_MS);
 
-  test("serialize round-trips every captured harness screen @full", async () => {
+  test("frame/agent-screen: serialize round-trips every captured harness screen @full", async () => {
     const fixtures = loadFixtures();
     expect(fixtures.length).toBeGreaterThan(0);
     for (const f of fixtures)
@@ -94,7 +94,7 @@ describe("screen model", () => {
 });
 
 describe("screen model: scrollback", () => {
-  test("line() stays the live screen; viewLine() and cells() scroll back into history", async () => {
+  test("frame/scrollback: line() stays the live screen; viewLine() and cells() scroll back into history", async () => {
     const s = createScreen(10, 3, { scrollback: 5 });
     await s.write(Array.from({ length: 12 }, (_, i) => `L${i}`).join("\r\n"));
     expect([0, 1, 2].map((y) => s.line(y).text)).toEqual(["L9", "L10", "L11"]);
@@ -107,7 +107,7 @@ describe("screen model: scrollback", () => {
     s.dispose();
   });
 
-  test("none by default, none on the alternate screen", async () => {
+  test("frame/scrollback: none by default, none on the alternate screen", async () => {
     const s = createScreen(10, 2);
     await s.write("1\r\n2\r\n3\r\n4");
     expect(s.scrollbackLength()).toBe(0);
@@ -125,7 +125,7 @@ describe("screen model: scrollback", () => {
 });
 
 describe("screen model: cells for painting", () => {
-  test("every column, every attribute, palette and RGB told apart, wide characters", async () => {
+  test("frame/agent-screen: every column, every attribute, palette and RGB told apart, wide characters", async () => {
     const s = createScreen(12, 2);
     await s.write("\x1b[1;3;4;9;53;38;5;5;48;2;0;0;5mA\x1b[0;2;5;7;8;38;2;0;0;5;45mB\x1b[0m中x");
     const c = s.cells(0);
@@ -156,7 +156,7 @@ describe("screen model: cells for painting", () => {
     s.dispose();
   });
 
-  test("Unicode 11 widths: emoji newer than Unicode 6 are wide, as real terminals draw them", async () => {
+  test("frame/agent-screen: Unicode 11 widths: emoji newer than Unicode 6 are wide, as real terminals draw them", async () => {
     const s = createScreen(12, 1);
     await s.write("🤖🦀a");
     expect(s.cells(0).slice(0, 5).map((c) => c.width)).toEqual([2, 0, 2, 0, 1]);
@@ -172,7 +172,7 @@ describe("screen model: replies, bell, title", () => {
     return got;
   };
 
-  test("xterm's replies to DA1, CPR and DECRQM come out in order", async () => {
+  test("frame/terminal-queries: xterm's replies to DA1, CPR and DECRQM come out in order", async () => {
     const s = createScreen(20, 4);
     const got = replies(s);
     await s.write("\x1b[c\x1b[2;3H\x1b[6n\x1b[?2026$p");
@@ -180,7 +180,7 @@ describe("screen model: replies, bell, title", () => {
     s.dispose();
   });
 
-  test("OSC 10 / 11 / 12 are answered from the colours given, else not at all", async () => {
+  test("frame/terminal-queries: OSC 10 / 11 / 12 are answered from the colours given, else not at all", async () => {
     const s = createScreen(20, 4, { colours: { fg: [0xe0, 0xe0, 0xe0], bg: [0x1e, 0x1e, 0x2e], cursor: [255, 0, 127.6] } });
     const got = replies(s);
     await s.write("\x1b]11;?\x07\x1b]10;?\x1b\\\x1b]12;?\x07\x1b]10;?;?\x07");
@@ -202,7 +202,7 @@ describe("screen model: replies, bell, title", () => {
     t.dispose();
   });
 
-  test("CSI ? u is answered only when the real terminal speaks kitty, with the flags in effect", async () => {
+  test("frame/terminal-queries: CSI ? u is answered only when the real terminal speaks kitty, with the flags in effect", async () => {
     const off = createScreen(20, 4);
     const offGot = replies(off);
     await off.write("\x1b[?u\x1b[>1u\x1b[?u");
@@ -215,7 +215,7 @@ describe("screen model: replies, bell, title", () => {
     on.dispose();
   });
 
-  test("one ordered queue: a kitty reply comes before the DA1 reply after it, however the input is split", async () => {
+  test("frame/terminal-queries: one ordered queue: a kitty reply comes before the DA1 reply after it, however the input is split", async () => {
     const input = "\x1b[?u\x1b]11;?\x07\x1b[c\x1b[6n";
     const want = ["\x1b[?0u", "\x1b]11;rgb:0000/0000/0000\x1b\\", "\x1b[?1;2c", "\x1b[1;1R"];
     for (let cut = 0; cut <= input.length; cut++) {
@@ -228,7 +228,7 @@ describe("screen model: replies, bell, title", () => {
     }
   });
 
-  test("a listener stops when it unsubscribes; bell, title and change are reported", async () => {
+  test("frame/agent-screen: a listener stops when it unsubscribes; bell, title and change are reported", async () => {
     const s = createScreen(20, 4);
     const got: string[] = [];
     const off = s.onReply((r) => got.push(r));
