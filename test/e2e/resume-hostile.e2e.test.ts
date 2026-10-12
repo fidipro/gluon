@@ -35,10 +35,10 @@ function seed(s: Sandbox, w: unknown, id = "abcdef") {
 }
 const saved = (s: Sandbox): Workspace[] => (existsSync(s.ws) ? readdirSync(s.ws).filter((f) => f.endsWith(".json")).map((f) => parseWorkspace(readFileSync(join(s.ws, f), "utf8"))!) : []);
 
-describe("BUG-291/resume: a hostile workspace file", () => {
+describe("a hostile workspace file", () => {
   const evil = "\x1b]0;PWNED\x07\x1b[2J\x9b2J‮";
 
-  test("BUG-291/resume: gluon sessions and the errors of gluon resume never put an escape from the file on the terminal", async () => {
+  test("resume/untrusted-file: gluon sessions and the errors of gluon resume never put an escape from the file on the terminal", async () => {
     const s = sandbox();
     seed(s, workspace("/tmp/x", { name: `n${evil}`, sessions: [child({ name: `s${evil}` })] }));
     const list = await cli(["sessions"], { env: s.env });
@@ -51,7 +51,7 @@ describe("BUG-291/resume: a hostile workspace file", () => {
     expect(gone.stderr + gone.stdout).not.toMatch(/[\x00-\x08\x0b-\x1a\x1c-\x1f\x7f-\x9f‮]/);
   });
 
-  test("BUG-291/resume: a saved name with an escape is a plain line in the home view, the chat and the question", async () => {
+  test("resume/untrusted-file: a saved name with an escape is a plain line in the home view, the chat and the question", async () => {
     const s = sandbox();
     // A harness with no way to resume: the user is asked, with the name in the question.
     seed(s, workspace(repo.tiny(), { sessions: [child({ name: `Gluon-evil${evil}`, harness: "antigravity", model: "gemini-3.8-flash", resume: undefined })] }));
@@ -62,7 +62,7 @@ describe("BUG-291/resume: a hostile workspace file", () => {
     expect(app.since()).not.toContain("‮");
   });
 
-  test("BUG-291/resume: a file that holds a resume id like an option never puts it in an argv", async () => {
+  test("resume/untrusted-file: a file that holds a resume id like an option never puts it in an argv", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ resume: { id: "--dangerously-skip-permissions", source: "captured" } as never })] }));
     const app = await start({ cwd: repo.tiny(), args: ["resume", "abcdef"], agents: ALL, env: s.env });
@@ -71,8 +71,8 @@ describe("BUG-291/resume: a hostile workspace file", () => {
   });
 });
 
-describe("BUG-291/resume: the directory a resume enters", () => {
-  test("BUG-291/resume: a saved directory that is a file, or a relative path, is never entered", async () => {
+describe("the directory a resume enters", () => {
+  test("resume/untrusted-file: a saved directory that is a file, or a relative path, is never entered", async () => {
     const s = sandbox();
     const file = join(repo.tiny(), "README.md");
     writeFileSync(file, "x");
@@ -85,7 +85,7 @@ describe("BUG-291/resume: the directory a resume enters", () => {
     expect(rel.stderr).toContain('no saved session "abcdef"');
   });
 
-  test("BUG-291/resume: a relative GLUON_CONFIG still names the same files after the resume's chdir @full", async () => {
+  test("resume/reopens: a relative GLUON_CONFIG still names the same files after the resume's chdir @full", async () => {
     const s = sandbox();
     const saved0 = workspace(repo.tiny());
     seed(s, saved0);
@@ -112,7 +112,7 @@ describe("BUG-291/resume: the directory a resume enters", () => {
 const starts = (app: { agentLog(): string }): string[][] => app.agentLog().split(/FAKE-[A-Z]+ argc=\d+\n/).slice(1).map((blk) => [...blk.matchAll(/^ARG\d+=<(.*)>$/gm)].map((m) => m[1]!));
 
 describe("BUG-292/resume: lifecycle", () => {
-  test("BUG-292/resume: a SIGTERM while a question about a saved session is up keeps every saved session, the one asked about too", async () => {
+  test("resume/record-lifecycle: a SIGTERM while a question about a saved session is up keeps every saved session, the one asked about too #BUG-292/resume", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ key: "kc" }), child({ key: "ka", name: "Gluon-agy-task", harness: "antigravity", model: "gemini-3.8-flash", resume: undefined })] }));
     const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
@@ -124,7 +124,7 @@ describe("BUG-292/resume: lifecycle", () => {
     if (!WIN) expect(app.history()).toContain("Resume this session: gluon resume abcdef");
   });
 
-  test("BUG-292/resume: a crash of Gluon keeps the record and says how to resume on stderr", async () => {
+  test("resume/record-lifecycle: a crash of Gluon keeps the record and says how to resume on stderr #BUG-292/resume", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const app = await start({ cwd: repo.tiny(), args: ["resume", "abcdef"], agents: ALL, env: { ...s.env, GLUON_TEST_PTY_FAIL: "1" } });
@@ -137,7 +137,7 @@ describe("BUG-292/resume: lifecycle", () => {
     expect(app.history()).toContain("Resume this session: gluon resume abcdef");
   });
 
-  test("BUG-292/resume: saved sessions with one name are both reopened (the second under a free name) and both kept under their keys", async () => {
+  test("resume/reopens: saved sessions with one name are both reopened (the second under a free name) and both kept under their keys #BUG-292/resume", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ key: "k1" }), child({ key: "k2", resume: { id: "22222222-1111-4222-8333-444455556666", source: "minted" } })] }));
     const app = await start({ cwd: repo.tiny(), args: ["resume", "abcdef"], agents: ALL, env: s.env });
@@ -150,7 +150,7 @@ describe("BUG-292/resume: lifecycle", () => {
     expect(w!.sessions.map((c) => c.resume!.id)).toEqual([UUID, "22222222-1111-4222-8333-444455556666"]);
   });
 
-  test("BUG-292/resume: two Gluons on one workspace each keep their own sessions' records from the other's (the later write never loses a file) @full", async () => {
+  test("resume/record-lifecycle: two Gluons on one workspace each keep their own sessions' records from the other's (the later write never loses a file) @full #BUG-292/resume", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const a = await start({ cwd: repo.tiny(), args: ["resume", "abcdef"], agents: ALL, env: s.env });
@@ -175,7 +175,7 @@ describe("BUG-292/resume: lifecycle", () => {
 describe("BUG-295/resume: the picker of gluon resume (a terminal, no id)", () => {
   const picker = (s: Sandbox, args: string[] = ["resume"]) => new App({ cwd: repo.tiny(), args, agents: ALL, env: s.env, cols: 120, rows: 30 });
 
-  test("BUG-295/resume: it lists this directory's workspaces, newest first; Enter on one reopens that one; Esc resumes nothing, exit 130 @full", async () => {
+  test("resume/find: it lists this directory's workspaces, newest first; Enter on one reopens that one; Esc resumes nothing, exit 130 @full #BUG-295/resume", async () => {
     const s = sandbox();
     const here = repo.tiny();
     seed(s, workspace(here, { id: "aaaaaa", name: "older", updatedAt: Date.now() - 90_000 }), "aaaaaa");
