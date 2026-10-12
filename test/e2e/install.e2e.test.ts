@@ -80,7 +80,7 @@ describe("gluon install <agent>", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("Show the command only prints it and runs nothing", async () => {
+  test("install/offer: Show the command only prints it and runs nothing", async () => {
     const s = setup("show");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -106,7 +106,7 @@ describe("gluon install <agent>", () => {
     expect(log[0]).not.toContain(repo.tiny());
   });
 
-  test("installed where PATH doesn't reach: says where and to open a new terminal; not used", async () => {
+  test("install/after: installed where PATH doesn't reach: says where and to open a new terminal; not used", async () => {
     const s = setup("offpath", { offPath: true });
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -116,7 +116,7 @@ describe("gluon install <agent>", () => {
     expect(await app.exitCode()).toBe(1);
   });
 
-  test("Ctrl+C in the offer: exit 130, nothing runs", async () => {
+  test("install/offer: Ctrl+C in the offer: exit 130, nothing runs", async () => {
     const s = setup("ctrlc");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -134,7 +134,7 @@ describe("gluon install <agent>", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("an agent already installed, by its binary's name; an unknown one", async () => {
+  test("install/command: an agent already installed, by its binary's name; an unknown one", async () => {
     const s = setup("names");
     const ok = await cli(["install", "claude"], { env: s.env });
     expect(ok.code).toBe(0);
@@ -149,7 +149,7 @@ describe("gluon install <agent>", () => {
 });
 
 describe("gluon install (no agent named)", () => {
-  test("a checklist of the missing agents; Esc installs nothing", async () => {
+  test("install/command: a checklist of the missing agents; Esc installs nothing", async () => {
     const s = setup("list-esc");
     const app = s.app(["install"]);
     await app.waitFor("Install coding agents");
@@ -161,7 +161,7 @@ describe("gluon install (no agent named)", () => {
     expect(await app.exitCode()).toBe(0);
   });
 
-  test("the checked ones are offered in turn", async () => {
+  test("install/command: the checked ones are offered in turn", async () => {
     const s = setup("list-run");
     const app = s.app(["install"]);
     await app.waitFor("Install coding agents");
@@ -177,7 +177,7 @@ describe("the setup offers to install a missing agent", () => {
   /** How often `text` was printed so far. */
   const printed = (app: App, text: string) => app.history().split(text).length - 1;
 
-  test("installed: its screens follow; going back never offers or runs it again; nothing written @full", async () => {
+  test("install/in-setup: installed: its screens follow; going back never offers or runs it again; nothing written @full", async () => {
     const s = setup("setup-run");
     const app = s.app(["setup"]);
     await app.waitFor("Connect your coding agents");
@@ -202,7 +202,7 @@ describe("the setup offers to install a missing agent", () => {
     expect(existsSync(s.env.GLUON_CONFIG)).toBe(false);
   });
 
-  test("skipped (Esc): the summary says how to install it, and it isn't offered again", async () => {
+  test("install/in-setup: skipped (Esc): the summary says how to install it, and it isn't offered again", async () => {
     const s = setup("setup-skip");
     const app = s.app(["setup"]);
     await app.waitFor("Connect your coding agents");
@@ -227,7 +227,7 @@ describe("the setup offers to install a missing agent", () => {
 describe("review of phase 4", () => {
   const printed = (app: App, text: string) => app.history().split(text).length - 1;
 
-  test("BUG-109/A: a paste never answers the offer: '3' + Enter in one read, or bracketed", async () => {
+  test("install/run-it-enter-only: a paste never answers the offer: '3' + Enter in one read, or bracketed #BUG-109/A", async () => {
     const s = setup("paste");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -242,7 +242,7 @@ describe("review of phase 4", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("BUG-109/A: in the setup, a key pasted with a trailing '3' + Enter doesn't run the installer", async () => {
+  test("install/run-it-enter-only: in the setup, a key pasted with a trailing '3' + Enter doesn't run the installer #BUG-109/A", async () => {
     const s = setup("paste-setup");
     const app = s.app(["setup"]);
     await app.waitFor("Connect your coding agents");
@@ -256,7 +256,7 @@ describe("review of phase 4", () => {
     expect(existsSync(s.env.GLUON_CONFIG)).toBe(false);
   });
 
-  test("BUG-110/B: keys typed ahead as the offer appears (100 ms after the checklist's Enter) are dropped", async () => {
+  test("install/run-it-enter-only: keys typed ahead as the offer appears (100 ms after the checklist's Enter) are dropped #BUG-110/B", async () => {
     const s = setup("typeahead");
     const app = s.app(["setup"]);
     await app.waitFor("Connect your coding agents");
@@ -274,7 +274,7 @@ describe("review of phase 4", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("BUG-111/C: Alt+3 doesn't select Run it, and Up from Skip doesn't wrap to it @full", async () => {
+  test("install/run-it-enter-only: Alt+3 doesn't select Run it, and Up from Skip doesn't wrap to it @full #BUG-111/C", async () => {
     const s = setup("alt");
     const app = s.app(["install", "opencode"]);
     await offer(app);
@@ -308,7 +308,7 @@ describe("review of phase 4", () => {
     expect(s.logged()).toBe("");
   });
 
-  test("BUG-112/D: an installer that fails is a failure, even with an old binary in its directory (which the offer names)", async () => {
+  test("install/after: an installer that fails is a failure, even with an old binary in its directory (which the offer names) #BUG-112/D", async () => {
     const s = setup("fail", { offPath: true, extra: { FAKE_INSTALL_FAIL: "1" } });
     if (!WIN) {
       mkdirSync(s.to, { recursive: true });
@@ -323,7 +323,7 @@ describe("review of phase 4", () => {
     expect(await app.exitCode()).toBe(1);
   });
 
-  test("BUG-113/E: setup, installed off PATH: the summary says where and how to finish, not 'isn't installed'", async () => {
+  test("install/in-setup: setup, installed off PATH: the summary says where and how to finish, not 'isn't installed' #BUG-113/E", async () => {
     const s = setup("setup-offpath", { offPath: true });
     const app = s.app(["setup"]);
     await app.waitFor("Connect your coding agents");
@@ -338,7 +338,7 @@ describe("review of phase 4", () => {
     expect(await app.exitCode(5000)).toBe(1);
   });
 
-  test.skipIf(WIN)("BUG-114: Ctrl+C during the installer: exit 130; in the setup nothing is written @full", async () => {
+  test.skipIf(WIN)("install/after: Ctrl+C during the installer: exit 130; in the setup nothing is written @full #BUG-114", async () => {
     const s = setup("ctrlc-run", { extra: { FAKE_INSTALL_WAIT: "1" } });
     const app = s.app(["setup"]);
     await app.waitFor("Connect your coding agents");
@@ -358,7 +358,7 @@ describe("review of phase 4", () => {
     expect(await b.exitCode()).toBe(130);
   });
 
-  test("BUG-115: at 80×12 the offer keeps whole lines, the command first, and never clears the screen", async () => {
+  test("setup/menus-fit: at 80×12 the offer keeps whole lines, the command first, and never clears the screen", async () => {
     const s = setup("small", { rows: 12, cols: 80 });
     const app = s.app(["install", "codex"]);
     app.mark();
@@ -373,7 +373,7 @@ describe("review of phase 4", () => {
     expect(await app.exitCode()).toBe(1);
   });
 
-  test("BUG-116: printed commands put 'or' before the alternative", async () => {
+  test("install/official-commands: printed commands put 'or' before the alternative", async () => {
     const s = setup("or");
     const r = await cli(["install", "codex"], { env: s.env });
     expect(r.stdout).toContain(`\n  or  npm install -g @openai/codex`);
@@ -400,12 +400,12 @@ describe.skipIf(!canUnshare)("QA B5: WSL, only a Windows install", () => {
     return { stdout, stderr, code };
   };
 
-  test("doctor names the Windows install (the baseline: this works)", async () => {
+  test("detection/wsl-windows-install: doctor names the Windows install (the baseline: this works)", async () => {
     const r = await foreign(["doctor"]);
     expect(r.stdout).toContain("a Windows install was found on PATH; install it inside WSL");
   });
 
-  test("BUG-629/QA-onb-06: `gluon brain` says a Windows-only claude is a Windows install to redo inside WSL, not \"not installed (not found on PATH)\"", async () => {
+  test("detection/wsl-windows-install: `gluon brain` says a Windows-only claude is a Windows install to redo inside WSL, not \"not installed (not found on PATH)\" #BUG-629/QA-onb-06", async () => {
     const r = await foreign(["brain"]);
     expect(r.stdout).toContain("1. Sonnet");
     expect(r.stdout).not.toContain("claude is not installed (not found on PATH)");

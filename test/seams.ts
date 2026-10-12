@@ -70,8 +70,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/config.ts", "src/sessions.ts", "src/workspaces.ts", "src/cost/ledger-file.ts"],
   },
   "text-layout": {
-    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars",
-    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts", "src/ui/layout.ts", "src/pty/chrome.ts"],
+    says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars, a setup menu's fit",
+    modules: ["src/ui/width.tsx", "src/ui/markdown.tsx", "src/ui/theme.ts", "src/ui/layout.ts", "src/ui/menu-fit.ts", "src/pty/chrome.ts"],
   },
   polling: {
     says: "a work tree and an events directory over time → the files changed and the events read, and the processes and listings each poll costs",
@@ -88,6 +88,14 @@ export const SEAMS: Record<string, Seam> = {
   analytics: {
     says: "a session's start, its changes and its end → its row in `analytics.db` (the columns `gluon stats sql` queries, `MIGRATIONS` the schema); the database → what `gluon stats` prints, as text and as JSON",
     modules: ["src/analytics.ts", "src/stats.ts", "src/stats-sql.ts"],
+  },
+  "agent-status": {
+    says: "each harness's own status, model-list and version output, as its vendor prints it → installed, signed in (on a plan, its label), the models listed, the version, or a failure that is transient or definitive",
+    modules: ["src/status.ts"],
+  },
+  install: {
+    says: "an agent and the OS (PATH, WSL, Windows) → its official install commands, which of them can run here and what is missing, the argv that runs one, and where its installer puts the binary",
+    modules: ["src/install.ts"],
   },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",

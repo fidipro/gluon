@@ -48,7 +48,7 @@ Use an OpenRouter key that only Gluon uses. Gluon reads the key's usage to show 
 ## Move around the screens
 
 - A digit moves the selection and Enter confirms it.
-- A checklist toggles rows with Space or their number; on a list of ten or more rows, `1` then `0` within a second is row 10.
+- A checklist toggles rows with Space or their number.
 - Esc goes back one screen with your earlier answer selected. On the first screen it leaves setup.
 - Ctrl+C quits setup at once (exit code 130, nothing checked).
 

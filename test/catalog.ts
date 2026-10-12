@@ -239,6 +239,47 @@ export const CATALOG: Record<string, Feature> = {
       "default-valid": rule("whatever the shipped `routing.yaml` and this build's catalog route to is valid: a connected, allowed agent within the limits, with an effort its model takes, and a launch a proposal accepts, for every type × steps × mode × limits × connected set; the default names only this build's models, every type lists the same fields at medium effort, and its commented examples parse", ["seam"]),
     },
   },
+  setup: {
+    says: "the setup screens (docs/getting-started/connect-agents.md \"Run setup\", \"Move around the screens\")",
+    entries: {
+      checklist: b("the first screen, \"Connect your coding agents\", lists the six agents, each marked installed or missing with its official install command; Esc on it leaves setup"),
+      keys: b("a digit moves the selection and Enter confirms; a digit and Enter in one menu answer that menu only; keys that arrive in one read are handled one by one; a digit pressed the moment the next menu appears is honoured"),
+      back: b("Esc goes back one screen with the earlier answer selected, within an agent and across agents, from a key or AWS prompt, past a login handoff (never running it again); the footers say `esc to cancel` on the first screen and `esc to go back` after it"),
+      quit: b("Ctrl+C in a menu or a key prompt quits setup at once: exit 130, nothing probed, nothing written"),
+      "nothing-until-done": b("nothing (config or keys) is saved until the last screen is answered; leaving or quitting changes nothing, a pasted key included; unchecking a connected agent disconnects it after asking (`Keep connected` keeps it)"),
+      "terminal-replies": b("a terminal's late reply (OSC 11, either terminator, its rest coming later) never closes a menu, types into a key prompt or counts as Esc; a real Esc still does"),
+      "menus-fit": b("a menu fits the terminal: its margins go first, then its body is cut at whole lines from the first (the install command first), then its list scrolls with the cursor; the title stays and the screen is never cleared", ["seam", "e2e"]),
+    },
+  },
+  detection: {
+    says: "finding the agents (docs/getting-started/connect-agents.md, docs/guides/troubleshooting.md)",
+    entries: {
+      "on-path": b("an agent is installed when its binary is on the PATH (an explicit PATH searched instead of the environment's), resolved to an absolute path; otherwise it says why not", ["seam"]),
+      "wsl-windows-install": b("on WSL a Windows install alone (under `/mnt/<drive>/`, `.exe` / `.cmd`) is found but not used: setup, `gluon doctor` and `gluon brain` name it as a Windows install to redo inside WSL, never \"not installed\"; a Linux one later on PATH wins", ["seam", "e2e"]),
+    },
+  },
+  "sign-in": {
+    says: "a subscription's sign-in (docs/getting-started/connect-agents.md \"With a subscription\", docs/guides/connections.md, the agent pages)",
+    entries: {
+      "status-check": b("given a subscription, then Gluon runs the agent's own status check: signed in, no notice and straight to the check; signed out, it offers the agent's own login (a terminal handoff) and checks again; not now, nothing is connected; an agent without a status command (Kimi Code) is asked after its login"),
+      "plan-only": b("only a sign-in to the plan counts as the subscription: an agent signed in with an API key (Claude Code, Codex) is not on the plan, which it says, offering the login; an `OPENCODE_API_KEY` variable or a sign-in OpenCode wants redone isn't the OpenCode Go plan", ["e2e", "seam"]),
+      "handoff-input": b("a login handoff gets the terminal: the first line typed reaches the login"),
+      "status-read": b("an agent's own status, list and version output is read as the vendor prints it: a plan by its label and nothing of the account (an email never comes through); signed out is a definitive answer; garbage, an empty answer, a non-object JSON or a crash is a transient failure saying what the binary printed, keys masked; a check that hangs is killed at its timeout, and a child holding the pipe doesn't hold it", ["seam"]),
+    },
+  },
+  connections: {
+    says: "the ways in: plans, API keys, Bedrock, OpenRouter (docs/guides/connections.md)",
+    entries: {
+      choice: b("for each checked agent, the ways in it takes (connections.md's table), the API-key providers above the plan, the model maker's own key provider first", ["e2e", "seam"]),
+      "api-key": b("pick the provider, then paste the key or reuse one already set (the environment, the `.env` next to the config); a pasted key is saved next to the config (0600), never shown, and is what Gluon and the agent use, even when the same variable is exported; nothing of the agent's own is written"),
+      bedrock: b("Bedrock asks for the AWS profile and region, never credentials; Enter on an empty line pins neither and shows what Bedrock will use; a configured profile and region are pre-filled, typing one pins it"),
+      "env-warning": b("a variable of the user's that would change what a plan connection does (`ANTHROPIC_API_KEY`) is pointed out, never removed"),
+      "told-what-to-set": b("where an agent takes a setting Gluon must not write (Antigravity's Gemini key), setup says what to set in the agent's own settings"),
+      "opencode-providers": b("OpenCode takes a checklist of providers and `Add another`: its plan through OpenCode's own login, OpenRouter by its key, both together (a launch gets only its model's key, the plan none); Esc at `Done / Add another` goes back, never Done, and leaving keeps the previous connection"),
+      reachable: b("a check's results are kept with their date: a model found unreachable is left out, one never checked is offered; only a definitive answer (signed out, a key rejected, a model not listed or refused) changes them, a passing failure (timeout, network, limit, 5xx) shows ✗ with its reason and keeps the last results; Bedrock's refused models are named and the rest still offered", ["e2e", "seam"]),
+      "check-at-end": b("after the last screen, with any agent connected, Gluon checks every model of every connection and the intake agent's order, prints a summary and starts; with nothing chosen nothing is checked, no config is written, and it says what to do"),
+    },
+  },
   launch: {
     says: "how Gluon starts each harness: its argv, environment, adapter and private files (docs/guides/harnesses/*, docs/concepts/architecture.md, src/AGENTS.md)",
     entries: {
@@ -449,6 +490,8 @@ export const CATALOG: Record<string, Feature> = {
       "masked-when-printed": rule("given a key or token in text Gluon prints (an error, a probe's output), then it is masked, by shape and by value"),
       "private-files-directory-first": rule("when a private file is written, then it is made in a fresh 0700 directory and renamed into place, and nothing is left behind on a failure"),
       "only-next-to-config": rule("the keys are read only from the `.env` next to the config (a saved key beats the environment); a dev key file is used only when handed in, and named as the source; nothing comes from Gluon's own source directory"),
+      "env-file": b("the `.env` next to the config is read as dotenv reads it: assignments, `export`, quotes, CRLF, spaces around `=`; a value's trailing whitespace is not part of the key, spaces inside quotes are; comments, blank lines and junk are not assignments; an empty value is no key; any line is read in linear time", ["seam"]),
+      saved: b("saving a key replaces only that name's lines of the `.env` (a name that is a prefix of another leaves the other alone), keeps every other line, and is in effect at once; the file is 0600 whatever the umask, a fresh config's directory made too; a symlink planted at the `.env` is replaced, never followed; uninstall drops only Gluon's own key lines", ["seam"]),
     },
   },
   pty: {
@@ -465,6 +508,11 @@ export const CATALOG: Record<string, Feature> = {
     entries: {
       "run-it-enter-only": rule("given the install offer, when the user pastes, presses a digit, holds Enter, presses Esc or has no terminal, then nothing runs; only Run it + Enter runs it", ["e2e"]),
       "verbatim-no-sudo": rule("when an installer is shown and run, then it is the vendor's constant https or npm command, shown as it runs, with nothing interpolated, no --yes and no sudo", ["code", "seam", "e2e"]),
+      offer: b("the offer shows the exact command, where it downloads from and the vendor's docs, with Skip (the default), Show the command only (prints it, runs nothing) and Run it; Ctrl+C at it exits 130 and runs nothing"),
+      after: b("after Run it, Gluon finds the agent on PATH; installed in a directory PATH doesn't reach, it names the directory and says to open a new terminal, and never runs it from there; an installer that fails is a failure (an old binary in its directory named, not used); Ctrl+C during it exits 130, nothing written", ["e2e", "seam"]),
+      command: b("`gluon install` offers a checklist of the agents not installed (Esc installs nothing), `gluon install <agents>` names them by id or binary name (an unknown one is refused, an installed one said so), each checked one offered in turn", ["e2e", "seam"]),
+      "in-setup": b("a checked agent that is missing is offered an install first; installed, its screens follow and going back never offers or runs it again; skipped, the summary gives its install command and it isn't offered again; installed off PATH, the summary says where and how to finish"),
+      "official-commands": b("each agent's official commands per platform, the recommended first, an npm alternative where there is one (`or` before it); a method runs only when all it needs is on PATH (a relative PATH entry doesn't count; on WSL a Windows npm is named as not usable), what is missing is named, an unchecked method never runs; on Windows PowerShell by its full path, `-NoProfile`, the command as one argument", ["seam", "e2e"]),
     },
   },
   update: {

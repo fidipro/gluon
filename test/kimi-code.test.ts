@@ -65,7 +65,7 @@ describe("the harness", () => {
     expect(installMethods("kimi-code", "win32").flatMap((m) => m.needs)).toEqual(["powershell"]);
   });
 
-  test("where the installer puts it: ~/.kimi-code/bin, or $KIMI_INSTALL_DIR/bin", () => {
+  test("install/after: where the installer puts it: ~/.kimi-code/bin, or $KIMI_INSTALL_DIR/bin", () => {
     expect(installDirs("kimi-code", { platform: "linux", env: {}, home: "/home/u" })).toEqual(["/home/u/.kimi-code/bin"]);
     expect(installDirs("kimi-code", { platform: "linux", env: { KIMI_INSTALL_DIR: "/opt/k" }, home: "/home/u" })).toEqual(["/opt/k/bin"]);
     expect(installDirs("kimi-code", { platform: "win32", env: { USERPROFILE: "C:\\Users\\u" }, home: "x" })).toEqual(["C:\\Users\\u\\.kimi-code\\bin"]);
@@ -125,7 +125,7 @@ describe("the harness", () => {
     expect(cycleModel({ harness: "kimi-code", model: "kimi-k2.7-code" }, agents("openrouter")).effort).toBeUndefined();
   });
 
-  test("the plan is a subscription (personal use, `kimi login`); a Moonshot or an OpenRouter key are the key providers (the vendor's own first)", () => {
+  test("connections/choice: the plan is a subscription (personal use, `kimi login`); a Moonshot or an OpenRouter key are the key providers (the vendor's own first)", () => {
     expect(info.providers).toEqual(["moonshot", "openrouter"]);
     expect(isPlanConn("plan")).toBe(true);
     expect(subscriptionOf("kimi-code", "plan")).toMatchObject({ vendor: "moonshot", plan: "Kimi Code plan", loginArgv: ["kimi", "login"] });

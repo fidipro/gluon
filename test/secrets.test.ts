@@ -32,25 +32,25 @@ afterAll(() => {
 });
 
 describe("parseEnv", () => {
-  test("assignments, `export`, quotes, CRLF, spaces around =; comments, blank lines and junk are not assignments", () => {
+  test("keys/env-file: assignments, `export`, quotes, CRLF, spaces around =; comments, blank lines and junk are not assignments", () => {
     writeFileSync(env(), ['# comment', "", "A=1", "export B=two", 'C="three"', "D='four'", "  E = five", "F=", "not an assignment", "1BAD=x", "G=a=b", 'H="unbalanced', "I=\"x\"y\""].join("\r\n"));
     expect(parseEnv(env())).toEqual([["A", "1"], ["B", "two"], ["C", "three"], ["D", "four"], ["E", "five"], ["F", ""], ["G", "a=b"], ["H", '"unbalanced'], ["I", 'x"y']]);
   });
-  test("BUG-587/trailing-space: trailing whitespace after a value is not part of the key (`XAI_API_KEY=xai-... ` in a hand-edited .env would be sent as an HTTP header with the space; dotenv trims it)", () => {
+  test("keys/env-file: trailing whitespace after a value is not part of the key (`XAI_API_KEY=xai-... ` in a hand-edited .env would be sent as an HTTP header with the space; dotenv trims it) #BUG-587/trailing-space", () => {
     writeFileSync(env(), "XAI_API_KEY=xai-abc123  \nOTHER = spaced \n");
     expect(parseEnv(env())).toEqual([["XAI_API_KEY", "xai-abc123"], ["OTHER", "spaced"]]);
   });
-  test("BUG-587/linear: a value followed by tens of thousands of spaces, and a line of nothing but spaces, are read in linear time", () => {
+  test("keys/env-file: a value followed by tens of thousands of spaces, and a line of nothing but spaces, are read in linear time #BUG-587/linear", () => {
     writeFileSync(env(), `A=x${" ".repeat(400_000)}y\n${" ".repeat(400_000)}B=1\nC${" ".repeat(400_000)}\nD=z${" ".repeat(400_000)}\n`);
     const t0 = performance.now();
     expect(parseEnv(env())).toEqual([["A", `x${" ".repeat(400_000)}y`], ["B", "1"], ["D", "z"]]);
     expect(performance.now() - t0).toBeLessThan(1000 * SLOW);
   });
-  test("BUG-587/quoted: a quoted value keeps the spaces inside the quotes, loses those around them; tabs and CRLF count as trailing too", () => {
+  test("keys/env-file: a quoted value keeps the spaces inside the quotes, loses those around them; tabs and CRLF count as trailing too #BUG-587/quoted", () => {
     writeFileSync(env(), 'A="  inner  spaces "  \r\nB=\'x y\'\t\r\nC=plain \t \nD="kept" # not a comment handler\nE=   \n');
     expect(parseEnv(env())).toEqual([["A", "  inner  spaces "], ["B", "x y"], ["C", "plain"], ["D", '"kept" # not a comment handler'], ["E", ""]]);
   });
-  test("a missing file is no assignments, and an empty value is no secret", () => {
+  test("keys/env-file: a missing file is no assignments, and an empty value is no secret", () => {
     expect(parseEnv(join(TMP, "absent.env"))).toEqual([]);
     writeFileSync(env(), "XAI_API_KEY=\n");
     loadSecrets();
@@ -60,7 +60,7 @@ describe("parseEnv", () => {
 });
 
 describe("what a key is, and where it came from", () => {
-  test("saved beats the environment; the source names the file or the environment, never the value; a development key file counts as saved but is never written", () => {
+  test("keys/only-next-to-config: saved beats the environment; the source names the file or the environment, never the value; a development key file counts as saved but is never written", () => {
     process.env.XAI_API_KEY = "xai-from-the-environment-0000";
     expect(secretSource("XAI_API_KEY")).toBe("your environment");
     writeFileSync(env(), "XAI_API_KEY=xai-from-the-env-file-1111\n");
@@ -85,18 +85,18 @@ describe("what a key is, and where it came from", () => {
 });
 
 describe("saveSecrets", () => {
-  test("replaces a name's lines (also `export NAME =`), keeps every other line, ends with a newline, and the secret is in memory at once", () => {
+  test("keys/saved: replaces a name's lines (also `export NAME =`), keeps every other line, ends with a newline, and the secret is in memory at once", () => {
     writeFileSync(env(), "KEEP=1\nexport XAI_API_KEY = old\nXAI_API_KEY=older\n# note\n");
     saveSecrets([["XAI_API_KEY", "xai-new-value-00000000"], ["OPENAI_API_KEY", "sk-proj-newnewnewnewnewnew"]]);
     expect(readFileSync(env(), "utf8")).toBe("KEEP=1\n# note\nXAI_API_KEY=xai-new-value-00000000\nOPENAI_API_KEY=sk-proj-newnewnewnewnewnew\n");
     expect(secret("XAI_API_KEY")).toBe("xai-new-value-00000000");
   });
-  test("a name that is a prefix of another leaves the other alone (XAI_API_KEY vs XAI_API_KEY_2)", () => {
+  test("keys/saved: a name that is a prefix of another leaves the other alone (XAI_API_KEY vs XAI_API_KEY_2)", () => {
     writeFileSync(env(), "XAI_API_KEY_2=other\n");
     saveSecret("XAI_API_KEY", "xai-new-value-00000000");
     expect(readFileSync(env(), "utf8")).toBe("XAI_API_KEY_2=other\nXAI_API_KEY=xai-new-value-00000000\n");
   });
-  test.skipIf(!POSIX)("0600 whatever the umask or the old file's mode, and the directory of a fresh config is created too", () => {
+  test.skipIf(!POSIX)("keys/saved: 0600 whatever the umask or the old file's mode, and the directory of a fresh config is created too", () => {
     const old = process.umask(0);
     try {
       writeFileSync(env(), "A=1\n", { mode: 0o666 });
@@ -120,7 +120,7 @@ describe("saveSecrets", () => {
     expect(readFileSync(env(), "utf8")).toBe("KEEP=1\n");
     expect(secret("XAI_API_KEY")).toBeUndefined();
   });
-  test.skipIf(!canSymlink)("a symlink planted at the .env is replaced, not followed: its target is never written", () => {
+  test.skipIf(!canSymlink)("keys/saved: a symlink planted at the .env is replaced, not followed: its target is never written", () => {
     const target = join(TMP, "victim.txt");
     writeFileSync(target, "untouched\n");
     symlinkSync(target, env());
@@ -129,7 +129,7 @@ describe("saveSecrets", () => {
     expect(lstatSync(env()).isSymbolicLink()).toBe(false);
     expect(readFileSync(env(), "utf8")).toContain("XAI_API_KEY=xai-new-value-00000000\n");
   });
-  test("withoutSavedKeys drops only Gluon's own key lines, keeps the line ending, and says null when nothing else is left", () => {
+  test("keys/saved: withoutSavedKeys drops only Gluon's own key lines, keeps the line ending, and says null when nothing else is left", () => {
     expect(withoutSavedKeys("XAI_API_KEY=a\r\nMINE=1\r\nexport OPENAI_API_KEY=b\r\n")).toBe("MINE=1\r\n");
     expect(withoutSavedKeys("XAI_API_KEY=a\n\n")).toBeNull();
     expect(withoutSavedKeys("MINE=1\n")).toBe("MINE=1\n");
@@ -151,7 +151,7 @@ describe("private files", () => {
       process.umask(old);
     }
   });
-  test.skipIf(!POSIX)("restricting for Windows where there is no whoami.exe / icacls.exe is a warning naming the path, never a throw", () => {
+  test.skipIf(!POSIX)("windows/private-keys: restricting for Windows where there is no whoami.exe / icacls.exe is a warning naming the path, never a throw", () => {
     const dir = join(TMP, "w");
     mkdirSync(dir);
     expect(restrictToUser(dir, true)).toBe(`could not limit ${dir} to your account (icacls); check who can read it`);
@@ -171,7 +171,7 @@ describe("private files", () => {
     expect(readdirSync(join(TMP, "a", "b"))).toEqual(["file.json"]);
     if (POSIX) expect(statSync(path).mode & 0o777).toBe(0o600);
   });
-  test("renameOver retries a busy file a few times, then gives up with its own error; another error is not retried", () => {
+  test("keys/private-files-directory-first: renameOver retries a busy file a few times, then gives up with its own error; another error is not retried", () => {
     let calls = 0;
     renameOver("a", "b", () => {
       if (++calls < 3) throw Object.assign(new Error("busy"), { code: "EBUSY" });
@@ -197,13 +197,13 @@ describe("private files", () => {
 });
 
 describe("Windows' side, as pure functions", () => {
-  test("parseSid takes the SID from whoami's CSV and nothing else", () => {
+  test("windows/private-keys: parseSid takes the SID from whoami's CSV and nothing else", () => {
     expect(parseSid('"HOST\\me","S-1-5-21-111-222-333-1001"\r\n')).toBe("S-1-5-21-111-222-333-1001");
     expect(parseSid("")).toBeNull();
     expect(parseSid("ERROR: Access denied")).toBeNull();
     expect(parseSid('"HOST\\me","S-1-"\n')).toBeNull();
   });
-  test("outsideProfile: inside the profile, beside it, another drive, case-insensitive", () => {
+  test("windows/private-keys: outsideProfile: inside the profile, beside it, another drive, case-insensitive", () => {
     const same = (p: string) => p;
     expect(outsideProfile("C:\\Users\\me\\.config\\gluon\\.env", "C:\\Users\\me", same)).toBe(false);
     expect(outsideProfile("c:\\USERS\\ME\\x", "C:\\Users\\me", same)).toBe(false);
@@ -211,7 +211,7 @@ describe("Windows' side, as pure functions", () => {
     expect(outsideProfile("D:\\keys\\.env", "C:\\Users\\me", same)).toBe(true);
     expect(outsideProfile("C:\\Users\\me2\\x", "C:\\Users\\me", same)).toBe(true);
   });
-  test("storageNote is honest per platform", () => {
+  test("windows/private-keys: storageNote is honest per platform", () => {
     expect(storageNote("linux")).toBe("readable only by you (mode 600)");
     expect(storageNote("darwin")).toBe("readable only by you (mode 600)");
     expect(storageNote("win32", "C:\\Users\\me\\x\\.env", "C:\\Users\\me")).toContain("in your Windows profile");
@@ -220,7 +220,7 @@ describe("Windows' side, as pure functions", () => {
 });
 
 describe("masking edges", () => {
-  test("a known value is masked wherever it occurs, longest first, with regex characters in it, and a value under 8 characters is not (too short to tell from text)", () => {
+  test("keys/masked-when-printed: a known value is masked wherever it occurs, longest first, with regex characters in it, and a value under 8 characters is not (too short to tell from text)", () => {
     saveSecret("XAI_API_KEY", "a.b*c+d?e(f)g[h]");
     saveSecret("OPENAI_API_KEY", "a.b*c+d?e(f)g[h]-longer-one");
     expect(maskSecrets("x a.b*c+d?e(f)g[h]-longer-one y a.b*c+d?e(f)g[h] z")).toBe("x •••• y •••• z");
@@ -228,7 +228,7 @@ describe("masking edges", () => {
     saveSecret("MY_PLAIN_TOKEN", "short");
     expect(maskSecrets("a short one")).toBe("a short one");
   });
-  test("a secret-named variable in the .env is masked by value; the environment's only for the names Gluon hands out", () => {
+  test("keys/masked-when-printed: a secret-named variable in the .env is masked by value; the environment's only for the names Gluon hands out", () => {
     writeFileSync(env(), "MY_PLAIN_TOKEN=plain-token-value-1\nREGION=us-east-1-long\n");
     loadSecrets();
     process.env.AWS_SESSION_TOKEN = "plain-session-value-2";
@@ -240,21 +240,21 @@ describe("masking edges", () => {
     }
     expect(knownSecretValues(SECRET_ENV)).toEqual(expect.arrayContaining(["plain-token-value-1", "plain-session-value-2"]));
   });
-  test("maskValue keeps a known vendor's prefix and shows nothing of an unknown shape", () => {
+  test("keys/masked-when-printed: maskValue keeps a known vendor's prefix and shows nothing of an unknown shape", () => {
     expect(maskValue("sk-ant-api03-abcdefghijklmnop")).toBe("sk-ant-••••");
     expect(maskValue("ghp_abcdefghijklmnopqrstuvwxyz0123456789")).toBe("ghp_••••");
     expect(maskValue("plain")).toBe("••••");
   });
-  test("Bearer values, JWTs and text with a key twice: every occurrence goes; text around stays", () => {
+  test("keys/masked-when-printed: Bearer values, JWTs and text with a key twice: every occurrence goes; text around stays", () => {
     const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     expect(maskSecrets(`Authorization: Bearer abcdefghijklmnop1234 and ${jwt} and sk-ant-api03-abcdefghijklmnop sk-ant-api03-abcdefghijklmnop`)).toBe("Authorization: Bearer •••• and eyJ•••• and sk-ant-•••• sk-ant-••••");
   });
-  test("an empty string, and text with nothing to hide, come back unchanged", () => {
+  test("keys/masked-when-printed: an empty string, and text with nothing to hide, come back unchanged", () => {
     expect(maskSecrets("")).toBe("");
     expect(maskSecrets("model gpt-6 failed: 429 rate limit (retry in 20 s)")).toBe("model gpt-6 failed: 429 rate limit (retry in 20 s)");
   });
 
-  test("BUG-583/vendor-tokens: the tokens GitHub, GitLab, npm, Slack and Hugging Face hand out today are masked (github_pat_…, glpat-…, npm_…, xox*-…, hf_…): an error, an issue text from `forge`, a spec saved to analytics or a workspace carries them as they are", () => {
+  test("keys/masked-when-printed: the tokens GitHub, GitLab, npm, Slack and Hugging Face hand out today are masked (github_pat_…, glpat-…, npm_…, xox*-…, hf_…): an error, an issue text from `forge`, a spec saved to analytics or a workspace carries them as they are #BUG-583/vendor-tokens", () => {
     const tokens = [
       "github_pat_11ABCDEFG0abcdefghijkl_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ",
       "glpat-abcdefghij0123456789",
@@ -264,7 +264,7 @@ describe("masking edges", () => {
     ];
     expect(tokens.filter((t) => maskSecrets(`error ${t} end`).includes(t.slice(-12)))).toEqual([]);
   });
-  test("BUG-584/url-password-and-pem: a password in a URL (https://user:password@host, a git remote or a database DSN) and a PEM private key block are masked", () => {
+  test("keys/masked-when-printed: a password in a URL (https://user:password@host, a git remote or a database DSN) and a PEM private key block are masked #BUG-584/url-password-and-pem", () => {
     const text = "fatal: unable to access 'https://user:s3cretPassw0rd@example.com/x.git'";
     expect(maskSecrets(text)).not.toContain("s3cretPassw0rd");
     expect(maskSecrets("-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA7abcdefgh\n-----END RSA PRIVATE KEY-----")).not.toContain("MIIEowIBAAKCAQEA7abcdefgh");
@@ -287,48 +287,48 @@ describe("masking edges", () => {
       "SG.": ["SG.abcdef0123456789abcdef.abcdef0123456789abcdef0123456789abcdef01234", "SG.••••"],
     };
     for (const [name, [token, shown]] of Object.entries(TOKENS)) {
-      test(`BUG-583/${name}: masked in a sentence, at the end of a line and in JSON; only the prefix stays`, () => {
+      test(`keys/masked-when-printed: ${name}: masked in a sentence, at the end of a line and in JSON; only the prefix stays #BUG-583`, () => {
         expect(maskSecrets(`I pasted ${token} by mistake, sorry`)).toBe(`I pasted ${shown} by mistake, sorry`);
         expect(maskSecrets(`line one\nTOKEN=${token}\nline three`)).toBe(`line one\nTOKEN=${shown}\nline three`);
         expect(maskSecrets(`{"auth":"${token}"}`)).toBe(`{"auth":"${shown}"}`);
         expect(maskValue(token)).toBe(shown);
       });
     }
-    test("BUG-583/authorization: an Authorization header's Basic and Bearer credentials go (16+ characters), the scheme stays; the word Basic in prose does not count", () => {
+    test("keys/masked-when-printed: an Authorization header's Basic and Bearer credentials go (16+ characters), the scheme stays; the word Basic in prose does not count #BUG-583/authorization", () => {
       expect(maskSecrets("-H 'Authorization: Basic dXNlcjpwYXNzd29yZDEyMzQ1Njc4' -H \"Authorization: Bearer abcdef0123456789abcdef\"")).toBe("-H 'Authorization: Basic ••••' -H \"Authorization: Bearer ••••\"");
       expect(maskSecrets('{"Authorization":"Basic dXNlcjpwYXNzd29yZDEyMzQ1Njc4"}')).toBe('{"Authorization":"Basic ••••"}');
       expect(maskSecrets("curl https://hooks.slack.com/services/T0123456789/B0123456789/abcdef0123456789abcdef0123 now")).toBe("curl https://hooks.slack.com/services/•••• now");
       const prose = "Basic configuration infrastructure; Authorization: Basic abc; Authorization: Bearer short";
       expect(maskSecrets(prose)).toBe(prose);
     });
-    test("BUG-583/not-tokens: words that only start like a token, and tokens too short to be one, stay as they are", () => {
+    test("keys/masked-when-printed: words that only start like a token, and tokens too short to be one, stay as they are #BUG-583/not-tokens", () => {
       const prose = "run npm_modules or npm_config_cache; hf_ and gsk_ prefixes, glpat-x, xoxb-short, pplx-1, github_pat_ alone, sk_live_ keys, the hf_hub cache, an npm_ var";
       expect(maskSecrets(prose)).toBe(prose);
     });
   });
 
   describe("a password in a URL", () => {
-    test("BUG-584/url: the password goes; scheme, user and host stay, whatever the scheme (a git remote, a DSN) and what follows", () => {
+    test("keys/masked-when-printed: the password goes; scheme, user and host stay, whatever the scheme (a git remote, a DSN) and what follows #BUG-584/url", () => {
       expect(maskSecrets("fatal: unable to access 'https://user:s3cretPassw0rd@example.com/x.git'")).toBe("fatal: unable to access 'https://user:••••@example.com/x.git'");
       expect(maskSecrets("DATABASE_URL=postgres://app:pa55-abcdef-0123@db.internal:5432/app?sslmode=require")).toBe("DATABASE_URL=postgres://app:••••@db.internal:5432/app?sslmode=require");
       expect(maskSecrets("redis://:abcdef0123@cache:6379")).toBe("redis://:••••@cache:6379");
       expect(maskSecrets('{"remote":"git+https://ci:pw-abcdef-0123456789@git.example.com/org/repo"}')).toBe('{"remote":"git+https://ci:••••@git.example.com/org/repo"}');
       expect(maskSecrets("clone https://u:p%40ss-abcdef@host.example, then ssh://u:abcdef0123@h:22/x.")).toBe("clone https://u:••••@host.example, then ssh://u:••••@h:22/x.");
     });
-    test("BUG-584/url-at-sign: a raw @ in the password does not leave its tail visible (the password runs to the last @ before the host)", () => {
+    test("keys/masked-when-printed: a raw @ in the password does not leave its tail visible (the password runs to the last @ before the host) #BUG-584/url-at-sign", () => {
       expect(maskSecrets("https://user:pa@ss-word99@host/x")).toBe("https://user:••••@host/x");
       expect(maskSecrets("mysql://root:pa@ss-word99@db:3306/x, then")).toBe("mysql://root:••••@db:3306/x, then");
       expect(maskSecrets('{"u":"postgres://a:b@c-abcdef@h"}')).toBe('{"u":"postgres://a:••••@h"}');
     });
-    test("BUG-584/url-placeholder: a placeholder or an already masked password stays as it is", () => {
+    test("keys/masked-when-printed: a placeholder or an already masked password stays as it is #BUG-584/url-placeholder", () => {
       const text = "https://u:${T}@h https://u:<pw>@h https://u:{{x}}@h https://u:$VAR@h https://u:%s@h https://u:••••@h";
       expect(maskSecrets(text)).toBe(text);
     });
-    test("BUG-584/url-unchanged: a URL without a password stays whole (user only, port, query, e-mail, scp-style remote)", () => {
+    test("keys/masked-when-printed: a URL without a password stays whole (user only, port, query, e-mail, scp-style remote) #BUG-584/url-unchanged", () => {
       const text = "see https://github.com/org/repo, https://user@host/x, http://localhost:3000/a?b=c@d, http://localhost:3000 me@x.com, git@github.com:org/repo.git, ssh://git@host:22/x.git";
       expect(maskSecrets(text)).toBe(text);
     });
-    test("BUG-584/url-linear: hostile URLs take linear time (a long https:// with many ':' and no '@', a password that never ends, thousands of schemes)", () => {
+    test("keys/masked-when-printed: hostile URLs take linear time (a long https:// with many ':' and no '@', a password that never ends, thousands of schemes) #BUG-584/url-linear", () => {
       for (const text of ["https://" + ":".repeat(2_000_000), "https://user:" + "x".repeat(2_000_000), "https://a:b".repeat(300_000), "https://u:" + "a@".repeat(1_000_000), "https://u:".repeat(300_000), "a.".repeat(1_000_000) + "://" + "u:".repeat(500_000)]) {
         const t0 = performance.now();
         maskSecrets(text);
@@ -341,7 +341,7 @@ describe("masking edges", () => {
     const BODY = "MIIEowIBAAKCAQEA7abcdefghABCDEFGHIJ0123456789abcdefghABCDEFGHIJ0123456789==";
     // Built at run time so no secret scanner sees a PEM header in this file.
     const B = "-----BEGIN ";
-    test("BUG-584/pem: the body goes, the header and end line stay, for each kind of key and in a sentence, JSON or CRLF text", () => {
+    test("keys/masked-when-printed: the body goes, the header and end line stay, for each kind of key and in a sentence, JSON or CRLF text #BUG-584/pem", () => {
       for (const kind of ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY", "OPENSSH PRIVATE KEY", "ENCRYPTED PRIVATE KEY", "PGP PRIVATE KEY BLOCK"]) {
         const pem = `${B}${kind}-----\n${BODY}\n${BODY}\n-----END ${kind}-----`;
         expect(maskSecrets(`use this key:\n${pem}\nthen deploy`)).toBe(`use this key:\n${B}${kind}-----\n••••\n-----END ${kind}-----\nthen deploy`);
@@ -356,18 +356,18 @@ describe("masking edges", () => {
         `a ${B}PRIVATE KEY-----\n••••\n-----END PRIVATE KEY----- b ${B}EC PRIVATE KEY-----\n••••\n-----END EC PRIVATE KEY----- c`,
       );
     });
-    test("BUG-584/pem-cut: a block whose end line was cut off hides the key lines after the header, and not the text after them", () => {
+    test("keys/masked-when-printed: a block whose end line was cut off hides the key lines after the header, and not the text after them #BUG-584/pem-cut", () => {
       expect(maskSecrets(`${B}RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\n${BODY}\n${BODY}\n\nthen test the thing`)).toBe(`${B}RSA PRIVATE KEY-----\n••••\n\nthen test the thing`);
       const prose = `a private key starts with ${B}PRIVATE KEY----- and ends with the matching line`;
       expect(maskSecrets(prose)).toBe(prose);
     });
-    test("BUG-584/pem-unchanged: a certificate or a public key is not a private key", () => {
+    test("keys/masked-when-printed: a certificate or a public key is not a private key #BUG-584/pem-unchanged", () => {
       const cert = `-----BEGIN CERTIFICATE-----\n${BODY}\n-----END CERTIFICATE-----`;
       expect(maskSecrets(cert)).toBe(cert);
       const pub = `-----BEGIN PUBLIC KEY-----\n${BODY}\n-----END PUBLIC KEY-----`;
       expect(maskSecrets(pub)).toBe(pub);
     });
-    test("BUG-584/pem-linear: a BEGIN with no END, thousands of BEGINs, a body that never stops, a header of spaces take linear time", () => {
+    test("keys/masked-when-printed: a BEGIN with no END, thousands of BEGINs, a body that never stops, a header of spaces take linear time #BUG-584/pem-linear", () => {
       const cases = [
         `${B}PRIVATE KEY-----\n`.repeat(150_000),
         `${B}PRIVATE KEY-----` + "\nAAAAAAAAAAAAAAAA".repeat(200_000),
@@ -384,18 +384,18 @@ describe("masking edges", () => {
   });
 
   describe("a value after a key that names a secret", () => {
-    test("BUG-588/key-value: password=, passwd=, secret=, token= (also in a longer name, quoted, in JSON): the value goes, the key stays", () => {
+    test("keys/masked-when-printed: password=, passwd=, secret=, token= (also in a longer name, quoted, in JSON): the value goes, the key stays #BUG-588/key-value", () => {
       expect(maskSecrets("password=hunter2-abcdef and passwd = pw0123456789 then")).toBe("password=•••• and passwd = •••• then");
       expect(maskSecrets("export DB_PASSWORD=\"correct horse abcdef\"\nAPI_TOKEN='abcdef0123456789'")).toBe("export DB_PASSWORD=••••\nAPI_TOKEN=••••");
       expect(maskSecrets('{"password": "correct horse abcdef", "client_secret":"abcdef0123456789", "name": "ann"}')).toBe('{"password": ••••, "client_secret":••••, "name": "ann"}');
       expect(maskSecrets("curl 'https://x.example/api?access_token=abcdef0123456789&page=2'")).toBe("curl 'https://x.example/api?access_token=••••&page=2'");
       expect(maskSecrets("SECRET=abcdef0123456789")).toBe("SECRET=••••");
     });
-    test("BUG-588/key-value-unchanged: prose, placeholders, short values and other names stay", () => {
+    test("keys/masked-when-printed: prose, placeholders, short values and other names stay #BUG-588/key-value-unchanged", () => {
       const text = "secret: none; token: abcdefghi (prose); password=short; max_tokens=100000; passwordless=abcdefghij; tokens=abcdefghij; token=$TOKEN; secret=<your secret>; password={{pw}}; token=%s; password=••••";
       expect(maskSecrets(text)).toBe(text);
     });
-    test("BUG-588/key-value-code: code in a spec survives (a call, a member, an index, a comparison, a keyword value); a value that looks real still goes", () => {
+    test("keys/masked-when-printed: code in a spec survives (a call, a member, an index, a comparison, a keyword value); a value that looks real still goes #BUG-588/key-value-code", () => {
       const code = [
         "password=getPassword()", "password = config.password", "if (token==abcdefg) {}", "if (token === abcdefghij)", "if (token!=abcdefghij)", 'password=os.environ["X"]',
         "token=undefined", "token=null", "password=string", "password=None", "secret=required", "api_key=optional", "token=true", "password=password", "token=token",
@@ -404,14 +404,14 @@ describe("masking edges", () => {
       expect(maskSecrets("password=stringified-abc123 and password=Required-value-123")).toBe("password=•••• and password=••••");
       expect(maskSecrets("DB_PASSWORD=Xy7kQ9pLm2 password=hunter2hunter2")).toBe("DB_PASSWORD=•••• password=••••");
     });
-    test("BUG-588/key-value-names: api_key, apikey, api-key, client_secret, MYSQL_PWD count like password", () => {
+    test("keys/masked-when-printed: api_key, apikey, api-key, client_secret, MYSQL_PWD count like password #BUG-588/key-value-names", () => {
       expect(maskSecrets("api_key=abcdef0123456789 apikey=abcdef0123456789 api-key = abcdef0123456789 client_secret=abcdef0123456789 MYSQL_PWD=abcdef0123")).toBe(
         "api_key=•••• apikey=•••• api-key = •••• client_secret=•••• MYSQL_PWD=••••",
       );
       const same = "api_key=undefined; apikey=getKey(); api_keys=abcdef0123456789; pwd=/home/abcdef0123";
       expect(maskSecrets(same)).toBe(same);
     });
-    test("BUG-588/key-value-linear: long runs of the keywords, of spaces and of an open quote take linear time", () => {
+    test("keys/masked-when-printed: long runs of the keywords, of spaces and of an open quote take linear time #BUG-588/key-value-linear", () => {
       for (const text of ["password=".repeat(500_000), "token" + " ".repeat(2_000_000) + "=", 'secret="' + "a ".repeat(1_000_000), 'passwd="'.repeat(300_000), "token=" + "a".repeat(2_000_000), "api_key=a.".repeat(300_000), "Authorization: Basic " + "A".repeat(2_000_000), "Authorization: Basic ".repeat(100_000), 'token"='.repeat(500_000)]) {
         const t0 = performance.now();
         maskSecrets(text);
@@ -420,7 +420,7 @@ describe("masking edges", () => {
     });
   });
 
-  test("BUG-583/linear: every token pattern takes linear time on a long run of its own prefix and on prefixes in a row", () => {
+  test("keys/masked-when-printed: every token pattern takes linear time on a long run of its own prefix and on prefixes in a row #BUG-583/linear", () => {
     const prefixes = ["github_pat_", "glpat-", "npm_", "xoxb-", "hf_", "sk_live_", "rk_test_", "gsk_", "pplx-"];
     const cases = [...prefixes.map((p) => p + "a".repeat(2_000_000)), prefixes.join(" ").repeat(100_000), prefixes.map((p) => p.repeat(100_000)).join(" ")];
     for (const text of cases) {
@@ -440,7 +440,7 @@ describe("the config directory under a loose umask", () => {
       process.umask(old);
     }
   };
-  (POSIX ? test : test.skip)("BUG-585/config-dir-umask: the directory that holds the .env is never writable by group or others, whatever the umask (umask 000, as WSL1 and some containers start: 0777, so another user can replace or unlink the .env)", () => {
+  (POSIX ? test : test.skip)("keys/private-files-directory-first: the directory that holds the .env is never writable by group or others, whatever the umask (umask 000, as WSL1 and some containers start: 0777, so another user can replace or unlink the .env) #BUG-585/config-dir-umask", () => {
     const dir = join(TMP, "fresh-config-dir");
     process.env.GLUON_CONFIG = join(dir, "config.yaml");
     try {
@@ -450,7 +450,7 @@ describe("the config directory under a loose umask", () => {
       process.env.GLUON_CONFIG = join(TMP, "config.yaml");
     }
   });
-  (POSIX ? test : test.skip)("BUG-586/config-file-umask: config.yaml is not writable by group or others, whatever the umask (saveConfig writes it with the default mode: 0666 under umask 000)", async () => {
+  (POSIX ? test : test.skip)("keys/private-files-directory-first: config.yaml is not writable by group or others, whatever the umask (saveConfig writes it with the default mode: 0666 under umask 000) #BUG-586/config-file-umask", async () => {
     const { saveConfig } = await import("../src/config.ts");
     const path = join(TMP, "umask-config.yaml");
     process.env.GLUON_CONFIG = path;
@@ -461,7 +461,7 @@ describe("the config directory under a loose umask", () => {
       process.env.GLUON_CONFIG = join(TMP, "config.yaml");
     }
   });
-  (POSIX ? test : test.skip)("BUG-585/dirs-and-modes: under umask 000 a new config directory is 0700 and a new config.yaml 0600, a looser existing config.yaml loses the write bits for others and keeps its read bits, a 0600 one stays", async () => {
+  (POSIX ? test : test.skip)("keys/private-files-directory-first: under umask 000 a new config directory is 0700 and a new config.yaml 0600, a looser existing config.yaml loses the write bits for others and keeps its read bits, a 0600 one stays #BUG-585/dirs-and-modes", async () => {
     const { saveConfig } = await import("../src/config.ts");
     const dir = join(TMP, "deep", "new", "config-dir");
     const path = join(dir, "config.yaml");
@@ -480,7 +480,7 @@ describe("the config directory under a loose umask", () => {
       process.env.GLUON_CONFIG = join(TMP, "config.yaml");
     }
   });
-  test.skipIf(!POSIX)("under umask 077 and 000 the keys stay 0600 and their temp directory is gone (what rules.test.ts checks for 022)", () => {
+  test.skipIf(!POSIX)("keys/private-files-directory-first: under umask 077 and 000 the keys stay 0600 and their temp directory is gone (what rules.test.ts checks for 022)", () => {
     for (const u of [0o077, 0]) {
       under(u, () => saveSecret("XAI_API_KEY", `xai-new-value-0000000${u}`));
       expect(statSync(env()).mode & 0o777).toBe(0o600);

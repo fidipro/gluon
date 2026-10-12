@@ -49,7 +49,7 @@ async function back(app: App, title: string): Promise<string> {
 }
 
 describe("the checklist", () => {
-  test("lists the six harnesses, installed or not (the install offer shows the command); esc changes nothing", async () => {
+  test("setup/checklist: lists the six harnesses, installed or not (the install offer shows the command); esc changes nothing", async () => {
     const cfg = freshConfig("checklist");
     const app = run([], { GLUON_CONFIG: cfg }, { agents: ["claude", "opencode"] });
     await app.waitFor("Connect your coding agents");
@@ -68,7 +68,7 @@ describe("the checklist", () => {
     expect(existsSync(cfg)).toBe(false);
   });
 
-  test("a checked harness that isn't installed is offered an install; skipped, the summary gives its install command", async () => {
+  test("install/in-setup: a checked harness that isn't installed is offered an install; skipped, the summary gives its install command", async () => {
     const cfg = freshConfig("checklist-missing");
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ["claude"] });
     await checklist(app, [2]);
@@ -81,7 +81,7 @@ describe("the checklist", () => {
 });
 
 describe("Claude Code", () => {
-  test("subscription, signed in: no notice, straight to the check, then the session on the plan", async () => {
+  test("sign-in/status-check: subscription, signed in: no notice, straight to the check, then the session on the plan", async () => {
     const cfg = freshConfig("cc-plan");
     const app = run([], { GLUON_CONFIG: cfg });
     await checklist(app, [1]);
@@ -103,7 +103,7 @@ describe("Claude Code", () => {
     expect(c.brain.active).toEqual({ route: "claude-plan", model: "claude-sonnet-5-5" });
   });
 
-  test("subscription, logged out: offers `claude auth login`, hands over the terminal, then checks again", async () => {
+  test("sign-in/status-check: subscription, logged out: offers `claude auth login`, hands over the terminal, then checks again", async () => {
     const cfg = freshConfig("cc-logged-out");
     const state = join(dirname(cfg), "claude-signed-in");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, FAKE_CLAUDE_LOGGED_OUT: "1", FAKE_CLAUDE_STATE: state });
@@ -121,7 +121,7 @@ describe("Claude Code", () => {
     expect(yaml(cfg).connections["claude-code"]).toEqual({ auth: "subscription" });
   });
 
-  test("subscription, logged out and not now: nothing is connected", async () => {
+  test("sign-in/status-check: subscription, logged out and not now: nothing is connected", async () => {
     const cfg = freshConfig("cc-not-now");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, FAKE_CLAUDE_LOGGED_OUT: "1" });
     await app.waitFor("How should Claude Code sign in?");
@@ -132,7 +132,7 @@ describe("Claude Code", () => {
     expect(yaml(cfg).connections).toBeUndefined();
   });
 
-  test("an old `notices:` key loads and is ignored; ANTHROPIC_API_KEY in the environment is pointed out, not removed", async () => {
+  test("connections/env-warning: an old `notices:` key loads and is ignored; ANTHROPIC_API_KEY in the environment is pointed out, not removed", async () => {
     const cfg = freshConfig("cc-old-notices", "# mine\nnotices: { claude: 2026-01-01, xai: 2026-01-02 } # old\n");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, ANTHROPIC_API_KEY: "sk-ant-api03-envkeyenvkeyenvkey" });
     await app.waitFor("How should Claude Code sign in?");
@@ -146,7 +146,7 @@ describe("Claude Code", () => {
     expect(yaml(cfg).connections).toEqual({ "claude-code": { auth: "subscription" } });
   });
 
-  test("API key: a pasted Anthropic key is saved next to the config (0600), never shown; the brain uses it @full", async () => {
+  test("connections/api-key: API key: a pasted Anthropic key is saved next to the config (0600), never shown; the brain uses it @full", async () => {
     const cfg = freshConfig("cc-key");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg });
     await app.waitFor("How should Claude Code sign in?");
@@ -166,7 +166,7 @@ describe("Claude Code", () => {
     expect(yaml(cfg).connections["claude-code"]).toEqual({ auth: "api", provider: "anthropic" });
   });
 
-  test("API key: a key already set is offered for reuse @full", async () => {
+  test("connections/api-key: API key: a key already set is offered for reuse @full", async () => {
     const cfg = freshConfig("cc-key-reuse");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, ANTHROPIC_API_KEY: "sk-ant-api03-testkeytestkeytestkey" });
     await app.waitFor("How should Claude Code sign in?");
@@ -181,7 +181,7 @@ describe("Claude Code", () => {
     expect(existsSync(join(dirname(cfg), ".env"))).toBe(false);
   });
 
-  test("OpenRouter: the key is saved; the launch gets OpenRouter's documented Claude Code setup and nothing else @full", async () => {
+  test("launch/environment: OpenRouter: the key is saved; the launch gets OpenRouter's documented Claude Code setup and nothing else @full", async () => {
     const cfg = freshConfig("cc-openrouter");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg });
     await app.waitFor("How should Claude Code sign in?");
@@ -201,7 +201,7 @@ describe("Claude Code", () => {
 });
 
 describe("Codex", () => {
-  test("ChatGPT plan, logged out: `codex login` handoff, then the brain on the ChatGPT plan (no notice)", async () => {
+  test("sign-in/status-check: ChatGPT plan, logged out: `codex login` handoff, then the brain on the ChatGPT plan (no notice)", async () => {
     const cfg = freshConfig("codex-plan");
     const state = join(dirname(cfg), "codex-signed-in");
     const app = run(["connect", "codex"], { GLUON_CONFIG: cfg, FAKE_CODEX_LOGGED_OUT: "1", FAKE_CODEX_STATE: state }, { agents: ["codex"] });
@@ -223,7 +223,7 @@ describe("Codex", () => {
     expect(c.brain.active).toEqual({ route: "chatgpt-plan", model: "gpt-6.1-sol" });
   });
 
-  test("signed in with an API key is not the ChatGPT plan: it says so and offers `codex login`", async () => {
+  test("sign-in/plan-only: signed in with an API key is not the ChatGPT plan: it says so and offers `codex login`", async () => {
     const cfg = freshConfig("codex-api-key-login");
     const app = run(["connect", "codex"], { GLUON_CONFIG: cfg, FAKE_CODEX_METHOD: "api-key" }, { agents: ["codex"] });
     await app.waitFor("How should Codex sign in?");
@@ -234,7 +234,7 @@ describe("Codex", () => {
     expect(await app.exitCode(8000)).toBe(1);
   });
 
-  test("OpenRouter: codex gets OpenRouter as its model provider and only OPENROUTER_API_KEY", async () => {
+  test("launch/environment: OpenRouter: codex gets OpenRouter as its model provider and only OPENROUTER_API_KEY", async () => {
     const cfg = freshConfig("codex-openrouter", "connections: { codex: { auth: api, provider: openrouter } }\n");
     const r = await cli(["--launch", "codex", "--model", "gpt-6.1-sol", "--effort", "high", "--dry-run", "- x"], { env: { GLUON_CONFIG: cfg, OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef0123456789abcdef", OPENAI_API_KEY: "sk-proj-shouldnotbepassed0123456" }, agents: ["codex"] });
     const cmd = JSON.parse(r.stdout);
@@ -246,7 +246,7 @@ describe("Codex", () => {
     expect(cmd.env).toEqual({ OPENROUTER_API_KEY: "sk-or-v1-••••" });
   });
 
-  test("BUG-420/codex-bedrock-runtime: codex on Bedrock uses its amazon-bedrock-runtime provider (the one that takes the global.openai.* profiles), with the configured AWS profile and region", async () => {
+  test("launch/environment: codex on Bedrock uses its amazon-bedrock-runtime provider (the one that takes the global.openai.* profiles), with the configured AWS profile and region #BUG-420/codex-bedrock-runtime", async () => {
     const cfg = freshConfig("codex-bedrock", "connections: { codex: { auth: api, provider: bedrock } }\nbedrock: { profile: dev, region: us-west-2 }\n");
     const r = await cli(["--launch", "codex", "--model", "gpt-6-luna", "--dry-run", "x"], { env: { GLUON_CONFIG: cfg }, agents: ["codex"] });
     const cmd = JSON.parse(r.stdout);
@@ -256,7 +256,7 @@ describe("Codex", () => {
 });
 
 describe("Antigravity and Grok Build", () => {
-  test("Antigravity on the Google account: `agy models` is the check; launches with the effort in the model id", async () => {
+  test("sign-in/status-check: Antigravity on the Google account: `agy models` is the check; launches with the effort in the model id", async () => {
     const cfg = freshConfig("agy-plan", "notices: { claude: 2026-01-01 }\nconnections: { claude-code: { auth: subscription } }\n");
     const app = run(["connect", "antigravity"], { GLUON_CONFIG: cfg }, { agents: ["claude", "agy"] });
     await app.waitFor("How should Antigravity sign in?");
@@ -268,7 +268,7 @@ describe("Antigravity and Grok Build", () => {
     expect(JSON.parse(r.stdout)).toMatchObject({ argv: ["agy", "--model=gemini-3.8-flash-high", "--prompt-interactive=- x"], env: {} });
   });
 
-  test("Antigravity with a Gemini key: it tells the user what to set in Antigravity's own settings", async () => {
+  test("connections/told-what-to-set: Antigravity with a Gemini key: it tells the user what to set in Antigravity's own settings", async () => {
     const cfg = freshConfig("agy-key");
     const app = run(["connect", "antigravity"], { GLUON_CONFIG: cfg, GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv" }, { agents: ["agy"] });
     await app.waitFor("How should Antigravity sign in?");
@@ -280,7 +280,7 @@ describe("Antigravity and Grok Build", () => {
     expect(app.history()).not.toContain("0123456789abcdef");
   });
 
-  test("Grok Build, logged out: `grok login`, then only the models the account lists (grok-4.7 unavailable on this one)", async () => {
+  test("sign-in/status-check: Grok Build, logged out: `grok login`, then only the models the account lists (grok-4.7 unavailable on this one)", async () => {
     const cfg = freshConfig("grok-plan");
     const state = join(dirname(cfg), "grok-signed-in");
     const app = run(["connect", "grok-build"], { GLUON_CONFIG: cfg, FAKE_GROK_LOGGED_OUT: "1", FAKE_GROK_STATE: state, FAKE_GROK_MODELS: "grok-4.6" }, { agents: ["grok"] });
@@ -296,7 +296,7 @@ describe("Antigravity and Grok Build", () => {
     expect(yaml(cfg).verified ?? {}).toEqual({});
   });
 
-  test("Kimi Code, logged out: `kimi login` (no status command: `kimi provider list` is asked after it), then K3 on the plan; K2.7 Code isn't there", async () => {
+  test("sign-in/status-check: Kimi Code, logged out: `kimi login` (no status command: `kimi provider list` is asked after it), then K3 on the plan; K2.7 Code isn't there", async () => {
     const cfg = freshConfig("kimi-plan");
     const state = join(dirname(cfg), "kimi-signed-in");
     const app = run(["connect", "kimi-code"], { GLUON_CONFIG: cfg, FAKE_KIMI_LOGGED_OUT: "1", FAKE_KIMI_STATE: state }, { agents: ["kimi"] });
@@ -313,7 +313,7 @@ describe("Antigravity and Grok Build", () => {
     expect(yaml(cfg).connections).toEqual({ "kimi-code": { auth: "subscription" } });
   });
 
-  test("Kimi Code on OpenRouter: the key is OpenRouter's (reused from the environment), both models are checked, nothing of Kimi's is written", async () => {
+  test("connections/api-key: Kimi Code on OpenRouter: the key is OpenRouter's (reused from the environment), both models are checked, nothing of Kimi's is written", async () => {
     const cfg = freshConfig("kimi-key");
     const app = run(["connect", "kimi-code"], { GLUON_CONFIG: cfg, OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef0123", GLUON_TEST_PROBES: probes("kimi-key", {}) }, { agents: ["kimi"] });
     await app.waitFor("How should Kimi Code sign in?");
@@ -327,7 +327,7 @@ describe("Antigravity and Grok Build", () => {
     expect(app.history()).not.toContain("0123456789abcdef");
   });
 
-  test("Kimi Code on Moonshot (issue #107): the key is Moonshot's (reused from the environment), both models are checked, nothing of Kimi's is written, no base URL", async () => {
+  test("connections/api-key: Kimi Code on Moonshot (issue #107): the key is Moonshot's (reused from the environment), both models are checked, nothing of Kimi's is written, no base URL", async () => {
     const cfg = freshConfig("kimi-moonshot");
     const app = run(["connect", "kimi-code"], { GLUON_CONFIG: cfg, MOONSHOT_API_KEY: "sk-moonshot0123456789abcdef0123", GLUON_TEST_PROBES: probes("kimi-moonshot", {}) }, { agents: ["kimi"] });
     await app.waitFor("How should Kimi Code sign in?");
@@ -343,7 +343,7 @@ describe("Antigravity and Grok Build", () => {
     expect(existsSync(join(dirname(cfg), ".env"))).toBe(false);
   });
 
-  test("BUG-100: the first line typed into a login handoff reaches the login (on Windows Gluon's stdin took it)", async () => {
+  test("sign-in/handoff-input: the first line typed into a login handoff reaches the login (on Windows Gluon's stdin took it) #BUG-100", async () => {
     const cfg = freshConfig("bug-100");
     const state = join(dirname(cfg), "claude-signed-in");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, FAKE_CLAUDE_LOGGED_OUT: "1", FAKE_CLAUDE_STATE: state });
@@ -360,7 +360,7 @@ describe("Antigravity and Grok Build", () => {
 });
 
 describe("OpenCode (its plan and OpenRouter)", () => {
-  test("the plan signs in through OpenCode's own login (a handoff), then an OpenRouter key: a launch gets only its model's key, the plan none; an effort goes in OpenCode's config @full", async () => {
+  test("connections/opencode-providers: the plan signs in through OpenCode's own login (a handoff), then an OpenRouter key: a launch gets only its model's key, the plan none; an effort goes in OpenCode's config @full", async () => {
     const cfg = freshConfig("opencode-plan");
     const state = join(dirname(cfg), "opencode-signed-in");
     const app = run(["connect", "opencode"], { GLUON_CONFIG: cfg, FAKE_OPENCODE_LOGGED_OUT: "1", FAKE_OPENCODE_STATE: state }, { agents: ["opencode"] });
@@ -403,7 +403,7 @@ describe("OpenCode (its plan and OpenRouter)", () => {
     expect(bad.stderr).toContain("does not take effort");
   });
 
-  test("an OPENCODE_API_KEY variable is not the plan: only a stored sign-in counts, and one OpenCode wants redone doesn't @full", async () => {
+  test("sign-in/plan-only: an OPENCODE_API_KEY variable is not the plan: only a stored sign-in counts, and one OpenCode wants redone doesn't @full", async () => {
     for (const [name, env] of [["env-only", { FAKE_OPENCODE_ENV_ONLY: "1" }], ["needs-auth", { FAKE_OPENCODE_NEEDS_AUTH: "1" }]] as const) {
       const cfg = freshConfig(`opencode-plan-${name}`);
       const app = run(["connect", "opencode"], { GLUON_CONFIG: cfg, OPENCODE_API_KEY: "sk-oc-0123456789abcdefghij", ...env }, { agents: ["opencode"] });
@@ -420,7 +420,7 @@ describe("OpenCode (its plan and OpenRouter)", () => {
 });
 
 describe("the menus", () => {
-  test("BUG-49/I1: a late reply to the background-colour query doesn't close a picker or the checklist", async () => {
+  test("setup/terminal-replies: a late reply to the background-colour query doesn't close a picker or the checklist #BUG-49/I1", async () => {
     const cfg = freshConfig("late-osc");
     const app = run([], { GLUON_CONFIG: cfg }, { osc11: { delayMs: 600, splitMs: 60 } });
     await app.waitFor("Connect your coding agents");
@@ -432,7 +432,7 @@ describe("the menus", () => {
     expect(app.screen()).not.toMatch(/rgb:|11;/);
   });
 
-  test("BUG-49/I1: a late reply that arrives while a picker is up is ignored there too", async () => {
+  test("setup/terminal-replies: a late reply that arrives while a picker is up is ignored there too #BUG-49/I1", async () => {
     const cfg = freshConfig("late-osc-pick");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg });
     await app.waitFor("How should Claude Code sign in?");
@@ -458,7 +458,7 @@ describe("the menus", () => {
 describe("the brain order", () => {
   const P = (name: string, answers: Record<string, true | string>) => probes(name, answers);
 
-  test("`gluon brain`: the plan comes first when it's connected", async () => {
+  test("doctor/brain: `gluon brain`: the plan comes first when it's connected", async () => {
     const cfg = freshConfig("brain-plan", "connections: { claude-code: { auth: subscription } }\nnotices: { claude: 2026-01-01 }\n");
     const r = await cli(["brain"], { env: { GLUON_CONFIG: cfg, OPENAI_API_KEY: "sk-proj-x0123456789abcdef" } });
     expect(r.code).toBe(0);
@@ -476,7 +476,7 @@ describe("the brain order", () => {
     expect(yaml(high).brain.active).toEqual({ route: "claude-plan", model: "claude-sonnet-5-5", effort: "high" });
   });
 
-  test("keys and Bedrock: unavailable steps are skipped with their reason (Bedrock's OpenAI models → the next step)", async () => {
+  test("doctor/brain: keys and Bedrock: unavailable steps are skipped with their reason (Bedrock's OpenAI models → the next step)", async () => {
     const cfg = freshConfig("brain-mix", "bedrock: { region: us-east-1 }\n");
     const env = {
       GLUON_CONFIG: cfg,
@@ -496,7 +496,7 @@ describe("the brain order", () => {
     expect(yaml(cfg).brain.active).toEqual({ route: "bedrock", model: "us.anthropic.claude-sonnet-4-6" });
   });
 
-  test("OpenRouter before the 4.6 fallbacks; nothing connected: no brain, exit 1", async () => {
+  test("doctor/brain: OpenRouter before the 4.6 fallbacks; nothing connected: no brain, exit 1", async () => {
     const or = await cli(["brain"], { env: { GLUON_CONFIG: freshConfig("brain-or", "bedrock: { region: us-east-1 }\n"), OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef01", GLUON_TEST_PROBES: P("brain-or", { "bedrock/*": "access denied" }) } });
     expect(or.stdout).toContain("✓ 7. Sonnet 5.5 via OpenRouter   ← in use");
     const none = await cli(["brain"], { env: { GLUON_CONFIG: freshConfig("brain-none") } });
@@ -504,7 +504,7 @@ describe("the brain order", () => {
     expect(none.stdout).toContain("No step works");
   });
 
-  test("a custom order in the config is followed", async () => {
+  test("doctor/brain: a custom order in the config is followed", async () => {
     const cfg = freshConfig("brain-custom", "brain:\n  order:\n    - { route: openrouter, model: openai/gpt-6-sol }\n    - { route: anthropic-api, model: claude-haiku-4-5 }\n");
     const r = await cli(["brain"], { env: { GLUON_CONFIG: cfg, ANTHROPIC_API_KEY: "sk-ant-api03-x0123456789abcdef" } });
     expect(r.stdout).toContain("· 1. GPT-6 Sol via OpenRouter · not connected");
@@ -513,7 +513,7 @@ describe("the brain order", () => {
 });
 
 describe("doctor", () => {
-  test("Bedrock: models refused are named and the rest still offered (global. ids; Codex's are the runtime provider's); results cached", async () => {
+  test("connections/reachable: Bedrock: models refused are named and the rest still offered (global. ids; Codex's are the runtime provider's); results cached", async () => {
     const cfg = freshConfig("doctor-bedrock", "bedrock: { region: us-east-1 }\nconnections:\n  claude-code: { auth: api, provider: bedrock }\n  codex: { auth: api, provider: bedrock }\n");
     const denied = "access denied (enable model access in the Bedrock console)";
     const env = {
@@ -548,7 +548,7 @@ describe("doctor", () => {
     expect(launch.env).toEqual({ AWS_REGION: "us-east-1", CLAUDE_CODE_USE_BEDROCK: "1" });
   });
 
-  test("on the plan: a failed call is reported with a hint, tokens masked; `claude -p` gets no tools or settings", async () => {
+  test("doctor/checks: on the plan: a failed call is reported with a hint, tokens masked; `claude -p` gets no tools or settings", async () => {
     const cfg = freshConfig("doctor-fail", "connections: { claude-code: { auth: subscription } }\nnotices: { claude: 2026-01-01 }\n");
     const log = join(dirname(cfg), "claude.log");
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: cfg, FAKE_PING_FAIL: "1", FAKE_CLAUDE_LOG: log } });
@@ -561,7 +561,7 @@ describe("doctor", () => {
     expect(read(log)).toContain("-p --model sonnet --output-format json --tools  --setting-sources  --no-session-persistence");
   });
 
-  test("on the plan, logged out: says so", async () => {
+  test("doctor/checks: on the plan, logged out: says so", async () => {
     const cfg = freshConfig("doctor-out", "connections: { claude-code: { auth: subscription } }\nnotices: { claude: 2026-01-01 }\n");
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: cfg, FAKE_CLAUDE_LOGGED_OUT: "1" } });
     expect(r.code).toBe(1);
@@ -569,7 +569,7 @@ describe("doctor", () => {
     expect(r.stdout).toContain("not logged in to Claude Code");
   });
 
-  test("every harness: version, connection, sign-in check and models; a missing binary shows its install command", async () => {
+  test("doctor/checks: every harness: version, connection, sign-in check and models; a missing binary shows its install command", async () => {
     const cfg = freshConfig(
       "doctor-all",
       "notices: { claude: 2026-01-01, google: 2026-01-01, xai: 2026-01-01 }\nconnections:\n  claude-code: { auth: subscription }\n  codex: { auth: subscription }\n  antigravity: { auth: subscription }\n  grok-build: { auth: subscription }\n  opencode: { providers: [openrouter] }\n",
@@ -588,7 +588,7 @@ describe("doctor", () => {
 });
 
 describe("config from the first pass", () => {
-  test("old keys are mapped to the new shape once, keeping comments", async () => {
+  test("config/defaults-and-migration: old keys are mapped to the new shape once, keeping comments", async () => {
     const cfg = freshConfig("migrate", "# mine\nbrain: { provider: subscription, model: sonnet, subscriptionNotice: 2026-09-01 }\nauth: { claude-code: subscription }\naws: { profile: dev, region: eu-west-1 }\n");
     const r = await cli(["--help"], { env: { GLUON_CONFIG: cfg } });
     expect(r.code).toBe(0);
@@ -605,7 +605,7 @@ describe("config from the first pass", () => {
   });
 });
 
-test("all fake agents on PATH: the checklist marks each one installed", async () => {
+test("setup/checklist: all fake agents on PATH: the checklist marks each one installed", async () => {
   const app = run([], { GLUON_CONFIG: freshConfig("checklist-all") }, { agents: ALL });
   // The title can be drawn before the rows: wait for the last one.
   await app.waitFor(/5\. \[.\] OpenCode/);
@@ -613,7 +613,7 @@ test("all fake agents on PATH: the checklist marks each one installed", async ()
 });
 
 describe("setup back navigation", () => {
-  test("setup back navigation/within a harness: Esc at the provider goes back to the sign-in choice, pre-selected @full", async () => {
+  test("setup/back: within a harness: Esc at the provider goes back to the sign-in choice, pre-selected @full", async () => {
     const cfg = freshConfig("back-within");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg });
     await app.waitFor("How should Claude Code sign in?");
@@ -628,7 +628,7 @@ describe("setup back navigation", () => {
     expect(yaml(cfg).connections).toEqual({ "claude-code": { auth: "subscription" } });
   });
 
-  test("setup back navigation/across harnesses: back from Codex's first screen to Claude Code's key, the provider and the checklist, all as answered @full", async () => {
+  test("setup/back: across harnesses: back from Codex's first screen to Claude Code's key, the provider and the checklist, all as answered @full", async () => {
     const cfg = freshConfig("back-across");
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ["claude", "codex"] });
     await checklist(app, [1, 2]);
@@ -666,7 +666,7 @@ describe("setup back navigation", () => {
     expect(read(join(dirname(cfg), ".env")).trim()).toBe("OPENROUTER_API_KEY=sk-or-v1-0123456789abcdef0123456789abcdef");
   });
 
-  test("setup back navigation/from the key prompt and the AWS prompts back to the provider choice @full", async () => {
+  test("setup/back: from the key prompt and the AWS prompts back to the provider choice @full", async () => {
     const cfg = freshConfig("back-key");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, AWS_PROFILE: undefined, AWS_REGION: undefined });
     await app.waitFor("How should Claude Code sign in?");
@@ -690,7 +690,7 @@ describe("setup back navigation", () => {
     expect(existsSync(cfg)).toBe(false);
   });
 
-  test("setup back navigation/back past a login handoff lands on the sign-in choice and doesn't run the login again @full", async () => {
+  test("setup/back: back past a login handoff lands on the sign-in choice and doesn't run the login again @full", async () => {
     const cfg = freshConfig("back-login");
     const state = join(dirname(cfg), "claude-signed-in");
     const app = run(["setup"], { GLUON_CONFIG: cfg, FAKE_CLAUDE_LOGGED_OUT: "1", FAKE_CLAUDE_STATE: state }, { agents: ["claude", "opencode"] });
@@ -717,7 +717,7 @@ describe("setup back navigation", () => {
     expect(yaml(cfg).connections).toEqual({ "claude-code": { auth: "subscription" } });
   });
 
-  test("setup back navigation/Esc on the first screen leaves with config and .env untouched, even after a key was pasted @full", async () => {
+  test("setup/nothing-until-done: Esc on the first screen leaves with config and .env untouched, even after a key was pasted @full", async () => {
     const before = "# mine\nconnections: { claude-code: { auth: api, provider: anthropic } } # keep\n";
     const cfg = freshConfig("back-first", before);
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ["claude", "opencode"] });
@@ -738,7 +738,7 @@ describe("setup back navigation", () => {
     expect(app.history()).not.toMatch(/Intake agent ·|Checking|pastedpasted/);
   });
 
-  test("setup back navigation/Ctrl+C after a key was pasted, in the next harness: exit 130, nothing written, nothing probed @full", async () => {
+  test("setup/quit: Ctrl+C after a key was pasted, in the next harness: exit 130, nothing written, nothing probed @full", async () => {
     const before = "# mine\nbedrock: { region: eu-west-1 }\n";
     const cfg = freshConfig("back-ctrlc", before);
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ["claude", "opencode"] });
@@ -759,7 +759,7 @@ describe("setup back navigation", () => {
     expect(existsSync(join(dirname(cfg), ".env"))).toBe(false);
   });
 
-  test("setup back navigation/a late reply to the background-colour query is not an Esc: no going back @full", async () => {
+  test("setup/terminal-replies: a late reply to the background-colour query is not an Esc: no going back @full", async () => {
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: freshConfig("back-osc") });
     await app.waitFor("How should Claude Code sign in?");
     await choose(app, 1);
@@ -776,7 +776,7 @@ describe("setup back navigation", () => {
     expect(await back(app, "How should Claude Code sign in?")).toMatch(/› 1\. API key/);
   });
 
-  test("setup back navigation/the footers: esc to cancel on the first screen, esc to go back after it @full", async () => {
+  test("setup/back: the footers: esc to cancel on the first screen, esc to go back after it @full", async () => {
     const app = run(["setup"], { GLUON_CONFIG: freshConfig("back-footer") }, { agents: ["claude"] });
     await app.waitFor("Connect your coding agents");
     expect(app.screen()).toContain("space or 1-6 to check · enter to continue · esc to cancel · ctrl+c to quit");
@@ -790,7 +790,7 @@ describe("setup back navigation", () => {
 });
 
 describe("menus: keys (QA pass 2)", () => {
-  test("BUG-50/2.9: a digit then Enter picks in this menu only; the login menu still needs its own answer @full", async () => {
+  test("setup/keys: a digit then Enter picks in this menu only; the login menu still needs its own answer @full #BUG-50/2.9", async () => {
     const cfg = freshConfig("bug50");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, FAKE_CLAUDE_LOGGED_OUT: "1" });
     await app.waitFor("How should Claude Code sign in?");
@@ -808,7 +808,7 @@ describe("menus: keys (QA pass 2)", () => {
     expect(await app.exitCode(5000)).toBe(1);
   });
 
-  test("BUG-50/4.2: a digit alone only moves the selection", async () => {
+  test("setup/keys: a digit alone only moves the selection #BUG-50/4.2", async () => {
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: freshConfig("bug50-move") });
     await app.waitFor("How should Claude Code sign in?");
     await app.press("2");
@@ -817,7 +817,7 @@ describe("menus: keys (QA pass 2)", () => {
     expect(app.screen()).not.toContain("Signed in to");
   });
 
-  test("BUG-61/4.1: keys that arrive in one read are handled one by one ('13', two spaces)", async () => {
+  test("setup/keys: keys that arrive in one read are handled one by one ('13', two spaces) #BUG-61/4.1", async () => {
     const app = run(["setup"], { GLUON_CONFIG: freshConfig("bug61") }, { agents: ALL });
     await app.waitFor("Connect your coding agents");
     // All five installed: all checked. "13" unchecks rows 1 and 3, the cursor on row 3.
@@ -832,7 +832,7 @@ describe("menus: keys (QA pass 2)", () => {
     expect(app.screen()).toMatch(/3\. \[ \] Antigravity/);
   });
 
-  test("BUG-133: a digit pressed the moment the next menu appears is honoured (on Windows it was lost: raw mode came on a turn after the menu's first frame) @full", async () => {
+  test("setup/keys: a digit pressed the moment the next menu appears is honoured (on Windows it was lost: raw mode came on a turn after the menu's first frame) @full #BUG-133", async () => {
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: freshConfig("bug133") });
     await app.waitFor("How should Claude Code sign in?");
     // From the sign-in menu, then back and forth between the provider menu and the key prompts:
@@ -858,7 +858,7 @@ describe("menus: keys (QA pass 2)", () => {
     }
   });
 
-  test("BUG-57/2.10: Ctrl+C in a setup menu quits setup at once: exit 130, nothing probed, config untouched", async () => {
+  test("setup/quit: Ctrl+C in a setup menu quits setup at once: exit 130, nothing probed, config untouched #BUG-57/2.10", async () => {
     const before = "# mine\nbedrock: { region: eu-west-1 }\n";
     const cfg = freshConfig("bug57", before);
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ALL });
@@ -873,7 +873,7 @@ describe("menus: keys (QA pass 2)", () => {
     expect(read(cfg)).toBe(before);
   });
 
-  test("BUG-57/2.10: Ctrl+C in a key prompt quits too @full", async () => {
+  test("setup/quit: Ctrl+C in a key prompt quits too @full #BUG-57/2.10", async () => {
     const cfg = freshConfig("bug57-key");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg });
     await app.waitFor("How should Claude Code sign in?");
@@ -888,7 +888,7 @@ describe("menus: keys (QA pass 2)", () => {
 });
 
 describe("menus: late OSC replies (QA pass 2)", () => {
-  test("BUG-54/3.2: a light terminal's late reply (ESC \\ terminator) types nothing into the key @full", async () => {
+  test("setup/terminal-replies: a light terminal's late reply (ESC \\ terminator) types nothing into the key @full #BUG-54/3.2", async () => {
     const cfg = freshConfig("bug54");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg }, { osc11: { delayMs: 1500, light: true } });
     await app.waitFor("How should Claude Code sign in?");
@@ -915,7 +915,7 @@ describe("menus: late OSC replies (QA pass 2)", () => {
     }
   });
 
-  test("BUG-63/3.1: a reply whose rest comes 250 ms after its ESC doesn't close the menu; a real Esc still does @full", async () => {
+  test("setup/terminal-replies: a reply whose rest comes 250 ms after its ESC doesn't close the menu; a real Esc still does @full #BUG-63/3.1", async () => {
     for (const light of [false, true]) {
       const app = run(["connect", "claude-code"], { GLUON_CONFIG: freshConfig(`bug63-${light}`) }, { osc11: { delayMs: 300, splitMs: 250, light } });
       await app.waitFor("How should Claude Code sign in?");
@@ -929,7 +929,7 @@ describe("menus: late OSC replies (QA pass 2)", () => {
 });
 
 describe("menus: short terminals (QA pass 2)", () => {
-  test("BUG-58/4.4: at 80×15 the checklist and a picker never clear the screen and keep their title", async () => {
+  test("setup/menus-fit: at 80×15 the checklist and a picker never clear the screen and keep their title #4.4", async () => {
     const cfg = freshConfig("bug58");
     const app = new App({ cwd: repo.tiny(), args: ["setup"], env: { GLUON_CONFIG: cfg }, agents: ALL, noDemo: true, rows: 15, cols: 80 });
     await app.waitFor("Connect your coding agents");
@@ -937,6 +937,12 @@ describe("menus: short terminals (QA pass 2)", () => {
     await app.press(KEY.down, KEY.down);
     expect(app.clears()).toEqual({ screen: 0, scrollback: 0 });
     expect(app.screen()).toContain("Connect your coding agents");
+    // Down to the last row: it shows with the cursor, the title stays, nothing is cleared.
+    await app.press(KEY.down, KEY.down, KEY.down);
+    expect(app.screen()).toMatch(/› 6\. /);
+    expect(app.screen()).toContain("Connect your coding agents");
+    expect(app.clears()).toEqual({ screen: 0, scrollback: 0 });
+    await app.press(KEY.up, KEY.up, KEY.up);
     await app.press("2", "3", "4", "5", KEY.enter);
     await app.waitFor("How should Claude Code sign in?");
     await choose(app, 1);
@@ -950,7 +956,7 @@ describe("menus: short terminals (QA pass 2)", () => {
 });
 
 describe("setup: what it changes (QA pass 2)", () => {
-  test("BUG-66/2.1: unchecking a connected agent disconnects it, once confirmed", async () => {
+  test("setup/nothing-until-done: unchecking a connected agent disconnects it, once confirmed #BUG-66/2.1", async () => {
     const cfg = freshConfig("bug66", "notices: { xai: 2026-01-01 }\nconnections:\n  grok-build: { auth: subscription }\n");
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ALL });
     await app.waitFor("Connect your coding agents");
@@ -963,7 +969,7 @@ describe("setup: what it changes (QA pass 2)", () => {
     expect(yaml(cfg).connections ?? {}).toEqual({});
   });
 
-  test("BUG-66/2.1: … and 'Keep connected' keeps it", async () => {
+  test("setup/nothing-until-done: unchecking a connected agent and choosing 'Keep connected' keeps it #BUG-66/2.1", async () => {
     const cfg = freshConfig("bug66-keep", "notices: { xai: 2026-01-01 }\nconnections:\n  grok-build: { auth: subscription }\n");
     const app = run(["setup"], { GLUON_CONFIG: cfg }, { agents: ALL });
     await app.waitFor("Connect your coding agents");
@@ -974,7 +980,7 @@ describe("setup: what it changes (QA pass 2)", () => {
     expect(yaml(cfg).connections).toEqual({ "grok-build": { auth: "subscription" } });
   });
 
-  test("BUG-69/2.13: nothing chosen on the first run: no probe, no config, and it says what to do", async () => {
+  test("connections/check-at-end: nothing chosen on the first run: no probe, no config, and it says what to do #BUG-69/2.13", async () => {
     const cfg = freshConfig("bug69");
     const app = run([], { GLUON_CONFIG: cfg, ANTHROPIC_API_KEY: "sk-ant-api03-envenvenvenvenvenv", GLUON_TEST_PROBES: probes("bug69", { "anthropic-api/*": "a probe ran" }) }, { agents: [] });
     await app.waitFor("Connect your coding agents");
@@ -986,7 +992,7 @@ describe("setup: what it changes (QA pass 2)", () => {
     expect(existsSync(cfg)).toBe(false);
   });
 
-  test("BUG-73/2.6: Esc at OpenCode's 'Done / Add another' goes back (never 'Done'); leaving keeps the previous connection", async () => {
+  test("connections/opencode-providers: Esc at OpenCode's 'Done / Add another' goes back (never 'Done'); leaving keeps the previous connection #BUG-73/2.6", async () => {
     const before = "connections:\n  opencode: { providers: [openrouter] }\n";
     const cfg = freshConfig("bug73", before);
     const app = run(["connect", "opencode"], { GLUON_CONFIG: cfg, OPENROUTER_API_KEY: "sk-or-v1-0123456789abcdef0123456789abcdef" }, { agents: ["opencode"] });
@@ -1000,7 +1006,7 @@ describe("setup: what it changes (QA pass 2)", () => {
     expect(existsSync(join(dirname(cfg), ".env"))).toBe(false);
   });
 
-  test("2.7: a pasted replacement key is what Gluon and the agent use, not the environment's @full", async () => {
+  test("connections/api-key: a pasted replacement key is what Gluon and the agent use, not the environment's @full #2.7", async () => {
     const cfg = freshConfig("bug52");
     const env = { GLUON_CONFIG: cfg, ANTHROPIC_API_KEY: "sk-ant-api03-FROMTHEENVIRONMENTenv1" };
     const app = run(["connect", "claude-code"], env);
@@ -1024,7 +1030,7 @@ describe("setup: what it changes (QA pass 2)", () => {
 });
 
 describe("doctor and the brain (QA pass 2)", () => {
-  test("BUG-70/5.1: doctor exits 1 when it prints a ✗, even if other models work", async () => {
+  test("doctor/checks: doctor exits 1 when it prints a ✗, even if other models work #BUG-70/5.1", async () => {
     const cfg = freshConfig("bug70", "notices: { claude: 2026-01-01 }\nconnections: { claude-code: { auth: subscription } }\n");
     const r = await cli(["doctor"], { env: { GLUON_CONFIG: cfg, FAKE_CLAUDE_BAD_MODELS: "fable" } });
     expect(r.stdout).toContain("✗ fable · fable");
@@ -1035,7 +1041,7 @@ describe("doctor and the brain (QA pass 2)", () => {
     expect(ok.code).toBe(0);
   });
 
-  test("BUG-65/6.4: a stale brain.active (order edited) is dropped and the order tried again", async () => {
+  test("doctor/brain: a stale brain.active (order edited) is dropped and the order tried again #BUG-65/6.4", async () => {
     const cfg = freshConfig("bug65", "notices: { claude: 2026-01-01 }\nconnections: { claude-code: { auth: subscription } }\nbrain:\n  order:\n    - { route: claude-plan, model: claude-sonnet-5-5 }\n  active: 3\n");
     const r = await cli(["brain"], { env: { GLUON_CONFIG: cfg } });
     expect(r.stderr).toBe("");
@@ -1050,7 +1056,7 @@ describe("doctor and the brain (QA pass 2)", () => {
 });
 
 describe("review of PR #1", () => {
-  test("BUG-87/12: Enter on the empty AWS prompts pins nothing, and shows what Bedrock will use (AWS_PROFILE, AWS_DEFAULT_REGION)", async () => {
+  test("connections/bedrock: Enter on the empty AWS prompts pins nothing, and shows what Bedrock will use (AWS_PROFILE, AWS_DEFAULT_REGION) #BUG-87/12", async () => {
     const cfg = freshConfig("aws-unpinned");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, AWS_PROFILE: "envprof", AWS_REGION: undefined, AWS_DEFAULT_REGION: "eu-central-1" });
     await app.waitFor("How should Claude Code sign in?");
@@ -1074,7 +1080,7 @@ describe("review of PR #1", () => {
     expect(read(cfg)).not.toMatch(/envprof|eu-central-1/);
   });
 
-  test("BUG-87/12: a configured profile and region are pre-filled; typing one pins it", async () => {
+  test("connections/bedrock: a configured profile and region are pre-filled; typing one pins it #BUG-87/12", async () => {
     const cfg = freshConfig("aws-pinned", "bedrock: { profile: work, region: us-west-2 }\n");
     const app = run(["connect", "claude-code"], { GLUON_CONFIG: cfg, AWS_PROFILE: undefined, AWS_REGION: undefined, AWS_DEFAULT_REGION: undefined });
     await app.waitFor("How should Claude Code sign in?");
