@@ -22,12 +22,15 @@ skipping one, tagging it `@full` or `@quarantine`, or loosening a matcher is a d
 **3. Test at the product's surface; below it only at a typed seam; one layer.** Test a behaviour the way a user meets it:
 an end-to-end scenario through Gluon's terminal with the fake agents; the real-harness tier when it depends on a harness's
 screens, flags or hooks; a live check when only a real model, or a harness with no loopback, shows it. A test below the
-surface is right only at a seam, a module whose contract is a type or an outside format (`test/seams.ts` lists them:
-routing, the adapters, the screen readers, the agent session, the cost functions…), never at an internal helper. The
-agent that writes the code writes the test: a test of a helper restates the code and breaks with every refactor. The
-same bug tested at two layers costs twice and catches once.
+surface is right only at a seam, a module whose contract is a type or an outside format (`test/seams.ts` lists each seam
+and the modules it holds: routing, the adapters, the screen readers, the agent session, the cost functions…), never at
+an internal helper. The agent that writes the code writes the test: a test of a helper restates the code and breaks with
+every refactor. Pure logic stuck in a module that isn't a seam moves into one, behaviour unchanged, before it gets a
+test below the surface. The same bug tested at two layers costs twice and catches once: a bug's tag stays on the test
+that holds its coverage-matrix case id (`test/fixtures/gluon-matrix.ts`), else on its seam test; a bug tested only end
+to end keeps its tag there.
 *Checked:* `test/catalog.test.ts`: a test below the surface imports from `src/` only seams; `test/test-style.test.ts`: no
-new bug tested at both layers (the files and bugs that already break these can only go).
+new bug tested at both layers (the few already tested at both, in its baseline, can only go).
 
 **4. Wait for a state, never for a time.** Wait for what the step should produce (`waitFor`, `until`, `exitCode()`);
 a fixed sleep is too short on a loaded runner and too long everywhere else. A sleep is right only as a window in
@@ -51,7 +54,10 @@ lists the slow ones, breaks on any far over the threshold, and on the fast tier 
 **8. Every test names what it promises; a bug strengthens that test.** A test's title starts with the id of its entry in
 the catalog (`test/catalog.ts`): `feature/entry: <what holds>`. A bug fix makes the test of the entry that should have
 caught it fail, then fixes the code, and tags the test `#BUG-<n>`; when no entry could have caught it, the fix adds the
-missing one. Search the catalog before adding a test: a new case often belongs in an existing one.
+missing one. Search the catalog before adding a test: a new case often belongs in an existing one. The entry is
+written out at the start of the title, a built title's before its first `${` (or `%s`), never on a `describe`; tags go at
+the end and hold no spaces or apostrophes (`#BUG-<n>/two-words`); a test plan's case id (`#F<n>`, `#QA-<area>-<n>`) and a
+coverage-matrix case id (`#GLUON-<n>`) stay as tags, verbatim.
 *Checked:* `test/catalog.test.ts`: every entry has a test and every test a known entry (an open `BUG-CANDIDATE` names
 none until it is triaged); `red-check` runs a newly tagged test against the base.
 
@@ -80,6 +86,11 @@ area's source one at a time (a comparison flipped, a `!` dropped) and runs its t
 a gap to close; a test that catches nothing no other test catches is a candidate to delete, the slow ones first. It also
 lists the bugs the area tests at both layers. Candidates need a large sample (hundreds of mutants) before they mean much;
 a pull request that deletes tests says why for each, and waits for a maintainer's `tests-reviewed` label.
+Compare a change's kills before and after with the same `--max` and `--seed`. A run sees only the area's own test files,
+so a kill that seems lost may be held by another area's e2e test: apply that one mutant by hand and run the test that
+should catch it. A kill seen once on a loaded machine can be a timeout, not a catch; run the mutant again before
+believing it. `--e2e` runs the area's e2e files for each mutant (minutes each): use it when the e2e files' bodies
+changed, not for a change of titles.
 
 ## Flaky tests
 

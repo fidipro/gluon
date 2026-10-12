@@ -8,11 +8,13 @@ Unit tests (`*.test.ts(x)`), e2e scenarios (`e2e/`, how-to in `e2e/README.md`), 
 - **Never weaken a test to get green**: no deleted test or `expect`, no new skip, `@full` or `@quarantine`
   without a person's `tests-reviewed` label (`scripts/test-guard.ts`). Fix the code, or stop and say what fails.
 - **Test at the product's surface** (an e2e scenario; `test/real/` when it hangs on a harness's screens); below it only
-  at a seam (`test/seams.ts`; `docs/contributing/testing.md` rule 3), never an internal helper; one layer per bug.
+  at a seam (`test/seams.ts`; `docs/contributing/testing.md` rule 3), never an internal helper. One layer per bug: its tag
+  stays on the test with its coverage-matrix case id, else on its seam test; an e2e-only bug keeps it there.
 - **Assert meaning, not copy**: the state or region that matters; no snapshot outside `test/visual/`; fakes at the
   process or network boundary, not `mock.module`.
-- **A test's title starts with its catalog entry** (`feature/entry: …`, `test/catalog.ts`); a bug strengthens that test,
-  tagged `#BUG-nn`. Search the catalog first. A new or changed entry or seam waits for a person's `tests-reviewed`.
+- **A test's title starts with its catalog entry** (`feature/entry: …`, `test/catalog.ts`; a built title's before its first
+  `${`, never on a `describe`); a bug strengthens that test, tagged `#BUG-nn` at the end (no spaces; case ids stay
+  verbatim). Search the catalog first. A new or changed entry or seam waits for a person's `tests-reviewed`.
 
 - **Never reach a real model, API or installer**: use the fakes and `fakeInstaller()`; real installers only in
   a throwaway container. Probes come from `GLUON_TEST_PROBES`. Real harness binaries only in `test/real/`, through
