@@ -5,7 +5,7 @@
  * (CI, Release, Pages). Nothing here runs a workflow.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
@@ -196,6 +196,53 @@ describe("the draft release's body is the changelog section", () => {
     const notes = releaseNotes(read("CHANGELOG.md"), "1.0.0");
     expect(notes).toContain("First public release");
     expect(notes).not.toStartWith("No CHANGELOG.md section");
+  });
+});
+
+describe("the old name", () => {
+  // `git grep` needs a checkout: docker-test's build context is the tracked files without `.git`, where it finds nothing.
+  test.skipIf(!existsSync(join(ROOT, ".git")))("`fidicode` (but issue links, `fidipro/fidicode/issues/N`, which GitHub redirects) stays only where it is history or a legacy path to remove", () => {
+    const out = Bun.spawnSync(["git", "grep", "-ilP", "(?<!fidipro/)fidicode"], { cwd: ROOT, env: process.env, stdout: "pipe" }).stdout.toString();
+    expect(out.split("\n").filter(Boolean).sort()).toEqual([
+      "src/AGENTS.md", // the legacy names, as a rule
+      "src/adapters/permanent.ts", // legacy paths written by old versions: removed, never written
+      "test/fixtures/screens/claude-code/2.1.296.json", // a captured screen
+      "test/permanent.test.ts",
+      "test/release.test.ts", // this test
+      "test/rules.test.ts",
+    ]);
+  });
+
+  /** Where the GitHub org and repository name (`fidipro/gluon`) may be spelled out; everywhere else says `REPO_SLUG`. */
+  const SLUG_PLACES = new Set([
+    "src/repo.ts", // REPO_SLUG, the one name in src/
+    "install.sh", // REPO= (and its usage comment)
+    "install.ps1", // $Repo (and its usage comment)
+    "package.json", // homepage, bugs, repository
+    ".github/ISSUE_TEMPLATE/config.yml", // contact links
+    "README.md", // install one-liners
+    "SECURITY.md", // the advisory form link
+    "SUPPORT.md", // the issue chooser link
+    "CONTRIBUTING.md", // git clone
+    "docs/index.mdx", // install one-liners
+    "docs/getting-started/install.md", // install one-liners, `gh release download -R`, the cosign identity
+    "docs/reference/env.md", // generated from the installers' own text
+    "docs/reference/cli.md", // generated from `gluon update --help`, which names the releases it installs
+    "test/release.test.ts", // this list
+  ]);
+
+  test("the repository's slug (`fidipro/...`) is spelled only where it must be: use REPO_SLUG from src/repo.ts, or add the place to SLUG_PLACES with a reason", () => {
+    const out = Bun.spawnSync(["git", "grep", "-nIi", "fidipro"], { cwd: ROOT, env: process.env, stdout: "pipe" }).stdout.toString();
+    // A link to an issue (`github.com/fidipro/fidicode/issues/76`) is a reference to history, not a copy of the name.
+    const hits = out.split("\n").filter(Boolean).filter((l) => /fidipro/i.test(l.replace(/fidipro\/fidicode\/issues\/\d+/gi, "")));
+    const files = [...new Set(hits.map((l) => l.slice(0, l.indexOf(":"))))].filter((f) => !SLUG_PLACES.has(f));
+    expect(files.sort()).toEqual([]);
+  });
+
+  test("the repository's own policy files exist (CODE_OF_CONDUCT.md, SUPPORT.md, SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, the issue-template config)", () => {
+    for (const f of ["CODE_OF_CONDUCT.md", "SUPPORT.md", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/ISSUE_TEMPLATE/config.yml"]) {
+      expect([f, existsSync(join(ROOT, f))]).toEqual([f, true]);
+    }
   });
 });
 

@@ -1000,7 +1000,7 @@ describe("setup: what it changes (QA pass 2)", () => {
     expect(existsSync(join(dirname(cfg), ".env"))).toBe(false);
   });
 
-  test("BUG-52/2.7: a pasted replacement key is what Gluon and the agent use, not the environment's @full", async () => {
+  test("2.7: a pasted replacement key is what Gluon and the agent use, not the environment's @full", async () => {
     const cfg = freshConfig("bug52");
     const env = { GLUON_CONFIG: cfg, ANTHROPIC_API_KEY: "sk-ant-api03-FROMTHEENVIRONMENTenv1" };
     const app = run(["connect", "claude-code"], env);

@@ -6,7 +6,7 @@
  */
 import type { SDKMessage, query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { repoContext, systemPrompt } from "../src/agent/prompt.ts";
@@ -53,52 +53,6 @@ const sources = (dir: string): [string, string][] =>
     return statSync(p).isDirectory() ? sources(p) : /\.tsx?$/.test(f) ? [[p.slice(ROOT.length + 1).replaceAll("\\", "/"), readFileSync(p, "utf8")] as [string, string]] : [];
   });
 const SRC = sources(join(ROOT, "src"));
-
-describe("the old name", () => {
-  // `git grep` needs a checkout: docker-test's build context is the tracked files without `.git`, where it finds nothing.
-  test.skipIf(!existsSync(join(ROOT, ".git")))("`fidicode` (but issue links, `fidipro/fidicode/issues/N`, which GitHub redirects) stays only where it is history or a legacy path to remove", () => {
-    const out = Bun.spawnSync(["git", "grep", "-ilP", "(?<!fidipro/)fidicode"], { cwd: ROOT, env: process.env, stdout: "pipe" }).stdout.toString();
-    expect(out.split("\n").filter(Boolean).sort()).toEqual([
-      "src/AGENTS.md", // the legacy names, as a rule
-      "src/adapters/permanent.ts", // legacy paths written by old versions: removed, never written
-      "test/fixtures/screens/claude-code/2.1.296.json", // a captured screen
-      "test/permanent.test.ts",
-      "test/rules.test.ts",
-    ]);
-  });
-
-  /** Where the GitHub org and repository name (`fidipro/gluon`) may be spelled out; everywhere else says `REPO_SLUG`. */
-  const SLUG_PLACES = new Set([
-    "src/repo.ts", // REPO_SLUG, the one name in src/
-    "install.sh", // REPO= (and its usage comment)
-    "install.ps1", // $Repo (and its usage comment)
-    "package.json", // homepage, bugs, repository
-    ".github/ISSUE_TEMPLATE/config.yml", // contact links
-    "README.md", // install one-liners
-    "SECURITY.md", // the advisory form link
-    "SUPPORT.md", // the issue chooser link
-    "CONTRIBUTING.md", // git clone
-    "docs/index.mdx", // install one-liners
-    "docs/getting-started/install.md", // install one-liners, `gh release download -R`, the cosign identity
-    "docs/reference/env.md", // generated from the installers' own text
-    "docs/reference/cli.md", // generated from `gluon update --help`, which names the releases it installs
-    "test/rules.test.ts", // this list
-  ]);
-
-  test("the repository's slug (`fidipro/...`) is spelled only where it must be: use REPO_SLUG from src/repo.ts, or add the place to SLUG_PLACES with a reason", () => {
-    const out = Bun.spawnSync(["git", "grep", "-nIi", "fidipro"], { cwd: ROOT, env: process.env, stdout: "pipe" }).stdout.toString();
-    // A link to an issue (`github.com/fidipro/fidicode/issues/76`) is a reference to history, not a copy of the name.
-    const hits = out.split("\n").filter(Boolean).filter((l) => /fidipro/i.test(l.replace(/fidipro\/fidicode\/issues\/\d+/gi, "")));
-    const files = [...new Set(hits.map((l) => l.slice(0, l.indexOf(":"))))].filter((f) => !SLUG_PLACES.has(f));
-    expect(files.sort()).toEqual([]);
-  });
-
-  test("the repository's own policy files exist (CODE_OF_CONDUCT.md, SUPPORT.md, SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, the issue-template config)", () => {
-    for (const f of ["CODE_OF_CONDUCT.md", "SUPPORT.md", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/ISSUE_TEMPLATE/config.yml"]) {
-      expect([f, existsSync(join(ROOT, f))]).toEqual([f, true]);
-    }
-  });
-});
 
 /**
  * The allowlist of harness config names (issue #39): the one module that may name a harness's config
@@ -180,7 +134,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     expect(HARNESS_INFO.antigravity.keyNote?.gemini).toContain("set that yourself");
   });
 
-  test("#108: Antigravity takes only the Gemini API as a key: its base-URL override speaks Gemini's wire format, which OpenRouter does not serve", () => {
+  test("subscriptions/base-url-allowlist: Antigravity takes only the Gemini API as a key: its base-URL override speaks Gemini's wire format, which OpenRouter does not serve #108", () => {
     expect(HARNESS_INFO.antigravity.providers).toEqual(["gemini"]);
     expect(BASE_URL_ENV).toContain("GOOGLE_GEMINI_BASE_URL");
   });
@@ -191,7 +145,7 @@ describe("rule 1: never touch any harness's credentials", () => {
     expect(text).not.toMatch(/\bfetch\(|https?:\/\//);
   });
 
-  test("only the updater (src/update/) reads GitHub's releases or Sigstore's TUF repository", () => {
+  test("update/hosts: only the updater (src/update/) reads GitHub's releases or Sigstore's TUF repository", () => {
     for (const [file, text] of SRC) {
       if (file.startsWith("src/update/")) continue;
       expect([file, text]).not.toEqual([file, expect.stringMatching(/releases\/(latest|download)|githubusercontent\.com|tuf-repo-cdn|@sigstore\//)]);
@@ -245,7 +199,7 @@ describe("rules 1 and 4: no base URL on a subscription, no token forwarding", ()
     expect(OPENROUTER_ANTHROPIC_BASE).toBe("https://openrouter.ai/api");
   });
 
-  test("every connection of every harness: no token, a base URL only on OpenRouter, only the chosen provider's key", () => {
+  test("subscriptions/no-token-forwarding: every connection of every harness: no token, a base URL only on OpenRouter, only the chosen provider's key", () => {
     const keys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "MOONSHOT_API_KEY"];
     for (const k of keys) process.env[k] = `sk-test-${k.toLowerCase()}-0123456789abcdef`;
     try {
@@ -405,7 +359,7 @@ describe("rule 2: keys", () => {
     loadSecrets();
   });
 
-  test("BUG-82/7: .env.example states the precedence secrets.ts implements (saved > environment, no other .env)", () => {
+  test("keys/only-next-to-config: .env.example states the precedence secrets.ts implements (saved > environment, no other .env) #BUG-82/7", () => {
     const example = readFileSync(join(ROOT, ".env.example"), "utf8");
     expect(example).not.toMatch(/environment wins/i);
     expect(example).toContain("Precedence: a key in that file wins over your\n# environment. Gluon reads no other .env.");
@@ -421,7 +375,7 @@ describe("rule 2: keys", () => {
     }
   });
 
-  test("BUG-89: a key is never written into a looser existing .env, and a config that can't be saved saves no key", async () => {
+  test("keys/private-files-directory-first: a key is never written into a looser existing .env, and a config that can't be saved saves no key #BUG-89", async () => {
     const env = join(TMP, ".env");
     writeFileSync(env, "OTHER_SETTING=1\n", { mode: 0o644 });
     const before = statSync(env).ino;
@@ -475,7 +429,7 @@ test("keys/masked-when-printed: token-like values are masked, for every vendor",
   }
 });
 
-test("saveConfig changes only the keys it sets and keeps comments", () => {
+test("config/written-in-place: saveConfig changes only the keys it sets and keeps comments", () => {
   const path = process.env.GLUON_CONFIG!;
   writeFileSync(path, "# mine\nconnections: { claude-code: { auth: subscription } } # keep\nbedrock: { region: eu-west-1 }\n");
   saveConfig([[["connections", "codex"], { auth: "api", provider: "openai" }], [["brain", "active"], 2]]);
@@ -517,7 +471,7 @@ function fakeQuery(script: { text?: string; tool?: { name: string; input: Record
   return { run, results };
 }
 
-test("on the plan, questions, proposals and exploring look the same, and nothing calls the network", async () => {
+test("subscriptions/plan-brain-official-only: on the plan, questions, proposals and exploring look the same, and nothing calls the network", async () => {
   const realFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = (() => {
@@ -644,7 +598,7 @@ describe("the plan brain's start-up (the SDK loads lazily)", () => {
 });
 
 describe("masking (QA pass 2)", () => {
-  test("BUG-55/5.4: every key shape the providers table hands out is masked", () => {
+  test("keys/masked-when-printed: every key shape the providers table hands out is masked #BUG-55/5.4", () => {
     const samples: Record<string, string> = {
       anthropic: "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789",
       openai: "sk-proj-abcdefghijklmnopqrstuvwxyz0123",
@@ -680,7 +634,7 @@ describe("masking (QA pass 2)", () => {
     }
   });
 
-  test("BUG-86/11: only secrets in Gluon's .env files are masked by value, not its other settings", () => {
+  test("keys/masked-when-printed: only secrets in Gluon's .env files are masked by value, not its other settings #BUG-86/11", () => {
     writeFileSync(join(TMP, ".env"), "AWS_REGION=us-east-1-long\nAWS_PROFILE=my-work-profile\nMY_SERVICE_TOKEN=plainTokenValueNoShape7\nDEEPSEEK_API_KEY=plainKeyValueNoShape123\n");
     loadSecrets();
     try {
@@ -692,7 +646,7 @@ describe("masking (QA pass 2)", () => {
     }
   });
 
-  test("BUG-52/2.7: a key saved by Gluon wins over the environment's", () => {
+  test("keys/only-next-to-config: a key saved by Gluon wins over the environment's #BUG-52/2.7", () => {
     process.env.XAI_API_KEY = "xai-fromtheenvironment0000";
     try {
       expect(secret("XAI_API_KEY")).toBe("xai-fromtheenvironment0000");
@@ -718,7 +672,7 @@ describe("installing a harness (Phase 4)", () => {
   };
   const all = HARNESSES.flatMap((h) => (["posix", "win32"] as const).flatMap((p) => (HARNESS_INFO[h].install[p] ?? []).map((m) => ({ h, p, m }))));
 
-  test("every harness has a method on each platform, the vendor's docs on https", () => {
+  test("install/verbatim-no-sudo: every harness has a method on each platform, the vendor's docs on https", () => {
     for (const h of HARNESSES) for (const p of ["posix", "win32"] as const) expect(HARNESS_INFO[h].install[p]?.length).toBeGreaterThan(0);
     for (const { m } of all) expect(new URL(m.docs).protocol).toBe("https:");
   });

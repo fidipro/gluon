@@ -40,7 +40,6 @@
   "test/figures.test.ts": 1
  },
  "bothLayers": [
-  "BUG-52",
   "BUG-58",
   "BUG-115",
   "BUG-116",
