@@ -259,7 +259,7 @@ describe("matrix `na`: pixel mouse reports (mode 1016) that no fake asks for", (
   // pixels; an unknown size still drops the report. Risks: a terminal that doesn't answer `16 t` (as today), a font change
   // without a resize (stale size), ConPTY has no 1016. The query is Gluon's own bytes; the reply must never reach an agent.
   // This test then passes `cellPx` (say 8×20) and expects pixel (392,140) shifted; add: outside is null, unknown size is null.
-  test.failing("frame/mouse-to-agent: BUG-CANDIDATE/QA-frame-04: an agent that asked for pixel mouse reports (?1016) gets a click in the middle of its screen (pixel 400,200 of 800×480): moved or passed on, never dropped as outside the interior", () => {
+  test.failing("BUG-CANDIDATE/QA-frame-04: an agent that asked for pixel mouse reports (?1016) gets a click in the middle of its screen (pixel 400,200 of 800×480): moved or passed on, never dropped as outside the interior", () => {
     expect(shiftMouse(ev(400, 200), interior, "sgr-pixels", false)).not.toBeNull();
   });
 });

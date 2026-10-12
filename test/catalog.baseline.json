@@ -39,6 +39,7 @@
   "test/effort.test.ts": 18,
   "test/figures.test.ts": 54,
   "test/forge.test.ts": 24,
+  "test/gluon-qa-frame.test.ts": 1,
   "test/gluon.test.ts": 3,
   "test/grok.test.ts": 32,
   "test/handoff.test.ts": 13,
