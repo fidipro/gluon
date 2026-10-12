@@ -39,7 +39,7 @@ const flat = (app: App) => app.screen().replace(/\s+/g, " ");
 
 describe("QA-resume: one Gluon per workspace", () => {
   // Linux only: the process start is read from /proc there; Windows (PowerShell) is unverified, and macOS falls back to the pid alone (`processStart`).
-  (process.platform === "linux" ? test : test.skip)("BUG-642/QA-resume-01: a pid in the file that another, unrelated process now holds (pids are reused after a reboot, at once in a container) doesn't make `gluon resume` say the workspace is open in another Gluon", async () => {
+  (process.platform === "linux" ? test : test.skip)("resume/one-gluon: a pid in the file that another, unrelated process now holds (pids are reused after a reboot, at once in a container) doesn't make `gluon resume` say the workspace is open in another Gluon #QA-resume-01", async () => {
     const s = sandbox();
     const other = Bun.spawn(["sleep", "60"]);
     try {
@@ -52,7 +52,7 @@ describe("QA-resume: one Gluon per workspace", () => {
     }
   });
 
-  (process.platform === "linux" ? test : test.skip)("BUG-642/variants: a process that started when the record says is still the Gluon (refused, naming it); a record without a start is decided by the pid, as before", async () => {
+  (process.platform === "linux" ? test : test.skip)("resume/one-gluon: a process that started when the record says is still the Gluon (refused, naming it); a record without a start is decided by the pid, as before", async () => {
     const s = sandbox();
     const other = Bun.spawn(["sleep", "60"]);
     try {
@@ -69,7 +69,7 @@ describe("QA-resume: one Gluon per workspace", () => {
     }
   });
 
-  test("BUG-643/QA-resume-02: two Gluons that resume one workspace at the same moment are not both let in (the check reads the pid file at startup; the claim is written about a second later, so both reopen the same harness session)", async () => {
+  test("resume/one-gluon: two Gluons that resume one workspace at the same moment are not both let in (the check reads the pid file at startup; the claim is written about a second later, so both reopen the same harness session) #QA-resume-02", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const dir = repo.tiny();
@@ -79,12 +79,12 @@ describe("QA-resume: one Gluon per workspace", () => {
   });
 });
 
-describe("BUG-643/variants: the claim on a workspace", () => {
+describe("the claim on a workspace", () => {
   const lock = (s: Sandbox) => join(s.ws, "abcdef.lock");
   const deadPid = () => Bun.spawnSync([process.execPath, "-e", ""]).pid;
   const hold = (s: Sandbox, pid: number) => writeFileSync(lock(s), `${JSON.stringify({ v: 1, pid })}\n`);
 
-  test("a live claim refuses the resume naming its pid; --force takes it over; a claim of a Gluon that is gone never blocks; none outlives the command", async () => {
+  test("resume/one-gluon: a live claim refuses the resume naming its pid; --force takes it over; a claim of a Gluon that is gone never blocks; none outlives the command", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     hold(s, process.pid);
@@ -101,7 +101,7 @@ describe("BUG-643/variants: the claim on a workspace", () => {
     expect(existsSync(lock(s))).toBe(false);
   });
 
-  (WIN ? test.skip : test)("a running resumed Gluon holds a private claim naming its process, and quitting removes it", async () => {
+  (WIN ? test.skip : test)("resume/one-gluon: a running resumed Gluon holds a private claim naming its process, and quitting removes it", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
@@ -119,7 +119,7 @@ describe("BUG-643/variants: the claim on a workspace", () => {
 });
 
 describe("QA-resume: a saved session that can't come back", () => {
-  test("BUG-659/QA-resume-06: a saved session whose model is gone (PR #84) says how to let it go: the notice names a way to drop it, or the question has a key for it (today the record stays for ever and nothing in Gluon removes it)", async () => {
+  test("resume/cannot-resume: a saved session whose model is gone (PR #84) says how to let it go: the notice names a way to drop it, or the question has a key for it (today the record stays for ever and nothing in Gluon removes it) #BUG-659/QA-resume-06", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ model: "sonnet-0" })] }));
     const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: s.env });
@@ -127,7 +127,7 @@ describe("QA-resume: a saved session that can't come back", () => {
     expect(flat(app)).toMatch(/sessions --delete|esc drops|drop it/i);
   });
 
-  test("a harness that refuses an unknown session id but exits 0 is not seen as a refusal: the session ends like any other, its record (spec included) is deleted, and the only text is the 'Resuming workspace' line (documented limit, `resumeRefused`)", async () => {
+  test("resume/cannot-resume: a harness that refuses an unknown session id but exits 0 is not seen as a refusal: the session ends like any other, its record (spec included) is deleted, and the only text is the 'Resuming workspace' line (documented limit, `resumeRefused`)", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const app = await start({ cwd: repo.tiny(), cols: 200, rows: 40, args: ["resume", "abcdef"], agents: ALL, env: { ...s.env, FAKE_REFUSE_RESUME: "0" } });
@@ -139,7 +139,7 @@ describe("QA-resume: a saved session that can't come back", () => {
 });
 
 describe("QA-resume: the directory a resume enters", () => {
-  test("BUG-661/QA-resume-14: a saved directory that was moved or renamed says what to do next (the message only says it no longer exists; the harnesses find their sessions by directory, so the way out is to move it back or delete the record)", async () => {
+  test("resume/find: a saved directory that was moved or renamed says what to do next (the message only says it no longer exists; the harnesses find their sessions by directory, so the way out is to move it back or delete the record) #BUG-661/QA-resume-14", async () => {
     const s = sandbox();
     seed(s, workspace("/nonexistent/gluon-qa/moved-away"));
     const r = await cli(["resume", "abcdef"], { env: s.env });
@@ -150,7 +150,7 @@ describe("QA-resume: the directory a resume enters", () => {
 });
 
 describe("QA-resume: files Gluon can't read", () => {
-  test("BUG-638/QA-resume-11: a saved workspace file that doesn't parse (a crash mid-write on a system that lost the rename, a hand edit, a newer build) can be deleted by its id (it is invisible to `gluon sessions`, and `--delete` says there is no such session)", async () => {
+  test("resume/unreadable-listed: a saved workspace file that doesn't parse (a crash mid-write on a system that lost the rename, a hand edit, a newer build) can be deleted by its id (it is invisible to `gluon sessions`, and `--delete` says there is no such session) #QA-resume-11", async () => {
     const s = sandbox();
     mkdirSync(s.ws, { recursive: true });
     writeFileSync(join(s.ws, "abcdef.json"), '{"v":1,"id":"abcdef","name":');
@@ -158,7 +158,7 @@ describe("QA-resume: files Gluon can't read", () => {
     expect([r.code, existsSync(join(s.ws, "abcdef.json"))]).toEqual([0, false]);
   });
 
-  test("BUG-638/variants: `gluon sessions` names the file it can't read with the way to remove it; a readable one stays listed beside it, and deleting the broken one leaves it alone; a prefix or an unknown id doesn't delete it", async () => {
+  test("resume/unreadable-listed: `gluon sessions` names the file it can't read with the way to remove it; a readable one stays listed beside it, and deleting the broken one leaves it alone; a prefix or an unknown id doesn't delete it", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { id: "ghijkl" }), "ghijkl");
     writeFileSync(join(s.ws, "abcdef.json"), "not json");
@@ -176,7 +176,7 @@ describe("QA-resume: files Gluon can't read", () => {
 
 describe("QA-resume: uninstall", () => {
   // Owner decision: uninstall refuses while a Gluon runs, naming its pid, and removes nothing (the candidate expected it to remove everything and the Gluon not to write back).
-  (WIN ? test.skip : test)("BUG-644/QA-resume-12: `gluon uninstall --yes` while a Gluon is running refuses, naming that Gluon's pid, and removes nothing; once the Gluon has quit it uninstalls @full", async () => {
+  (WIN ? test.skip : test)("resume/uninstall-waits: `gluon uninstall --yes` while a Gluon is running refuses, naming that Gluon's pid, and removes nothing; once the Gluon has quit it uninstalls @full #QA-resume-12", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const own = mkdtempSync(join(tmpdir(), "gluon-qa-uninstall-"));
@@ -203,6 +203,42 @@ describe("QA-resume: uninstall", () => {
       expect(after.code).toBe(0);
       expect(existsSync(s.ws)).toBe(false);
     } finally {
+      rmSync(own, { recursive: true, force: true });
+    }
+  });
+
+  // Not on Windows: its last `uninstall --yes` removes for real, and HOME doesn't move Windows' profile directories.
+  (WIN ? test.skip : test)("resume/uninstall-waits: a live pid in a workspace file or only in a claim: gluon uninstall, with --yes or without, refuses naming it, exits 1 and removes nothing; once it is gone, uninstall --yes removes both", async () => {
+    const s = sandbox();
+    const own = mkdtempSync(join(tmpdir(), "gluon-qa-uninstall-"));
+    const gluon = Bun.spawn([process.execPath, "-e", "await Bun.sleep(30000)"], { stdio: ["ignore", "ignore", "ignore"] });
+    try {
+      const home = join(own, "home");
+      mkdirSync(home);
+      const env = { ...s.env, HOME: home, XDG_STATE_HOME: join(own, "state"), XDG_CONFIG_HOME: join(own, "xdg"), TMPDIR: own };
+      const lock = join(s.ws, "abcdef.lock");
+      const there = () => [existsSync(join(s.ws, "abcdef.json")), existsSync(lock), existsSync(s.cfg)];
+      // Refused before anything else, the terminal check of an uninstall without --yes too: it never asks.
+      const refused = async (files: boolean[]) => {
+        for (const args of [["uninstall"], ["uninstall", "--yes"]]) {
+          const r = await cli(args, { env });
+          expect([r.code, r.stdout, r.stderr]).toEqual([1, "", `gluon: a Gluon is running (process ${gluon.pid}); nothing was removed. Quit it, then run gluon uninstall again.\n`]);
+          expect(there()).toEqual(files);
+        }
+      };
+      seed(s, workspace(repo.tiny(), { pid: gluon.pid }));
+      await refused([true, false, true]);
+      seed(s, workspace(repo.tiny()));
+      writeFileSync(lock, JSON.stringify({ v: 1, pid: gluon.pid }));
+      await refused([true, true, true]);
+      gluon.kill();
+      await gluon.exited;
+      const after = await cli(["uninstall", "--yes"], { env });
+      expect(after.code).toBe(0);
+      // A claim is one of the session files the sweep removes.
+      expect(there().slice(0, 2)).toEqual([false, false]);
+    } finally {
+      gluon.kill();
       rmSync(own, { recursive: true, force: true });
     }
   });

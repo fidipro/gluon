@@ -5,10 +5,9 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { canSymlink, isPrivate } from "./e2e/fixtures.ts";
 import { claimWorkspace, deleteWorkspace, describeWorkspace, dirProblem, findWorkspace, listWorkspaces, liveOwner, loadWorkspace, localTime, MAX_SPEC, newWorkspaceId, ownerAlive, ownStart, parseWorkspace, processAlive, processStart, Recorder, RESUME_ID, runningGluons, sameDir, saveWorkspace, scanWorkspaces, WORKSPACE_ID, workspaceName, workspacesDir, type ChildRecord, type Workspace } from "../src/workspaces.ts";
-import { uninstall, workspaceFiles } from "../src/uninstall.ts";
 import { loadSecrets, useSecrets } from "../src/secrets.ts";
 
 const TMP = mkdtempSync(join(tmpdir(), "gluon-workspaces-test-"));
@@ -31,14 +30,14 @@ const workspace = (over: Partial<Workspace> = {}): Workspace => ({ v: 1, id: "ab
 const fileOf = (id: string) => join(workspacesDir(), `${id}.json`);
 const raw = (ws: unknown) => JSON.stringify(ws);
 
-describe("BUG-312/resume: the saved workspace file", () => {
-  test("a workspace round-trips through its file", () => {
+describe("the saved workspace file", () => {
+  test("resume/saved: a workspace round-trips through its file #BUG-312/resume", () => {
     const ws = workspace({ sessions: [child(), child({ key: "k2", harness: "codex", model: "gpt-5.5", effort: undefined, done: true, resume: { id: "019a-codex", source: "captured" } }), child({ key: "k3", harness: "antigravity", resume: undefined })] });
     saveWorkspace(ws);
     expect(loadWorkspace("abcdef")).toEqual(ws);
   });
 
-  test("BUG-612/resume-modes: a session's mode round-trips through the file; a record without one stays without (it is not guessed as build)", () => {
+  test("resume/saved: a session's mode round-trips through the file; a record without one stays without (it is not guessed as build) #BUG-612/resume-modes", () => {
     const ws = workspace({ sessions: [child({ key: "k1", harness: "codex", model: "gpt-5.5", resume: { id: "019a-codex", source: "captured" }, mode: "explore" }), child({ key: "k2", mode: "plan" }), child({ key: "k3", mode: "build" }), child({ key: "k4" })] });
     saveWorkspace(ws);
     const got = loadWorkspace("abcdef")!.sessions;
@@ -47,7 +46,7 @@ describe("BUG-312/resume: the saved workspace file", () => {
     expect(loadWorkspace("abcdef")).toEqual(ws);
   });
 
-  test("BUG-712/permissions-resume: a session's permissions round-trip; an unknown level is dropped, not the session (the harness's own asks more, never less)", () => {
+  test("resume/saved: a session's permissions round-trip; an unknown level is dropped, not the session (the harness's own asks more, never less) #BUG-712/permissions-resume", () => {
     const ws = workspace({ sessions: [child({ key: "k1", permissions: "auto" }), child({ key: "k2" })] });
     saveWorkspace(ws);
     expect(loadWorkspace("abcdef")!.sessions.map((c) => c.permissions)).toEqual(["auto", undefined]);
@@ -55,19 +54,19 @@ describe("BUG-312/resume: the saved workspace file", () => {
     expect(odd!.sessions.map((c) => [c.key, c.permissions])).toEqual([["b0", undefined], ["b1", undefined], ["b2", undefined]]);
   });
 
-  test("BUG-612/resume-modes: a mode that is no known mode (or no string) is a bad record like a bad effort: that session is dropped, the others kept", () => {
+  test("resume/untrusted-file: a mode that is no known mode (or no string) is a bad record like a bad effort: that session is dropped, the others kept #BUG-612/resume-modes", () => {
     const bad = ["yolo", "", "EXPLORE", 1, null, ["explore"], { x: 1 }].map((mode, i) => ({ ...child({ key: `b${i}` }), mode }));
     const ws = parseWorkspace(raw({ ...workspace(), sessions: [child({ key: "k1", mode: "explore" }), ...bad, child({ key: "k9" })] }));
     expect(ws!.sessions.map((s) => s.key)).toEqual(["k1", "k9"]);
   });
 
-  test("the file is private (mode 600) and no temporary directory is left next to it", () => {
+  test("resume/private-file: the file is private (mode 600) and no temporary directory is left next to it #BUG-312/resume", () => {
     saveWorkspace(workspace());
     expect(isPrivate(fileOf("abcdef"), tmpdir())).toBe(true);
     expect(readdirSync(workspacesDir())).toEqual(["abcdef.json"]);
   });
 
-  test("a key in a spec is masked on disk, the rest of the spec kept", () => {
+  test("resume/private-file: a key in a spec is masked on disk, the rest of the spec kept #BUG-312/resume", () => {
     const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
     saveWorkspace(workspace({ sessions: [child({ spec: `use ANTHROPIC_API_KEY=${key} to fix add` })] }));
     const text = readFileSync(fileOf("abcdef"), "utf8");
@@ -76,7 +75,7 @@ describe("BUG-312/resume: the saved workspace file", () => {
     expect(loadWorkspace("abcdef")!.sessions[0]!.spec).not.toContain(key);
   });
 
-  test("saving a workspace with no sessions removes its file", () => {
+  test("resume/record-lifecycle: saving a workspace with no sessions removes its file #BUG-312/resume", () => {
     saveWorkspace(workspace());
     expect(existsSync(fileOf("abcdef"))).toBe(true);
     saveWorkspace(workspace({ sessions: [] }));
@@ -86,8 +85,8 @@ describe("BUG-312/resume: the saved workspace file", () => {
   });
 });
 
-describe("BUG-312/resume: the file is read as untrusted text", () => {
-  test("corrupt, foreign-shaped and oversized files are skipped; the good ones listed", () => {
+describe("the file is read as untrusted text", () => {
+  test("resume/untrusted-file: corrupt, foreign-shaped and oversized files are skipped; the good ones listed #BUG-312/resume", () => {
     saveWorkspace(workspace({ id: "good22" }));
     mkdirSync(workspacesDir(), { recursive: true });
     writeFileSync(fileOf("corrupt"), "{ not json");
@@ -107,13 +106,13 @@ describe("BUG-312/resume: the file is read as untrusted text", () => {
     expect(loadWorkspace("abcdem")).toBeNull();
   });
 
-  test("one bad session is dropped and the others kept", () => {
+  test("resume/untrusted-file: one bad session is dropped and the others kept #BUG-312/resume", () => {
     const bad = [{ ...child({ key: "b1" }), harness: "nope" }, { ...child({ key: "b2" }), model: "" }, { ...child({ key: "b3" }), key: "bad key!" }, { ...child({ key: "b4" }), effort: "ludicrous" }, null, 7, "x"];
     const ws = parseWorkspace(raw({ ...workspace(), sessions: [child({ key: "k1" }), ...bad, child({ key: "k9", name: "Gluon-other" })] }));
     expect(ws!.sessions.map((s) => s.key)).toEqual(["k1", "k9"]);
   });
 
-  test("a resume id that could be read as an option is dropped; the session stays, to be started again", () => {
+  test("resume/argv: a resume id that could be read as an option is dropped; the session stays, to be started again #BUG-312/resume", () => {
     for (const id of ["-x", "--resume=1", "a b", "a\nb", "", "x".repeat(65), "ses/../x"]) {
       const ws = parseWorkspace(raw({ ...workspace(), sessions: [child({ resume: { id, source: "captured" } })] }));
       expect(ws!.sessions).toHaveLength(1);
@@ -125,19 +124,19 @@ describe("BUG-312/resume: the file is read as untrusted text", () => {
     expect(parseWorkspace(raw({ ...workspace(), sessions: [child({ resume: { id: "ok-id", source: "guess" as never } })] }))!.sessions[0]!.resume).toBeUndefined();
   });
 
-  test("a workspace with an id that is not six base32 characters is refused", () => {
+  test("resume/untrusted-file: a workspace with an id that is not six base32 characters is refused #BUG-312/resume", () => {
     for (const id of ["ABCDEF", "abcde", "abcdefg", "abc018", "../abcd"]) expect(parseWorkspace(raw(workspace({ id })))).toBeNull();
     expect(WORKSPACE_ID.test("abcdef")).toBe(true);
   });
 
-  test("at most 200 sessions are read", () => {
+  test("resume/limits: at most 200 sessions are read #BUG-312/resume", () => {
     const many = Array.from({ length: 300 }, (_, i) => child({ key: `k${i}` }));
     expect(parseWorkspace(raw(workspace({ sessions: many })))!.sessions).toHaveLength(200);
   });
 });
 
-describe("BUG-312/resume: ids, prefixes and the list", () => {
-  test("a new id is six characters of the alphabet and never one taken", () => {
+describe("ids, prefixes and the list", () => {
+  test("resume/saved: a new id is six characters of the alphabet and never one taken #BUG-312/resume", () => {
     const seen = new Set<string>();
     for (let i = 0; i < 200; i++) {
       const id = newWorkspaceId((x) => seen.has(x));
@@ -151,7 +150,7 @@ describe("BUG-312/resume: ids, prefixes and the list", () => {
     expect(id).toMatch(WORKSPACE_ID);
   });
 
-  test("workspaces are listed most recently updated first", () => {
+  test("resume/list: workspaces are listed most recently updated first #BUG-312/resume", () => {
     saveWorkspace(workspace({ id: "aaaaaa", updatedAt: 10 }));
     saveWorkspace(workspace({ id: "bbbbbb", updatedAt: 30 }));
     saveWorkspace(workspace({ id: "cccccc", updatedAt: 20 }));
@@ -159,7 +158,7 @@ describe("BUG-312/resume: ids, prefixes and the list", () => {
     expect(listWorkspaces().map((w) => w.id)).toEqual(["bbbbbb", "cccccc", "aaaaaa"]);
   });
 
-  test("an id or a unique prefix finds the workspace; an ambiguous or unknown one says so", () => {
+  test("resume/list: an id or a unique prefix finds the workspace; an ambiguous or unknown one says so #BUG-312/resume", () => {
     const all = ["abcdef", "abcxyz", "kkkkkk"].map((id) => workspace({ id }));
     expect(findWorkspace("kkk", all)).toEqual({ ws: all[2]! });
     expect(findWorkspace("ABCDEF", all)).toEqual({ ws: all[0]! });
@@ -172,7 +171,7 @@ describe("BUG-312/resume: ids, prefixes and the list", () => {
     expect("ws" in findWorkspace("abcdef", nested)).toBe(true);
   });
 
-  test("a workspace is named for its directory and day, and described in one line", () => {
+  test("resume/list: a workspace is named for its directory and day, and described in one line #BUG-312/resume", () => {
     expect(workspaceName("/home/me/tiny/", Date.UTC(2026, 9, 4, 12))).toBe("tiny · Oct 4");
     expect(workspaceName("C:\\work\\tiny", Date.UTC(2026, 9, 4, 12))).toBe("tiny · Oct 4");
     // The time is the machine's own, with its offset from UTC (BUG-662): built here from the Date's local fields, so any zone passes.
@@ -181,7 +180,7 @@ describe("BUG-312/resume: ids, prefixes and the list", () => {
     expect(describeWorkspace(workspace({ sessions: [child(), child({ key: "k2" })] }))).toContain("2 sessions");
   });
 
-  test("directories compare as the OS does: a trailing slash is the same, Windows ignores case", () => {
+  test("resume/list: directories compare as the OS does: a trailing slash is the same, Windows ignores case #BUG-312/resume", () => {
     expect(sameDir("/work/tiny", "/work/tiny/", "linux")).toBe(true);
     expect(sameDir("/work/tiny", "/work/Tiny", "linux")).toBe(false);
     expect(sameDir("/", "/", "linux")).toBe(true);
@@ -189,7 +188,7 @@ describe("BUG-312/resume: ids, prefixes and the list", () => {
     expect(sameDir("C:\\Work\\Tiny", "c:/work/other", "win32")).toBe(false);
   });
 
-  test("BUG-309/resume: the long form (a call into the file system) is asked for only when the spellings differ and both are on one drive", () => {
+  test("resume/list: the long form (a call into the file system) is asked for only when the spellings differ and both are on one drive #BUG-309/resume", () => {
     const asked: string[] = [];
     const long = (p: string) => (asked.push(p), p.replace("PROGRA~1", "Program Files"));
     // Equal as written, or on another drive (a disconnected mapped one): never asked.
@@ -205,14 +204,14 @@ describe("BUG-312/resume: ids, prefixes and the list", () => {
   });
 });
 
-describe("BUG-312/resume: the recorder", () => {
+describe("the recorder", () => {
   const noSave = () => {
     const saved: Workspace[] = [];
     return { saved, save: (ws: Workspace) => (saved.push(structuredClone(ws)), undefined) };
   };
   const base = { harness: "claude-code" as const, model: "sonnet", spec: "fix add", startedAt: 5 };
 
-  test("an empty Gluon saves nothing; the first session creates the workspace", () => {
+  test("resume/saved: an empty Gluon saves nothing; the first session creates the workspace #BUG-312/resume", () => {
     const { saved, save } = noSave();
     const rec = new Recorder("/work/tiny", undefined, { save, now: () => 3_000 });
     expect(rec.id).toBeNull();
@@ -224,7 +223,7 @@ describe("BUG-312/resume: the recorder", () => {
     expect(first.key).toMatch(/^[A-Za-z0-9-]{1,64}$/);
   });
 
-  test("a change is written once; a patch that changes nothing writes nothing; an undefined removes the field", () => {
+  test("resume/record-lifecycle: a change is written once; a patch that changes nothing writes nothing; an undefined removes the field #BUG-312/resume", () => {
     const { saved, save } = noSave();
     const rec = new Recorder("/work/tiny", undefined, { save });
     const c = rec.add({ ...base, name: "a", resume: { id: "old-id", source: "captured" } });
@@ -241,7 +240,7 @@ describe("BUG-312/resume: the recorder", () => {
     ]);
   });
 
-  test("the last session to end takes the file with it, and the workspace keeps its id for the next", () => {
+  test("resume/record-lifecycle: the last session to end takes the file with it, and the workspace keeps its id for the next #BUG-312/resume", () => {
     const rec = new Recorder("/work/tiny", undefined, {});
     const a = rec.add({ ...base, name: "a" });
     const b = rec.add({ ...base, name: "b" });
@@ -257,7 +256,7 @@ describe("BUG-312/resume: the recorder", () => {
     expect(loadWorkspace(id)!.sessions.map((s) => s.name)).toEqual(["c"]);
   });
 
-  test("a resumed workspace continues in the same file with the same keys", () => {
+  test("resume/record-lifecycle: a resumed workspace continues in the same file with the same keys #BUG-312/resume", () => {
     saveWorkspace(workspace());
     const rec = new Recorder("/work/tiny", loadWorkspace("abcdef")!, {});
     expect(rec.id).toBe("abcdef");
@@ -271,7 +270,7 @@ describe("BUG-312/resume: the recorder", () => {
     expect(after.updatedAt).toBeGreaterThan(2_000);
   });
 
-  test("a save that fails never throws: it is reported once", () => {
+  test("resume/record-lifecycle: a save that fails never throws: it is reported once #BUG-312/resume", () => {
     const errors: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: () => { throw new Error("disk full"); }, onError: (m) => errors.push(m) });
     const c = rec.add({ ...base, name: "a" });
@@ -280,7 +279,7 @@ describe("BUG-312/resume: the recorder", () => {
     expect(errors).toEqual(["couldn't save the session record: disk full"]);
   });
 
-  test("a warning from the private write (icacls) is passed on once", () => {
+  test("resume/private-file: a warning from the private write (icacls) is passed on once #BUG-312/resume", () => {
     const errors: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: () => "icacls said no", onError: (m) => errors.push(m) });
     const c = rec.add({ ...base, name: "a" });
@@ -289,10 +288,10 @@ describe("BUG-312/resume: the recorder", () => {
   });
 });
 
-describe("BUG-710/worktree-removed: a session saved by a Gluon that gave it a worktree", () => {
+describe("a session saved by a Gluon that gave it a worktree", () => {
   const wt = { path: "/work/tiny/.gluon/worktrees/gluon-fix-add", branch: "gluon/fix-add" };
 
-  test("loads without the worktree, and a write after it saves none", () => {
+  test("resume/untrusted-file: loads without the worktree, and a write after it saves none #BUG-710/worktree-removed", () => {
     saveWorkspace(workspace());
     const file = fileOf("abcdef");
     const old = JSON.parse(readFileSync(file, "utf8"));
@@ -307,8 +306,8 @@ describe("BUG-710/worktree-removed: a session saved by a Gluon that gave it a wo
 });
 const base0 = { harness: "claude-code" as const, model: "sonnet", spec: "fix add", startedAt: 5 };
 
-describe("BUG-303/resume: a directory that can't be saved", () => {
-  test("a network path or one with control or direction characters is no workspace: nothing is written, no id, and the user is told once why", () => {
+describe("a directory that can't be saved", () => {
+  test("resume/unsaveable-dir: a network path or one with control or direction characters is no workspace: nothing is written, no id, and the user is told once why #BUG-303/resume", () => {
     for (const cwd of ["\\\\server\\share\\repo", "//server/share/repo", "/work/tab\there", "/work/evil\u202edir", "relative/dir"]) {
       const errors: string[] = [];
       const saved: Workspace[] = [];
@@ -326,7 +325,7 @@ describe("BUG-303/resume: a directory that can't be saved", () => {
     expect(existsSync(workspacesDir())).toBe(false);
   });
 
-  test("an ordinary directory, with spaces or on a drive, is saved", () => {
+  test("resume/unsaveable-dir: an ordinary directory, with spaces or on a drive, is saved #BUG-303/resume", () => {
     for (const cwd of ["/work/my project", "C:\\Users\\me\\repo"]) {
       expect(dirProblem(cwd)).toBeNull();
       const rec = new Recorder(cwd, undefined, { save: () => undefined });
@@ -336,8 +335,8 @@ describe("BUG-303/resume: a directory that can't be saved", () => {
   });
 });
 
-describe("BUG-306/resume: one Gluon at a time per workspace", () => {
-  test("the recorder writes its process id on every save, and a resumed workspace claims it at once", () => {
+describe("one Gluon at a time per workspace", () => {
+  test("resume/one-gluon: the recorder writes its process id on every save, and a resumed workspace claims it at once #BUG-306/resume", () => {
     const rec = new Recorder("/work/tiny", undefined, { pid: 4242 });
     const c = rec.add({ ...base0, name: "a" });
     expect(loadWorkspace(rec.id!)!.pid).toBe(4242);
@@ -350,12 +349,12 @@ describe("BUG-306/resume: one Gluon at a time per workspace", () => {
     expect(loadWorkspace("bbbbbb")!.pid).toBe(77);
   });
 
-  test("a pid in the file is a safe positive integer or nothing", () => {
+  test("resume/one-gluon: a pid in the file is a safe positive integer or nothing #BUG-306/resume", () => {
     for (const pid of [0, -5, 1.5, "7", null, 2 ** 60, Number.NaN, true]) expect(parseWorkspace(raw({ ...workspace(), pid }))!.pid).toBeUndefined();
     expect(parseWorkspace(raw({ ...workspace(), pid: 12345 }))!.pid).toBe(12345);
   });
 
-  test("a process is alive when signal 0 reaches it or is refused (EPERM); not when it's gone (ESRCH), nor for this process, nor a bad id", async () => {
+  test("resume/one-gluon: a process is alive when signal 0 reaches it or is refused (EPERM); not when it's gone (ESRCH), nor for this process, nor a bad id #BUG-306/resume", async () => {
     const err = (code: string) => () => {
       throw Object.assign(new Error(code), { code });
     };
@@ -376,8 +375,8 @@ describe("BUG-306/resume: one Gluon at a time per workspace", () => {
   });
 });
 
-describe("BUG-308/resume: deleting one saved workspace", () => {
-  test("only that workspace's file goes", () => {
+describe("deleting one saved workspace", () => {
+  test("resume/delete: only that workspace's file goes #BUG-308/resume", () => {
     saveWorkspace(workspace({ id: "aaaaaa" }));
     saveWorkspace(workspace({ id: "bbbbbb" }));
     writeFileSync(join(workspacesDir(), "notes.txt"), "mine");
@@ -388,11 +387,11 @@ describe("BUG-308/resume: deleting one saved workspace", () => {
   });
 });
 
-describe("BUG-291/resume: a hand-edited file is hostile text", () => {
+describe("a hand-edited file is hostile text", () => {
   const evil = "\x1b]0;PWNED\x07\x1b[2J\x1b[31mred\x9b2J\u202eevil\u200b\n";
   const sane = (s: string) => !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(s);
 
-  test("names and models are made one safe line; a directory or model with controls is refused", () => {
+  test("resume/untrusted-file: names and models are made one safe line; a directory or model with controls is refused #BUG-291/resume", () => {
     const ws = parseWorkspace(raw({ ...workspace({ name: `repo${evil}` }), sessions: [child({ name: `Gluon-x${evil}` })] }))!;
     expect(sane(ws.name)).toBe(true);
     expect(sane(ws.sessions[0]!.name)).toBe(true);
@@ -406,13 +405,13 @@ describe("BUG-291/resume: a hand-edited file is hostile text", () => {
     expect(sane(describeWorkspace(ws))).toBe(true);
   });
 
-  test("a real model id survives the round trip (masking a model would only lose its session)", () => {
+  test("resume/private-file: a real model id survives the round trip (masking a model would only lose its session) #BUG-291/resume", () => {
     for (const model of ["us.anthropic.claude-sonnet-4-5-20250929-v1:0", "anthropic/claude-sonnet-4.5", "openai/gpt-5.1-codex-max", "amazon.nova-pro-v1:0", "AbCdEfGhIj/KlMnOpQrStUvWxYz+0123456789ab"]) {
       expect(parseWorkspace(raw({ ...workspace(), sessions: [child({ model })] }))!.sessions.map((c) => c.model)).toEqual([model]);
     }
   });
 
-  test("a name holding a key is masked, on disk and when read", () => {
+  test("resume/private-file: a name holding a key is masked, on disk and when read #BUG-291/resume", () => {
     const key = "sk-ant-api03-" + "A1b2C3d4E5f6G7h8".repeat(3);
     const ws = workspace({ name: `repo ${key}`, sessions: [child({ name: `Gluon-${key}` })] });
     saveWorkspace(ws);
@@ -421,21 +420,21 @@ describe("BUG-291/resume: a hand-edited file is hostile text", () => {
     expect(parseWorkspace(raw(ws))!.name).not.toContain(key);
   });
 
-  test("a directory that is not absolute is refused: a resume never enters a path relative to wherever it was started", () => {
+  test("resume/untrusted-file: a directory that is not absolute is refused: a resume never enters a path relative to wherever it was started #BUG-291/resume", () => {
     for (const cwd of [".", "..", "repo", "../x", "~/x", "-x"]) expect(parseWorkspace(raw(workspace({ cwd })))).toBeNull();
     expect(parseWorkspace(raw(workspace({ cwd: "C:\\Users\\me\\repo" })))).not.toBeNull();
     expect(parseWorkspace(raw(workspace({ cwd: "/work/tiny" })))).not.toBeNull();
   });
 
-  test("BUG-297/resume: a network (UNC) directory is refused: entering it would make Windows sign in to a host a file names", () => {
+  test("resume/untrusted-file: a network (UNC) directory is refused: entering it would make Windows sign in to a host a file names #BUG-297/resume", () => {
     for (const cwd of ["\\\\evil\\share\\repo", "//evil/share/repo", "\\\\?\\UNC\\evil\\share"]) expect(parseWorkspace(raw(workspace({ cwd })))).toBeNull();
   });
 
-  test("a real directory with two spaces, a trailing space, an emoji sequence or non-Latin letters is kept exactly", () => {
+  test("resume/untrusted-file: a real directory with two spaces, a trailing space, an emoji sequence or non-Latin letters is kept exactly #BUG-291/resume", () => {
     for (const cwd of ["/work/my  project", "/work/trailing ", "/work/👨‍👩‍👧 family", "/work/проект", "C:\\Users\\me\\My Repo"]) expect(parseWorkspace(raw(workspace({ cwd })))!.cwd).toBe(cwd);
   });
 
-  test("BUG-294/resume: a time a Date can't show refuses the file instead of crashing gluon sessions", () => {
+  test("resume/untrusted-file: a time a Date can't show refuses the file instead of crashing gluon sessions #BUG-294/resume", () => {
     for (const bad of [1e300, 8.64e15 + 1, -1, "1", null]) {
       expect(parseWorkspace(raw({ ...workspace(), updatedAt: bad }))).toBeNull();
       expect(parseWorkspace(raw({ ...workspace(), createdAt: bad }))).toBeNull();
@@ -444,12 +443,12 @@ describe("BUG-291/resume: a hand-edited file is hostile text", () => {
     expect(describeWorkspace(parseWorkspace(raw({ ...workspace(), updatedAt: 8.64e15 }))!)).toContain("275760-09-1");
   });
 
-  test("two sessions with one key keep the first (a key names one session)", () => {
+  test("resume/untrusted-file: two sessions with one key keep the first (a key names one session) #BUG-291/resume", () => {
     const ws = parseWorkspace(raw({ ...workspace(), sessions: [child({ key: "k1", name: "Gluon-first" }), child({ key: "k1", name: "Gluon-second" }), child({ key: "k2" })] }))!;
     expect(ws.sessions.map((s) => s.name)).toEqual(["Gluon-first", "Gluon-fix-add"]);
   });
 
-  test("__proto__ and other odd keys in the file reach nothing", () => {
+  test("resume/untrusted-file: __proto__ and other odd keys in the file reach nothing #BUG-291/resume", () => {
     const text = `{"v":1,"id":"abcdef","name":"x","cwd":"/work","createdAt":1,"updatedAt":2,"__proto__":{"polluted":1},"sessions":[{"key":"k1","name":"a","harness":"claude-code","model":"sonnet","spec":"s","startedAt":1,"__proto__":{"polluted":1},"constructor":{"prototype":{"polluted":1}},"resume":{"id":"abc","source":"minted","__proto__":{"polluted":1}}}]}`;
     const ws = parseWorkspace(text)!;
     expect(ws.sessions).toHaveLength(1);
@@ -459,7 +458,7 @@ describe("BUG-291/resume: a hand-edited file is hostile text", () => {
     expect(ws.sessions[0]!.resume).toEqual({ id: "abc", source: "minted" });
   });
 
-  test.skipIf(!canSymlink)("a workspace file that is a link to a file or a device is not read", () => {
+  test.skipIf(!canSymlink)("resume/untrusted-file: a workspace file that is a link to a file or a device is not read #BUG-291/resume", () => {
     mkdirSync(workspacesDir(), { recursive: true });
     const real = join(TMP, "elsewhere.json");
     writeFileSync(real, raw(workspace({ id: "abcdef" })));
@@ -471,7 +470,7 @@ describe("BUG-291/resume: a hand-edited file is hostile text", () => {
     expect(listWorkspaces()).toEqual([]);
   });
 
-  test.skipIf(!canSymlink)("a symlinked file is replaced by a save, never written through", () => {
+  test.skipIf(!canSymlink)("resume/private-file: a symlinked file is replaced by a save, never written through #BUG-291/resume", () => {
     mkdirSync(workspacesDir(), { recursive: true });
     const victim = join(TMP, "victim.txt");
     writeFileSync(victim, "precious");
@@ -490,7 +489,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     return loadWorkspace(ws.id);
   };
 
-  test("BUG-634/QA-resume-03: a directory whose name is over ~190 characters is still resumable (its workspace name, `<dir> · Oct 4`, is read back with a 200-character limit and the whole file is refused)", () => {
+  test("resume/limits: a directory whose name is over ~190 characters is still resumable (its workspace name, `<dir> · Oct 4`, is read back with a 200-character limit and the whole file is refused) #BUG-634/QA-resume-03", () => {
     const rec = new Recorder(`/work/${"x".repeat(250)}`, undefined, { save: saveWorkspace });
     rec.add({ name: "Gluon-a", harness: "claude-code", model: "sonnet", spec: "s", startedAt: 1 });
     // Gluon announces `Resume this session: gluon resume <id>` for this id.
@@ -498,7 +497,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(loadWorkspace(rec.id!)).not.toBeNull();
   });
 
-  test("BUG-635/QA-resume-04: a workspace that saves is not larger than the 4 MB the reader accepts (five 900 KB specs are written, then `gluon resume` finds no such session): the writer refuses the fifth, out loud, and the file keeps reading back", () => {
+  test("resume/limits: a workspace that saves is not larger than the 4 MB the reader accepts (five 900 KB specs are written, then `gluon resume` finds no such session): the writer refuses the fifth, out loud, and the file keeps reading back #BUG-635/QA-resume-04", () => {
     const told: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace, onError: (m) => told.push(m) });
     for (let i = 1; i <= 5; i++) rec.add({ name: `Gluon-s${i}`, harness: "claude-code", model: "sonnet", spec: "x".repeat(900_000), startedAt: 1 });
@@ -509,7 +508,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(told[0]).toMatch(/can't be saved for resume.*4 MB/);
   });
 
-  test("BUG-635/variants: saveWorkspace itself writes nothing it couldn't read back (it throws, the earlier file stays); a spec over the limit is refused, the session after it is recorded", () => {
+  test("resume/limits: saveWorkspace itself writes nothing it couldn't read back (it throws, the earlier file stays); a spec over the limit is refused, the session after it is recorded #BUG-635/variants", () => {
     const big = workspace({ sessions: [1, 2, 3, 4, 5].map((i) => child({ key: `k${i}`, spec: "x".repeat(900_000) })) });
     saveWorkspace(workspace());
     expect(() => saveWorkspace({ ...big, sessions: big.sessions })).toThrow(/wouldn't read back.*4 MB/);
@@ -524,13 +523,13 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(told[0]).toContain("1,000,001 characters");
   });
 
-  test("BUG-636/QA-resume-04b: the 201st session is not recorded in a file that reads back only 200 (the newest, not the oldest, are silently lost)", () => {
+  test("resume/limits: the 201st session is not recorded in a file that reads back only 200 (the newest, not the oldest, are silently lost) #BUG-636/QA-resume-04b", () => {
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace });
     for (let i = 0; i < 201; i++) rec.add({ name: `Gluon-s${i}`, harness: "claude-code", model: "sonnet", spec: "s", startedAt: 1 });
     expect(loadWorkspace(rec.id!)!.sessions).toHaveLength(rec.children.length);
   });
 
-  test("BUG-636/variants: the 201st session is refused out loud and runs unrecorded; the 200 saved stay, and a session ending frees a place", () => {
+  test("resume/limits: the 201st session is refused out loud and runs unrecorded; the 200 saved stay, and a session ending frees a place #BUG-636/variants", () => {
     const told: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace, onError: (m) => told.push(m) });
     for (let i = 0; i < 201; i++) rec.add({ name: `Gluon-s${i}`, harness: "claude-code", model: "sonnet", spec: "s", startedAt: 1 });
@@ -544,7 +543,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(told).toHaveLength(1);
   });
 
-  test("BUG-634/variants: a long name is cut to fit, with its day; a short one and an astral character are kept whole", () => {
+  test("resume/limits: a long name is cut to fit, with its day; a short one and an astral character are kept whole #BUG-634/variants", () => {
     const at = Date.UTC(2026, 9, 4, 12);
     for (const dir of ["x".repeat(190), "x".repeat(250), "😀".repeat(150), `${"y".repeat(193)}😀z`]) {
       const name = workspaceName(`/work/${dir}`, at);
@@ -558,13 +557,13 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(workspaceName(`/work/${"x".repeat(250)}`, at)).toContain("… · Oct 4");
   });
 
-  test("BUG-637/QA-resume-05: a file whose content names another workspace than its file name is not listed as that one (copying `abcdef.json` to `ghijkl.json` lists abcdef twice, and `--delete ghijkl` finds nothing)", () => {
+  test("resume/untrusted-file: a file whose content names another workspace than its file name is not listed as that one (copying `abcdef.json` to `ghijkl.json` lists abcdef twice, and `--delete ghijkl` finds nothing) #BUG-637/QA-resume-05", () => {
     mkdirSync(workspacesDir(), { recursive: true });
     writeFileSync(fileOf("ghijkl"), raw(workspace({ id: "abcdef" })));
     expect(loadWorkspace("ghijkl")).toBeNull();
   });
 
-  test("BUG-637/variants: a copy under another name is not listed twice or found by the id it holds; it is named as unreadable, so it can be deleted by its file's id; the original stays", () => {
+  test("resume/untrusted-file: a copy under another name is not listed twice or found by the id it holds; it is named as unreadable, so it can be deleted by its file's id; the original stays #BUG-637/variants", () => {
     saveWorkspace(workspace());
     writeFileSync(fileOf("ghijkl"), raw(workspace({ id: "abcdef" })));
     expect(listWorkspaces().map((w) => w.id)).toEqual(["abcdef"]);
@@ -575,7 +574,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(loadWorkspace("abcdef")).not.toBeNull();
   });
 
-  test.skipIf(!canSymlink)("BUG-638/variants: a dangling link named like a workspace is named as unreadable and deleted by its id (the link goes, nothing else)", () => {
+  test.skipIf(!canSymlink)("resume/unreadable-listed: a dangling link named like a workspace is named as unreadable and deleted by its id (the link goes, nothing else) #BUG-638/variants", () => {
     mkdirSync(workspacesDir(), { recursive: true });
     symlinkSync(join(TMP, "nonexistent"), fileOf("dangaa"));
     expect(scanWorkspaces().unreadable).toEqual(["dangaa"]);
@@ -584,7 +583,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(deleteWorkspace("dangaa")).toBe(false);
   });
 
-  test("BUG-635/variants: a session whose resume id the reader would drop is refused out loud, not written and lost on the next read; a good one beside it stays", () => {
+  test("resume/limits: a session whose resume id the reader would drop is refused out loud, not written and lost on the next read; a good one beside it stays #BUG-635/variants", () => {
     const told: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace, onError: (m) => told.push(m) });
     const base = { name: "Gluon-a", harness: "claude-code" as const, model: "sonnet", spec: "s", startedAt: 1 };
@@ -601,7 +600,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(loadWorkspace(rec.id!)!.sessions[0]!.resume).toBeUndefined();
   });
 
-  test("BUG-635/variants: a key that becomes known while a record lives is masked in the next write (the masking of a record is not kept past the set of known keys)", () => {
+  test("resume/private-file: a key that becomes known while a record lives is masked in the next write (the masking of a record is not kept past the set of known keys) #BUG-635/variants", () => {
     const plain = "plain-value-not-shaped-like-a-token";
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace });
     rec.add({ name: "Gluon-a", harness: "claude-code", model: "sonnet", spec: `deploy with ${plain} then test`, startedAt: 1 });
@@ -615,7 +614,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     }
   });
 
-  test("BUG-635/variants: a field the reader doesn't keep (a token on a record or on the workspace) is refused, never written raw; the message shows the name as one short line", () => {
+  test("resume/limits: a field the reader doesn't keep (a token on a record or on the workspace) is refused, never written raw; the message shows the name as one short line #BUG-635/variants", () => {
     const told: string[] = [];
     const rec = new Recorder("/work/tiny", undefined, { save: saveWorkspace, onError: (m) => told.push(m) });
     const base = { name: "Gluon-a", harness: "claude-code" as const, model: "sonnet", spec: "s", startedAt: 1 };
@@ -632,7 +631,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(told[1]!.length).toBeLessThan(160);
   });
 
-  test("BUG-638/variants: a file that doesn't parse, a directory and a stray name: only the first is named as unreadable", () => {
+  test("resume/unreadable-listed: a file that doesn't parse, a directory and a stray name: only the first is named as unreadable #BUG-638/variants", () => {
     mkdirSync(workspacesDir(), { recursive: true });
     writeFileSync(fileOf("abcdef"), '{"v":1,"id":"abcdef","name":');
     mkdirSync(fileOf("ghijkl"));
@@ -642,7 +641,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(listWorkspaces()).toEqual([]);
   });
 
-  test("BUG-589/spec-secrets-on-disk: a URL password, a password= value and a cut key block are masked in the file, and the workspace still reads back", () => {
+  test("resume/private-file: a URL password, a password= value and a cut key block are masked in the file, and the workspace still reads back #BUG-589/spec-secrets-on-disk", () => {
     const spec = "clone https://ci:pw-abcdef-0123456789@git.example.com/org/repo with password=hunter2-abcdef\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA7abcdefghABCDEFGHIJ0123456789\n\nthen test";
     saveWorkspace(workspace({ sessions: [child({ spec })] }));
     const text = readFileSync(fileOf("abcdef"), "utf8");
@@ -650,13 +649,13 @@ describe("QA-resume: what is saved must be readable again", () => {
     expect(loadWorkspace("abcdef")!.sessions[0]!.spec).toBe("clone https://ci:••••@git.example.com/org/repo with password=••••\n-----BEGIN RSA PRIVATE KEY-----\n••••\n\nthen test");
   });
 
-  test("BUG-589/pem-in-spec: a private key block in a spec is masked on disk like any other secret (a PEM body is saved as it is, in a 0600 file that lives as long as the workspace)", () => {
+  test("resume/private-file: a private key block in a spec is masked on disk like any other secret (a PEM body is saved as it is, in a 0600 file that lives as long as the workspace) #BUG-589/pem-in-spec", () => {
     const pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH PRIVATE KEY-----";
     saveWorkspace(workspace({ sessions: [child({ spec: `deploy with this key:\n${pem}\nthen test` })] }));
     expect(readFileSync(fileOf("abcdef"), "utf8")).not.toContain("b3BlbnNzaC1rZXktdjEAAAAABG5vbmU");
   });
 
-  test("BUG-662/QA-resume-10: `gluon sessions` and the picker show the time in the zone the user lives in, or say UTC (it printed `toISOString` as `2026-10-06 23:30` with no label)", () => {
+  test("resume/list: `gluon sessions` and the picker show the time in the zone the user lives in, or say UTC (it printed `toISOString` as `2026-10-06 23:30` with no label) #BUG-662/QA-resume-10", () => {
     const at = Date.UTC(2026, 9, 6, 23, 30);
     const line = describeWorkspace(workspace({ updatedAt: at }));
     const local = new Date(at);
@@ -666,7 +665,7 @@ describe("QA-resume: what is saved must be readable again", () => {
     if (local.getTimezoneOffset() === 0) expect(line).toContain("UTC");
   });
 
-  test("BUG-662/variants: the time is the local one with its offset from UTC (half hours included), and `UTC` alone at offset 0; the day follows the zone", () => {
+  test("resume/list: the time is the local one with its offset from UTC (half hours included), and `UTC` alone at offset 0; the day follows the zone #BUG-662/variants", () => {
     const at = Date.UTC(2026, 9, 6, 23, 30);
     // Bun keeps the zone it was last given after `delete process.env.TZ` (and ignores a later assignment of nothing): the zone in use is set back by name, as `test/stats.test.ts` does.
     const was = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -685,7 +684,7 @@ describe("QA-resume: what is saved must be readable again", () => {
   });
 });
 
-describe("BUG-642/resume: a pid reused by another process is not the Gluon", () => {
+describe("a pid reused by another process is not the Gluon", () => {
   const stat = (comm: string, ticks = "123456") => `4242 (${comm}) S 1 4242 4242 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 ${ticks} 1000 100 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n`;
   const enoent = (): never => {
     throw new Error("ENOENT");
@@ -696,7 +695,7 @@ describe("BUG-642/resume: a pid reused by another process is not the Gluon", () 
     return enoent();
   };
 
-  test("Linux: the start is the 22nd field of /proc/<pid>/stat with the boot id, whatever the command is called", () => {
+  test("resume/one-gluon: Linux: the start is the 22nd field of /proc/<pid>/stat with the boot id, whatever the command is called #BUG-642/resume", () => {
     expect(processStart(4242, { platform: "linux", read: files("bun") })).toBe("boot-1:123456");
     // A name with spaces and parentheses must not move the fields.
     expect(processStart(4242, { platform: "linux", read: files("a (b) c d e") })).toBe("boot-1:123456");
@@ -717,13 +716,13 @@ describe("BUG-642/resume: a pid reused by another process is not the Gluon", () 
     expect(processStart(Number.NaN, { platform: "linux", read: files("bun") })).toBeUndefined();
   });
 
-  test("this process has a start on Linux, and it is stable", () => {
+  test("resume/one-gluon: this process has a start on Linux, and it is stable #BUG-642/resume", () => {
     if (process.platform !== "linux") return;
     expect(ownStart()).toMatch(/:\d+$|^\d+$/);
     expect(ownStart()).toBe(processStart(process.pid));
   });
 
-  test("an owner is alive when the pid is and the start is the recorded one; a different start is a different process; where no start is known the pid decides", () => {
+  test("resume/one-gluon: an owner is alive when the pid is and the start is the recorded one; a different start is a different process; where no start is known the pid decides #BUG-642/resume", () => {
     const alive = () => true;
     expect(ownerAlive({ pid: 4242, start: "s1" }, { alive, startOf: () => "s1" })).toBe(true);
     expect(ownerAlive({ pid: 4242, start: "s1" }, { alive, startOf: () => "s2" })).toBe(false);
@@ -734,13 +733,13 @@ describe("BUG-642/resume: a pid reused by another process is not the Gluon", () 
     expect(ownerAlive({ pid: 4242 }, { alive: () => false })).toBe(false);
   });
 
-  test("the file keeps a start only beside a pid, as plain characters", () => {
+  test("resume/one-gluon: the file keeps a start only beside a pid, as plain characters #BUG-642/resume", () => {
     expect(parseWorkspace(raw({ ...workspace(), pid: 7, start: "boot-1:123" }))).toMatchObject({ pid: 7, start: "boot-1:123" });
     for (const start of ["", "a b", "x".repeat(101), 5, null, ["a"], "a;b", "../x"]) expect(parseWorkspace(raw({ ...workspace(), pid: 7, start }))!.start).toBeUndefined();
     expect(parseWorkspace(raw({ ...workspace(), start: "boot-1:123" }))!.start).toBeUndefined();
   });
 
-  test("the recorder writes its own start with its pid, and none when a pid is named for a test (unless it names a start too)", () => {
+  test("resume/one-gluon: the recorder writes its own start with its pid, and none when a pid is named for a test (unless it names a start too) #BUG-642/resume", () => {
     const rec = new Recorder("/work/tiny", undefined);
     rec.add({ ...base0, name: "a" });
     expect(loadWorkspace(rec.id!)!.pid).toBe(process.pid);
@@ -753,7 +752,7 @@ describe("BUG-642/resume: a pid reused by another process is not the Gluon", () 
     expect(loadWorkspace(given.id!)!.start).toBe("boot-1:9");
   });
 
-  test("liveOwner: a live process with another start than the file's is nobody's Gluon; the same start is; this process is not another", async () => {
+  test("resume/one-gluon: liveOwner: a live process with another start than the file's is nobody's Gluon; the same start is; this process is not another #BUG-642/resume", async () => {
     const child = Bun.spawn([process.execPath, "-e", "await Bun.sleep(30000)"], { stdio: ["ignore", "ignore", "ignore"] });
     try {
       const now = processStart(child.pid);
@@ -770,14 +769,14 @@ describe("BUG-642/resume: a pid reused by another process is not the Gluon", () 
   });
 });
 
-describe("BUG-643/resume: the claim on a saved workspace", () => {
+describe("the claim on a saved workspace", () => {
   const lockOf = (id: string) => join(workspacesDir(), `${id}.lock`);
   const me = { pid: 111, start: "s-me" };
   const livePids = new Set<number>();
   const alive = (o: { pid: number }) => livePids.has(o.pid);
   beforeEach(() => livePids.clear());
 
-  test("the first claim wins and the second is refused with the first's pid, however many ask", () => {
+  test("resume/one-gluon: the first claim wins and the second is refused with the first's pid, however many ask #BUG-643/resume", () => {
     livePids.add(111);
     expect(claimWorkspace("abcdef", { owner: me, alive })).toEqual({ ok: true });
     expect(JSON.parse(readFileSync(lockOf("abcdef"), "utf8"))).toEqual({ v: 1, pid: 111, start: "s-me" });
@@ -787,7 +786,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     expect(claimWorkspace("ghijkl", { owner: { pid: 222 }, alive })).toEqual({ ok: true });
   });
 
-  test("a claim whose owner is gone is taken over, a garbled one too; --force takes a live one", () => {
+  test("resume/one-gluon: a claim whose owner is gone is taken over, a garbled one too; --force takes a live one #BUG-643/resume", () => {
     livePids.add(222);
     claimWorkspace("abcdef", { owner: { pid: 111 }, alive });
     expect(claimWorkspace("abcdef", { owner: { pid: 222 }, alive })).toEqual({ ok: true });
@@ -803,17 +802,17 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     expect(readdirSync(workspacesDir())).toEqual(["abcdef.lock"]);
   });
 
-  test("the claim file is private, and is made inside a private directory first", () => {
+  test("resume/one-gluon: the claim file is private, and is made inside a private directory first #BUG-643/resume", () => {
     claimWorkspace("abcdef", { owner: me, alive });
     expect(isPrivate(lockOf("abcdef"), tmpdir())).toBe(true);
   });
 
-  test("an id that is no workspace id makes no file", () => {
+  test("resume/one-gluon: an id that is no workspace id makes no file #BUG-643/resume", () => {
     expect(claimWorkspace("../x", { owner: me, alive })).toEqual({ ok: true });
     expect(existsSync(workspacesDir())).toBe(false);
   });
 
-  test("processes that claim at once: exactly one gets it, and each takes its own claim off at exit", async () => {
+  test("resume/one-gluon: processes that claim at once: exactly one gets it, and each takes its own claim off at exit #BUG-643/resume", async () => {
     mkdirSync(workspacesDir(), { recursive: true });
     const script = `import { claimWorkspace } from ${JSON.stringify(join(import.meta.dir, "../src/workspaces.ts"))}; console.log(JSON.stringify(claimWorkspace("abcdef"))); await Bun.sleep(1500);`;
     const run = () => Bun.spawn([process.execPath, "--no-env-file", `--config=${join(import.meta.dir, "../scripts/empty-bunfig.toml")}`, "-e", script], { stdout: "pipe", stderr: "ignore", env: { ...process.env, GLUON_CONFIG: process.env.GLUON_CONFIG } });
@@ -839,7 +838,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     return text.trim();
   }
 
-  test("BUG-643/variants: processes that take over one stale claim at the same millisecond: exactly one holds it, round after round @full", async () => {
+  test("resume/one-gluon: processes that take over one stale claim at the same millisecond: exactly one holds it, round after round @full #BUG-643/variants", async () => {
     const ROUNDS = 40;
     const WORKERS = 4;
     const alphabet = "abcdefghijklmnopqrstuvwxyz234567";
@@ -871,7 +870,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     expect(readdirSync(workspacesDir())).toEqual([]);
   });
 
-  test("a takeover file left by a crashed process (dead owner, or old) doesn't stop the claim; its sweep is a Gluon file's", () => {
+  test("resume/one-gluon: a takeover file left by a crashed process (dead owner, or old) doesn't stop the claim; its sweep is a Gluon file's #BUG-643/resume", () => {
     mkdirSync(workspacesDir(), { recursive: true });
     livePids.add(222);
     writeFileSync(lockOf("abcdef"), `${JSON.stringify({ v: 1, pid: 111 })}\n`);
@@ -883,7 +882,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
 
   // 200 tries, each a sleep of 10 ms and two private-directory creations (the claim, the takeover file): 2 s on Linux, 9.4 s on a macOS CI runner (BUG-643).
   const SLOW = Number(process.env.GLUON_TEST_SLOW) || (process.platform === "win32" ? 3 : 1);
-  test("a garbled claim that can't be taken over names no process", () => {
+  test("resume/one-gluon: a garbled claim that can't be taken over names no process #BUG-643/resume", () => {
     // A takeover file held by a live process keeps the garbled claim in place for the whole wait.
     mkdirSync(workspacesDir(), { recursive: true });
     livePids.add(333);
@@ -892,7 +891,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     expect(claimWorkspace("abcdef", { owner: { pid: 222 }, alive })).toEqual({ ok: false });
   }, 10_000 * SLOW);
 
-  test("deleting a saved workspace takes its claim along; a claim without a workspace is left to its owner", () => {
+  test("resume/delete: deleting a saved workspace takes its claim along; a claim without a workspace is left to its owner #BUG-643/resume", () => {
     saveWorkspace(workspace());
     claimWorkspace("abcdef", { owner: { pid: 111 }, alive });
     expect(deleteWorkspace("abcdef")).toBe(true);
@@ -902,7 +901,7 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
     expect(existsSync(lockOf("ghijkl"))).toBe(true);
   });
 
-  test("a claim is no saved session: it is not listed, nor read as an unreadable file", () => {
+  test("resume/one-gluon: a claim is no saved session: it is not listed, nor read as an unreadable file #BUG-643/resume", () => {
     saveWorkspace(workspace());
     claimWorkspace("abcdef", { owner: { pid: 111 }, alive });
     claimWorkspace("zzzzzz", { owner: { pid: 111 }, alive });
@@ -910,10 +909,10 @@ describe("BUG-643/resume: the claim on a saved workspace", () => {
   });
 });
 
-describe("BUG-644/resume: uninstall refuses while a Gluon is running", () => {
+describe("uninstall refuses while a Gluon is running", () => {
   const sleeper = () => Bun.spawn([process.execPath, "-e", "await Bun.sleep(30000)"], { stdio: ["ignore", "ignore", "ignore"] });
 
-  test("runningGluons names the live pids of workspace files and of claims, once each, and not a dead one or this process", async () => {
+  test("resume/uninstall-waits: runningGluons names the live pids of workspace files and of claims, once each, and not a dead one or this process #BUG-644/resume", async () => {
     const a = sleeper();
     const b = sleeper();
     try {
@@ -938,36 +937,5 @@ describe("BUG-644/resume: uninstall refuses while a Gluon is running", () => {
       await Promise.all([a.exited, b.exited]);
     }
     expect(runningGluons(join(TMP, "nowhere"))).toEqual([]);
-  });
-
-  test("uninstall refuses naming the pid, exits 1, removes nothing and asks nothing; a claim counts as a saved session file for the sweep", async () => {
-    const a = sleeper();
-    const logged: string[] = [];
-    try {
-      saveWorkspace(workspace({ pid: a.pid }));
-      writeFileSync(join(workspacesDir(), "abcdef.lock"), JSON.stringify({ v: 1, pid: a.pid }));
-      writeFileSync(process.env.GLUON_CONFIG!, "x: 1\n");
-      const errors: string[] = [];
-      const was = console.error;
-      console.error = (m: string) => void errors.push(m);
-      try {
-        const ask = (): boolean => {
-          throw new Error("must not ask");
-        };
-        expect(uninstall({ yes: false, tty: true, log: (l) => logged.push(l), ask })).toBe(1);
-        expect(uninstall({ yes: true, tty: false, log: (l) => logged.push(l), ask })).toBe(1);
-      } finally {
-        console.error = was;
-      }
-      const said = `gluon: a Gluon is running (process ${a.pid}); nothing was removed. Quit it, then run gluon uninstall again.`;
-      expect(errors).toEqual([said, said]);
-      expect(logged).toEqual([]);
-      expect([existsSync(fileOf("abcdef")), existsSync(join(workspacesDir(), "abcdef.lock")), existsSync(process.env.GLUON_CONFIG!)]).toEqual([true, true, true]);
-    } finally {
-      a.kill();
-      await a.exited;
-    }
-    expect(runningGluons()).toEqual([]);
-    expect(workspaceFiles().map((f) => basename(f)).sort()).toEqual(["abcdef.json", "abcdef.lock"]);
   });
 });

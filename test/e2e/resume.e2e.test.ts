@@ -69,15 +69,15 @@ async function quit(app: App, live = true) {
   return app.exitCode();
 }
 
-describe("BUG-312/resume: gluon sessions and the picker's checks, without a terminal", () => {
-  test("gluon sessions says so when nothing is saved", async () => {
+describe("gluon sessions and the picker's checks, without a terminal", () => {
+  test("resume/list: gluon sessions says so when nothing is saved", async () => {
     const s = sandbox();
     const r = await cli(["sessions"], { env: s.env });
     expect([r.code, r.stderr]).toEqual([0, ""]);
     expect(r.stdout).toContain("No saved sessions");
   });
 
-  test("gluon sessions lists every saved workspace, this directory's first and marked", async () => {
+  test("resume/list: gluon sessions lists every saved workspace, this directory's first and marked", async () => {
     const s = sandbox();
     const here = repo.tiny();
     seed(s, workspace("/elsewhere/project", { id: "aaaaaa", name: "project · Oct 1", updatedAt: Date.now() - 1000 }));
@@ -93,7 +93,7 @@ describe("BUG-312/resume: gluon sessions and the picker's checks, without a term
     expect(fakeRuns(s)).toEqual([]);
   });
 
-  test("gluon resume with no id and no terminal prints this directory's workspaces and exits 2; with none, says so and exits 1", async () => {
+  test("resume/find: gluon resume with no id and no terminal prints this directory's workspaces and exits 2; with none, says so and exits 1", async () => {
     const s = sandbox();
     const here = repo.tiny();
     const none = await cli(["resume"], { cwd: here, env: s.env });
@@ -115,7 +115,7 @@ describe("BUG-312/resume: gluon sessions and the picker's checks, without a term
     expect(fakeRuns(s)).toEqual([]);
   });
 
-  test("an unknown or ambiguous id stops before anything starts", async () => {
+  test("resume/find: an unknown or ambiguous id stops before anything starts", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { id: "abcdef" }));
     seed(s, workspace(repo.tiny(), { id: "abcxyz" }));
@@ -129,7 +129,7 @@ describe("BUG-312/resume: gluon sessions and the picker's checks, without a term
     expect(fakeRuns(s)).toEqual([]);
   });
 
-  test("a workspace whose directory is gone stops with a clear message, exit 1", async () => {
+  test("resume/find: a workspace whose directory is gone stops with a clear message, exit 1", async () => {
     const s = sandbox();
     const gone = mkdtempSync(join(tmpdir(), "gluon-gone-"));
     rmSync(gone, { recursive: true });
@@ -140,7 +140,7 @@ describe("BUG-312/resume: gluon sessions and the picker's checks, without a term
     expect(fakeRuns(s)).toEqual([]);
   });
 
-  test("resume takes one id; --all goes only with resume and sessions; a mistyped resume is caught; --help lists both @full", async () => {
+  test("resume/find: resume takes one id; --all goes only with resume and sessions; a mistyped resume is caught; --help lists both @full", async () => {
     const s = sandbox();
     const two = await cli(["resume", "abcdef", "ghijkl"], { env: s.env });
     expect(two.code).toBe(2);
@@ -159,7 +159,7 @@ describe("BUG-312/resume: gluon sessions and the picker's checks, without a term
     expect(help.stdout).toContain("gluon resume [<id>] [--all]");
   });
 
-  test("a valid id without a terminal gets as far as the terminal check: in the saved directory, no agent", async () => {
+  test("resume/find: a valid id without a terminal gets as far as the terminal check: in the saved directory, no agent", async () => {
     const s = sandbox();
     const dir = repo.withSpace();
     seed(s, workspace(dir));
@@ -171,8 +171,8 @@ describe("BUG-312/resume: gluon sessions and the picker's checks, without a term
   });
 });
 
-describe("BUG-312/resume: what Gluon keeps while it runs", () => {
-  test("an empty Gluon saves nothing and prints no resume line", async () => {
+describe("what Gluon keeps while it runs", () => {
+  test("resume/saved: an empty Gluon saves nothing and prints no resume line", async () => {
     const s = sandbox();
     const app = await gluon(100, 30, s.env);
     expect(await quit(app, false)).toBe(130);
@@ -180,7 +180,7 @@ describe("BUG-312/resume: what Gluon keeps while it runs", () => {
     expect(app.history()).not.toContain("gluon resume");
   });
 
-  test("a launch creates the record (masked spec, minted id), names the workspace in the header and chat; quitting keeps it and prints how to resume @full", async () => {
+  test("resume/saved: a launch creates the record (masked spec, minted id), names the workspace in the header and chat; quitting keeps it and prints how to resume @full", async () => {
     const s = sandbox();
     const app = await gluon(110, 30, s.env);
     await launch(app, "alpha task");
@@ -204,7 +204,7 @@ describe("BUG-312/resume: what Gluon keeps while it runs", () => {
     expect(app.history()).toContain(`Resume this session: gluon resume ${w!.id}`);
   });
 
-  test("a session the user ends leaves the record, and the record with it @full", async () => {
+  test("resume/record-lifecycle: a session the user ends leaves the record, and the record with it @full", async () => {
     const s = sandbox();
     const app = await gluon(110, 30, s.env);
     await launch(app, "alpha task");
@@ -219,7 +219,7 @@ describe("BUG-312/resume: what Gluon keeps while it runs", () => {
     expect(app.history()).not.toContain("Resume this session");
   });
 
-  test("a session marked done stays in the record, marked @full", async () => {
+  test("resume/record-lifecycle: a session marked done stays in the record, marked @full", async () => {
     const s = sandbox();
     const app = await gluon(110, 30, s.env);
     await launch(app, "alpha task");
@@ -230,7 +230,7 @@ describe("BUG-312/resume: what Gluon keeps while it runs", () => {
     expect(saved(s)[0]!.sessions[0]!).toMatchObject({ name: "Gluon-alpha-task", done: true });
   });
 
-  test("an agent that exits on its own leaves the record @full", async () => {
+  test("resume/record-lifecycle: an agent that exits on its own leaves the record @full", async () => {
     const s = sandbox();
     const app = await gluon(110, 30, { ...s.env, FAKE_EXIT: "0" });
     await launch(app, "alpha task");
@@ -252,8 +252,8 @@ async function firstRun(s: Sandbox, fake?: FakeAgent, then?: (app: App) => Promi
   return saved(s)[0]!;
 }
 
-describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
-  test("start, quit, resume: the agent is reopened under its id with no spec, in the saved directory; the record continues; quitting again keeps it @full", async () => {
+describe("gluon resume reopens the saved sessions", () => {
+  test("resume/reopens: start, quit, resume: the agent is reopened under its id with no spec, in the saved directory; the record continues; quitting again keeps it @full", async () => {
     const s = sandbox();
     const before = await firstRun(s);
     const minted = before.sessions[0]!.resume!.id;
@@ -291,7 +291,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(app.history()).toContain(`Resume this session: gluon resume ${before.id}`);
   });
 
-  test("an id's unique prefix is enough; a resume from another directory runs in the saved one and says so", async () => {
+  test("resume/find: an id's unique prefix is enough; a resume from another directory runs in the saved one and says so", async () => {
     const s = sandbox();
     const here = repo.tiny();
     seed(s, workspace(here));
@@ -305,7 +305,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(app.screen()).not.toContain("nogit");
   });
 
-  test("Codex and OpenCode give their session id by hook: it is saved, and the resume uses it @full", async () => {
+  test("resume/reopens: Codex and OpenCode give their session id by hook: it is saved, and the resume uses it @full", async () => {
     for (const [fake, last, resumes] of [["codex", "019a1b2c-d3e4-test", (a: string[]) => a[0] === "resume" && a.at(-2) === "--" && a.at(-1) === "019a1b2c-d3e4-test"], ["opencode", "ses_3f2a9c0d1e8b", (a: string[]) => a.includes("--session=ses_3f2a9c0d1e8b") && !a.some((x) => x.startsWith("--prompt="))]] as const) {
       const s = sandbox();
       const before = await firstRun(s, fake, async (app) => {
@@ -320,7 +320,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     }
   });
 
-  test("sessions that can't be resumed are asked about one at a time once the others are up: Enter starts one again from its spec (same key), Esc drops one @full", async () => {
+  test("resume/cannot-resume: sessions that can't be resumed are asked about one at a time once the others are up: Enter starts one again from its spec (same key), Esc drops one @full", async () => {
     const s = sandbox();
     const here = repo.tiny();
     seed(s, workspace(here, { sessions: [child({ key: "kc" }), child({ key: "ka", name: "Gluon-agy-task", harness: "antigravity", model: "gemini-3.8-flash", spec: "agy spec", resume: undefined }), child({ key: "kx", name: "Gluon-codex-task", harness: "codex", mode: "build", model: "gpt-6.1-sol", spec: "codex spec", resume: undefined })] }));
@@ -345,7 +345,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(w!.sessions[0]!.resume!.id).toBe(UUID);
   });
 
-  test("a harness that refuses the resume soon after it starts is asked about the same way, with the reason; Enter starts it again under a new id", async () => {
+  test("resume/cannot-resume: a harness that refuses the resume soon after it starts is asked about the same way, with the reason; Enter starts it again under a new id", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const app = await resumeApp(s, ["abcdef"], repo.tiny(), { FAKE_REFUSE_RESUME: "3" });
@@ -366,7 +366,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(saved(s)[0]!.sessions[0]!.resume).toEqual({ id: newId, source: "minted" });
   });
 
-  test("a refused resume answered no is dropped from the record, each in turn @full", async () => {
+  test("resume/cannot-resume: a refused resume answered no is dropped from the record, each in turn @full", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child(), child({ key: "k2", name: "Gluon-two", resume: { id: "22222222-1111-4222-8333-444455556666", source: "minted" } })] }));
     const app = await resumeApp(s, ["abcdef"], repo.tiny(), { FAKE_REFUSE_RESUME: "9" });
@@ -381,7 +381,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(app.lines()[1]).not.toContain("workspace");
   });
 
-  test("a saved session whose model is gone can be neither resumed nor started again: the chat says why and the record keeps it", async () => {
+  test("resume/cannot-resume: a saved session whose model is gone can be neither resumed nor started again: the chat says why and the record keeps it", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ model: "sonnet-0" })] }));
     const app = await resumeApp(s, ["abcdef"]);
@@ -392,7 +392,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(saved(s)[0]!.sessions[0]!.model).toBe("sonnet-0");
   });
 
-  test("BUG-423/resume-dropped-effort: a saved session with an effort its model no longer takes (Codex has no max) still resumes, without the effort", async () => {
+  test("resume/reopens: a saved session with an effort its model no longer takes (Codex has no max) still resumes, without the effort #BUG-423/resume-dropped-effort", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ name: "Gluon-codex-task", harness: "codex", mode: "build", model: "gpt-6.1-sol", effort: "max", spec: "codex spec", resume: { id: "019a1b2c-d3e4-test", source: "captured" } })] }));
     const app = await resumeApp(s, ["abcdef"]);
@@ -403,7 +403,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     app.kill();
   });
 
-  test.skipIf(MAC_STEALS)("without a pseudo-terminal each saved session is asked about, one at a time; Enter resumes it with the terminal itself", async () => {
+  test.skipIf(MAC_STEALS)("resume/reopens: without a pseudo-terminal each saved session is asked about, one at a time; Enter resumes it with the terminal itself", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny()));
     const app = await resumeApp(s, ["abcdef"], repo.tiny(), { GLUON_TEST_NO_PTY: "1" });
@@ -414,7 +414,7 @@ describe("BUG-312/resume: gluon resume reopens the saved sessions", () => {
     expect(starts(app)[0]).toContain(`--resume=${UUID}`);
   });
 
-  test.skipIf(MAC_STEALS || WIN)("BUG-290/resume: without a pseudo-terminal a session event (Codex's hook, OpenCode's plugin) is not the agent's way back to Gluon: it keeps running @full", async () => {
+  test.skipIf(MAC_STEALS || WIN)("no-pty/hands-terminal: without a pseudo-terminal a session event (Codex's hook, OpenCode's plugin) is not the agent's way back to Gluon: it keeps running @full #BUG-290/resume", async () => {
     const s = sandbox();
     const write = `"${process.execPath}" --no-env-file "${join(import.meta.dir, "../fixtures/write-event.ts")}" session ses_1`;
     const app = await start({ cwd: repo.tiny(), rows: 60, env: { ...s.env, FAKE_TUI: "", GLUON_TEST_NO_PTY: "1", FAKE_HOOK: `${write}${WIN ? " & " : "; "}"${process.execPath}" -e "await Bun.sleep(${2000 * SLOW})"` } });
@@ -435,7 +435,7 @@ describe("BUG-298/resume: the review's findings", () => {
   const agy = (key = "ka") => child({ key, name: "Gluon-agy-task", harness: "antigravity", model: "gemini-3.8-flash", spec: "agy spec", resume: undefined });
   const asked = "Gluon-agy-task (Antigravity) can't be resumed";
 
-  test.skipIf(MAC_STEALS)("BUG-298/resume: without a pseudo-terminal an agent that refuses the resume soon after it starts stays in the record and is asked about, and on_exit quit does not quit Gluon @full", async () => {
+  test.skipIf(MAC_STEALS)("resume/cannot-resume: without a pseudo-terminal an agent that refuses the resume soon after it starts stays in the record and is asked about, and on_exit quit does not quit Gluon @full #BUG-298/resume", async () => {
     const s = sandbox(`${ASK_YAML}  on_exit: quit\n`);
     seed(s, workspace(repo.tiny()));
     const app = await resumeApp(s, ["abcdef"], repo.tiny(), { GLUON_TEST_NO_PTY: "1", FAKE_REFUSE_RESUME: "3" });
@@ -452,7 +452,7 @@ describe("BUG-298/resume: the review's findings", () => {
     expect(saved(s)[0]!.sessions[0]!.resume!.id).not.toBe(UUID);
   });
 
-  test("BUG-299/resume: typing while Gluon's own question is up closes it and keeps every key; it is not asked again while the chat holds text, and comes back when it is empty @full", async () => {
+  test("resume/cannot-resume: typing while Gluon's own question is up closes it and keeps every key; it is not asked again while the chat holds text, and comes back when it is empty @full", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [agy()] }));
     const app = await resumeApp(s, ["abcdef"]);
@@ -474,7 +474,7 @@ describe("BUG-298/resume: the review's findings", () => {
     expect(saved(s)[0]!.sessions).toHaveLength(1);
   });
 
-  test("BUG-300/resume: Ctrl+C on the start-again question keeps the session in the record (the next resume asks again); only Esc drops it @full", async () => {
+  test("resume/cannot-resume: Ctrl+C on the start-again question keeps the session in the record (the next resume asks again); only Esc drops it @full", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [agy()] }));
     const app = await resumeApp(s, ["abcdef"]);
@@ -492,7 +492,7 @@ describe("BUG-298/resume: the review's findings", () => {
     await again.waitFor(() => saved(s).length === 0);
   });
 
-  test.skipIf(WIN)("BUG-303/resume: a directory that can't be saved is recorded nowhere: no workspace in the header, no resume line on quit, and the chat says why @full", async () => {
+  test.skipIf(WIN)("resume/unsaveable-dir: a directory that can't be saved is recorded nowhere: no workspace in the header, no resume line on quit, and the chat says why @full", async () => {
     const s = sandbox();
     const dir = join(mkdtempSync(join(tmpdir(), "gluon-bidi-")), "evil‮dir");
     mkdirSync(dir);
@@ -506,7 +506,7 @@ describe("BUG-298/resume: the review's findings", () => {
     expect(app.history()).not.toContain("Resume this session");
   });
 
-  test("BUG-307/resume: starting a Codex session again forgets the id the harness refused (a fresh start has none until its hook sends one) @full", async () => {
+  test("resume/cannot-resume: starting a Codex session again forgets the id the harness refused (a fresh start has none until its hook sends one) @full #BUG-307/resume", async () => {
     const s = sandbox();
     seed(s, workspace(repo.tiny(), { sessions: [child({ key: "kx", name: "Gluon-codex-task", harness: "codex", mode: "build", model: "gpt-6.1-sol", spec: "codex spec", resume: { id: "019a1b2c-d3e4-test", source: "captured" } })] }));
     const app = await resumeApp(s, ["abcdef"], repo.tiny(), { FAKE_REFUSE_RESUME: "3" });
@@ -520,10 +520,10 @@ describe("BUG-298/resume: the review's findings", () => {
   });
 });
 
-describe("BUG-306/resume: one Gluon per workspace, and deleting a saved one", () => {
+describe("one Gluon per workspace, and deleting a saved one", () => {
   const deadPid = () => Bun.spawnSync([process.execPath, "-e", ""]).pid;
 
-  test("BUG-306/resume: a workspace another live Gluon has open is refused naming its process; --force opens it anyway; a dead id never blocks", async () => {
+  test("resume/one-gluon: a workspace another live Gluon has open is refused naming its process; --force opens it anyway; a dead id never blocks", async () => {
     const s = sandbox();
     const dir = repo.withSpace();
     seed(s, workspace(dir, { pid: process.pid }));
@@ -540,7 +540,7 @@ describe("BUG-306/resume: one Gluon per workspace, and deleting a saved one", ()
     expect(fakeRuns(s)).toEqual([]);
   });
 
-  test("BUG-310/resume: --delete of a workspace another live Gluon has open is refused naming its process; --force deletes it; a dead id never blocks", async () => {
+  test("resume/delete: --delete of a workspace another live Gluon has open is refused naming its process; --force deletes it; a dead id never blocks #BUG-310/resume", async () => {
     const s = sandbox();
     seed(s, workspace("/elsewhere/a", { id: "abcdef", pid: process.pid }));
     const live = await cli(["sessions", "--delete", "abcdef", "--yes"], { env: s.env });
@@ -555,7 +555,7 @@ describe("BUG-306/resume: one Gluon per workspace, and deleting a saved one", ()
     expect(saved(s)).toEqual([]);
   });
 
-  test("BUG-306/resume: --force, --delete and --yes go only where they belong, and --help names them", async () => {
+  test("resume/delete: --force, --delete and --yes go only where they belong, and --help names them", async () => {
     const s = sandbox();
     const force = await cli(["sessions", "--force"], { env: s.env });
     expect([force.code, force.stderr]).toEqual([2, expect.stringContaining("--force goes with `gluon resume` and `gluon sessions --delete <id>`")]);
@@ -568,7 +568,7 @@ describe("BUG-306/resume: one Gluon per workspace, and deleting a saved one", ()
     expect(help.stdout).toContain("gluon resume [<id>] [--all] [--force]");
   });
 
-  test("BUG-308/resume: gluon sessions --delete removes that workspace's file only; unknown and ambiguous ids stop; without a terminal it needs --yes", async () => {
+  test("resume/delete: gluon sessions --delete removes that workspace's file only; unknown and ambiguous ids stop; without a terminal it needs --yes", async () => {
     const s = sandbox();
     seed(s, workspace("/elsewhere/a", { id: "abcdef" }));
     seed(s, workspace("/elsewhere/b", { id: "abcxyz" }));
@@ -588,7 +588,7 @@ describe("BUG-306/resume: one Gluon per workspace, and deleting a saved one", ()
     expect(readdirSync(s.ws).sort()).toEqual(["abcdef.json", "abcxyz.json", "notes.txt"]);
   });
 
-  test("BUG-308/resume: on a terminal --delete asks first: anything but y deletes nothing", async () => {
+  test("resume/delete: on a terminal --delete asks first: anything but y deletes nothing", async () => {
     const s = sandbox();
     seed(s, workspace("/elsewhere/a", { id: "abcdef" }));
     const no = new App({ cwd: repo.tiny(), args: ["sessions", "--delete", "abcd"], env: s.env, cols: 120, rows: 20 });
