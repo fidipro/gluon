@@ -39,7 +39,7 @@ async function post(bodies: Uint8Array[], path = "/v1/logs") {
 }
 
 describe("the protobuf decoder (src/otlp-protobuf.ts)", () => {
-  test("the real captured body of Grok Build 1.0.46: event names from field 12, the typed attributes, as OTLP/JSON", () => {
+  test("cost/sources: the real captured body of Grok Build 1.0.46: event names from field 12, the typed attributes, as OTLP/JSON", () => {
     const records = (decodeLogs(canon).resourceLogs[0] as { scopeLogs: { logRecords: { attributes: { key: string; value: Record<string, string | boolean> }[] }[] }[] }).scopeLogs.flatMap((s) => s.logRecords);
     const attr = (r: (typeof records)[number], k: string) => Object.values(r.attributes.find((a) => a.key === k)?.value ?? {})[0];
     expect(records.map((r) => attr(r, "event.name"))).toEqual(["grok_code.auth", "grok_code.session_start", "grok_code.model_switched", "grok_code.user_prompt", "grok_code.api_request", "grok_code.turn_completed", "grok_code.assistant_response", "grok_code.session_end"]);
@@ -48,7 +48,7 @@ describe("the protobuf decoder (src/otlp-protobuf.ts)", () => {
     expect(records[2]!.attributes.find((a) => a.key === "success")!.value).toEqual({ boolValue: true });
   });
 
-  test("malformed bytes throw, never hang or allocate: every truncation of the real body, a varint of 11 bytes, a length past the end, field number 0, a deep or huge message", () => {
+  test("cost/listener-strict: malformed bytes throw, never hang or allocate: every truncation of the real body, a varint of 11 bytes, a length past the end, field number 0, a deep or huge message", () => {
     for (let n = 1; n < canon.length; n += 7) {
       try {
         decodeLogs(canon.subarray(0, n));
@@ -74,7 +74,7 @@ describe("the protobuf decoder (src/otlp-protobuf.ts)", () => {
     }
   });
 
-  test("the encoder used by these tests round-trips what the decoder reads (ints, strings, bools; an event with no name)", () => {
+  test("cost/sources: the encoder used by these tests round-trips what the decoder reads (ints, strings, bools; an event with no name)", () => {
     const body = encodeLogs([{ eventName: "e.one", attributes: { a: "x", b: 7, c: true } }, { attributes: { "event.name": "e.two" } }]);
     const records = (decodeLogs(body).resourceLogs[0] as { scopeLogs: { logRecords: { attributes: { key: string; value: object }[] }[] }[] }).scopeLogs[0]!.logRecords;
     expect(records[0]!.attributes).toEqual([{ key: "a", value: { stringValue: "x" } }, { key: "b", value: { intValue: "7" } }, { key: "c", value: { boolValue: true } }, { key: "event.name", value: { stringValue: "e.one" } }]);
@@ -85,14 +85,14 @@ describe("the protobuf decoder (src/otlp-protobuf.ts)", () => {
 });
 
 describe("the listener takes Grok's protobuf", () => {
-  test("a real request: answered 200 with an empty protobuf body; its api_request is one usage event (input includes the cache reads, output the reasoning), and the context is input + output", async () => {
+  test("cost/sources: a real request: answered 200 with an empty protobuf body; its api_request is one usage event (input includes the cache reads, output the reasoning), and the context is input + output", async () => {
     const { usages, contexts, responses } = await post([canon]);
     expect([responses[0]!.status, responses[0]!.headers.get("content-type"), (await responses[0]!.arrayBuffer()).byteLength]).toEqual([200, "application/x-protobuf", 0]);
     expect(usages).toEqual([{ harness: "grok-build", model: "spike-1", input: 20_000, output: 500, reasoning: 200, cacheRead: 15_000, cacheWrite: 0, reportedMicros: expect.any(Number), subagent: false, session: expect.stringMatching(UUID) }]);
     expect(contexts).toEqual([{ tokens: 20_500, model: "spike-1" }]);
   });
 
-  test("a re-sent batch counts once; metrics are taken and dropped; a malformed body is a 400; no token, 401; JSON still works", async () => {
+  test("cost/listener-strict: a re-sent batch counts once; metrics are taken and dropped; a malformed body is a 400; no token, 401; JSON still works", async () => {
     const twice = await post([canon, canon]);
     expect(twice.usages.length).toBe(1);
     expect((await post([canon], "/v1/metrics")).responses[0]!.status).toBe(200);
@@ -103,7 +103,7 @@ describe("the listener takes Grok's protobuf", () => {
     s.close();
   });
 
-  test("a real turn with 300k input (100k cached), a compaction: the context follows each main request, then is unknown (its `tokens_after` isn't the new size)", async () => {
+  test("context/after-compact: a real turn with 300k input (100k cached), a compaction: the context follows each main request, then is unknown (its `tokens_after` isn't the new size)", async () => {
     const records = fromDecoded(decodedFixture("grok-1.0.46-tui-300k-compaction.decoded.json").filter((r) => r.eventName !== "grok_code.auth"));
     const { usages, contexts } = await post(records.map((r) => encodeLogs([r])));
     expect(usages.map((u) => (u.harness === "grok-build" ? [u.input, u.output, u.cacheRead, u.reasoning] : []))).toEqual([[30_000, 100, 0, 0], [300_000, 1_000, 100_000, 400]]);
@@ -111,7 +111,7 @@ describe("the listener takes Grok's protobuf", () => {
     expect(contexts).toEqual([{ tokens: 30_100, model: "spike-1" }, { tokens: 301_000, model: "spike-1" }, null]);
   });
 
-  test("a subagent's requests count for cost but not for the context: none while one runs (its first request, before the `launched` event, can't be told apart)", async () => {
+  test("context/main-thread-only: a subagent's requests count for cost but not for the context: none while one runs (its first request, before the `launched` event, can't be told apart)", async () => {
     const records = fromDecoded(decodedFixture("grok-1.0.46-subagent.decoded.json"));
     const { usages, contexts } = await post(records.map((r) => encodeLogs([r])));
     expect(usages.map((u) => (u.harness === "grok-build" ? u.input : 0))).toEqual([50_000, 1_000, 7_000]);
@@ -131,7 +131,7 @@ describe("a subagent that never completes (BUG-401)", () => {
     for (const b of bodies) await fetch(`${srv.endpoint}/v1/logs`, { method: "POST", headers: { "content-type": "application/x-protobuf", [TELEMETRY_HEADER]: token }, body: b });
   };
 
-  test("BUG-401/subagent-lost-on-turn-end: the turn's end clears the count, so the next main request moves the context again (it stayed frozen at the subagent's `launched` for good)", async () => {
+  test("context/main-thread-only: the turn's end clears the count, so the next main request moves the context again (it stayed frozen at the subagent's `launched` for good) #BUG-401/subagent-lost-on-turn-end", async () => {
     const { before, next } = lost();
     const contexts: (ContextFigure | null)[] = [];
     const s = server.session({ onContext: (c) => contexts.push(c) });
@@ -143,7 +143,7 @@ describe("a subagent that never completes (BUG-401)", () => {
     s.close();
   });
 
-  test("BUG-401/subagent-lost-timeout: with no turn end either, a count nothing moved for SUBAGENT_STALE_MS is a lost record: the next request is the main thread's (and until then it is not)", async () => {
+  test("context/main-thread-only: with no turn end either, a count nothing moved for SUBAGENT_STALE_MS is a lost record: the next request is the main thread's (and until then it is not) #BUG-401/subagent-lost-timeout", async () => {
     let clock = 1_000_000;
     const srv = startTelemetry({ now: () => clock });
     try {
@@ -169,7 +169,7 @@ describe("Grok's own estimate (src/cost/grok.ts), audited against the server's f
   const table = (cost: object): ModelsDevTable => frozenTableWith({ "xai/spike-1": { cost, context: 500_000 } as never });
   const tiered = { input: 2, output: 6, cache_read: 0.5, tiers: [{ tier: { type: "context", size: 200_000 }, input: 4, output: 12, cache_read: 1 }] };
 
-  test("uncached input, cache reads and output (reasoning inside it); no cache-write price; the 200k tier is a named assumption", () => {
+  test("cost/grok: uncached input, cache reads and output (reasoning inside it); no cache-write price; the 200k tier is a named assumption", () => {
     const entry = { cost: tiered, context: 500_000 };
     expect(grokCost(entry, { input: 20_000, cacheRead: 15_000, output: 500 })).toMatchObject({ usd: (5_000 * 2 + 15_000 * 0.5 + 500 * 6) / 1e6, assumptions: [] });
     const long = grokCost(entry, { input: 300_000, cacheRead: 100_000, output: 1_000 });
@@ -180,7 +180,7 @@ describe("Grok's own estimate (src/cost/grok.ts), audited against the server's f
     expect(grokCost(entry, { input: 100, cacheRead: 999, output: 0 }).usd).toBeCloseTo((100 * 0.5) / 1e6, 12);
   });
 
-  test("the tracker prices every request and audits it against cost_usd_micros (floored by the server: a micro under is rounding); a difference no cause explains stays one", () => {
+  test("cost/grok: the tracker prices every request and audits it against cost_usd_micros (floored by the server: a micro under is rounding); a difference no cause explains stays one", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "grok-build", conn: "xai", ledger, table: table(tiered), now: () => 1 });
     t.grokRequest({ model: "spike-1", input: 20_000, output: 500, reasoning: 200, cacheRead: 15_000, cacheWrite: 0, reportedMicros: 20_499 });
@@ -195,7 +195,7 @@ describe("Grok's own estimate (src/cost/grok.ts), audited against the server's f
     expect(l2.divergences().map((d) => d.cause)).toEqual(["long-context-tier"]);
   });
 
-  test("a model with no price: the server's own costs, summed, are shown (marked); with none stamped (a plan's usual case) there is no figure", () => {
+  test("cost/unpriced-model: a model with no price: the server's own costs, summed, are shown (marked); with none stamped (a plan's usual case) there is no figure", () => {
     const t = frozenTracker({ harness: "grok-build", conn: "plan", ledger: new Ledger(), now: () => 1 });
     t.grokRequest({ model: "grok-9", input: 100, output: 10, reasoning: 0, cacheRead: 0, cacheWrite: 0 });
     expect(t.figure()).toBeUndefined();
@@ -204,7 +204,7 @@ describe("Grok's own estimate (src/cost/grok.ts), audited against the server's f
     expect(t.figure()).toEqual({ usd: 0.002, approx: true, own: false });
   });
 
-  test("the bundled table prices Grok's models (a plan as the xAI API) and its windows are Grok's own: 500k from its binary, grok-4.7's 256k observed", () => {
+  test("cost/grok: the bundled table prices Grok's models (a plan as the xAI API) and its windows are Grok's own: 500k from its binary, grok-4.7's 256k observed", () => {
     const plan = frozenTracker({ harness: "grok-build", conn: "plan" });
     plan.grokRequest({ model: "grok-4.7", input: 10_000, cacheRead: 4_000, output: 100, reasoning: 0, cacheWrite: 0 });
     expect(plan.figure()).toMatchObject({ usd: (6_000 * 2 + 4_000 * 0.5 + 100 * 6) / 1e6, approx: true, own: true });
@@ -214,7 +214,7 @@ describe("Grok's own estimate (src/cost/grok.ts), audited against the server's f
 });
 
 describe("Grok's launch", () => {
-  test("protobuf OTLP to the launch's listener with its token; prompts and content off; nothing when your environment has telemetry settings of its own", () => {
+  test("cost/telemetry-setup: protobuf OTLP to the launch's listener with its token; prompts and content off; nothing when your environment has telemetry settings of its own", () => {
     const session = { token: "t0k", endpoint: "http://127.0.0.1:4318" };
     const l = telemetryLaunch("grok-build", session, { PATH: "/bin" })!;
     expect(l.argv).toEqual([]);
@@ -239,11 +239,11 @@ describe("Grok's launch", () => {
 describe("`grok usage <session>`: Grok's own persisted totals, an audit (src/cost/grok-usage.ts)", () => {
   const fixture = (name: string) => readFileSync(join(DIR, name), "utf8");
 
-  test("the real output of 1.0.46: turns, the server's cost floored to micro-USD (a tick is 1e-10 USD), tokens with the cache reads included", () => {
+  test("ledger/audit: the real output of 1.0.46: turns, the server's cost floored to micro-USD (a tick is 1e-10 USD), tokens with the cache reads included", () => {
     expect(parseGrokUsage(fixture("grok-1.0.46-usage-canon-usage.json"))).toEqual({ turns: 1, micros: 12_345, partial: false, inputTokens: 20_000, outputTokens: 500, cachedReadTokens: 15_000, modelCalls: 1 });
   });
 
-  test("a turn the server stamped no cost on: the report is partial, and the audit skips it", () => {
+  test("ledger/audit: a turn the server stamped no cost on: the report is partial, and the audit skips it", () => {
     const r = parseGrokUsage(fixture("grok-1.0.46-usage-partial-cost-3-turns.json"))!;
     expect([r.turns, r.partial]).toEqual([3, true]);
     const ledger = new Ledger();
@@ -251,12 +251,12 @@ describe("`grok usage <session>`: Grok's own persisted totals, an audit (src/cos
     expect(ledger.entries).toEqual([]);
   });
 
-  test("junk and hostile output is no report, never an exception", () => {
+  test("ledger/audit: junk and hostile output is no report, never an exception", () => {
     for (const bad of ["", "nope", "[]", "null", '{"session":3,"turns":[]}', '{"session":{},"turns":"x"}', JSON.stringify({ session: {}, turns: new Array(100_001).fill({}) })]) expect(parseGrokUsage(bad)).toBeNull();
     expect(parseGrokUsage('{"session":{"costUsdTicks":-1,"inputTokens":"x"},"turns":[]}')).toMatchObject({ micros: null, inputTokens: 0 });
   });
 
-  test("only a UUID is ever run (an id from the agent's own export is untrusted): GROK_DISABLE_AUTOUPDATER set, the id the last argument; no binary, no run", async () => {
+  test("ledger/audit: only a UUID is ever run (an id from the agent's own export is untrusted): GROK_DISABLE_AUTOUPDATER set, the id the last argument; no binary, no run", async () => {
     const calls: { argv: string[]; env: Record<string, string | undefined> }[] = [];
     const spawn: SpawnUsage = async (argv, o) => (calls.push({ argv, env: o.env }), fixture("grok-1.0.46-usage-canon-usage.json"));
     const id = "01a10748-9317-7c11-8fcc-b3dde48d5344";
@@ -269,7 +269,7 @@ describe("`grok usage <session>`: Grok's own persisted totals, an audit (src/cos
     expect(calls[0]!.env.GROK_DISABLE_AUTOUPDATER).toBe("1");
   });
 
-  test("the data lands after the Stop hook: retried until a newer turn shows; a failing or never-newer run is null after its tries", async () => {
+  test("ledger/audit: the data lands after the Stop hook: retried until a newer turn shows; a failing or never-newer run is null after its tries", async () => {
     const id = "01a10748-9317-7c11-8fcc-b3dde48d5344";
     let n = 0;
     const late: SpawnUsage = async () => (++n < 3 ? null : fixture("grok-1.0.46-usage-canon-usage.json"));
@@ -283,7 +283,7 @@ describe("`grok usage <session>`: Grok's own persisted totals, an audit (src/cos
     expect(await readGrokUsage(id, { spawn: async () => Promise.reject(new Error("boom")), bin: "/x/grok", delayMs: 1, tries: 2 })).toBeNull();
   });
 
-  test("the audit: our own total against Grok's, cumulative, at the request count the report holds; a subagent's requests are in both (BUG-391), rounding is none", () => {
+  test("ledger/audit: the audit: our own total against Grok's, cumulative, at the request count the report holds; a subagent's requests are in both (BUG-391), rounding is none", () => {
     const table: ModelsDevTable = frozenTableWith({ "xai/spike-1": { cost: { input: 2, output: 6, cache_read: 0.5 }, context: 500_000 } as never });
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "grok-build", conn: "xai", ledger, table, now: () => 1 });
@@ -299,7 +299,7 @@ describe("`grok usage <session>`: Grok's own persisted totals, an audit (src/cos
     expect(ledger.entries.filter((e) => e.kind === "observation").map((e) => (e as { cause?: string }).cause)).toEqual(["none", "none", "unexplained"]);
   });
 
-  test("BUG-390/audit-waits-for-the-requests: a report that counts more requests than Gluon has received waits (no observation), is audited at ITS count when the last arrives, and is a dropped entry when they never do", () => {
+  test("ledger/audit: a report that counts more requests than Gluon has received waits (no observation), is audited at ITS count when the last arrives, and is a dropped entry when they never do #BUG-390/audit-waits-for-the-requests", () => {
     const table: ModelsDevTable = frozenTableWith({ "xai/spike-1": { cost: { input: 2, output: 6, cache_read: 0.5 }, context: 500_000 } as never });
     const main = { model: "spike-1", input: 20_000, output: 500, reasoning: 0, cacheRead: 15_000, cacheWrite: 0 };
     const report = (turns: number, micros: number, modelCalls: number) => ({ turns, micros, partial: false, inputTokens: 1, outputTokens: 1, cachedReadTokens: 0, modelCalls });
@@ -351,7 +351,7 @@ describe("`grok usage <session>`: Grok's own persisted totals, an audit (src/cos
 describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
   const embedded = JSON.stringify({ default: "grok-4.6", models: [{ id: "grok-4.6", model: "grok-4.6", context_window: 500_000, auto_compact_threshold_percent: 80, name: "Grok é" }, { id: "grok-5", context_window: 2_000_000 }, { id: "bad id!", context_window: 1 }, { id: "grok-x", context_window: 0 }] }, null, 2);
 
-  test("BUG-406/grok-catalog-one-decode: a binary full of braces before the catalog (each a candidate for its opening) is decoded once, not once per brace, and the same catalog comes out (multi-byte text before it included)", () => {
+  test("pricing/sources: a binary full of braces before the catalog (each a candidate for its opening) is decoded once, not once per brace, and the same catalog comes out (multi-byte text before it included) #BUG-406/grok-catalog-one-decode", () => {
     const catalog = JSON.stringify({ models: [{ id: "grok-5", context_window: 2_000_000 }] });
     // 1,500 balanced `{}` inside a string between the catalog's `{` and its "models" key: each is tried first, and fails quickly.
     const bytes = Buffer.concat([Buffer.from("é\u00e9 \x00"), Buffer.from(`{"k":"${"{}".repeat(1_500)}",${catalog.slice(1)}`), Buffer.alloc(100_000, 0x78)]);
@@ -370,7 +370,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
     expect(decodes).toBeLessThanOrEqual(3);
   });
 
-  test("BUG-342/grok-table-generator: the embedded default_models.json is found in a binary's bytes and parsed (never evaluated); models.dev seeds what it lacks, marked", () => {
+  test("pricing/sources: the embedded default_models.json is found in a binary's bytes and parsed (never evaluated); models.dev seeds what it lacks, marked #BUG-342/grok-table-generator", () => {
     const bytes = Buffer.concat([Buffer.from('\x00{"models":[1]} junk "models": ['), Buffer.from(embedded), Buffer.from("\x00default_models.json: invalid JSON")]);
     const found = defaultModels(bytes)!;
     expect(found.text).toBe(embedded);
@@ -386,7 +386,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
     });
   });
 
-  test("BUG-342/grok-table-bundled: the committed table names its source, version and digest, marks what is a seed, and carries Grok 4.5/4.6 at 500k and 4.7 at the observed 256k", () => {
+  test("pricing/sources: the committed table names its source, version and digest, marks what is a seed, and carries Grok 4.5/4.6 at 500k and 4.7 at the observed 256k #BUG-342/grok-table-bundled", () => {
     expect(GROK_MODELS).toMatchObject({ schema: 1, source: "grok binary default_models.json", grokVersion: "1.0.46" });
     expect(GROK_MODELS.digest).toMatch(/^[0-9a-f]{64}$/);
     // The live table may list more (the daily refresh seeds models.dev's): these three are the ones whose window is pinned.
@@ -397,7 +397,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
     for (const m of Object.values(GROK_MODELS.models)) if (m.cost) expect(m.costSource).toBe("models.dev-seed");
   });
 
-  test("BUG-342/grok-window-from-table: the window is the table's, then the default (a guess); the source says which", () => {
+  test("context/window: the window is the table's, then the default (a guess); the source says which #BUG-342/grok-window-from-table", () => {
     const table: GrokModelsTable = { ...GROK_MODELS, models: { "grok-t": { context: 123_456, source: "binary" } } };
     expect(grokWindowOf("grok-t", table)).toEqual({ window: 123_456, source: "grok-table" });
     expect(grokWindowOf("nope", table)).toEqual({ window: GROK_DEFAULT_WINDOW, source: "grok-default" });
@@ -410,7 +410,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
   const observedTable = (models: GrokObservedWindowsTable["models"]): GrokObservedWindowsTable => ({ schema: 1, source: "observed", note: "test", models });
   const seen = (context: number) => ({ context, observedAt: "2026-10-04", grokVersion: "1.0.46", evidence: "test" });
 
-  test("BUG-396/grok-4.7-window-is-256k-observed: grok-4.7 is not in Grok 1.0.46's catalog, so its window is the observed table's 256,000 (its footer read 13K / 256K and 17K / 256K), not models.dev's 500,000", () => {
+  test("context/window: grok-4.7 is not in Grok 1.0.46's catalog, so its window is the observed table's 256,000 (its footer read 13K / 256K and 17K / 256K), not models.dev's 500,000 #BUG-396/grok-4.7-window-is-256k-observed", () => {
     expect(GROK_OBSERVED_WINDOWS).toMatchObject({ schema: 1, source: "observed", models: { "grok-4.7": { context: 256_000, observedAt: "2026-10-04", grokVersion: "1.0.46" } } });
     expect(GROK_OBSERVED_WINDOWS.models["grok-4.7"]!.evidence).toContain("13K / 256K");
     // The footer's K is 1000 (301K / 500K for 301,000 of 500,000 tokens above): 256K is 256,000, not 262,144.
@@ -420,7 +420,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
     expect(windowIsGuess("grok-observed")).toBe(false);
   });
 
-  test("BUG-397/grok-window-precedence: the binary's window, then the observed table's, then none (the default, a guess); models.dev's `limit.context` is never one", () => {
+  test("context/window: the binary's window, then the observed table's, then none (the default, a guess); models.dev's `limit.context` is never one #BUG-397/grok-window-precedence", () => {
     const observed = observedTable({ "grok-o": seen(256_000), "grok-b": seen(111_000) });
     const table: GrokModelsTable = { ...GROK_MODELS, models: { "grok-b": { context: 500_000, source: "binary" }, "grok-p": { cost: { input: 1, output: 2 }, costSource: "models.dev-seed" } } };
     // Both hold grok-b: the binary's wins. Only the observed table holds grok-o (a table built before it was added: an overlay).
@@ -439,7 +439,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
     expect(models["grok-b"]).toEqual({ context: 500_000, source: "binary" });
   });
 
-  test("BUG-398/grok-observed-notice: when the binary lists a model the observed table holds, the generator says to remove it and uses the binary's window; the daily script prints it", () => {
+  test("pricing/sources: when the binary lists a model the observed table holds, the generator says to remove it and uses the binary's window; the daily script prints it #BUG-398/grok-observed-notice", () => {
     const lines: string[] = [];
     const observed = observedTable({ "grok-4.7": seen(256_000), "grok-9": seen(256_000) });
     const bytes = Buffer.from(JSON.stringify({ models: [{ id: "grok-4.6", context_window: 500_000 }, { id: "grok-4.7", context_window: 262_144 }] }));
@@ -467,7 +467,7 @@ describe("Grok's own model table (scripts/pricing/grok.ts; issue #39)", () => {
     }
   });
 
-  test("BUG-342/grok-price-from-table: a price in Grok's table is used before models.dev's, and the request is tagged with the table's digest; without one models.dev's price and digest", () => {
+  test("cost/grok: a price in Grok's table is used before models.dev's, and the request is tagged with the table's digest; without one models.dev's price and digest #BUG-342/grok-price-from-table", () => {
     const table: GrokModelsTable = { ...FROZEN_GROK_MODELS, digest: "ab".repeat(32), models: { "grok-t": { context: 1, source: "binary", cost: { input: 10, output: 20, cache_read: 5 }, costSource: "binary" } } };
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "grok-build", conn: "xai", ledger, grokTable: table, now: () => 1 });
@@ -483,7 +483,7 @@ describe("`grok usage` is bounded and audits only what this launch spent (issue 
   const id = "01a10748-9317-7c11-8fcc-b3dde48d5344";
   const opts = { cwd: tmpdir(), env: { PATH: process.env.PATH }, timeoutMs: 20_000 };
 
-  test("BUG-340/usage-stdout-cap: a process printing past MAX_USAGE_BYTES is killed and read as null; one within it is read whole", async () => {
+  test("ledger/audit: a process printing past MAX_USAGE_BYTES is killed and read as null; one within it is read whole #BUG-340/usage-stdout-cap", async () => {
     // cwd is the temp dir, so there is no bunfig to skip (and Windows has no /dev/null for --config).
     const print = (bytes: number) => [process.execPath, "--no-env-file", "-e", `process.stdout.write("x".repeat(${bytes}))`];
     expect((await defaultSpawn(print(1000), opts))?.length).toBe(1000);
@@ -491,7 +491,7 @@ describe("`grok usage` is bounded and audits only what this launch spent (issue 
     expect(await defaultSpawn([process.execPath, "--no-env-file", "-e", "process.exit(3)"], opts)).toBeNull();
   });
 
-  test("BUG-340/usage-no-double-dash: the session id is the last argument with no `--` (nothing in the repo shows `grok usage` takes one; a UUID can't start with `-` anyway)", async () => {
+  test("ledger/audit: the session id is the last argument with no `--` (nothing in the repo shows `grok usage` takes one; a UUID can't start with `-` anyway) #BUG-340/usage-no-double-dash", async () => {
     const calls: string[][] = [];
     const spawn: SpawnUsage = async (argv) => (calls.push(argv), readFileSync(join(DIR, "grok-1.0.46-usage-canon-usage.json"), "utf8"));
     await readGrokUsage(id, { spawn, bin: "/x/grok" });
@@ -499,7 +499,7 @@ describe("`grok usage` is bounded and audits only what this launch spent (issue 
     expect(UUID.test("-1a10748-9317-7c11-8fcc-b3dde48d5344")).toBe(false);
   });
 
-  test("BUG-341/grok-resume-baseline: the history a resumed or forked session inherited (`grok usage` totals it) is taken off the cumulative audit, so only this launch's spend is compared", () => {
+  test("cost/this-launch-only: the history a resumed or forked session inherited (`grok usage` totals it) is taken off the cumulative audit, so only this launch's spend is compared #BUG-341/grok-resume-baseline", () => {
     const table: ModelsDevTable = frozenTableWith({ "xai/spike-1": { cost: { input: 2, output: 6, cache_read: 0.5 }, context: 500_000 } as never });
     const main = { model: "spike-1", input: 20_000, output: 500, reasoning: 0, cacheRead: 15_000, cacheWrite: 0 };
     // 5,000 uncached x 2 + 15,000 x 0.5 + 500 x 6 = $0.0205 = 20,500 micros.

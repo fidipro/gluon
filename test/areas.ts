@@ -43,7 +43,7 @@ export const AREAS: Record<string, Area> = {
     live: "brain",
     src: ["src/cli.tsx", "src/main.tsx", "src/usage.ts", "src/startup.ts", "src/self.ts", "src/internal.ts", "src/uninstall.ts", "src/doctor.ts", "src/config.ts", "src/xdg.ts"],
     files: ["test/fixtures/hook-graph/**"],
-    unit: ["test/usage.test.ts", "test/hook-import-graph.test.ts", "test/doctor.test.ts"],
+    unit: ["test/hook-import-graph.test.ts", "test/doctor.test.ts"],
     e2e: ["test/e2e/cli.e2e.test.ts", "test/e2e/startup.e2e.test.ts"],
     e2eOnly: ["src/cli.tsx", "src/main.tsx", "src/startup.ts", "src/doctor.ts", "src/uninstall.ts"],
     unmeasured: { "src/internal.ts": "runs as `gluon signal` / `gluon hook` in a subprocess" },

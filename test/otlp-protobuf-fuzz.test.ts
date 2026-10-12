@@ -171,11 +171,11 @@ function check(body: Uint8Array, label: string) {
 }
 
 describe("BUG-343/protobuf-fuzz: the OTLP protobuf decoder survives seeded mutations of real bodies", () => {
-  test("the corpus decodes unmodified", () => {
+  test("cost/sources: the corpus decodes unmodified", () => {
     for (const { name, body } of corpus) expect([name, decodeLogs(body).resourceLogs.length > 0]).toEqual([name, true]);
   });
 
-  test("bit flips, truncation, length inflation, varint overflow, deep nesting and repetition: only the decoder's own errors or a bounded result, each decode fast; the whole run under 2 s of CPU @full", () => {
+  test("cost/listener-strict: bit flips, truncation, length inflation, varint overflow, deep nesting and repetition: only the decoder's own errors or a bounded result, each decode fast; the whole run under 2 s of CPU @full", () => {
     const names = Object.keys(MUTATIONS);
     const fuzz = () => {
       const start = cpuMs();
@@ -215,7 +215,7 @@ describe("BUG-343/protobuf-fuzz: the OTLP protobuf decoder survives seeded mutat
     expect(run.ms).toBeLessThan(2000 * BUDGET);
   }, 90_000); // bun's 5 s default is wall time; the budget above is CPU time, the run up to four times
 
-  test("the limits hold at their edges: a varint of 10 bytes reads, 11 does not; a length past the end (also 2^64-1) and field number 0 throw; 4097 fields and 257 attributes are refused", () => {
+  test("cost/listener-strict: the limits hold at their edges: a varint of 10 bytes reads, 11 does not; a length past the end (also 2^64-1) and field number 0 throw; 4097 fields and 257 attributes are refused", () => {
     const ten = Uint8Array.from([0x08, ...Array(9).fill(0xff), 0x01]);
     expect(() => decodeLogs(ten)).not.toThrow();
     expect(() => decodeLogs(Uint8Array.from([0x08, ...Array(10).fill(0xff), 0x01]))).toThrow(/varint too long/);

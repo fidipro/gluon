@@ -49,7 +49,7 @@ function fakeKey(usages: number[] | (() => number)) {
 const settledTo = (m: BilledMeter) => m.finish();
 
 describe("BUG-481/the key's usage over a session is what OpenRouter billed it", () => {
-  test("BUG-481/clean delta: usage before and after, both settled: the session's figure, audited against ours with the provider-price cause", async () => {
+  test("openrouter/billed: usage before and after, both settled: the session's figure, audited against ours with the provider-price cause #BUG-481/clean-delta", async () => {
     const dir = fresh();
     const key = fakeKey([10, 10.37, 10.37, 10.37]);
     const results: BilledResult[] = [];
@@ -76,7 +76,7 @@ describe("BUG-481/the key's usage over a session is what OpenRouter billed it", 
     expect(obs && "ownMicros" in obs && obs.ownMicros).toBe(Math.round(own.usd * 1e6));
   });
 
-  test("BUG-481/a billed delta that equals ours (a single-price model) is `none`, not a cause", async () => {
+  test("openrouter/billed: a billed delta that equals ours (a single-price model) is `none`, not a cause #BUG-481", async () => {
     const ledger = new Ledger();
     const tracker = new CostTracker({ harness: "opencode", conn: "openrouter", launchedKey: KIMI_KEY, table: oneEndpoint(), ledger });
     tracker.openrouterSession();
@@ -87,7 +87,7 @@ describe("BUG-481/the key's usage over a session is what OpenRouter billed it", 
     expect(ledger.entries.find((e) => e.kind === "observation" && e.scope === "billed")).toMatchObject({ cause: "none" });
   });
 
-  test("BUG-482/lag then settle: usage still rising after the exit is not settled; two equal readings after the settle time are", async () => {
+  test("openrouter/billed: lag then settle: usage still rising after the exit is not settled; two equal readings after the settle time are #BUG-482", async () => {
     const key = fakeKey([5, 5.1, 5.4, 5.62, 5.62, 5.62, 5.62]);
     const m = await BilledMeter.begin({ key: KEY, source: source(), registry: new Registry(fresh()), fetch: key.fetch });
     const t0 = Date.now();
@@ -98,14 +98,14 @@ describe("BUG-481/the key's usage over a session is what OpenRouter billed it", 
     expect(Date.now() - t0).toBeGreaterThanOrEqual(FAST.settleMs);
   });
 
-  test("BUG-482/a usage that never stops moving is given up on: unsettled, no figure", async () => {
+  test("openrouter/billed: a usage that never stops moving is given up on: unsettled, no figure #BUG-482", async () => {
     let u = 1;
     const key = fakeKey(() => (u += 0.01));
     const m = await BilledMeter.begin({ key: KEY, source: source({ giveUpMs: 60 }), registry: new Registry(fresh()), fetch: key.fetch });
     expect(await m.finish()).toEqual({ status: "unsettled", why: "timeout" });
   });
 
-  test("BUG-482/no baseline (the key can't be read at the start) or no reading at the end: no figure, said", async () => {
+  test("openrouter/billed: no baseline (the key can't be read at the start) or no reading at the end: no figure, said #BUG-482", async () => {
     const down = async () => new Response("{}", { status: 503 });
     const m = await BilledMeter.begin({ key: KEY, source: source(), registry: new Registry(fresh()), fetch: down });
     expect(await m.finish()).toEqual({ status: "unreadable", why: "no-baseline" });
@@ -121,7 +121,7 @@ describe("BUG-481/the key's usage over a session is what OpenRouter billed it", 
 });
 
 describe("BUG-483/a delta is the session's only if no other OpenRouter session of Gluon shared the key meanwhile", () => {
-  test("BUG-483/same process: two sessions that overlap get no figure, each", async () => {
+  test("openrouter/shared-key: same process: two sessions that overlap get no figure, each #BUG-483", async () => {
     const dir = fresh();
     const reg = new Registry(dir);
     const a = fakeKey([1, 1.5, 1.5, 1.5]);
@@ -140,7 +140,7 @@ describe("BUG-483/a delta is the session's only if no other OpenRouter session o
     expect(tracker.figure()).toBeUndefined();
   });
 
-  test("BUG-483/one that started after the other ended, but before its usage had settled, overlaps it; one after the settle does not", async () => {
+  test("openrouter/shared-key: one that started after the other ended, but before its usage had settled, overlaps it; one after the settle does not #BUG-483", async () => {
     const dir = fresh();
     const reg = new Registry(dir);
     const a = fakeKey([1, 1.5, 1.5, 1.5]);
@@ -157,7 +157,7 @@ describe("BUG-483/a delta is the session's only if no other OpenRouter session o
     expect(rc.status === "clean" && Math.round(rc.usd * 1e6)).toBe(250_000);
   });
 
-  test("BUG-483/another key is no overlap", async () => {
+  test("openrouter/shared-key: another key is no overlap #BUG-483", async () => {
     const reg = new Registry(fresh());
     const ma = await BilledMeter.begin({ key: KEY, source: source(), registry: reg, fetch: fakeKey([1, 1.5, 1.5, 1.5]).fetch });
     const mb = await BilledMeter.begin({ key: `${KEY}-other`, source: source(), registry: reg, fetch: fakeKey([7, 8, 8, 8]).fetch });
@@ -166,7 +166,7 @@ describe("BUG-483/a delta is the session's only if no other OpenRouter session o
     expect(rb.status).toBe("clean");
   });
 
-  test("BUG-484/two Gluon processes: a session running in another process is seen through the registry file; once that process is gone its window ends at its last touch plus the lag tail", async () => {
+  test("openrouter/shared-key: two Gluon processes: a session running in another process is seen through the registry file; once that process is gone its window ends at its last touch plus the lag tail #BUG-484", async () => {
     const dir = fresh();
     // The other process: registers a running session on the same key and stays until its stdin closes.
     const script = join(TMP, "other-gluon.ts");
@@ -203,7 +203,7 @@ await Bun.stdin.text();`,
     expect((await m2.finish()).status).toBe("clean");
   });
 
-  test("BUG-484/the registry: private directory made first, one file per session, a key's hash and never the key, a stale window removed", () => {
+  test("openrouter/key-private: the registry: private directory made first, one file per session, a key's hash and never the key, a stale window removed #BUG-484", () => {
     const dir = join(fresh(), "gluon", "openrouter-sessions");
     let t = 1_000_000_000_000;
     const reg = new Registry(dir, { now: () => t, pid: 4242, alive: () => false, tailMs: 10 });
@@ -229,7 +229,7 @@ await Bun.stdin.text();`,
     utimesSync(join(dir, "x"), new Date(), new Date());
   });
 
-  test("BUG-484/the windows' arithmetic: touching windows don't overlap, an open one reaches to the end of time", () => {
+  test("openrouter/shared-key: the windows' arithmetic: touching windows don't overlap, an open one reaches to the end of time #BUG-484", () => {
     expect(overlap({ start: 0, end: 10 }, { start: 10, end: 20 })).toBe(false);
     expect(overlap({ start: 0, end: 11 }, { start: 10, end: 20 })).toBe(true);
     expect(overlap({ start: 50 }, { start: 0, end: 20 })).toBe(false);
@@ -239,7 +239,7 @@ await Bun.stdin.text();`,
 });
 
 describe("BUG-485/Gluon quitting first", () => {
-  test("BUG-485/quit before the figure settles: an unsettled record and no figure; the window keeps the lag tail for the next session", async () => {
+  test("openrouter/quit-early: quit before the figure settles: an unsettled record and no figure; the window keeps the lag tail for the next session #BUG-485", async () => {
     const dir = fresh();
     const reg = new Registry(dir);
     let u = 1;
@@ -266,7 +266,7 @@ describe("BUG-485/Gluon quitting first", () => {
     expect(key.calls.length).toBe(calls);
   });
 
-  test("BUG-485/a launch that failed leaves no window and no record", async () => {
+  test("openrouter/quit-early: a launch that failed leaves no window and no record #BUG-485", async () => {
     const reg = new Registry(fresh());
     const ledger = new Ledger();
     const m = await BilledMeter.begin({ key: KEY, source: source(), registry: reg, fetch: fakeKey([1]).fetch, onSettled: () => ledger.add({ kind: "dropped", t: 1, harness: "codex", what: "cost", reason: "x", count: 1 }) });
@@ -278,7 +278,7 @@ describe("BUG-485/Gluon quitting first", () => {
 });
 
 describe("BUG-486/the key is never logged", () => {
-  test("BUG-486/it travels only in the Authorization header: not in a file, the ledger, a note, process.env, or an error", async () => {
+  test("openrouter/key-private: it travels only in the Authorization header: not in a file, the ledger, a note, process.env, or an error #BUG-486", async () => {
     const dir = fresh();
     const ledger = new Ledger();
     const tracker = new CostTracker({ harness: "codex", conn: "openrouter", ledger });
@@ -345,7 +345,7 @@ describe("BUG-487/the live figure: calibrated against the lagged usage, ours unt
     return { ks, figures, reads, tracker };
   }
 
-  test("BUG-487/a cheap provider: k from a lagged series, the figure drops below the table price before the session ends", async () => {
+  test("openrouter/estimate: a cheap provider: k from a lagged series, the figure drops below the table price before the session ends #BUG-487", async () => {
     const s = await session(() => 0.4);
     const k = s.ks.filter((x): x is number => x !== undefined).at(-1)!;
     expect(k).toBeGreaterThan(0.38);
@@ -357,7 +357,7 @@ describe("BUG-487/the live figure: calibrated against the lagged usage, ours unt
     expect(s.figures[0]!.shown).toBeCloseTo(s.figures[0]!.table, 6);
   });
 
-  test("BUG-487/a provider switch mid-session: k moves toward the new price", async () => {
+  test("openrouter/estimate: a provider switch mid-session: k moves toward the new price #BUG-487", async () => {
     const s = await session((t) => (t < 200_000 ? 0.4 : 2.0));
     const ks = s.ks.filter((x): x is number => x !== undefined);
     const early = ks.find((_, i) => i === 0)!;
@@ -366,7 +366,7 @@ describe("BUG-487/the live figure: calibrated against the lagged usage, ours unt
     expect(ks.at(-1)!).toBeLessThan(2.1);
   });
 
-  test("BUG-487/another OpenRouter session on the key in the window: no calibration, the table estimate marked ~, and no more readings", async () => {
+  test("openrouter/estimate: another OpenRouter session on the key in the window: no calibration, the table estimate marked ~, and no more readings #BUG-487", async () => {
     const s = await session(() => 0.4, { overlapAt: 150_000 });
     // Calibrated before the overlap, then reset: the last event is the return to the table price.
     expect(s.ks.at(-1)).toBeUndefined();
@@ -377,14 +377,14 @@ describe("BUG-487/the live figure: calibrated against the lagged usage, ours unt
     expect(s.tracker.figure()).toMatchObject({ approx: true });
   });
 
-  test("BUG-487/idle: no reading while our own count doesn't change", async () => {
+  test("openrouter/estimate: no reading while our own count doesn't change #BUG-487", async () => {
     const s = await session(() => 0.4, { idleFrom: 100_000 });
     // The baseline, the samples while it worked (at most one per 45 s up to 100 s), nothing after.
     expect(s.reads.filter((t) => t > 1_000_000 + 100_000 + 10_000).length).toBeLessThanOrEqual(1);
     expect(s.reads.length).toBeLessThanOrEqual(4);
   });
 
-  test("BUG-487/the ratio: needs enough of our estimate at the lagged time, 1 outside 0.05..20, none for a bad figure", () => {
+  test("openrouter/estimate: the ratio: needs enough of our estimate at the lagged time, 1 outside 0.05..20, none for a bad figure #BUG-487", () => {
     expect(ratio(0.5, 0.0005)).toBeUndefined();
     expect(ratio(0.5, 1)).toBe(0.5);
     expect(ratio(100, 1)).toBe(1);
@@ -397,7 +397,7 @@ describe("BUG-487/the live figure: calibrated against the lagged usage, ours unt
     expect([h.at(500), h.at(1000), h.at(1999), h.at(5000)]).toEqual([0, 0.1, 0.1, 0.3]);
   });
 
-  test("BUG-487/the final k and a cause when it is far from 1 are in the ledger", () => {
+  test("openrouter/estimate: the final k and a cause when it is far from 1 are in the ledger #BUG-487", () => {
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "codex", conn: "openrouter", ledger });
     t.openrouterSession();
@@ -417,7 +417,7 @@ describe("BUG-487/the live figure: calibrated against the lagged usage, ours unt
 });
 
 describe("BUG-488/an OpenRouter session's figure is an estimate (~) until its model is known to have one endpoint price", () => {
-  test("BUG-488/the bundled table says, per OpenRouter model Gluon offers, how many endpoints and their price range: no request at run time", () => {
+  test("openrouter/estimate: the bundled table says, per OpenRouter model Gluon offers, how many endpoints and their price range: no request at run time #BUG-488", () => {
     const kimi = priceEntry(KIMI_KEY)!.endpoints!;
     expect(kimi.count).toBeGreaterThan(1);
     expect(kimi.input.max).toBeGreaterThan(kimi.input.min);
@@ -432,7 +432,7 @@ describe("BUG-488/an OpenRouter session's figure is an estimate (~) until its mo
     expect(readFileSync(join(import.meta.dir, "../src/openrouter-billed.ts"), "utf8")).not.toContain("/endpoints");
   });
 
-  test("BUG-488/the tracker marks ~ for several or unknown prices, nothing for one; other connections are as before", () => {
+  test("openrouter/estimate: the tracker marks ~ for several or unknown prices, nothing for one; other connections are as before #BUG-488", () => {
     const priced = (conn: "openrouter" | "anthropic", multiple?: boolean | "off") => {
       const t = new CostTracker({ harness: "codex", conn, ...(multiple !== undefined && multiple !== "off" ? { launchedKey: KIMI_KEY } : {}), ...(multiple === false ? { table: oneEndpoint() } : {}) });
       if (multiple !== "off" && conn === "openrouter") t.openrouterSession();
@@ -445,7 +445,7 @@ describe("BUG-488/an OpenRouter session's figure is an estimate (~) until its mo
     expect(priced("openrouter", "off")?.approx).toBe(false);
   });
 
-  test("BUG-488/the ledger entry and the report: scope `billed` is kept with its calibration, and read as what OpenRouter billed", () => {
+  test("ledger/report: the ledger entry and the report: scope `billed` is kept with its calibration, and read as what OpenRouter billed #BUG-488", () => {
     const e = sanitize({ kind: "observation", what: "cost", t: 5, harness: "kimi-code", scope: "billed", reportedMicros: 370_000, ownMicros: 200_000, cause: "openrouter-provider-price", calibration: 1.85123456, prompt: "x" });
     expect(e).toEqual({ kind: "observation", t: 5, harness: "kimi-code", what: "cost", scope: "billed", reportedMicros: 370_000, ownMicros: 200_000, cause: "openrouter-provider-price", calibration: 1.8512 });
     expect(sanitize({ kind: "observation", t: 5, harness: "codex", scope: "turn", reportedMicros: 1, calibration: 2 })).not.toHaveProperty("calibration");
@@ -456,7 +456,7 @@ describe("BUG-488/an OpenRouter session's figure is an estimate (~) until its mo
 });
 
 describe("BUG-489/no real network in the regression suite; none at all in a release build", () => {
-  test("BUG-489/under the offline suite the usage isn't read unless a test names its own server; the seam names the base and the timings", () => {
+  test("openrouter/offline-under-test: under the offline suite the usage isn't read unless a test names its own server; the seam names the base and the timings #BUG-489", () => {
     const saved = { seam: process.env.GLUON_TEST_OPENROUTER, probes: process.env.GLUON_TEST_PROBES };
     try {
       delete process.env.GLUON_TEST_OPENROUTER;
@@ -475,7 +475,7 @@ describe("BUG-489/no real network in the regression suite; none at all in a rele
     }
   });
 
-  test("BUG-490/fails closed: only an environment that says nothing of tests reaches openrouter.ai; a `bun test` process never does", () => {
+  test("openrouter/offline-under-test: fails closed: only an environment that says nothing of tests reaches openrouter.ai; a `bun test` process never does #BUG-490", () => {
     expect(billedSource({})?.base).toBe("https://openrouter.ai/api/v1");
     expect(billedSource({ NODE_ENV: "test" })).toBeNull();
     expect(billedSource({ GLUON_TEST_PROBES: "/x" })).toBeNull();
@@ -489,7 +489,7 @@ describe("BUG-489/no real network in the regression suite; none at all in a rele
     }
   });
 
-  test("BUG-491/the key's request follows no redirect (the key must not travel to another host) and fails quietly without it in a message", async () => {
+  test("openrouter/key-private: the key's request follows no redirect (the key must not travel to another host) and fails quietly without it in a message #BUG-491", async () => {
     let init: { redirect?: string; headers?: Record<string, string> } | undefined;
     const usage = await readUsage(KEY, source(), async (_url, i) => {
       init = i;
@@ -501,7 +501,7 @@ describe("BUG-489/no real network in the regression suite; none at all in a rele
 });
 
 describe("BUG-492/a registry file of a process that's gone, or whose pid another program now has, is not a running session", () => {
-  test("BUG-492/an untouched file of a live pid (reused) ends at its last touch plus the tail; a touched one stays open", () => {
+  test("openrouter/shared-key: an untouched file of a live pid (reused) ends at its last touch plus the tail; a touched one stays open #BUG-492", () => {
     const dir = join(fresh(), "reg");
     let t = 1_000_000_000_000;
     const reg = new Registry(dir, { now: () => t, pid: process.pid, alive: () => true, tailMs: 1000 });
@@ -531,7 +531,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     return { ledger, tracker, own: tracker.ownUsdNow() };
   };
 
-  test("BUG-494/lagged usage: the readings equal the baseline long past the old settle time, then the usage moves; it settles at the moved amount, not $0", async () => {
+  test("openrouter/billed: lagged usage: the readings equal the baseline long past the old settle time, then the usage moves; it settles at the moved amount, not $0 #BUG-494", async () => {
     const { tracker, own, ledger } = spent();
     expect(own).toBeGreaterThan(0.002);
     const results: BilledResult[] = [];
@@ -558,7 +558,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     expect(ledger.entries.find((e) => e.kind === "observation" && e.scope === "billed")).toMatchObject({ cause: "none" });
   });
 
-  test("BUG-494/not before landMs since the session's last request, even when the usage moved and two readings agree", async () => {
+  test("openrouter/billed: not before landMs since the session's last request, even when the usage moved and two readings agree #BUG-494", async () => {
     const { own } = spent();
     const key = fakeKey([5, 5 + own]);
     const m = await BilledMeter.begin({ key: KEY, source: source({ landMs: 150, giveUpMs: 1000 }), registry: new Registry(fresh()), fetch: key.fetch });
@@ -569,7 +569,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     expect(Date.now() - t0).toBeGreaterThanOrEqual(145);
   });
 
-  test("BUG-494/the usage never moves: unsettled at the give-up, no figure, a dropped record", async () => {
+  test("openrouter/billed: the usage never moves: unsettled at the give-up, no figure, a dropped record #BUG-494", async () => {
     const { tracker, ledger, own } = spent();
     const notes: string[] = [];
     const key = fakeKey([5]);
@@ -584,7 +584,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     expect(notes[0]).toBe("no billed figure: OpenRouter's usage hadn't settled after 5 minutes.");
   });
 
-  test("BUG-494/the exit counts a request the last tick missed: the count at the exit decides", async () => {
+  test("openrouter/billed: the exit counts a request the last tick missed: the count at the exit decides #BUG-494", async () => {
     const { own } = spent();
     const key = fakeKey([5]);
     const m = await BilledMeter.begin({ key: KEY, source: source({ giveUpMs: 200 }), registry: new Registry(fresh()), fetch: key.fetch });
@@ -592,7 +592,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     expect(await m.finish({ usd: own })).toEqual({ status: "unsettled", why: "timeout" });
   });
 
-  test("BUG-494/a session with no requests settles at $0 once two readings agree (settleMs after the exit), not after landMs", async () => {
+  test("openrouter/billed: a session with no requests settles at $0 once two readings agree (settleMs after the exit), not after landMs #BUG-494", async () => {
     const ledger = new Ledger();
     const tracker = new CostTracker({ harness: "codex", conn: "openrouter", launchedKey: KIMI_KEY, ledger });
     tracker.openrouterSession();
@@ -605,7 +605,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
     expect(notes[0]).toContain("OpenRouter billed $0.00✓");
   });
 
-  test("BUG-494/a model with a price of $0 (our estimate is $0, nothing unpriced) is a session with nothing to wait for", async () => {
+  test("openrouter/billed: a model with a price of $0 (our estimate is $0, nothing unpriced) is a session with nothing to wait for #BUG-494", async () => {
     const t = new CostTracker({ harness: "codex", conn: "openrouter" });
     t.openrouterSession();
     expect(t.usageExpected()).toBe(false);
@@ -615,7 +615,7 @@ describe("BUG-494/a session that spent never settles before the key's usage move
 });
 
 describe("BUG-495/the live calibration takes no k from a usage that hasn't moved", () => {
-  test("BUG-495/readings at the baseline give no ratio (the table price stands); once the usage moved, k is the ratio of the moved usage to our estimate one lag ago", async () => {
+  test("openrouter/estimate: readings at the baseline give no ratio (the table price stands); once the usage moved, k is the ratio of the moved usage to our estimate one lag ago #BUG-495", async () => {
     let now = 1_000_000;
     let usage = 20;
     const ks: (number | undefined)[] = [];
@@ -641,7 +641,7 @@ describe("BUG-495/the live calibration takes no k from a usage that hasn't moved
 });
 
 describe("BUG-496/a $0 reading for a session that spent is never a billed figure, never a provider price", () => {
-  test("BUG-496/tracker.billed(0) with spend: refused, a dropped record, and no `openrouter-provider-price` observation", () => {
+  test("openrouter/billed: tracker.billed(0) with spend: refused, a dropped record, and no `openrouter-provider-price` observation #BUG-496", () => {
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "codex", conn: "openrouter", launchedKey: KIMI_KEY, ledger });
     t.openrouterSession();
@@ -656,7 +656,7 @@ describe("BUG-496/a $0 reading for a session that spent is never a billed figure
     expect(new CostTracker({ harness: "codex", conn: "openrouter" }).billed(0)).toBe(true);
   });
 
-  test("BUG-496/settled() of a clean $0 for a session that spent says there is no figure, not '$0.00✓'", () => {
+  test("openrouter/billed: settled() of a clean $0 for a session that spent says there is no figure, not '$0.00✓' #BUG-496", () => {
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "codex", conn: "openrouter", launchedKey: KIMI_KEY, ledger });
     t.openrouterSession();
@@ -669,7 +669,7 @@ describe("BUG-496/a $0 reading for a session that spent is never a billed figure
 });
 
 describe("BUG-497/a figure under a cent shows enough digits to be above zero", () => {
-  test("BUG-497/costLabel: four decimals under $0.01 (live row and the billed chat line), two otherwise, $0.00 only for 0", () => {
+  test("openrouter/billed: four decimals under $0.01 (live row and the billed chat line), two otherwise, $0.00 only for 0 #BUG-497", () => {
     expect(costLabel({ usd: 0.002190975, approx: true })).toBe("~$0.0022");
     expect(costLabel({ usd: 0.002190975, approx: false, billed: true })).toBe("$0.0022✓");
     expect(costLabel({ usd: 0.0049, approx: false, own: false })).toBe("$0.0049*");
@@ -679,7 +679,7 @@ describe("BUG-497/a figure under a cent shows enough digits to be above zero", (
     expect(costLabel({ usd: 4.123, approx: true })).toBe("~$4.12");
   });
 
-  test("BUG-497/the chat line of a sub-cent billed figure and the running figure it replaces", () => {
+  test("openrouter/billed: the chat line of a sub-cent billed figure and the running figure it replaces #BUG-497", () => {
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "codex", conn: "openrouter", launchedKey: KIMI_KEY, ledger });
     t.openrouterSession();
@@ -691,7 +691,7 @@ describe("BUG-497/a figure under a cent shows enough digits to be above zero", (
 });
 
 describe("BUG-498/every counted request moves the last-request time, priced or not", () => {
-  test("BUG-498/requests Gluon couldn't price add nothing to our estimate, but the usage of the last one still lands late: not before landMs after it", async () => {
+  test("openrouter/billed: requests Gluon couldn't price add nothing to our estimate, but the usage of the last one still lands late: not before landMs after it #BUG-498", async () => {
     const t = new CostTracker({ harness: "codex", conn: "openrouter", launchedKey: "openrouter/unknown/model-x" });
     t.openrouterSession();
     t.codexResponse({ model: "unknown/model-x", input: 1000, cached: 0, cacheWrite: 0, output: 10 });
@@ -713,7 +713,7 @@ describe("BUG-498/every counted request moves the last-request time, priced or n
 });
 
 describe("BUG-499/the poll's sleep leaves no timer behind", () => {
-  test("BUG-499/abandon (a quit) clears the pending poll timer at once", async () => {
+  test("openrouter/quit-early: abandon (a quit) clears the pending poll timer at once #BUG-499", async () => {
     const live = new Set<unknown>();
     const { setTimeout: st, clearTimeout: ct } = globalThis;
     globalThis.setTimeout = ((fn: () => void, ms?: number) => {
@@ -744,7 +744,7 @@ describe("QA cost: what else spends on the key", () => {
   // (`brain.order`, and its default fallbacks in `config.ts`) sends OPENROUTER_API_KEY to openrouter.ai as the user chats while an OpenRouter session runs.
   // The owner's decision (2026-10-07): the brain is no part of any session, so its replies' exact `usage.cost` is taken off the delta (`BUG-631` below).
 
-  test("a key's usage that is not a plain non-negative number is no reading, whatever else the answer says", async () => {
+  test("openrouter/billed: a key's usage that is not a plain non-negative number is no reading, whatever else the answer says", async () => {
     const answers: unknown[] = [{ data: { usage: "5" } }, { data: { usage: null } }, { data: { usage: -1 } }, { data: { usage: [1] } }, { data: { usage: {} } }, { data: [] }, { data: null }, null, [], "usage", 5, { usage: 3 }, { data: { usage: 1e999 } }];
     for (const a of answers) {
       const f = async () => new Response(JSON.stringify(a), { status: 200 });
@@ -764,7 +764,7 @@ describe("QA cost: what else spends on the key", () => {
     }
   });
 
-  test("a registry file that is junk, oversized or of another shape is no window", () => {
+  test("openrouter/shared-key: a registry file that is junk, oversized or of another shape is no window", () => {
     const dir = fresh();
     const now = 10_000_000;
     const reg = new Registry(dir, { now: () => now, alive: () => false, restrict: false });
@@ -777,7 +777,7 @@ describe("QA cost: what else spends on the key", () => {
 
   // A crashed session's window ends at its file's last touch plus the lag tail. A last touch in the future (the clock was ahead, a VM was restored) makes the window
   // end in the future, and any session started after the clock is right again overlaps it: no billed figure on that key until that date.
-  test("BUG-632/QA-cost-05: a gone process's window never ends later than now plus the lag tail, whatever its file's time says", () => {
+  test("openrouter/shared-key: a gone process's window never ends later than now plus the lag tail, whatever its file's time says #BUG-632/QA-cost-05", () => {
     const dir = fresh();
     const now = 10_000_000;
     const reg = new Registry(dir, { now: () => now, alive: () => false, restrict: false });
@@ -847,7 +847,7 @@ const nextKey = () => `${KEY}-brain-${++keys}`;
 const micros = (usd: number) => Math.round(usd * 1e6);
 
 describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
-  test("BUG-631/QA-cost-04: a brain reply and a session on one key: the session's figure is its own, the brain's exact cost taken off (a `✓` of $0.30, not $0.32)", async () => {
+  test("openrouter/brain-on-key: a brain reply and a session on one key: the session's figure is its own, the brain's exact cost taken off (a `✓` of $0.30, not $0.32) #BUG-631/QA-cost-04", async () => {
     const key = nextKey();
     const or = fakeOpenRouter(20);
     const results: BilledResult[] = [];
@@ -877,7 +877,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(results).toEqual([r]);
   });
 
-  test("BUG-631/variants: the brain's probe spends on the key too, and is left out the same way", async () => {
+  test("openrouter/brain-on-key: the brain's probe spends on the key too, and is left out the same way #BUG-631/variants", async () => {
     const key = nextKey();
     const or = fakeOpenRouter(20);
     const m = await BilledMeter.begin({ key, source: brainTimings(), registry: new Registry(fresh()), fetch: or.fetch });
@@ -890,7 +890,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(r.status === "clean" && [micros(r.usd), micros(r.brainUsd ?? 0)]).toEqual([300_000, 10_000]);
   });
 
-  test("BUG-631/variants: a brain reply with no cost, or an error, or a stopped stream: the cost is unknown, so no `✓`, the estimate stays `~`, and the ledger and chat say why", async () => {
+  test("openrouter/brain-on-key: a brain reply with no cost, or an error, or a stopped stream: the cost is unknown, so no `✓`, the estimate stays `~`, and the ledger and chat say why #BUG-631/variants", async () => {
     for (const reply of ["no-usage", "401"] as const) {
       const key = nextKey();
       const or = fakeOpenRouter(20, { reply });
@@ -921,7 +921,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(await m.finish()).toEqual({ status: "brain" });
   });
 
-  test("BUG-631/variants: a brain reply that is not in the window (long before the baseline, or after the final reading) changes nothing, whatever it cost or whether its cost is known", async () => {
+  test("openrouter/brain-on-key: a brain reply that is not in the window (long before the baseline, or after the final reading) changes nothing, whatever it cost or whether its cost is known #BUG-631/variants", async () => {
     const key = nextKey();
     const brain = new BrainSpend();
     const tag = keyTag(key);
@@ -938,7 +938,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(r.status === "clean" && [micros(r.usd), r.brainUsd]).toEqual([300_000, undefined]);
   });
 
-  test("BUG-631/variants: a brain reply that ended a moment before the final reading may not have landed: the meter waits for it, then takes its exact cost off; one that never resolves gives no figure", async () => {
+  test("openrouter/brain-on-key: a brain reply that ended a moment before the final reading may not have landed: the meter waits for it, then takes its exact cost off; one that never resolves gives no figure #BUG-631/variants", async () => {
     const key = nextKey();
     const brain = new BrainSpend();
     const or = fakeOpenRouter(20);
@@ -969,7 +969,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(await m2.finish()).toEqual({ status: "brain" });
   });
 
-  test("BUG-631/variants: usage that moved only by the brain's reply is not the session's landing: the meter waits for the session's own", async () => {
+  test("openrouter/brain-on-key: usage that moved only by the brain's reply is not the session's landing: the meter waits for the session's own #BUG-631/variants", async () => {
     const key = nextKey();
     const brain = new BrainSpend();
     const or = fakeOpenRouter(20);
@@ -983,7 +983,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(r.status === "clean" && micros(r.usd)).toBe(300_000);
   });
 
-  test("BUG-631/variants: a brain reply that may have landed before the baseline (it ended within the lag window before it) leaves no figure; the brain's reply 30 s or less before it is taken off", () => {
+  test("openrouter/brain-on-key: a brain reply that may have landed before the baseline (it ended within the lag window before it) leaves no figure; the brain's reply 30 s or less before it is taken off #BUG-631/variants", () => {
     const lag = { minMs: 30_000, maxMs: 150_000 };
     const brain = new BrainSpend();
     const base = { from: 1_000_000, to: 1_000_200 };
@@ -1008,7 +1008,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(mid.share("other", base, final, lag)).toEqual({ usd: 0, unknown: false, pending: false });
   });
 
-  test("BUG-631/variants: more replies than the memory keeps: a window that reaches the forgotten ones is unknown, a later one is not", () => {
+  test("openrouter/brain-on-key: more replies than the memory keeps: a window that reaches the forgotten ones is unknown, a later one is not #BUG-631/variants", () => {
     const lag = { minMs: 30_000, maxMs: 150_000 };
     const brain = new BrainSpend();
     for (let i = 0; i < 2100; i++) brain.record("k", 1_000 + i, 0);
@@ -1016,7 +1016,7 @@ describe("BUG-631/Gluon's own brain on the session's OpenRouter key", () => {
     expect(brain.share("k", { from: 10_000_000, to: 10_000_100 }, { from: 10_900_000, to: 10_900_100 }, lag).unknown).toBe(false);
   });
 
-  test("BUG-631/variants: the live calibration leaves the brain's landed reply out of k, and skips a reading the brain's reply may be in", async () => {
+  test("openrouter/brain-on-key: the live calibration leaves the brain's landed reply out of k, and skips a reading the brain's reply may be in #BUG-631/variants", async () => {
     let now = 1_000_000;
     const lag = 60_000;
     const key = nextKey();
@@ -1048,7 +1048,7 @@ describe("BUG-631/variants: the brain's spend reaches no session's figure on any
   const BRAIN_FILES = ["src/brain.ts", ...readdirSync(join(import.meta.dir, "../src/agent")).filter((f) => f.endsWith(".ts")).map((f) => `src/agent/${f}`)];
   const SESSION_COST = ["cost/tracker", "cost/ledger", "cost/context", "telemetry", "otlp-protobuf", "kimi-usage", "stats", "analytics", "sessions", "workspaces", "events"];
 
-  test("the brain's code imports nothing that makes a session's figure, its audit ledger or the stats (only the key's tag and the brain's record)", () => {
+  test("openrouter/brain-on-key: the brain's code imports nothing that makes a session's figure, its audit ledger or the stats (only the key's tag and the brain's record) #BUG-631/variants", () => {
     for (const f of BRAIN_FILES) {
       // `MAX_SPEC` (a number, `choices.ts`) is the one thing taken from the workspaces module.
       const text = readFileSync(join(import.meta.dir, "..", f), "utf8").replace('import { MAX_SPEC } from "../workspaces.ts";', "");
@@ -1061,7 +1061,7 @@ describe("BUG-631/variants: the brain's spend reaches no session's figure on any
     expect([...brain.matchAll(/import \{([^}]*)\} from "\.\/(?:openrouter-billed|cost\/billed)\.ts"/g)].map((m) => m[1]!.trim())).toEqual(["keyTag, recordBrainReply"]);
   });
 
-  test("an Anthropic-key, OpenAI-key and OpenRouter brain call beside sessions of every connection: no tracker moves, no ledger entry, and only the OpenRouter key's replies are kept", async () => {
+  test("openrouter/brain-on-key: an Anthropic-key, OpenAI-key and OpenRouter brain call beside sessions of every connection: no tracker moves, no ledger entry, and only the OpenRouter key's replies are kept #BUG-631/variants", async () => {
     const conns = [["claude-code", "anthropic"], ["claude-code", "plan"], ["claude-code", "bedrock"], ["codex", "openai"], ["codex", "plan"], ["opencode", "openrouter"], ["kimi-code", "moonshot"], ["grok-build", "xai"]] as const;
     const sessions = conns.map(([harness, conn]) => {
       const ledger = new Ledger();
@@ -1109,7 +1109,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
   const processB = async (dir: string, key: string, or: ReturnType<typeof fakeOpenRouter>, over: Partial<Timings> = {}, alive: (pid: number) => boolean = () => true) =>
     BilledMeter.begin({ key, source: brainTimings(over), registry: new Registry(dir, { pid: 2002, alive }), fetch: or.fetch, brain: new BrainSpend() });
 
-  test("BUG-631/variants: process A's brain reply inside process B's session window is taken off B's figure, from A's file", async () => {
+  test("openrouter/brain-on-key: process A's brain reply inside process B's session window is taken off B's figure, from A's file #BUG-631/variants", async () => {
     const dir = fresh();
     const key = nextKey();
     const or = fakeOpenRouter(20);
@@ -1123,7 +1123,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
     expect(r.status === "clean" && [micros(r.usd), micros(r.brainUsd ?? 0)]).toEqual([300_000, 20_000]);
   });
 
-  test("BUG-631/variants: the file is private, holds the key's tag and never the key, and a reply of a dead process still counts (nothing removes its file)", async () => {
+  test("openrouter/brain-on-key: the file is private, holds the key's tag and never the key, and a reply of a dead process still counts (nothing removes its file) #BUG-631/variants", async () => {
     const dir = fresh();
     const key = nextKey();
     const or = fakeOpenRouter(20);
@@ -1147,7 +1147,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
     expect(readdirSync(dir).filter((f) => f.endsWith(".brain"))).toEqual(["1001.brain"]);
   });
 
-  test("BUG-631/variants: another process's file that can't be read (junk, torn, too big, another shape) makes the window unknown: no ✓", async () => {
+  test("openrouter/brain-on-key: another process's file that can't be read (junk, torn, too big, another shape) makes the window unknown: no ✓ #BUG-631/variants", async () => {
     for (const [name, text] of [["junk", "{not json"], ["torn", '{"v":1,"pid":1001,"boot":"ab","lost":0,"calls":[{"n":1,"key":"k","en'], ["big", "x".repeat(70_000)], ["shape", JSON.stringify({ v: 1, pid: 1001, boot: "ab", lost: 0, calls: [{ n: 1, key: 5, end: "now", usd: "free" }] })]] as const) {
       const dir = fresh();
       mkdirSync(dir, { recursive: true });
@@ -1161,7 +1161,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
     }
   });
 
-  test("BUG-631/variants: an unreadable file of a day ago, or a file of a process dead for a day, is removed and says nothing; another file's replies are counted once however often it is read", () => {
+  test("openrouter/brain-on-key: an unreadable file of a day ago, or a file of a process dead for a day, is removed and says nothing; another file's replies are counted once however often it is read #BUG-631/variants", () => {
     const dir = fresh();
     mkdirSync(dir, { recursive: true });
     const old = new Date(Date.now() - 2 * 86_400_000);
@@ -1189,7 +1189,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
     expect(live.foreignBrain().share("k2", win[0], win[1], lag).usd).toBe(0.5);
   });
 
-  test("BUG-631/variants: the file is bounded: replies older than the tail plus a margin and those past the cap leave it, and the newest one dropped is kept as `lost` so a window that reaches back is unknown", () => {
+  test("openrouter/brain-on-key: the file is bounded: replies older than the tail plus a margin and those past the cap leave it, and the newest one dropped is kept as `lost` so a window that reaches back is unknown #BUG-631/variants", () => {
     const dir = fresh();
     let now = 1_000_000;
     const a = new BrainLog(dir, { pid: 1001, tailMs: 150_000, now: () => now, restrict: false });
@@ -1210,7 +1210,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
     expect(reg.foreignBrain().share("k", { from: now + 1_000, to: now + 1_001 }, { from: now + 1_000_000, to: now + 1_000_001 }, lag).unknown).toBe(false);
   });
 
-  test("BUG-631/variants: the brain's own reply goes to this process's list and to its file, and this process does not read its own file back (no double count)", async () => {
+  test("openrouter/brain-on-key: the brain's own reply goes to this process's list and to its file, and this process does not read its own file back (no double count) #BUG-631/variants", async () => {
     const dir = fresh();
     const key = nextKey();
     const or = fakeOpenRouter(20);
@@ -1228,7 +1228,7 @@ describe("BUG-631/variants: the brain of another Gluon process on the same key",
 });
 
 describe("BUG-631/variants: an attempt the SDK retried may have been charged", () => {
-  test("BUG-631/variants: a reply that took a retry has no known cost (the failed attempt was charged, only the last one's cost is in the answer): no ✓; without a retry it is known", async () => {
+  test("openrouter/brain-on-key: a reply that took a retry has no known cost (the failed attempt was charged, only the last one's cost is in the answer): no ✓; without a retry it is known #BUG-631/variants", async () => {
     const key = nextKey();
     const or = fakeOpenRouter(20, { failFirst: true });
     const m = await BilledMeter.begin({ key, source: brainTimings(), registry: new Registry(fresh()), fetch: or.fetch });
@@ -1256,7 +1256,7 @@ describe("BUG-631/variants: reading the other brains' files never throws, whatev
   const win = [{ from: Date.now() - 10_000, to: Date.now() - 9_999 }, { from: Date.now() + 1000, to: Date.now() + 1001 }] as const;
   const aDayAgo = () => new Date(Date.now() - 2 * 86_400_000);
 
-  test("BUG-631/variants: a directory named like a brain file, a day old or new, is no file: no throw, no removal, and its window is unknown while it is new", () => {
+  test("openrouter/brain-on-key: a directory named like a brain file, a day old or new, is no file: no throw, no removal, and its window is unknown while it is new #BUG-631/variants", () => {
     const dir = fresh();
     mkdirSync(join(dir, "4242.brain"), { recursive: true });
     const reg = new Registry(dir, { pid: 2002, alive: () => false });
@@ -1268,7 +1268,7 @@ describe("BUG-631/variants: reading the other brains' files never throws, whatev
     expect(statSync(join(dir, "4242.brain")).isDirectory()).toBe(true);
   });
 
-  test.skipIf(process.platform === "win32")("BUG-631/variants: a FIFO named like a brain file is not read (it would block): unreadable, so unknown", () => {
+  test.skipIf(process.platform === "win32")("openrouter/brain-on-key: a FIFO named like a brain file is not read (it would block): unreadable, so unknown #BUG-631/variants", () => {
     const dir = fresh();
     mkdirSync(dir, { recursive: true });
     expect(Bun.spawnSync(["mkfifo", join(dir, "4242.brain")]).exitCode).toBe(0);
@@ -1276,7 +1276,7 @@ describe("BUG-631/variants: reading the other brains' files never throws, whatev
     expect(reg.foreignBrain().share("k", win[0], win[1], lag).unknown).toBe(true);
   });
 
-  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("BUG-631/variants: a read-only registry directory with an old dead process's file and an old junk one: no throw, the files stay, the old file's replies were still taken", () => {
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("openrouter/brain-on-key: a read-only registry directory with an old dead process's file and an old junk one: no throw, the files stay, the old file's replies were still taken #BUG-631/variants", () => {
     const dir = fresh();
     mkdirSync(dir, { recursive: true });
     const a = new BrainLog(dir, { pid: 4242, tailMs: 150_000, restrict: false });
@@ -1296,7 +1296,7 @@ describe("BUG-631/variants: reading the other brains' files never throws, whatev
     }
   });
 
-  test("BUG-631/variants: only `<pid>.brain` is ours: a stray `notes.brain`, old or new, is neither read nor removed", () => {
+  test("openrouter/brain-on-key: only `<pid>.brain` is ours: a stray `notes.brain`, old or new, is neither read nor removed #BUG-631/variants", () => {
     const dir = fresh();
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "notes.brain"), "my notes");

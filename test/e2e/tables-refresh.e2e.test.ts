@@ -40,7 +40,7 @@ async function sandbox(sources: Sources = moved(), opts: { hold?: boolean; gate?
   return { dir, state, server, seam, stored, env: { XDG_STATE_HOME: state, GLUON_TEST_PRICING: seam }, done: () => (server.stop(), rmSync(dir, { recursive: true, force: true })) };
 }
 
-test("BUG-509/e2e: `gluon pricing update` with no seam reaches no network in a test; with it, it writes the tables from the server, prints what moved, and offline it keeps them", async () => {
+test("pricing/command: `gluon pricing update` with no seam reaches no network in a test; with it, it writes the tables from the server, prints what moved, and offline it keeps them #BUG-509/e2e", async () => {
   const s = await sandbox();
   try {
     const none = await cli(["pricing", "update"], { env: { XDG_STATE_HOME: s.state } });
@@ -79,7 +79,7 @@ test("BUG-509/e2e: `gluon pricing update` with no seam reaches no network in a t
   }
 });
 
-test.skipIf(WIN)("BUG-510/e2e: Gluon at start refreshes the prices in the background: the stored table and the registry's price move, and the ledger names the moved price @full", async () => {
+test.skipIf(WIN)("pricing/when: Gluon at start refreshes the prices in the background: the stored table and the registry's price move, and the ledger names the moved price @full #BUG-510/e2e", async () => {
   const s = await sandbox();
   const app = await gluon(100, 30, s.env);
   try {
@@ -101,7 +101,7 @@ test.skipIf(WIN)("BUG-510/e2e: Gluon at start refreshes the prices in the backgr
   }
 });
 
-test.skipIf(WIN)("BUG-511/e2e: a source that never answers delays neither the home view nor a launch, and nothing it holds is written @full", async () => {
+test.skipIf(WIN)("pricing/when: a source that never answers delays neither the home view nor a launch, and nothing it holds is written @full #BUG-511/e2e", async () => {
   const s = await sandbox(moved(), { hold: true });
   try {
     const app = await gluon(100, 30, s.env);
@@ -117,7 +117,7 @@ test.skipIf(WIN)("BUG-511/e2e: a source that never answers delays neither the ho
 /** The digest a stored table carries (a ledger's usage entries name its first 8 characters). */
 const digestOf = (state: string, file: string): string => JSON.parse(readFileSync(join(state, "gluon", "tables", file), "utf8")).catalogDigest;
 
-test.skipIf(WIN)("BUG-512/e2e: a first run (no models.dev table yet) launches anyway; a model only models.dev prices shows no cost until the refresh lands, then the cost appears, and the ledger names models.dev's table @full", async () => {
+test.skipIf(WIN)("pricing/pending: a first run (no models.dev table yet) launches anyway; a model only models.dev prices shows no cost until the refresh lands, then the cost appears, and the ledger names models.dev's table @full", async () => {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   // Claude Code's table is the installed `claude`'s own catalog, built at the launch with no network: a model it lists is priced from it alone (BUG-704/e2e).
@@ -148,7 +148,7 @@ test.skipIf(WIN)("BUG-512/e2e: a first run (no models.dev table yet) launches an
   }
 });
 
-test.skipIf(WIN)("BUG-704/e2e: a first run's Claude catalog (built from the installed `claude` at the launch) that landed before the first request prices it at once, models.dev's refresh still held; the ledger names the catalog @full", async () => {
+test.skipIf(WIN)("pricing/pending: a first run's Claude catalog (built from the installed `claude` at the launch) that landed before the first request prices it at once, models.dev's refresh still held; the ledger names the catalog @full", async () => {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   const s = await sandbox(fixtureSources(), { gate });

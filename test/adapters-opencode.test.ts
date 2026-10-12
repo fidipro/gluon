@@ -403,7 +403,7 @@ describe("OpenCode plugin, run against a fake OpenCode", () => {
     expect(states(got)).toEqual(["working", "working", "done", "working", "working", "done", "awaiting", "working"]);
   });
 
-  test("BUG-188/opencode-2: an unknown window sends the tokens and the model (Gluon works the window out); a numeric cache counts", async () => {
+  test("cost/sources: an unknown window sends the tokens and the model (Gluon works the window out); a numeric cache counts #BUG-188/opencode-2", async () => {
     const got = await statuses(
       [
         { type: "session.step.started", data: { sessionID: "ses_1", model: { providerID: "anthropic", id: "claude-sonnet-5" } } },

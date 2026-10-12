@@ -20,7 +20,7 @@ async function waitUntil(ok: () => boolean, ms = 10_000 * SLOW) {
 }
 
 describe("Gluon's own context %: gaps found by mutation", () => {
-  test("ADV-PKG0/peak-in-the-first-big-request: a first prompt past 200k on a 200k model proves 1M at once (25%, not 100%), and the proof outlives a compaction @full", async () => {
+  test("context/window: a first prompt past 200k on a 200k model proves 1M at once (25%, not 100%), and the proof outlives a compaction @full #ADV-PKG0/peak-in-the-first-big-request", async () => {
     const app = await gluon();
     await launch(app, "peak task");
     const info = () => app.lines()[1]!;
@@ -36,7 +36,7 @@ describe("Gluon's own context %: gaps found by mutation", () => {
     expect(info()).not.toContain("50% context");
   });
 
-  test("ADV-PKG0/compaction-hook-clears-the-row: a status with `compacting` (Codex's PreCompact hook) empties the context % until the next request @full", async () => {
+  test("context/after-compact: a status with `compacting` (Codex's PreCompact hook) empties the context % until the next request @full #ADV-PKG0/compaction-hook-clears-the-row", async () => {
     const app = await gluon();
     await launch(app, "hook task");
     await say(app, "!otel 1.23 380000", "OTEL 200,200");
@@ -47,7 +47,7 @@ describe("Gluon's own context %: gaps found by mutation", () => {
     await app.waitFor((s) => s.split("\n")[1]!.includes("10% context"));
   });
 
-  test("ADV-PKG0/audit-of-a-stale-or-windowless-report: a report with tokens and no window is audited against our own figure; after a compaction there is no figure of ours to audit against; hostile figures are survived @full", async () => {
+  test("ledger/audit: a report with tokens and no window is audited against our own figure; after a compaction there is no figure of ours to audit against; hostile figures are survived @full #ADV-PKG0/audit-of-a-stale-or-windowless-report", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-ledger-"));
     try {
       const app = await gluon(100, 30, { XDG_STATE_HOME: state });
@@ -86,10 +86,10 @@ describe("Gluon's own context %: gaps found by mutation", () => {
   });
 });
 
-describe("BUG-366/peak-is-per-model", () => {
+describe("the 1M peak is per model", () => {
   // `peak` was the session's largest prompt: after a /model switch from a 1M-window model that had a 250k prompt to Haiku 4.5 (200k),
   // Haiku's 100k prompt read 10% of a window it does not have (50% is right). It is kept per model now.
-  test("BUG-366/peak-survives-a-model-switch: the 1M window proved by one model's big prompt is not applied to another model's 200k window @full", async () => {
+  test("context/window: the 1M window proved by one model's big prompt is not applied to another model's 200k window @full", async () => {
     const app = await gluon();
     await launch(app, "switch task");
     await say(app, "!otel 1 250000 claude-opus-4-6", "OTEL 200,200");

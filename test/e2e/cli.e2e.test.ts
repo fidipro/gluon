@@ -83,8 +83,15 @@ describe("arguments (BUG-21/22)", () => {
     expect((await cli(["--help"])).stdout).toContain("gluon routing default");
   });
 
-  test("issue 39/pricing: `pricing update` is in --help, has its own help, takes no other words, and needs no config", async () => {
-    expect((await cli(["--help"])).stdout).toContain("gluon pricing update");
+  test("pricing/command: `pricing update` is in --help, naming only the price sources it uses, has its own help, takes no other words, and needs no config #issue-39 #BUG-603/QA-cli-01", async () => {
+    const usage = (await cli(["--help"])).stdout;
+    expect(usage).toContain("gluon pricing update");
+    // #96: models.dev and OpenRouter over the network (src/cost/refresh.ts); nothing of Claude's public catalog (BUG-523).
+    const at = usage.indexOf("gluon pricing update");
+    const entry = usage.slice(at, usage.indexOf("\n  gluon ", at + 1)).replace(/\s+/g, " ");
+    expect(entry).toContain("models.dev");
+    expect(entry).toContain("OpenRouter");
+    expect(entry.toLowerCase()).not.toContain("public catalog");
     const help = await cli(["pricing", "update", "--help"]);
     expect([help.code, help.stdout]).toEqual([0, expect.stringContaining("only network use")]);
     expect(help.stdout).toContain("'gluon uninstall' removes them");

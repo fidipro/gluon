@@ -56,18 +56,22 @@ const OPUS = { model: "claude-opus-4-6", input: 1000, output: 600, cacheRead: 0,
 const STORED = FIXTURE_CLAUDE_CATALOG.claudeCodeVersion;
 
 describe("BUG-523/no-claude-source: Claude's table comes only from the installed binary; nothing is asked of downloads.claude.ai", () => {
-  test("no source, URL, seam key or fixture for a published Claude catalog is left in the code", () => {
+  test("pricing/sources: no source, URL, seam key or fixture for a published Claude catalog is left in the code #BUG-523/no-claude-source", () => {
     for (const f of ["src/cost/refresh.ts", "src/cost/pricing-update.ts", "src/cost/claude-catalog.ts", "src/cost/tables.ts", "src/cost/table-schema.ts"]) {
       const text = readFileSync(join(ROOT, f), "utf8");
       expect([f, /downloads\.claude\.ai|model-catalog\/v1|CLAUDE_CATALOG_URL|claude model catalog/.test(text)]).toEqual([f, false]);
     }
+    // The hosts the refresh does fetch from are named in it (and so in `gluon pricing update --help`, cli.e2e): models.dev and OpenRouter.
+    const refresh = readFileSync(join(ROOT, "src/cost/refresh.ts"), "utf8");
+    expect(refresh).toContain('"https://models.dev/');
+    expect(refresh).toContain('"https://openrouter.ai/');
     for (const f of ["SECURITY.md", "docs/concepts/architecture.md", "CHANGELOG.md"]) {
       // CHANGELOG may say why it went; the others name only what is contacted.
       if (f !== "CHANGELOG.md") expect([f, readFileSync(join(ROOT, f), "utf8").includes("downloads.claude.ai")]).toEqual([f, false]);
     }
   });
 
-  test("a network refresh asks models.dev and OpenRouter and writes no Claude table; with none stored it leaves none", async () => {
+  test("pricing/sources: a network refresh asks models.dev and OpenRouter and writes no Claude table; with none stored it leaves none #BUG-523/no-claude-source", async () => {
     const root = scratch();
     const dir = join(root, "tables");
     let tables: Tables = {};
@@ -103,7 +107,7 @@ describe("BUG-524/claude-upgrade: the first session after a Claude Code upgrade 
     return ref.ownUsdNow();
   };
 
-  test("the build of the installed version is running: the request waits, and is priced by the new table when it lands (never the old one)", () => {
+  test("pricing/pending: the build of the installed version is running: the request waits, and is priced by the new table when it lands (never the old one) #BUG-524/claude-upgrade", () => {
     const next = upgraded("2.2.0");
     expect(priced(next)).toBeGreaterThan(priced(FIXTURE_CLAUDE_CATALOG));
     setTableBuild("claudeCatalog", "building");
@@ -122,7 +126,7 @@ describe("BUG-524/claude-upgrade: the first session after a Claude Code upgrade 
     t.ended();
   });
 
-  test("the build fails: the request is priced by the stored table (what the session would have had), nothing is dropped", () => {
+  test("pricing/pending: the build fails: the request is priced by the stored table (what the session would have had), nothing is dropped #BUG-524/claude-upgrade", () => {
     setTableBuild("claudeCatalog", "building");
     const { t, ledger } = tracker("2.2.0 (Claude Code)");
     t.claudeRequest(OPUS);
@@ -136,7 +140,7 @@ describe("BUG-524/claude-upgrade: the first session after a Claude Code upgrade 
     t.ended();
   });
 
-  test("no build under way (same version, or none running): priced at once from the stored table; a session that ends while waiting leaves a marker", () => {
+  test("pricing/pending: no build under way (same version, or none running): priced at once from the stored table; a session that ends while waiting leaves a marker #BUG-524/claude-upgrade", () => {
     for (const version of [STORED, "2.2.0", undefined]) {
       const { t } = tracker(version);
       t.claudeRequest(OPUS);
@@ -153,7 +157,7 @@ describe("BUG-524/claude-upgrade: the first session after a Claude Code upgrade 
     expect(droppedOf(ledger)).toEqual([expect.objectContaining({ reason: "no-price-table", count: 1 })]);
   });
 
-  test("refreshBinaryTables says a build is running before its first await, and done or failed after", async () => {
+  test("pricing/pending: refreshBinaryTables says a build is running before its first await, and done or failed after #BUG-524/claude-upgrade", async () => {
     const root = scratch();
     const dir = join(root, "tables");
     seedTables(dir);
@@ -180,7 +184,7 @@ describe("BUG-524/claude-upgrade: the first session after a Claude Code upgrade 
 });
 
 describe("BUG-525/pricing-update-offline: nothing reachable is said and exits 1; never 'every table is current'", () => {
-  test("every source unreachable: stderr names what, the stored tables are kept, exit 1", async () => {
+  test("pricing/command: every source unreachable: stderr names what, the stored tables are kept, exit 1 #BUG-525/pricing-update-offline", async () => {
     const root = scratch();
     const dir = join(root, "tables");
     seedTables(dir);
@@ -194,7 +198,7 @@ describe("BUG-525/pricing-update-offline: nothing reachable is said and exits 1;
     expect(readdirSync(dir).map((f) => readFileSync(join(dir, f), "utf8"))).toEqual(before);
   });
 
-  test("a table written from an installed binary while the network is down is a run that did something: exit 0, the unreachable source still said", async () => {
+  test("pricing/command: a table written from an installed binary while the network is down is a run that did something: exit 0, the unreachable source still said #BUG-525/pricing-update-offline", async () => {
     const root = scratch();
     const dir = join(root, "tables");
     seedTables(dir);
@@ -227,7 +231,7 @@ describe("BUG-526/release-node-env: a user's NODE_ENV=test does not switch a rel
   };
 
   for (const flavor of ["release", "npm"]) {
-    test(`${flavor} build: refresh sources and the billed reading are the real ones under NODE_ENV=test; the seam is not read`, async () => {
+    test(`pricing/offline-under-test: ${flavor} build: refresh sources and the billed reading are the real ones under NODE_ENV=test; the seam is not read #BUG-526/release-node-env`, async () => {
       const wrapper = (entry: string, name: string) => {
         const dir = scratch();
         const file = join(dir, `${name}.ts`);
@@ -250,7 +254,7 @@ describe("BUG-526/release-node-env: a user's NODE_ENV=test does not switch a rel
     });
   }
 
-  test("from source (`bun test`, a test build) NODE_ENV=test still means no network", async () => {
+  test("pricing/offline-under-test: from source (`bun test`, a test build) NODE_ENV=test still means no network #BUG-526/release-node-env", async () => {
     const { pricingSource } = await import("../src/cost/refresh.ts");
     const { billedSource } = await import("../src/openrouter-billed.ts");
     expect([pricingSource({ NODE_ENV: "test" }), billedSource({ NODE_ENV: "test" })]).toEqual([null, null]);
@@ -258,7 +262,7 @@ describe("BUG-526/release-node-env: a user's NODE_ENV=test does not switch a rel
 });
 
 describe("BUG-527/gzip-bomb: the size cap counts the bytes on the wire", () => {
-  test("a compressed answer is refused unread (identity asked for, a content-encoding is no answer), and memory does not grow by what it would have inflated to", async () => {
+  test("pricing/fetch: a compressed answer is refused unread (identity asked for, a content-encoding is no answer), and memory does not grow by what it would have inflated to #BUG-527/gzip-bomb", async () => {
     const asked: { encoding: string | null } = { encoding: null };
     const bomb = gzipSync(Buffer.alloc(200_000_000, 97));
     const server = Bun.serve({
@@ -280,7 +284,7 @@ describe("BUG-527/gzip-bomb: the size cap counts the bytes on the wire", () => {
     }
   });
 
-  test("a plain answer within its cap still arrives, and one over it by wire bytes is null", async () => {
+  test("pricing/fetch: a plain answer within its cap still arrives, and one over it by wire bytes is null #BUG-527/gzip-bomb", async () => {
     const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: (req) => new Response(new URL(req.url).pathname === "/big" ? "x".repeat(2000) : '{"ok":true}', { headers: { "content-type": "application/json" } }) });
     try {
       expect(await defaultFetch(`http://127.0.0.1:${server.port}/`, { timeoutMs: 5000, maxBytes: 1000 })).toBe('{"ok":true}');
@@ -294,7 +298,7 @@ describe("BUG-527/gzip-bomb: the size cap counts the bytes on the wire", () => {
 describe("BUG-528/store-dir: the tables directory is held like the ledger's", () => {
   const table = () => ({ ...clone(FIXTURE_TABLES["codex-windows"]), fetchedAt: "2026-10-06T12:00:00.000Z" });
 
-  test.skipIf(!posix)("an existing loose directory is tightened to 0700 on a write", () => {
+  test.skipIf(!posix)("pricing/store: an existing loose directory is tightened to 0700 on a write #BUG-528/store-dir", () => {
     const dir = join(scratch(), "tables");
     mkdirSync(dir, { mode: 0o777 });
     chmodSync(dir, 0o777);
@@ -303,7 +307,7 @@ describe("BUG-528/store-dir: the tables directory is held like the ledger's", ()
     expect(readStoredTable("codex-windows", dir)).toBeDefined();
   });
 
-  test.skipIf(!posix)("a symlinked directory is refused: nothing is written through it and nothing is read from it", () => {
+  test.skipIf(!posix)("pricing/store: a symlinked directory is refused: nothing is written through it and nothing is read from it #BUG-528/store-dir", () => {
     const root = scratch();
     const real = join(root, "elsewhere");
     mkdirSync(real);
@@ -316,14 +320,14 @@ describe("BUG-528/store-dir: the tables directory is held like the ledger's", ()
     expect(readStoredTable("codex-windows", link)).toBeUndefined();
   });
 
-  test.skipIf(!posix)("a path that is a file is refused", () => {
+  test.skipIf(!posix)("pricing/store: a path that is a file is refused #BUG-528/store-dir", () => {
     const root = scratch();
     const file = join(root, "tables");
     writeFileSync(file, "x");
     expect(() => writeStoredTable("codex-windows", table(), file, false)).toThrow();
   });
 
-  test("a killed write's temp directory is removed on the next write once it is an hour old; a fresh one (a write in progress) and other files stay", () => {
+  test("pricing/store: a killed write's temp directory is removed on the next write once it is an hour old; a fresh one (a write in progress) and other files stay #BUG-528/store-dir", () => {
     const dir = join(scratch(), "tables");
     writeStoredTable("codex-windows", table(), dir, false);
     const old = join(dir, ".gluon-old1");
@@ -341,7 +345,7 @@ describe("BUG-528/store-dir: the tables directory is held like the ledger's", ()
 });
 
 describe("BUG-529/replay-throw: one request that can't be priced does not lose the rest", () => {
-  test("a throw while pricing a waiting request is a `price-error` marker, the others are priced in order", () => {
+  test("pricing/pending: a throw while pricing a waiting request is a `price-error` marker, the others are priced in order #BUG-529/replay-throw", () => {
     emptyRegistry();
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "codex", conn: "plan", ledger });
@@ -365,7 +369,7 @@ describe("BUG-530/grok-seed: Grok requests don't wait forever for a table that c
   const GROK = { model: "grok-4.7", input: 20_000, output: 500, reasoning: 200, cacheRead: 15_000, cacheWrite: 0 };
   const grokOnly = () => setTables({ modelsdev: FIXTURE_MODELS_DEV, grokModels: undefined });
 
-  test("the binary's table can't be built: waiting requests are priced from models.dev's xai price, marked `grok-seed-price`; later ones at once", () => {
+  test("pricing/pending: the binary's table can't be built: waiting requests are priced from models.dev's xai price, marked `grok-seed-price`; later ones at once #BUG-530/grok-seed", () => {
     grokOnly();
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "grok-build", conn: "plan", ledger });
@@ -388,7 +392,7 @@ describe("BUG-530/grok-seed: Grok requests don't wait forever for a table that c
     expect(droppedOf(ledger)).toEqual([]);
   });
 
-  test("a request no models.dev price covers is `unknown-model` once the table can't come, never pending; without models.dev it still waits", () => {
+  test("pricing/pending: a request no models.dev price covers is `unknown-model` once the table can't come, never pending; without models.dev it still waits #BUG-530/grok-seed", () => {
     grokOnly();
     setTableBuild("grokModels", "failed");
     const ledger = new Ledger();
@@ -403,7 +407,7 @@ describe("BUG-530/grok-seed: Grok requests don't wait forever for a table that c
     waiting.ended();
   });
 
-  test("the build says failed for every way it can't be built: no version, no binary, a bad layout, a failed earlier try", async () => {
+  test("pricing/pending: the build says failed for every way it can't be built: no version, no binary, a bad layout, a failed earlier try #BUG-530/grok-seed", async () => {
     const root = scratch();
     const dir = join(root, "tables");
     seedTables(dir);
@@ -425,7 +429,7 @@ describe("BUG-530/grok-seed: Grok requests don't wait forever for a table that c
     expect(tableBuildFailed("grokModels")).toBe(true);
   });
 
-  test("`grok usage` waits for the requests that wait for their table: it is not dropped while they do, and is audited once they are priced", () => {
+  test("pricing/pending: `grok usage` waits for the requests that wait for their table: it is not dropped while they do, and is audited once they are priced #BUG-530/grok-seed", () => {
     grokOnly();
     let now = 1_000;
     const ledger = new Ledger();
@@ -443,7 +447,7 @@ describe("BUG-530/grok-seed: Grok requests don't wait forever for a table that c
     t.ended();
   });
 
-  test("the session that ends while its requests still wait drops the report with them, never silence", () => {
+  test("pricing/pending: the session that ends while its requests still wait drops the report with them, never silence #BUG-530/grok-seed", () => {
     grokOnly();
     const ledger = new Ledger();
     const t = new CostTracker({ harness: "grok-build", conn: "plan", ledger });
@@ -455,12 +459,12 @@ describe("BUG-530/grok-seed: Grok requests don't wait forever for a table that c
 });
 
 describe("BUG-531/demo-no-refresh: the demo makes no network call, so it refreshes nothing", () => {
-  test("`refreshAllowed`: not in the demo unless a test names a local server of its own; always outside it", () => {
+  test("pricing/when: `refreshAllowed`: not in the demo unless a test names a local server of its own; always outside it #BUG-531/demo-no-refresh", () => {
     expect([refreshAllowed(false, {}), refreshAllowed(true, {})]).toEqual([true, false]);
     expect(refreshAllowed(true, { GLUON_TEST_PRICING: "/tmp/seam.json" })).toBe(true);
   });
 
-  test("a release build's demo never refreshes, seam or not; and both refresh calls in `runGluon` are behind it", async () => {
+  test("pricing/when: a release build's demo never refreshes, seam or not; and both refresh calls in `runGluon` are behind it #BUG-531/demo-no-refresh", async () => {
     const dir = scratch();
     const entry = join(dir, "entry.ts");
     writeFileSync(entry, `export { refreshAllowed } from ${JSON.stringify(join(ROOT, "src/cost/refresh.ts"))};\n`);
@@ -498,7 +502,7 @@ describe("BUG-532/refresh-order: a network refresh and an OpenRouter row refresh
     return p === "/api.json" ? sources.modelsDev() : p === "/api/v1/models" ? listing() : sources.endpoints(p.slice("/api/v1/models/".length, -"/endpoints".length));
   };
 
-  test("a row refresh asked while a network one runs waits for it and lands after it: the newer row wins", async () => {
+  test("pricing/when: a row refresh asked while a network one runs waits for it and lands after it: the newer row wins #BUG-532/refresh-order", async () => {
     const w = world();
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -517,7 +521,7 @@ describe("BUG-532/refresh-order: a network refresh and an OpenRouter row refresh
     expect(w.price()).toBe(4);
   });
 
-  test("a network refresh asked while a row refresh runs waits for it; the row it overwrites is newer data's, never older", async () => {
+  test("pricing/when: a network refresh asked while a row refresh runs waits for it; the row it overwrites is newer data's, never older #BUG-532/refresh-order", async () => {
     const w = world();
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -539,7 +543,7 @@ describe("BUG-533/grok-chunked-scan: Grok's embedded catalog is found without re
   const catalog = JSON.stringify({ default: "grok-4.6", models: [{ id: "grok-chunky", context_window: 321_000, auto_compact_threshold_percent: 80 }, { id: "grok-other", context_window: 1_000_000 }] });
   const decoys = '{"models":[1]} "models": [ {"id":"x"} ] ';
 
-  test("found wherever it sits, including across a chunk boundary, with the same result as the whole bytes", () => {
+  test("pricing/sources: found wherever it sits, including across a chunk boundary, with the same result as the whole bytes #BUG-533/grok-chunked-scan", () => {
     const dir = scratch();
     for (const at of [0, 1_000, 99_990, 100_000 - 5, 199_000, 330_000]) {
       const bytes = Buffer.concat([Buffer.alloc(at, 0x61), Buffer.from(decoys), Buffer.from(catalog), Buffer.alloc(400_000 - at, 0x62), Buffer.from(decoys)]);
@@ -553,7 +557,7 @@ describe("BUG-533/grok-chunked-scan: Grok's embedded catalog is found without re
     }
   });
 
-  test("a file with none is null; a small file (smaller than a chunk) works", () => {
+  test("pricing/sources: a file with none is null; a small file (smaller than a chunk) works #BUG-533/grok-chunked-scan", () => {
     const dir = scratch();
     writeFileSync(join(dir, "none"), Buffer.alloc(500_000, 0x61));
     expect(defaultModelsInFile(join(dir, "none"), { chunk: 100_000, overlap: 20_000 })).toBeNull();
@@ -563,7 +567,7 @@ describe("BUG-533/grok-chunked-scan: Grok's embedded catalog is found without re
     expect(defaultModelsInFile(join(dir, "empty"))).toBeNull();
   });
 
-  test("the refresh reads Grok's binary through the scan unless a test injects bytes: a real file gives the table", async () => {
+  test("pricing/sources: the refresh reads Grok's binary through the scan unless a test injects bytes: a real file gives the table #BUG-533/grok-chunked-scan", async () => {
     const dir = scratch();
     const bin = join(dir, "grok");
     writeFileSync(bin, Buffer.concat([Buffer.alloc(50_000, 0x61), Buffer.from(catalog), Buffer.alloc(50_000, 0x62)]));

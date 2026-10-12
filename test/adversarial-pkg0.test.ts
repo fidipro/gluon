@@ -18,7 +18,7 @@ const usageOf = (l: Ledger) => l.entries.filter((e): e is Extract<LedgerEntry, {
 const contextsOf = (l: Ledger) => l.entries.filter((e): e is ContextEntry => e.kind === "context");
 
 describe("tracker: gaps found by mutation", () => {
-  test("digest: a Claude fast request is tagged with the table that priced it: the catalog's own fast rows for a catalog model, models.dev's fast row for one outside it (mutation: digest follows `tier` alone)", () => {
+  test("cost/claude-code: digest: a Claude fast request is tagged with the table that priced it: the catalog's own fast rows for a catalog model, models.dev's fast row for one outside it (mutation: digest follows `tier` alone)", () => {
     // Package A: Claude Code's price function gives a catalog model its fast row (`fastPricing`); models.dev's fast mode is only for a model the catalog does not list.
     const outside = "claude-adv-outside-9";
     const table: ModelsDevTable = { ...FROZEN_TABLE, catalogDigest: "e".repeat(64), entries: { ...FROZEN_TABLE.entries, [`anthropic/${outside}`]: { cost: { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 }, context: 1_000_000, modes: { fast: { speed: "fast", cost: { input: 30, output: 150, cache_read: 3, cache_write: 37.5 } } } } } };
@@ -36,7 +36,7 @@ describe("tracker: gaps found by mutation", () => {
     expect([outNormal!.table, outFast!.table]).toEqual(["e".repeat(8), "e".repeat(8)]);
   });
 
-  test("launched-model-price is tagged on Codex and Grok too, not only OpenCode (mutation: tag dropped from codexResponse / grokRequest)", () => {
+  test("cost/unpriced-model: launched-model-price is tagged on Codex and Grok too, not only OpenCode (mutation: tag dropped from codexResponse / grokRequest)", () => {
     const grokTable: ModelsDevTable = frozenTableWith({ "xai/adv-launched": { cost: { input: 2, output: 6, cache_read: 0.5 }, context: 500_000 } });
     const lg = new Ledger();
     const g = frozenTracker({ harness: "grok-build", conn: "xai", launchedKey: "xai/adv-launched", ledger: lg, table: grokTable, now: () => 1 });
@@ -53,7 +53,7 @@ describe("tracker: gaps found by mutation", () => {
     expect(usageOf(lc)[0]!.ownMicros).toBe(usageOf(lc)[1]!.ownMicros);
   });
 
-  test("figure: one priced and one unpriced request never show the partial own sum as ours: the harness's total stands in, marked (mutation: `unpriced === 0` dropped)", () => {
+  test("cost/markers: figure: one priced and one unpriced request never show the partial own sum as ours: the harness's total stands in, marked (mutation: `unpriced === 0` dropped)", () => {
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger: new Ledger(), now: () => 1 });
     t.claudeRequest({ model: "claude-haiku-4-5", input: 1_000_000, output: 0, cacheRead: 0, cacheWrite: 0 });
     t.claudeRequest({ model: "claude-made-up-9", input: 1_000_000, output: 0, cacheRead: 0, cacheWrite: 0 });
@@ -64,7 +64,7 @@ describe("tracker: gaps found by mutation", () => {
     expect(costLabel(t.figure())).toBe("$2.50*");
   });
 
-  test("observeContext: a harness's tokens past its window are a reading of 100%, not 250% (mutation: clamp dropped)", () => {
+  test("context/percentage: observeContext: a harness's tokens past its window are a reading of 100%, not 250% (mutation: clamp dropped)", () => {
     const l = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger: l, now: () => 1 });
     t.observeContext({ own: { tokens: 100_000, window: 200_000 }, reported: { tokens: 500_000, window: 200_000 } });
@@ -73,7 +73,7 @@ describe("tracker: gaps found by mutation", () => {
 });
 
 describe("contextCause: boundaries (mutations: tolerances widened)", () => {
-  test("tokens within 0.1% of the harness's count are the same tokens; one past it are not", () => {
+  test("ledger/audit: tokens within 0.1% of the harness's count are the same tokens; one past it are not", () => {
     // Windows differ in both (so the percentages differ too): only the tokens decide window vs both.
     const own = { pct: 10, tokens: 1_000_900, window: 10_000_000 };
     const rep = (tokens: number) => ({ pct: 5, tokens, window: 20_000_000 });
@@ -81,7 +81,7 @@ describe("contextCause: boundaries (mutations: tolerances widened)", () => {
     expect(contextCause({ ...own, tokens: 1_001_100 }, rep(1_000_000))).toBe("both");
   });
 
-  test("percentages a whole point apart are the same reading; three points apart are not (the display's rounding is one point)", () => {
+  test("ledger/audit: percentages a whole point apart are the same reading; three points apart are not (the display's rounding is one point)", () => {
     expect(contextCause({ pct: 50, tokens: 100_000, window: 200_000 }, { pct: 49, tokens: 98_000, window: 200_000 })).toBe("none");
     expect(contextCause({ pct: 50, tokens: 100_000, window: 200_000 }, { pct: 47, tokens: 94_000, window: 200_000 })).toBe("tokens");
     expect(contextCause({ pct: 50, tokens: 100_000, window: 200_000 }, { pct: 51.5, tokens: 103_000, window: 200_000 })).toBe("tokens");
@@ -89,12 +89,12 @@ describe("contextCause: boundaries (mutations: tolerances widened)", () => {
 });
 
 describe("ownWindow: boundaries and the environment", () => {
-  test("a prompt of exactly 200k fills a 200k window (100%); it takes one token more to prove a 1M one (mutation: `>` to `>=`)", () => {
+  test("context/window: a prompt of exactly 200k fills a 200k window (100%); it takes one token more to prove a 1M one (mutation: `>` to `>=`)", () => {
     expect(ownWindow("claude-code", "claude-opus-4-6", { peak: 200_000 })).toEqual({ window: 200_000, source: "claude-catalog" });
     expect(ownWindow("claude-code", "claude-opus-4-6", { peak: 200_001 })).toEqual({ window: 1_000_000, source: "claude-peak" });
   });
 
-  test("CLAUDE_CODE_DISABLE_1M_CONTEXT=0/false/empty leave the 1M window on; 1/true turn it off whatever the peak says (mutation: `false` read as set)", () => {
+  test("context/window: CLAUDE_CODE_DISABLE_1M_CONTEXT=0/false/empty leave the 1M window on; 1/true turn it off whatever the peak says (mutation: `false` read as set)", () => {
     for (const off of ["0", "false", "FALSE", ""]) expect([off, ownWindow("claude-code", "claude-opus-5-5", { env: { CLAUDE_CODE_DISABLE_1M_CONTEXT: off } }).window]).toEqual([off, 1_000_000]);
     for (const on of ["1", "true", "TRUE"]) expect([on, ownWindow("claude-code", "claude-opus-5-5", { env: { CLAUDE_CODE_DISABLE_1M_CONTEXT: on }, peak: 900_000 })]).toEqual([on, { window: 200_000, source: "claude-1m-disabled" }]);
     // At 200k the percentage stays within 0..100 even for a prompt Claude would never have sent.
@@ -104,7 +104,7 @@ describe("ownWindow: boundaries and the environment", () => {
 
 describe("probes: an unknown model on every harness", () => {
   const unknown = "adv-no-such-model-0";
-  test("windows: Claude and OpenCode and Antigravity have none of ours; Codex falls to its own default; Grok to its default (marked as one)", () => {
+  test("context/window: windows: Claude and OpenCode and Antigravity have none of ours; Codex falls to its own default; Grok to its default (marked as one)", () => {
     const got = (h: Harness) => ownWindow(h, unknown, { launchedModel: "adv-launched-0" });
     expect(got("claude-code")).toEqual({ window: undefined, source: "none" });
     expect(got("opencode")).toEqual({ window: undefined, source: "none" });
@@ -116,7 +116,7 @@ describe("probes: an unknown model on every harness", () => {
     expect(ownPercent("claude-code", 10_000, got("claude-code").window)).toBeUndefined();
   });
 
-  test("cost: every harness's unknown model has no figure of ours, an unknown-model line in the ledger, and the harness's total is the marked fallback", () => {
+  test("cost/unpriced-model: cost: every harness's unknown model has no figure of ours, an unknown-model line in the ledger, and the harness's total is the marked fallback", () => {
     const run = (harness: Harness, conn: "anthropic" | "openai" | "xai" | "openrouter", feed: (t: CostTracker) => void) => {
       const l = new Ledger();
       const t = frozenTracker({ harness, conn, ledger: l, now: () => 1 });
@@ -139,7 +139,7 @@ describe("probes: what a harness reports as its context", () => {
     return { l, t: frozenTracker({ harness: "claude-code", conn: "anthropic", ledger: l, now: () => 1 }) };
   };
 
-  test("a report with tokens and no window: our side is kept, the reading has no percentage and no cause; with nothing of ours it writes nothing", () => {
+  test("ledger/audit: a report with tokens and no window: our side is kept, the reading has no percentage and no cause; with nothing of ours it writes nothing", () => {
     const { l, t } = tracker();
     t.observeContext({ own: { tokens: 100_000, window: 200_000 }, reported: { tokens: 100_000 } });
     expect(contextsOf(l)).toEqual([{ kind: "context", t: 1, harness: "claude-code", ownTokens: 100_000, reportedTokens: 100_000, ownWindow: 200_000, ownPct: 50 }]);
@@ -148,7 +148,7 @@ describe("probes: what a harness reports as its context", () => {
     expect(contextsOf(l).length).toBe(1);
   });
 
-  test("a percentage-only report (Antigravity): within a point of ours it is `none`; otherwise `both` (tokens and window are unknown on its side)", () => {
+  test("ledger/audit: a percentage-only report (Antigravity): within a point of ours it is `none`; otherwise `both` (tokens and window are unknown on its side)", () => {
     const { l, t } = tracker();
     t.observeContext({ own: { tokens: 100_000, window: 200_000 }, reported: { pct: 50.8 } });
     t.observeContext({ own: { tokens: 100_000, window: 200_000 }, reported: { pct: 20 } });
@@ -157,7 +157,7 @@ describe("probes: what a harness reports as its context", () => {
     expect(l.contextDivergences().length).toBe(1);
   });
 
-  test("negative, NaN, infinite and huge figures never throw and never put a nonsense figure in the ledger", () => {
+  test("ledger/audit: negative, NaN, infinite and huge figures never throw and never put a nonsense figure in the ledger", () => {
     const { l, t } = tracker();
     const own = { tokens: 100_000, window: 200_000 };
     const bad = [-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1e300];
@@ -176,7 +176,7 @@ describe("probes: what a harness reports as its context", () => {
     expect(contextsOf(l).at(-1)).toMatchObject({ reportedTokens: 9e12, reportedPct: 100 });
   });
 
-  test("a harness-reported percentage over 100 is kept as the harness said it (up to the ledger's 1000 cap); over the cap that side is absent and our own stays (BUG-368)", () => {
+  test("ledger/audit: a harness-reported percentage over 100 is kept as the harness said it (up to the ledger's 1000 cap); over the cap that side is absent and our own stays (BUG-368)", () => {
     const { l, t } = tracker();
     t.observeContext({ own: { tokens: 100_000, window: 200_000 }, reported: { pct: 150 } });
     expect(contextsOf(l)[0]).toMatchObject({ ownPct: 50, reportedPct: 150, cause: "both" });
@@ -188,13 +188,13 @@ describe("probes: what a harness reports as its context", () => {
 
 describe("BUG-366/367/368/369: what the first round of adversarial tests found", () => {
   // The telemetry names a `[1m]` model without its suffix, but Gluon knows what it launched: Package A's carry-over sizes it 1M.
-  test("BUG-367/launched-1m-suffix: a launch of `claude-opus-4-6[1m]` is sized 1M although the telemetry names `claude-opus-4-6`", () => {
+  test("context/window: a launch of `claude-opus-4-6[1m]` is sized 1M although the telemetry names `claude-opus-4-6` #BUG-367/launched-1m-suffix", () => {
     expect(ownWindow("claude-code", "claude-opus-4-6", { launchedModel: "claude-opus-4-6[1m]" })).toEqual({ window: 1_000_000, source: "claude-launched" });
     // Only the same model: another model's launched suffix is not carried over, and a model the catalog says has no `[1m]` stays 200k.
     expect(ownWindow("claude-code", "claude-haiku-4-5", { launchedModel: "claude-opus-4-6[1m]" }).window).toBe(200_000);
   });
 
-  test("BUG-366/override-is-codex's: the config's `model_context_window` sizes a Codex window only (capped by the model's maximum), no other harness's, and no Claude rule is skipped by it", () => {
+  test("context/window: the config's `model_context_window` sizes a Codex window only (capped by the model's maximum), no other harness's, and no Claude rule is skipped by it #BUG-366/override-is-codexs", () => {
     const models = { "claude-code": "claude-opus-4-6", "grok-build": "grok-4.6", opencode: "openrouter/deepseek/deepseek-v4-flash", antigravity: "gemini-3.8-flash" } as const;
     for (const [h, model] of Object.entries(models) as [keyof typeof models, string][]) expect([h, ownWindow(h, model, { override: 123_456 })]).toEqual([h, ownWindow(h, model)]);
     // Claude: the 1M rule and the peak rule still apply with an override present.
@@ -202,7 +202,7 @@ describe("BUG-366/367/368/369: what the first round of adversarial tests found",
     expect(ownWindow("codex", "gpt-6-sol", { override: 100_000 })).toEqual({ window: 95_000, source: "override" });
   });
 
-  test("BUG-368/context-sanitize-keeps-the-valid-side: one invalid figure is absent, the rest of the reading is kept; with no valid percentage left, a `dropped` count says so", () => {
+  test("ledger/entries: one invalid figure is absent, the rest of the reading is kept; with no valid percentage left, a `dropped` count says so #BUG-368/context-sanitize-keeps-the-valid-side", () => {
     const l = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger: l, now: () => 1 });
     const own = { tokens: 100_000, window: 200_000 };
@@ -225,7 +225,7 @@ describe("BUG-366/367/368/369: what the first round of adversarial tests found",
     expect(l.entries).toHaveLength(before);
   });
 
-  test("BUG-369/grok-unknown-model-window-is-a-guess: an unknown Grok model gets its own `grok-default` source, the row shows no % for it, and the ledger entry carries `unknown-model`", () => {
+  test("context/window: an unknown Grok model gets its own `grok-default` source, the row shows no % for it, and the ledger entry carries `unknown-model` #BUG-369/grok-unknown-model-window-is-a-guess", () => {
     expect(ownWindow("grok-build", "grok-no-such-9")).toEqual({ window: GROK_DEFAULT_WINDOW, source: "grok-default" });
     expect(windowIsGuess("grok-default")).toBe(true);
     for (const known of ["grok-table", "grok-observed", "codex-fallback", "claude-catalog", "opencode-models-dev", "agy-table"] as const) expect([known, windowIsGuess(known)]).toEqual([known, false]);

@@ -50,7 +50,7 @@ describe("Claude Code: the ported cost function reproduces its own cost_usd", ()
     return out;
   };
 
-  test("every request of a real Haiku 4.5 run (main thread, title, /compact), to the micro-dollar", () => {
+  test("cost/claude-code: every request of a real Haiku 4.5 run (main thread, title, /compact), to the micro-dollar", () => {
     const requests = apiRequests("claude-code-2.1.289-live-haiku.jsonl");
     expect(requests.length).toBeGreaterThanOrEqual(5);
     for (const a of requests) {
@@ -60,13 +60,13 @@ describe("Claude Code: the ported cost function reproduces its own cost_usd", ()
     }
   });
 
-  test("a real Opus 4.6 [1m] request: 3 input + 21,929 cache-creation + 4 output = $0.13717125 (the 5m write rate)", () => {
+  test("cost/claude-code: a real Opus 4.6 [1m] request: 3 input + 21,929 cache-creation + 4 output = $0.13717125 (the 5m write rate)", () => {
     const cost = claudeCost(OPUS_46, { input_tokens: 3, output_tokens: 4, cache_creation_input_tokens: 21_929 });
     expect(cost.usd).toBeCloseTo(0.13717125, 12);
     expect(cost.micros).toBe(137_171);
   });
 
-  test("the terms Claude Code adds that OTEL doesn't carry: 1h writes, US inference (x1.1 on tokens only), web searches", () => {
+  test("cost/claude-code: the terms Claude Code adds that OTEL doesn't carry: 1h writes, US inference (x1.1 on tokens only), web searches", () => {
     const u = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 2000, cache_creation_input_tokens: 10_000 };
     const base = claudeCost(OPUS_46, u).usd;
     expect(base).toBeCloseTo((1000 * 5 + 500 * 25 + 2000 * 0.5 + 10_000 * 6.25) / 1e6, 12);
@@ -81,21 +81,21 @@ describe("Claude Code: the ported cost function reproduces its own cost_usd", ()
     expect(claudeCost({ ...OPUS_46, promptCacheWrite1hTokens: undefined }, { ...u, cache_creation: { ephemeral_1h_input_tokens: 10_000 } }).usd).toBeCloseTo(base, 12);
   });
 
-  test("an OTEL-only request (no TTL split) with a cache write is flagged: the 5m rate was assumed", () => {
+  test("cost/claude-code: an OTEL-only request (no TTL split) with a cache write is flagged: the 5m rate was assumed", () => {
     expect(claudeCost(OPUS_46, { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 100 }, { assumed5m: true }).assumptions).toEqual(["cache-ttl-assumed-5m"]);
     expect(claudeCost(OPUS_46, { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 100 }, { assumed5m: true }).exact).toBe(true);
   });
 });
 
 describe("OpenCode: the ported Y0 reproduces its own step costs", () => {
-  test("the real deepseek-v4-flash run (OpenRouter): both steps, bit for bit", () => {
+  test("cost/opencode: the real deepseek-v4-flash run (OpenRouter): both steps, bit for bit", () => {
     const prices = opencodePrices({ input: 0.0224, output: 1.28, cache_read: 0.0224 });
     // session.step.ended of a real OpenCode 2.0.21: cost 0.0001341984 and 0.000137296.
     expect(opencodeCost({ input: 5191, output: 3, reasoning: 11, cache: { read: 0, write: 0 } }, prices).usd).toBe(0.0001341984);
     expect(opencodeCost({ input: 95, output: 3, reasoning: 13, cache: { read: 5120, write: 0 } }, prices).usd).toBe(0.000137296);
   });
 
-  test("all 31 captured step and compaction costs of real OpenCode 2.0.21 runs (4 cross a context tier), bit for bit", () => {
+  test("cost/opencode: all 31 captured step and compaction costs of real OpenCode 2.0.21 runs (4 cross a context tier), bit for bit", () => {
     type Entry = { source: string; kind: string; tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }; reportedCost: number; price: OpenCodePrice[] };
     const { entries } = JSON.parse(readFileSync(join(DIR, "opencode-2.0.21-cost-steps.json"), "utf8")) as { entries: Entry[] };
     expect(entries.length).toBe(31);
@@ -103,13 +103,13 @@ describe("OpenCode: the ported Y0 reproduces its own step costs", () => {
     expect(entries.filter((e) => e.price.some((p) => p.tier) && opencodePriceFor(e.price, e.tokens)?.tier).length).toBe(4);
   });
 
-  test("a configured price: reasoning at the output rate, cache read and write at their own", () => {
+  test("cost/opencode: a configured price: reasoning at the output rate, cache read and write at their own", () => {
     const prices = opencodePrices({ input: 2, output: 10, cache_read: 0.5, cache_write: 3 });
     expect(opencodeCost({ input: 10_000, output: 1_600, reasoning: 400, cache: { read: 20_000, write: 0 } }, prices).usd).toBe(0.05);
     expect(opencodeCost({ input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 1000 } }, prices).usd).toBe(0.003);
   });
 
-  test("context tiers: the largest one the prompt (input + cache read + cache write) strictly exceeds; the legacy context_over_200k is a tier at 200000 whatever the provider", () => {
+  test("cost/opencode: context tiers: the largest one the prompt (input + cache read + cache write) strictly exceeds; the legacy context_over_200k is a tier at 200000 whatever the provider", () => {
     const prices = opencodePrices({ input: 4, output: 12, cache_read: 1, tiers: [{ tier: { type: "context", size: 272_000 }, input: 8, output: 18, cache_read: 2 }], context_over_200k: { input: 6, output: 15, cache_read: 1.5 } });
     const at = (prompt: number) => opencodePriceFor(prices, { input: prompt, output: 1, reasoning: 0, cache: { read: 0, write: 0 } })!.input;
     expect([at(200_000), at(200_001), at(272_000), at(272_001)]).toEqual([4, 6, 6, 8]);
@@ -117,7 +117,7 @@ describe("OpenCode: the ported Y0 reproduces its own step costs", () => {
     expect(opencodePriceFor(prices, { input: 100, output: 999_999, reasoning: 0, cache: { read: 0, write: 0 } })!.input).toBe(4);
   });
 
-  test("no price entry, or junk counts and rates: 0, never NaN", () => {
+  test("cost/unpriced-model: no price entry, or junk counts and rates: 0, never NaN", () => {
     expect(opencodeCost({ input: 5, output: 5, reasoning: 0, cache: { read: 0, write: 0 } }, []).usd).toBe(0);
     const junk = opencodePrices({ input: Number.NaN, output: 1 });
     expect(opencodeCost({ input: 1e6, output: Number.POSITIVE_INFINITY, reasoning: -5, cache: { read: 0, write: 0 } }, junk).usd).toBe(0);
@@ -127,21 +127,21 @@ describe("OpenCode: the ported Y0 reproduces its own step costs", () => {
 describe("the price table (scripts/pricing/modelsdev.ts)", () => {
   const pairs = (Object.entries(DEFAULT_MODELS) as [Harness, (typeof DEFAULT_MODELS)[Harness]][]).flatMap(([harness, models]) => models.flatMap((m) => (Object.keys(m.ids) as Conn[]).map((conn) => ({ harness, model: m.id, conn, key: priceKey(harness, m.ids, conn) }))));
 
-  test("every model Gluon offers on every connection has a price (and a key): a gap is a failing test, not a silent \u2014", () => {
+  test("cost/every-model-priced: every model Gluon offers on every connection has a price (and a key): a gap is a failing test, not a silent \u2014", () => {
     expect(pairs.length).toBeGreaterThan(30);
     expect(pairs.filter((p) => !p.key).map((p) => `${p.harness}/${p.model}/${p.conn}`)).toEqual([]);
     expect(pairs.filter((p) => !priceEntry(p.key)).map((p) => `${p.harness}/${p.model}/${p.conn}: ${p.key}`)).toEqual([]);
     expect(MODELS_DEV.missing).toEqual([]);
   });
 
-  test("BUG-413/live-tables-size-every-offered-model: the live tables give every model Gluon offers a window (the table-dependent half of the coverage; the replays price from the frozen snapshot, not these)", () => {
+  test("cost/every-model-priced: the live tables give every model Gluon offers a window (the table-dependent half of the coverage; the replays price from the frozen snapshot, not these) #BUG-413/live-tables-size-every-offered-model", () => {
     const unsized = pairs.filter((p) => p.key && ownWindow(p.harness, p.harness === "opencode" ? p.key : p.model).window === undefined);
     expect(unsized.map((p) => `${p.harness}/${p.model}/${p.conn}: ${p.key}`)).toEqual([]);
     // The guess for a Grok model no table lists is a default, not a window.
     expect(pairs.filter((p) => p.harness === "grok-build" && windowIsGuess(ownWindow(p.harness, p.model).source)).map((p) => p.model)).toEqual([]);
   });
 
-  test("BUG-413/frozen-snapshot-shape: the prices the replays use are three tables of the shapes the live ones have (models.dev's trimmed to the entries looked up), dated, and not the live objects (editing the live tables cannot move a replay)", () => {
+  test("pricing/sources: the prices the replays use are three tables of the shapes the live ones have (models.dev's trimmed to the entries looked up), dated, and not the live objects (editing the live tables cannot move a replay) #BUG-413/frozen-snapshot-shape", () => {
     for (const [key, e] of Object.entries(FROZEN_TABLE.entries)) expect([key, typeof e.cost.input, typeof e.cost.output, typeof e.context]).toEqual([key, "number", "number", "number"]);
     expect(tableProblem("claude-catalog", FROZEN_CLAUDE_CATALOG)).toBeNull();
     expect(tableProblem("grok-models", FROZEN_GROK_MODELS)).toBeNull();
@@ -152,14 +152,14 @@ describe("the price table (scripts/pricing/modelsdev.ts)", () => {
     expect(FROZEN_TABLE.entries).not.toBe(MODELS_DEV.entries);
   });
 
-  test("BUG-360/table-age: the table carries its source's date (null: the public API's catalog has none, only OpenCode's cached copy does), the day it was generated, and a digest; every entry has input and output prices", () => {
+  test("pricing/sources: the table carries its source's date (null: the public API's catalog has none, only OpenCode's cached copy does), the day it was generated, and a digest; every entry has input and output prices #BUG-360/table-age", () => {
     if (MODELS_DEV.catalogUpdatedAt !== null) expect(MODELS_DEV.catalogUpdatedAt).toMatch(/^20\d\d-\d\d-\d\dT/);
     expect(MODELS_DEV.generatedAt).toMatch(/^20\d\d-\d\d-\d\d$/);
     expect(MODELS_DEV.catalogDigest).toMatch(/^[0-9a-f]{64}$/);
     for (const [key, e] of Object.entries(MODELS_DEV.entries)) expect([key, typeof e.cost.input, typeof e.cost.output]).toEqual([key, "number", "number"]);
   });
 
-  test("a connection decides the price: the same Claude model on the API, Bedrock and OpenRouter, and the plan priced as the vendor's API", () => {
+  test("cost/by-connection: a connection decides the price: the same Claude model on the API, Bedrock and OpenRouter, and the plan priced as the vendor's API", () => {
     const haiku = DEFAULT_MODELS["claude-code"].find((m) => m.id === "haiku")!;
     expect(priceKey("claude-code", haiku.ids, "plan")).toBe("anthropic/claude-haiku-5-5");
     expect(priceKey("claude-code", haiku.ids, "bedrock")).toBe("amazon-bedrock/global.anthropic.claude-haiku-5-5");
@@ -169,7 +169,7 @@ describe("the price table (scripts/pricing/modelsdev.ts)", () => {
     expect(priceEntry("anthropic/made-up")).toBeUndefined();
   });
 
-  test("OpenCode's own models price through the table: a gpt-6 tier above 272k, and the legacy 200k tier OpenCode adds", () => {
+  test("cost/opencode: OpenCode's own models price through the table: a gpt-6 tier above 272k, and the legacy 200k tier OpenCode adds", () => {
     const luna = frozenEntry("openai/gpt-6-luna")!;
     const prices = opencodePrices(luna.cost);
     expect(prices.map((p) => p.tier?.size ?? 0).sort()).toEqual([0, 200_000, 272_000]);
@@ -194,7 +194,7 @@ describe("Codex: Gluon's own estimate from response.completed (Codex reports no 
     .filter((a) => a.input_token_count)
     .map((a): CodexUsage => ({ input: Number(a.input_token_count), cached: Number(a.cached_token_count), cacheWrite: Number(a.cache_write_token_count), output: Number(a.output_token_count), ...(a.service_tier ? { serviceTier: a.service_tier } : {}) }));
 
-  test("the three real requests of a gpt-6-luna session: priority (main), standard (title thread), priority (main) = $0.011525; the tier is a named assumption", () => {
+  test("cost/codex: the three real requests of a gpt-6-luna session: priority (main), standard (title thread), priority (main) = $0.011525; the tier is a named assumption", () => {
     expect(usages.map((u) => u.serviceTier)).toEqual(["priority", undefined, "priority"]);
     const costs = usages.map((u) => codexCost(luna, u));
     // (3 uncached x 0.2 + 10,608 written x 0.25 + 228 out x 1) / 1e6, the priority (fast) mode's prices.
@@ -207,7 +207,7 @@ describe("Codex: Gluon's own estimate from response.completed (Codex reports no 
     expect(usages.map((u) => codexCost(luna, { ...u, serviceTier: undefined }).usd).reduce((n, c) => n + c, 0)).toBeCloseTo(0.006241, 6);
   });
 
-  test("the context tier above 272k prompt tokens (strictly), and a priced mode without tiers scaled by it (an assumption)", () => {
+  test("cost/codex: the context tier above 272k prompt tokens (strictly), and a priced mode without tiers scaled by it (an assumption)", () => {
     const at = (input: number, serviceTier?: string) => codexCost(luna, { input, cached: 0, cacheWrite: 0, output: 0, ...(serviceTier ? { serviceTier } : {}) });
     expect(at(272_000).usd).toBeCloseTo((272_000 * 0.1) / 1e6, 12);
     expect(at(272_001).usd).toBeCloseTo((272_001 * 0.2) / 1e6, 12);
@@ -216,7 +216,7 @@ describe("Codex: Gluon's own estimate from response.completed (Codex reports no 
     expect(long.assumptions).toEqual(["service-tier-requested", "long-context-tier-assumed"]);
   });
 
-  test("a tier with no priced mode (flex) is priced at the base and flagged; a missing cache price is billed at the input rate", () => {
+  test("cost/codex: a tier with no priced mode (flex) is priced at the base and flagged; a missing cache price is billed at the input rate", () => {
     const flex = codexCost(luna, { input: 1000, cached: 0, cacheWrite: 0, output: 1000, serviceTier: "flex" });
     expect(flex.usd).toBeCloseTo((1000 * 0.1 + 1000 * 0.5) / 1e6, 12);
     expect(flex.assumptions).toEqual(["service-tier-requested"]);
@@ -228,7 +228,7 @@ describe("Codex: Gluon's own estimate from response.completed (Codex reports no 
 describe("the per-launch tracker: our figure, the harness's beside it, the cause of a difference", () => {
   const entriesOf = (ledger: Ledger) => ledger.entries;
 
-  test("a real Claude Code Haiku run: every request priced and audited, no divergence, the total is Claude's own", () => {
+  test("cost/own-figure: a real Claude Code Haiku run: every request priced and audited, no divergence, the total is Claude's own", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     let reported = 0;
@@ -253,7 +253,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(frozenTracker({ harness: "claude-code", conn: "plan" }).figure()).toBeUndefined();
   });
 
-  test("BUG-324/ttl-divergence-recorded: a request Claude billed at the 1h cache rate (OTEL can't show it) is not re-priced and the TTL is not learned: the ledger names cache-ttl-1h as the cause", () => {
+  test("ledger/audit: a request Claude billed at the 1h cache rate (OTEL can't show it) is not re-priced and the TTL is not learned: the ledger names cache-ttl-1h as the cause #BUG-324/ttl-divergence-recorded", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     // The spike's vector on Opus 4.6: 20k cache write, all 1h: Claude said $0.22 where the 5m rate gives $0.145.
@@ -266,7 +266,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(entriesOf(ledger).filter((e) => e.kind === "usage").map((e) => (e as { assumptions: string[] }).assumptions)).toEqual([["cache-ttl-assumed-5m"], ["cache-ttl-assumed-5m"]]);
   });
 
-  test("BUG-324/ttl-from-settings: a cache TTL from the settings prices the writes (main and subagent apart), is no assumption, and a report that says the other one is the cause", () => {
+  test("cost/claude-code: a cache TTL from the settings prices the writes (main and subagent apart), is no assumption, and a report that says the other one is the cause #BUG-324/ttl-from-settings", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1, cacheTtl: { main: "1h", subagent: "5m" } });
     const req = { model: "claude-opus-4-6", input: 1000, output: 600, cacheRead: 0, cacheWrite: 20_000 };
@@ -281,7 +281,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(ledger.divergences().map((d) => d.cause)).toEqual(["cache-ttl-5m"]);
   });
 
-  test("BUG-407/hypotheses-at-the-ttl-used: a request priced at the 1h cache rate (a plan's main conversation, or the setting) and billed with the US geo factor is 'us-geo', judged from the 1h figure it was priced at, not from the 5m one ('unexplained')", () => {
+  test("ledger/audit: a request priced at the 1h cache rate (a plan's main conversation, or the setting) and billed with the US geo factor is 'us-geo', judged from the 1h figure it was priced at, not from the 5m one ('unexplained') #BUG-407/hypotheses-at-the-ttl-used", () => {
     const req = { model: "claude-opus-4-6", input: 1000, output: 600, cacheRead: 0, cacheWrite: 20_000 };
     for (const o of [{ conn: "plan" as const }, { conn: "anthropic" as const, cacheTtl: { main: "1h" as const } }]) {
       const ledger = new Ledger();
@@ -293,7 +293,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     }
   });
 
-  test("a difference no hypothesis explains stays a divergence ('unexplained'): the TTL is not touched", () => {
+  test("ledger/audit: a difference no hypothesis explains stays a divergence ('unexplained'): the TTL is not touched", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     t.claudeRequest({ model: "claude-opus-4-6", input: 1000, output: 600, cacheRead: 0, cacheWrite: 20_000, reportedUsd: 0.5 });
@@ -301,7 +301,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(t.figure()!.usd).toBeCloseTo(0.145, 9);
   });
 
-  test("a model with no price entry has no figure of ours: the harness's own total is shown, marked; the ledger says why", () => {
+  test("cost/unpriced-model: a model with no price entry has no figure of ours: the harness's own total is shown, marked; the ledger says why", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     t.claudeRequest({ model: "claude-made-up-9", input: 10, output: 10, cacheRead: 0, cacheWrite: 0, reportedUsd: 0.5 });
@@ -311,7 +311,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(entriesOf(ledger)[0]).toMatchObject({ kind: "usage", assumptions: ["unknown-model"], ownMicros: 0 });
   });
 
-  test("BUG-323/fallback-cost-marked: the harness's own total, shown because a request had no price of ours, is own=false and the row marks it; our own figure is not marked", () => {
+  test("cost/markers: the harness's own total, shown because a request had no price of ours, is own=false and the row marks it; our own figure is not marked #BUG-323/fallback-cost-marked", () => {
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger: new Ledger() });
     t.claudeRequest({ model: "claude-made-up-9", input: 10, output: 10, cacheRead: 0, cacheWrite: 0 });
     t.reportedCumulative(0.5);
@@ -326,7 +326,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(costLabel({ usd: 4.12, approx: true })).toBe("~$4.12");
   });
 
-  test("BUG-671/F06: an OpenCode step is priced at the model it reports, not the launched model's: a model switched to by hand, a free one ($0), and one with no entry (unknown, never the launched price)", () => {
+  test("cost/opencode: an OpenCode step is priced at the model it reports, not the launched model's: a model switched to by hand, a free one ($0), and one with no entry (unknown, never the launched price) #BUG-671/F06", () => {
     const ledger = new Ledger();
     const table = frozenTableWith({
       "openrouter/test/switched": { cost: { input: 10, output: 20 }, context: 100_000 },
@@ -353,7 +353,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(t.figure()).toEqual({ usd: 1.5, approx: false, own: false });
   });
 
-  test("BUG-325/launched-model-price: a model with no entry of its own is priced from the launched model's, and says so; one with an entry does not", () => {
+  test("cost/unpriced-model: a model with no entry of its own is priced from the launched model's, and says so; one with an entry does not #BUG-325/launched-model-price", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "opencode", conn: "openrouter", launchedKey: "openrouter/deepseek/deepseek-v4-flash", ledger, now: () => 1 });
     const tokens = { input: 1_000_000, output: 100_000, reasoning: 0, cache: { read: 0, write: 0 } };
@@ -372,7 +372,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(frozenTracker({ harness: "claude-code", conn: "anthropic" }).figure()).toBeUndefined();
   });
 
-  test("BUG-327/table-digest-of-the-pricing-table: the ledger names the table that priced the request (Claude Code's catalog or models.dev)", () => {
+  test("ledger/audit: the ledger names the table that priced the request (Claude Code's catalog or models.dev) #BUG-327/table-digest-of-the-pricing-table", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     t.claudeRequest({ model: "claude-opus-4-6", input: 10, output: 10, cacheRead: 0, cacheWrite: 0 });
@@ -385,7 +385,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(entriesOf(ledger).filter((e) => e.kind === "usage").map((e) => (e as { table: string }).table)).toEqual([FROZEN_CLAUDE_CATALOG.catalogDigest.slice(0, 8), FROZEN_TABLE.catalogDigest.slice(0, 8), FROZEN_TABLE.catalogDigest.slice(0, 8)]);
   });
 
-  test("BUG-326/context-cause: the ledger tells a difference in tokens from one in the window, and both from neither", () => {
+  test("ledger/audit: the ledger tells a difference in tokens from one in the window, and both from neither #BUG-326/context-cause", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     const own = { tokens: 100_000, window: 200_000 };
@@ -410,13 +410,13 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(entriesOf(ledger).length).toBe(6);
   });
 
-  test("a launch on a plan is API-equivalent (~) even when every request is priced", () => {
+  test("cost/markers: a launch on a plan is API-equivalent (~) even when every request is priced", () => {
     const t = frozenTracker({ harness: "claude-code", conn: "plan", launchedKey: "anthropic/claude-haiku-4-5" });
     t.claudeRequest({ model: "claude-haiku-4-5-20251001", input: 1000, output: 100, cacheRead: 0, cacheWrite: 0 });
     expect(t.figure()).toEqual({ usd: (1000 * 1 + 100 * 5) / 1e6, approx: true, own: true });
   });
 
-  test("Codex: every conversation counts (title thread too); the real gpt-6-luna session is an estimate", () => {
+  test("cost/codex: Codex: every conversation counts (title thread too); the real gpt-6-luna session is an estimate", () => {
     const t = frozenTracker({ harness: "codex", conn: "openai", ledger: new Ledger() });
     t.codexResponse({ model: "gpt-6-luna", input: 10_611, cached: 0, cacheWrite: 10_608, output: 228, serviceTier: "priority" });
     t.codexResponse({ model: "gpt-6-luna", input: 7_195, cached: 0, cacheWrite: 7_192, output: 115 });
@@ -429,7 +429,7 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
     expect(b.figure()!.usd).toBeCloseTo((1000 * 0.11) / 1e6, 12);
   });
 
-  test("OpenCode: a step priced from the table through the provider/model key, audited against its own cost", () => {
+  test("cost/opencode: OpenCode: a step priced from the table through the provider/model key, audited against its own cost", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "opencode", conn: "openrouter", ledger, now: () => 1 });
     const key = "openrouter/deepseek/deepseek-v4-flash";
@@ -446,14 +446,14 @@ describe("the per-launch tracker: our figure, the harness's beside it, the cause
 });
 
 describe("Claude Code's own catalog (scripts/pricing/claude.ts: read from its binary, parsed, never evaluated)", () => {
-  test("the literal parser reads what a bundler emits and refuses anything it would have to run", () => {
+  test("pricing/validated: the literal parser reads what a bundler emits and refuses anything it would have to run", () => {
     expect(parseJsLiteral('{a:1,"b-c":[1e6,-2.5,!0,!1,null],d:{e:"x\\u00e9\\"y"}}')).toEqual({ a: 1, "b-c": [1_000_000, -2.5, true, false, null], d: { e: 'x\u00e9"y' } });
     for (const bad of ["{a:foo}", "{a:f()}", "{a:`t`}", "{a:1} x", "{a:1,}x", "{a:'q'}", '{"a":1', "{a:1 b:2}", "[1,2", "{a:/re/}"]) expect(() => parseJsLiteral(bad)).toThrow();
     expect(balancedObject('x{a:"}",b:{c:1}}y', 1)).toBe('{a:"}",b:{c:1}}');
     expect(balancedObject("{a:{", 0)).toBeNull();
   });
 
-  test("the catalog text is found in a binary's bytes by its comment, and trimmed to ids, windows and tiers", () => {
+  test("pricing/sources: the catalog text is found in a binary's bytes by its comment, and trimmed to ids, windows and tiers", () => {
     const literal = '{"//":"Hand-maintained baked-in model catalog \\u2014 x",schema_version:1,pricing_tiers:{t:{input:1,output:2,cache_write_5m:1.25,cache_write_1h:2,cache_read:0.1,web_search:0.01}},models:[{id:"m-1",family:"f",provider_ids:{first_party:"m-1-20250101",bedrock:null},context:{window:1e6,native_1m:!0},pricing:"t"}]}';
     const bytes = Buffer.concat([Buffer.from("\x00junk;var usr="), Buffer.from(literal), Buffer.from(";more\x00")]);
     expect(catalogText(bytes)).toBe(literal);
@@ -463,7 +463,7 @@ describe("Claude Code's own catalog (scripts/pricing/claude.ts: read from its bi
     expect(() => trim({ pricing_tiers: {}, models: [{ id: "x", pricing: "missing" }] })).toThrow(/known price tier/);
   });
 
-  test("the bundled table: every model has a tier with the 5m and 1h cache-write prices; names resolve by API, Bedrock and Vertex id, dated or not, with [1m]", () => {
+  test("pricing/sources: the bundled table: every model has a tier with the 5m and 1h cache-write prices; names resolve by API, Bedrock and Vertex id, dated or not, with [1m]", () => {
     expect(CLAUDE_CATALOG.models.length).toBeGreaterThanOrEqual(20);
     for (const m of CLAUDE_CATALOG.models) expect(CLAUDE_CATALOG.pricingTiers[m.pricing]!.cache_write_1h).toBeGreaterThan(CLAUDE_CATALOG.pricingTiers[m.pricing]!.cache_write_5m);
     const haiku = claudeCatalogModel("claude-haiku-4-5")!;
@@ -472,7 +472,7 @@ describe("Claude Code's own catalog (scripts/pricing/claude.ts: read from its bi
     expect(claudeCatalogModel("gpt-6-sol")).toBeUndefined();
   });
 
-  test("windows from the catalog agree with the name-based rule for every model (so neither drifts alone); [1m] only where the catalog supports it", () => {
+  test("context/window: windows from the catalog agree with the name-based rule for every model (so neither drifts alone); [1m] only where the catalog supports it", () => {
     for (const m of CLAUDE_CATALOG.models) expect([m.id, claudeContextWindow(m.id, {})]).toEqual([m.id, claudeContextWindowByName(m.id, {}) ?? m.window]);
     expect(claudeContextWindow("claude-opus-4-6", {})).toBe(200_000);
     expect(claudeContextWindow("claude-opus-4-6[1m]", {})).toBe(1_000_000);
@@ -486,7 +486,7 @@ describe("Claude Code's own catalog (scripts/pricing/claude.ts: read from its bi
     expect(claudeContextWindow("sonnet-4.6", {})).toBe(200_000);
   });
 
-  test("its prices agree with models.dev's for the same models (two sources, one price): a difference is a failing test to look at", () => {
+  test("pricing/sources: its prices agree with models.dev's for the same models (two sources, one price): a difference is a failing test to look at", () => {
     for (const m of CLAUDE_CATALOG.models) {
       const dev = priceEntry(`anthropic/${m.providerIds.first_party}`)?.cost;
       if (!dev) continue;
@@ -495,7 +495,7 @@ describe("Claude Code's own catalog (scripts/pricing/claude.ts: read from its bi
     }
   });
 
-  test("the 1h write at Claude's own price: the spike's real vectors on Opus 4.6 ($0.145 at 5m, $0.22 at 1h, $0.19 mixed) and the tracker resolves a Bedrock id", () => {
+  test("cost/claude-code: the 1h write at Claude's own price: the spike's real vectors on Opus 4.6 ($0.145 at 5m, $0.22 at 1h, $0.19 mixed) and the tracker resolves a Bedrock id", () => {
     const opus = claudePriceFromTier(FROZEN_CLAUDE_CATALOG.pricingTiers[claudeCatalogModel("claude-opus-4-6", FROZEN_CLAUDE_CATALOG)!.pricing]!);
     const u = { input_tokens: 1000, output_tokens: 600, cache_creation_input_tokens: 20_000 };
     expect(claudeCost(opus, u).micros).toBe(145_000);
@@ -508,7 +508,7 @@ describe("Claude Code's own catalog (scripts/pricing/claude.ts: read from its bi
 });
 
 describe("Gluon's own context window and percentage (src/cost/context.ts)", () => {
-  test("Claude: the window comes from Claude Code's catalog or the name; a prompt past 200k proves 1M; the environment is an argument", () => {
+  test("context/window: Claude: the window comes from Claude Code's catalog or the name; a prompt past 200k proves 1M; the environment is an argument", () => {
     expect(ownWindow("claude-code", "claude-opus-4-6")).toEqual({ window: 200_000, source: "claude-catalog" });
     expect(ownWindow("claude-code", "opus")).toEqual({ window: 1_000_000, source: "claude-name" });
     expect(ownWindow("claude-code", "claude-opus-4-6", { peak: 300_000 })).toEqual({ window: 1_000_000, source: "claude-peak" });
@@ -519,7 +519,7 @@ describe("Gluon's own context window and percentage (src/cost/context.ts)", () =
     expect(ownWindow("claude-code", undefined, { launchedModel: "claude-haiku-4-5" }).window).toBe(200_000);
   });
 
-  test("Codex: the bundled table's usable window, Codex's fallback, the config's override; Grok: its table; OpenCode: models.dev's limit; Antigravity: its table", () => {
+  test("context/window: Codex: the bundled table's usable window, Codex's fallback, the config's override; Grok: its table; OpenCode: models.dev's limit; Antigravity: its table", () => {
     expect(ownWindow("codex", "gpt-6-sol")).toEqual({ window: 258_400, source: "codex-catalog" });
     expect(ownWindow("codex", "gpt-99-unlisted")).toEqual({ window: 258_400, source: "codex-fallback" });
     expect(ownWindow("codex", "gpt-6-sol", { override: 100_000 })).toEqual({ window: 95_000, source: "override" });
@@ -533,7 +533,7 @@ describe("Gluon's own context window and percentage (src/cost/context.ts)", () =
     expect(ownWindow("antigravity", "gemini-3.8-flash").source).toBe("agy-table");
   });
 
-  test("the percentage is counted as the harness's display counts it (Codex: the baseline off both sides), at most 100, undefined without a window", () => {
+  test("context/percentage: the percentage is counted as the harness's display counts it (Codex: the baseline off both sides), at most 100, undefined without a window", () => {
     expect(ownPercent("claude-code", 150_000, 200_000)).toBe(75);
     expect(ownPercent("claude-code", 300_000, 200_000)).toBe(100);
     expect(ownPercent("codex", 20_500, 258_400)).toBeCloseTo((8_500 / 246_400) * 100, 9);
@@ -543,7 +543,7 @@ describe("Gluon's own context window and percentage (src/cost/context.ts)", () =
     expect(ownPercent("grok-build", Number.NaN, 1_000)).toBeUndefined();
   });
 
-  test("BUG-326/cause-function: tokens, window, both or none; a missing figure counts as differing; equal percentages are none whatever the inputs", () => {
+  test("ledger/audit: tokens, window, both or none; a missing figure counts as differing; equal percentages are none whatever the inputs #BUG-326/cause-function", () => {
     expect(contextCause({ pct: 50, tokens: 100_000, window: 200_000 }, { pct: 50, tokens: 100_000, window: 200_000 })).toBe("none");
     expect(contextCause({ pct: 50, tokens: 100_000, window: 200_000 }, { pct: 30, tokens: 60_000, window: 200_000 })).toBe("tokens");
     expect(contextCause({ pct: 50, tokens: 100_000, window: 200_000 }, { pct: 25, tokens: 100_000, window: 400_000 })).toBe("window");
@@ -559,7 +559,7 @@ describe("Antigravity: no cost, its context is Gluon's own (src/cost/antigravity
     return { ledger, t: frozenTracker({ harness: "antigravity", conn: "plan", launchedKey: "google/gemini-3.8-flash", ledger, now: () => 1, ...over }) };
   };
 
-  test("BUG-348/no-priced-deltas: agy's status-line totals are the conversation's size, not what was billed, so nothing prices them: the tracker has no estimate, the module no price, the row's cost stays unknown (—) and the ledger holds no usage entry", () => {
+  test("cost/antigravity-none: agy's status-line totals are the conversation's size, not what was billed, so nothing prices them: the tracker has no estimate, the module no price, the row's cost stays unknown (—) and the ledger holds no usage entry #BUG-348/no-priced-deltas", () => {
     const { ledger, t } = agyTracker();
     expect(t.figure()).toBeUndefined();
     expect(costLabel(t.figure())).toBe("—");
@@ -572,11 +572,11 @@ describe("Antigravity: no cost, its context is Gluon's own (src/cost/antigravity
     expect(l.entries).toEqual([]);
   });
 
-  test("BUG-349/effort-suffix: agy names a model with its effort, which is no part of the table's id", () => {
+  test("context/window: agy names a model with its effort, which is no part of the table's id #BUG-349/effort-suffix", () => {
     for (const [from, to] of [["gemini-3.8-flash-high", "gemini-3.8-flash"], ["gemini-3.8-flash-minimal", "gemini-3.8-flash"], ["gemini-3.8-flash", "gemini-3.8-flash"], ["gemini-3.8-flash-highest", "gemini-3.8-flash-highest"]]) expect(agyModelId(from!)).toBe(to!);
   });
 
-  test("BUG-350/window-ledger-only: the window comes from Gluon's table (models.dev); agy's own percentage lands in the ledger beside ours with the cause, and is never shown", () => {
+  test("context/window: the window comes from Gluon's table (models.dev); agy's own percentage lands in the ledger beside ours with the cause, and is never shown #BUG-350/window-ledger-only", () => {
     const { t, ledger } = agyTracker();
     // The window is Gluon's (models.dev's limit.context), by the name agy reports (effort suffix and all) or the launched model's; the percentage is ours.
     expect(agyWindow("gemini-3.8-flash-high")).toBe(1_048_576);
@@ -592,7 +592,7 @@ describe("Antigravity: no cost, its context is Gluon's own (src/cost/antigravity
 describe("Codex's window table (scripts/pricing/codex.ts: `codex debug models` in CI, read at build time)", () => {
   const catalog = JSON.stringify({ models: [{ slug: "gpt-6-sol", context_window: 272_000, max_context_window: 872_000 }, { slug: "gpt-6-luna", max_context_window: 100_000, effective_context_window_percent: 90 }, { slug: "bad", context_window: "x" }, { not: "a model" }] });
 
-  test("BUG-335/generator: the table's shape from a catalog: windows as Codex reads them, a digest of the text, sorted, byte-stable", () => {
+  test("pricing/sources: the table's shape from a catalog: windows as Codex reads them, a digest of the text, sorted, byte-stable #BUG-335/generator", () => {
     const t = buildTable(catalog, { codexVersion: "0.159.3", generatedAt: "2026-10-04" });
     expect(t).toEqual({ schema: 1, source: "codex debug models", codexVersion: "0.159.3", generatedAt: "2026-10-04", digest: expect.stringMatching(/^[0-9a-f]{64}$/), models: { "gpt-6-luna": { context: 100_000, max: 100_000, percent: 90 }, "gpt-6-sol": { context: 272_000, max: 872_000, percent: 95 } } });
     expect(Object.keys(t.models)).toEqual(["gpt-6-luna", "gpt-6-sol"]);
@@ -602,7 +602,7 @@ describe("Codex's window table (scripts/pricing/codex.ts: `codex debug models` i
     for (const bad of ["not json", "{}", '{"models":[]}', '{"models":[{"slug":"x"}]}']) expect(() => buildTable(bad, { codexVersion: "1", generatedAt: "d" })).toThrow(/no model with a window/);
   });
 
-  test("the bundled table is that shape and Codex's own windows are sane", () => {
+  test("pricing/sources: the bundled table is that shape and Codex's own windows are sane", () => {
     // On a copy: Bun's toMatchObject overwrites the received object's fields with the asymmetric matchers, which would corrupt the shared table for every later test (BUG-365).
     expect(structuredClone(CODEX_WINDOWS)).toMatchObject({ schema: 1, source: "codex debug models", digest: expect.stringMatching(/^[0-9a-f]{64}$/), generatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
     expect(Object.keys(CODEX_WINDOWS.models).length).toBeGreaterThan(3);
@@ -636,7 +636,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
   };
   const turns = (ledger: Ledger) => ledger.entries.filter((e) => e.kind === "observation" && e.scope === "turn");
 
-  test("BUG-336/turn: a reported turn is matched to our responses by its tokens and recorded as a turn observation; the figure shown stays ours", () => {
+  test("ledger/audit: a reported turn is matched to our responses by its tokens and recorded as a turn observation; the figure shown stays ours #BUG-336/turn", () => {
     const { ledger, t } = setup();
     for (const r of R.slice(0, 2)) t.codexResponse(r);
     const before = t.figure()!;
@@ -648,7 +648,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
     expect(t.figure()!.own).toBe(true);
   });
 
-  test("BUG-336/divergence: a difference has a cause: the requested priority tier explains a turn Codex's server priced as standard; any other is unexplained", () => {
+  test("ledger/audit: a difference has a cause: the requested priority tier explains a turn Codex's server priced as standard; any other is unexplained #BUG-336/divergence", () => {
     const { ledger, t } = setup();
     t.codexResponse(R[0]!);
     t.codexTurnCost(turnOf(R[0]!, standardUsd(R[0]!)));
@@ -662,7 +662,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
     expect((turns(ledger)[1] as { cause: string }).cause).toBe("unexplained");
   });
 
-  test("BUG-336/pending: a turn cost that comes before its responses waits and is recorded when they are in; a turn spanning several responses sums them", () => {
+  test("ledger/audit: a turn cost that comes before its responses waits and is recorded when they are in; a turn spanning several responses sums them #BUG-336/pending", () => {
     const { ledger, t } = setup();
     const both = { model: "gpt-6-luna", input: R[0]!.input + R[2]!.input, cached: R[0]!.cached + R[2]!.cached, output: R[0]!.output + R[2]!.output, reportedUsd: 0.5 };
     t.codexTurnCost(both);
@@ -676,7 +676,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
     expect(turns(ledger)).toHaveLength(1);
   });
 
-  test("BUG-336/timeout: responses with no turn_cost leave no entry; a turn_cost with no responses is dropped after the timeout as a count, never as an observation", () => {
+  test("ledger/audit: responses with no turn_cost leave no entry; a turn_cost with no responses is dropped after the timeout as a count, never as an observation #BUG-336/timeout", () => {
     const { ledger, t, advance } = setup({ turnCostTimeoutMs: 60_000 });
     for (const r of R) t.codexResponse(r);
     advance(3_600_000);
@@ -696,7 +696,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
     expect(ledger.entries.filter((e) => e.kind === "dropped")).toHaveLength(1);
   });
 
-  test("BUG-338/resume: Codex has no cumulative oracle, so a resumed session has no inherited total to subtract, and a turn from before the resume (none of our responses) records nothing", () => {
+  test("ledger/audit: Codex has no cumulative oracle, so a resumed session has no inherited total to subtract, and a turn from before the resume (none of our responses) records nothing #BUG-338/resume", () => {
     const { ledger, t, advance } = setup({ turnCostTimeoutMs: 1_000 });
     expect(ledger.entries).toEqual([]);
     t.codexResponse(R[2]!);
@@ -710,7 +710,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
     expect(own).toBeCloseTo(codexCost(luna, R[2]!).usd, 12);
   });
 
-  test("BUG-339/tier: the service tier Codex requested (never the one it served) is named on the turn's entry, with the cause when the price differs", () => {
+  test("ledger/audit: the service tier Codex requested (never the one it served) is named on the turn's entry, with the cause when the price differs #BUG-339/tier", () => {
     const { ledger, t } = setup();
     t.codexResponse(R[0]!);
     t.codexResponse(R[1]!);
@@ -724,7 +724,7 @@ describe("Codex's turn_cost as an oracle (issue #39: a turn-scope observation, p
     expect(standard!.cause).toBe("none");
   });
 
-  test("an entry keeps only whitelisted assumptions (a ledger line can't carry free text)", () => {
+  test("ledger/entries: an entry keeps only whitelisted assumptions (a ledger line can't carry free text)", () => {
     const ledger = new Ledger();
     const e = ledger.add({ kind: "observation", what: "cost", t: 1, harness: "codex", scope: "turn", reportedMicros: 5, assumptions: ["service-tier-requested", "my prompt", 3] });
     expect(e).toMatchObject({ assumptions: ["service-tier-requested"] });
@@ -739,7 +739,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
   };
   const assumptionsOf = (ledger: Ledger) => ledger.entries.filter((e) => e.kind === "usage").map((e) => (e as { assumptions: string[] }).assumptions);
 
-  test("BUG-328/ttl-configured: a configured TTL prices the cache write at it and is no assumption; with none, 5m on an API key and Claude's automatic 1h for a subscription's main conversation, each an assumption", () => {
+  test("cost/claude-code: a configured TTL prices the cache write at it and is no assumption; with none, 5m on an API key and Claude's automatic 1h for a subscription's main conversation, each an assumption #BUG-328/ttl-configured", () => {
     const one = claude({ cacheTtl: { main: "1h" } });
     one.t.claudeRequest(req);
     expect(one.t.figure()!.usd).toBeCloseTo(0.22, 9);
@@ -771,7 +771,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     expect(viaSettings.t.figure()!.usd).toBeCloseTo(0.22 + 0.145, 9);
   });
 
-  test("BUG-329/ttl-subagent: the subagent TTL prices a subagent request, the main one the main request", () => {
+  test("cost/claude-code: the subagent TTL prices a subagent request, the main one the main request #BUG-329/ttl-subagent", () => {
     const { ledger, t } = claude({ cacheTtl: { main: "5m", subagent: "1h" } });
     t.claudeRequest({ ...req, reportedUsd: 0.145 });
     t.claudeRequest({ ...req, subagent: true, reportedUsd: 0.22 });
@@ -780,7 +780,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     expect(assumptionsOf(ledger)).toEqual([[], []]);
   });
 
-  test("BUG-330/cause-ttl-5m: a request our 1h figure disagrees with by the write's rate step is attributed to cache-ttl-5m, and the TTL stays the setting's", () => {
+  test("ledger/audit: a request our 1h figure disagrees with by the write's rate step is attributed to cache-ttl-5m, and the TTL stays the setting's #BUG-330/cause-ttl-5m", () => {
     const { ledger, t } = claude({ cacheTtl: { main: "1h" } });
     t.claudeRequest({ ...req, reportedUsd: 0.145 });
     expect(ledger.divergences().map((d) => [d.cause, d.reportedMicros, d.ownMicros])).toEqual([["cache-ttl-5m", 145_000, 220_000]]);
@@ -788,7 +788,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     expect(t.figure()!.usd).toBeCloseTo(0.44, 9);
   });
 
-  test("BUG-331/fast-mode: a fast request is priced from the catalog's fast row (Opus 4.6: 6x, $0.87 where $0.145 was), a model without a fast row as usual, and a request Claude billed fast that we priced standard is attributed to fast-mode", () => {
+  test("cost/claude-code: a fast request is priced from the catalog's fast row (Opus 4.6: 6x, $0.87 where $0.145 was), a model without a fast row as usual, and a request Claude billed fast that we priced standard is attributed to fast-mode #BUG-331/fast-mode", () => {
     expect(FROZEN_CLAUDE_CATALOG.fastPricing!["claude-opus-4-6"]).toMatchObject({ input: 30, output: 150, cache_write_5m: 37.5, cache_read: 3 });
     const { ledger, t } = claude();
     t.claudeRequest({ ...req, fast: true, reportedUsd: 0.87 });
@@ -811,7 +811,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     expect(missed.ledger.divergences().map((d) => d.cause)).toEqual(["fast-mode"]);
   });
 
-  test("BUG-331/fast-prices-parse: the generator reads the fast rows out of the binary's price function by model id", () => {
+  test("pricing/sources: the generator reads the fast rows out of the binary's price function by model id #BUG-331/fast-prices-parse", () => {
     const text = 'var a={inputTokens:5,outputTokens:25,promptCacheWriteTokens:6.25,promptCacheWrite1hTokens:10,promptCacheReadTokens:0.5,webSearchRequests:0.01},g_={inputTokens:30,outputTokens:150,promptCacheWriteTokens:37.5,promptCacheWrite1hTokens:60,promptCacheReadTokens:3,webSearchRequests:0.01},$w={inputTokens:10,outputTokens:50,promptCacheWriteTokens:12.5,promptCacheWrite1hTokens:20,promptCacheReadTokens:1,webSearchRequests:0.01};function L(e,n){let r=e;if(n.speed==="fast"){if(r==="claude-opus-4-8"||r==="claude-opus-5")return $w;if(r==="claude-opus-4-6")return g_}return a}';
     const fast = fastPrices(text);
     expect(Object.keys(fast)).toEqual(["claude-opus-4-6", "claude-opus-4-8", "claude-opus-5"]);
@@ -823,7 +823,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     for (const id of Object.keys(CLAUDE_CATALOG.fastPricing!)) expect(CLAUDE_CATALOG.models.some((m) => m.id === id)).toBe(true);
   });
 
-  test("BUG-332/cause-web-search: a difference of one or two search fees is attributed to web-search", () => {
+  test("ledger/audit: a difference of one or two search fees is attributed to web-search #BUG-332/cause-web-search", () => {
     for (const [fees, usd] of [[1, 0.155], [2, 0.165]] as const) {
       const { ledger, t } = claude();
       t.claudeRequest({ ...req, reportedUsd: usd });
@@ -831,7 +831,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     }
   });
 
-  test("BUG-334/no-model: a Claude request that names no model is counted at the launched model's price and tagged launched-model-price; with no launched model it is unknown", () => {
+  test("cost/unpriced-model: a Claude request that names no model is counted at the launched model's price and tagged launched-model-price; with no launched model it is unknown #BUG-334/no-model", () => {
     const { ledger, t } = claude({ launchedKey: "anthropic/claude-opus-4-6" });
     t.claudeRequest({ input: 1000, output: 600, cacheRead: 0, cacheWrite: 20_000 });
     expect(t.figure()).toEqual({ usd: 0.145, approx: true, own: true });
@@ -842,7 +842,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
     expect(bare.ledger.entries[0]).toMatchObject({ kind: "usage", assumptions: ["unknown-model"] });
   });
 
-  test("a harness's own cost audited without being the figure: observeCost writes the ledger only, so with no request of ours (the user's own OTEL) nothing is shown", () => {
+  test("cost/own-figure: a harness's own cost audited without being the figure: observeCost writes the ledger only, so with no request of ours (the user's own OTEL) nothing is shown", () => {
     const { ledger, t } = claude();
     t.observeCost(1.23);
     expect(t.figure()).toBeUndefined();
@@ -854,7 +854,7 @@ describe("Claude Code: its cache TTL, fast mode, web search and the request that
 });
 
 describe("Claude Code's window: the launched model's 1M, every default model sized", () => {
-  test("a [1m] on the launched model carries over to the telemetry's suffix-less name of the same model, where the catalog supports it; the disable variable and a different model keep 200k", () => {
+  test("context/window: a [1m] on the launched model carries over to the telemetry's suffix-less name of the same model, where the catalog supports it; the disable variable and a different model keep 200k", () => {
     expect(ownWindow("claude-code", "claude-opus-4-6", { launchedModel: "claude-opus-4-6[1m]" })).toEqual({ window: 1_000_000, source: "claude-launched" });
     expect(ownWindow("claude-code", "claude-opus-4-6-20260101", { launchedModel: "claude-opus-4-6[1m]" }).window).toBe(1_000_000);
     expect(ownWindow("claude-code", "claude-sonnet-4-6", { launchedModel: "claude-opus-4-6[1m]" }).window).toBe(200_000);
@@ -867,7 +867,7 @@ describe("Claude Code's window: the launched model's 1M, every default model siz
     expect(ownWindow("claude-code", "claude-opus-4-6", { launchedModel: "claude-opus-4-6", peak: 250_000 })).toEqual({ window: 1_000_000, source: "claude-peak" });
   });
 
-  test("every Claude model Gluon offers has a window of ours on every connection it runs on (the id the telemetry will name or the launch used)", () => {
+  test("cost/every-model-priced: every Claude model Gluon offers has a window of ours on every connection it runs on (the id the telemetry will name or the launch used)", () => {
     const conns: Conn[] = ["plan", "anthropic", "bedrock", "openrouter"];
     for (const m of DEFAULT_MODELS["claude-code"]) {
       for (const conn of conns) {
@@ -890,7 +890,7 @@ describe("BUG-471: Claude Code's own fallback price for an id its catalog lacks 
   const fallbackUsd = claudeCost(fallbackRow, { input_tokens: request.input, output_tokens: request.output, cache_creation_input_tokens: request.cacheWrite }).usd;
   const tracker = (ledger: Ledger) => frozenTracker({ harness: "claude-code", conn: "openrouter", launchedKey: "openrouter/anthropic/claude-haiku-4.5", ledger, table, now: () => 1 });
 
-  test("the observed request: ours is the billed $0.0422, Claude's $0.1688 is the fallback row's price, and the ledger says so instead of 'unexplained'", () => {
+  test("ledger/audit: the observed request: ours is the billed $0.0422, Claude's $0.1688 is the fallback row's price, and the ledger says so instead of 'unexplained'", () => {
     expect(claudeCatalogModel("anthropic/claude-haiku-4.5", FROZEN_CLAUDE_CATALOG)).toBeUndefined();
     expect(fallbackUsd).toBeCloseTo(0.1688, 4);
     const ledger = new Ledger();
@@ -905,7 +905,7 @@ describe("BUG-471: Claude Code's own fallback price for an id its catalog lacks 
     expect(t.figure()!.usd).toBeCloseTo(0.0422, 4);
   });
 
-  test("the cause is for an id the catalog lacks only: the same figure on an id it lists, or one that matches no row, stays unexplained", () => {
+  test("ledger/audit: the cause is for an id the catalog lacks only: the same figure on an id it lists, or one that matches no row, stays unexplained", () => {
     const listed = new Ledger();
     tracker(listed).claudeRequest({ ...request, model: "claude-haiku-4-5", reportedUsd: fallbackUsd });
     expect(listed.divergences().map((d) => d.cause)).toEqual(["unexplained"]);
@@ -920,7 +920,7 @@ describe("BUG-471: Claude Code's own fallback price for an id its catalog lacks 
     expect(same.divergences()).toEqual([]);
   });
 
-  test("the name is a ledger cause the file keeps, and the report counts it", () => {
+  test("ledger/audit: the name is a ledger cause the file keeps, and the report counts it", () => {
     const ledger = new Ledger();
     tracker(ledger).claudeRequest({ ...request, reportedUsd: fallbackUsd });
     expect(reportLines(ledger.entries).join("\n")).toContain("claude-code harness-unknown-model-price");
@@ -945,7 +945,7 @@ describe("BUG-472: a running total that arrives before the usage record it inclu
 
   const cumulative = (ledger: Ledger) => ledger.entries.filter((e) => e.kind === "observation" && e.scope === "cumulative") as { reportedMicros: number; ownMicros: number; cause: string }[];
 
-  test("Claude Code: the plugin's sample before the request's usage record (a one-turn session)", () => {
+  test("ledger/audit: Claude Code: the plugin's sample before the request's usage record (a one-turn session)", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     t.observeCost(claudeUsd);
@@ -959,7 +959,7 @@ describe("BUG-472: a running total that arrives before the usage record it inclu
     expect(reportLines(ledger.entries).join("\n")).toContain("running total: 1 observation, 0 differ");
   });
 
-  test("Claude Code: the telemetry's cumulative metric too, and a turn after turn: each total is met by its own request", () => {
+  test("ledger/audit: Claude Code: the telemetry's cumulative metric too, and a turn after turn: each total is met by its own request", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     for (let i = 1; i <= 3; i++) {
@@ -972,7 +972,7 @@ describe("BUG-472: a running total that arrives before the usage record it inclu
     expect(ledger.divergences()).toEqual([]);
   });
 
-  test("OpenCode: the `usage.updated` total before the step's record", () => {
+  test("ledger/audit: OpenCode: the `usage.updated` total before the step's record", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "opencode", conn: "openrouter", ledger, now: () => 1 });
     t.reportedCumulative(stepUsd);
@@ -982,7 +982,7 @@ describe("BUG-472: a running total that arrives before the usage record it inclu
     expect(ledger.divergences()).toEqual([]);
   });
 
-  test("a total that stays ahead of ours is still a divergence: judged when the session ends, or after the grace window at the next record, never silently dropped", () => {
+  test("ledger/audit: a total that stays ahead of ours is still a divergence: judged when the session ends, or after the grace window at the next record, never silently dropped", () => {
     let now = 1;
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => now });
@@ -1002,7 +1002,7 @@ describe("BUG-472: a running total that arrives before the usage record it inclu
     expect(ended.divergences().length).toBe(1);
   });
 
-  test("a total level with ours or behind it (the telemetry first, the old order) is written at once, as before", () => {
+  test("ledger/audit: a total level with ours or behind it (the telemetry first, the old order) is written at once, as before", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     t.claudeRequest(claudeReq);
@@ -1017,7 +1017,7 @@ describe("BUG-473: a context reading that arrives before the request's usage rec
   const contexts = (ledger: Ledger) => ledger.entries.filter((e) => e.kind === "context") as Context[];
 
   for (const harness of ["claude-code", "opencode"] as const) {
-    test(`${harness}: the reading first, then ours: one entry with both sides and the cause none`, () => {
+    test(`ledger/audit: ${harness}: the reading first, then ours: one entry with both sides and the cause none`, () => {
       const ledger = new Ledger();
       const t = frozenTracker({ harness, conn: "anthropic", ledger, now: () => 1 });
       t.observeContext({ reported: { tokens: 40_000, window: 200_000 } });
@@ -1030,7 +1030,7 @@ describe("BUG-473: a context reading that arrives before the request's usage rec
     });
   }
 
-  test("a turn after turn: each reading meets the request that follows it, and the last one is compared too", () => {
+  test("ledger/audit: a turn after turn: each reading meets the request that follows it, and the last one is compared too", () => {
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1 });
     t.ownContextChanged({ tokens: 20_000, window: 200_000 });
@@ -1042,7 +1042,7 @@ describe("BUG-473: a context reading that arrives before the request's usage rec
     expect(contexts(ledger).map((c) => [c.ownPct, c.reportedPct, c.cause])).toEqual([[20, 20, "none"], [30, 30, "none"], [40, 40, "none"]]);
   });
 
-  test("a reading that never agrees is a real difference, written against ours when the next reading comes, when the grace window passes, or at the end", () => {
+  test("ledger/audit: a reading that never agrees is a real difference, written against ours when the next reading comes, when the grace window passes, or at the end", () => {
     let now = 1;
     const ledger = new Ledger();
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => now });
@@ -1067,7 +1067,7 @@ describe("BUG-473: a context reading that arrives before the request's usage rec
 });
 
 describe("BUG-475: a session's tracker is ended at every way out of Gluon", () => {
-  test("the process's exit (a crash included) ends the trackers still waiting, and a session's own end drops its tracker", () => {
+  test("ledger/audit: the process's exit (a crash included) ends the trackers still waiting, and a session's own end drops its tracker", () => {
     const src = readFileSync(join(import.meta.dir, "..", "src", "gluon.ts"), "utf8");
     expect(src).toMatch(/process\.on\("exit", \(\) => \{[^}]*for \(const t of trackers\) t\.ended\(\);/s);
     expect(src).toMatch(/tracker\.ended\(\);\s*trackers\.delete\(tracker\);/);
@@ -1087,7 +1087,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
   const literal = (mutate: (c: Record<string, any>) => void) => claudeCatalogLiteral(mutate);
   const build = (mutate: (c: Record<string, any>) => void) => claudeTable(literal(mutate), { version: "9.9.9", fastPricing: {} });
 
-  test("a literal is never evaluated and a hostile one only ever throws an Error: deep nesting, a huge string, odd escapes, comments, numbers that are not numbers", () => {
+  test("pricing/validated: a literal is never evaluated and a hostile one only ever throws an Error: deep nesting, a huge string, odd escapes, comments, numbers that are not numbers", () => {
     const hostile = [
       "[".repeat(200_000),
       `{a:${"[".repeat(100_000)}${"]".repeat(100_000)}}`,
@@ -1129,12 +1129,12 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     expect((({}) as Record<string, unknown>).x).toBeUndefined();
   });
 
-  test("the numbers a bundler writes: 1e6, 1E-3, -0, 12.5, and a number that is too big is Infinity (the table then refuses it)", () => {
+  test("pricing/validated: the numbers a bundler writes: 1e6, 1E-3, -0, 12.5, and a number that is too big is Infinity (the table then refuses it)", () => {
     expect(parseJsLiteral("[1e6,1E-3,-0,12.5,0,007]")).toEqual([1_000_000, 0.001, -0, 12.5, 0, 7]);
     expect(parseJsLiteral("[1e999]")).toEqual([Infinity]);
   });
 
-  test("balancedObject: a brace inside a string or after an escaped quote does not close it, and one that never closes within the limit is null", () => {
+  test("pricing/validated: balancedObject: a brace inside a string or after an escaped quote does not close it, and one that never closes within the limit is null", () => {
     expect(balancedObject('{a:"}",b:"\\"}"}tail', 0)).toBe('{a:"}",b:"\\"}"}');
     expect(balancedObject("{a:{b:{c:1}}", 0)).toBeNull();
     expect(balancedObject(`{a:"${"x".repeat(500)}"}`, 0, 100)).toBeNull();
@@ -1142,7 +1142,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
 
   // `trim` gives a model whose `context.window` is not a number 200,000 (`claude-catalog.ts`), and the table is valid: a layout Claude Code changed (a renamed field) on a
   // user's newer binary makes every model 200k, so a 1M model's context reads 5x too full until it passes 200k. Gluon runs this build on the user's machine, no maintainer in the loop.
-  test("BUG-633/QA-cost-08: a catalog model whose context has no window is refused, not sized 200k: a layout Claude Code changed must not silently make every 1M model read 5x too full", () => {
+  test("pricing/validated: a catalog model whose context has no window is refused, not sized 200k: a layout Claude Code changed must not silently make every 1M model read 5x too full #BUG-633/QA-cost-08", () => {
     expect(() => build((c) => void (c.models[0].context = {}))).toThrow();
   });
 
@@ -1154,7 +1154,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     c.models.push({ id: "claude-haiku-5-5", family: "haiku", provider_ids: { first_party: "claude-haiku-5-5" }, pricing: "haiku_55", context: { window: 1_000_000, native_1m: true, supports_1m_beta: true } });
   };
 
-  test("BUG-675/claude-2.1.293: a catalog with legacy models that have no context and a tier with a long_prompt row builds a valid table (the model without a context is 200k)", () => {
+  test("pricing/validated: a catalog with legacy models that have no context and a tier with a long_prompt row builds a valid table (the model without a context is 200k) #BUG-675/claude-2.1.293", () => {
     const table = build(as293);
     expect(tableProblem("claude-catalog", table)).toBeNull();
     const legacy = table.models.filter((m) => m.id.startsWith("claude-3-9-test-"));
@@ -1163,7 +1163,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     expect(table.pricingTiers.haiku_55!.long_prompt).toEqual({ above_prompt_tokens: 100000, input: 0.5, output: 2.5, cache_write_5m: 0.625, cache_write_1h: 1, cache_read: 0.05 });
   });
 
-  test("BUG-675/claude-2.1.293: only a claude-3- model with no context is sized 200k: any other model without one throws, so a moved layout (or 8 of 11 1M models losing theirs) never builds at 200k", () => {
+  test("pricing/validated: only a claude-3- model with no context is sized 200k: any other model without one throws, so a moved layout (or 8 of 11 1M models losing theirs) never builds at 200k #BUG-675/claude-2.1.293", () => {
     expect(() => build((c) => void delete c.models.find((m: { id: string }) => !m.id.startsWith("claude-3-")).context)).toThrow(/without a context window/);
     expect(() => build((c) => void c.models.forEach((m: Record<string, unknown>) => delete m.context))).toThrow(/without a context window/);
     // A legacy id keeps its 200k only by its id, not because others lack a context too.
@@ -1173,7 +1173,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     })).toThrow(/without a context window/);
   });
 
-  test("BUG-675/claude-2.1.293: a prompt over a tier's long_prompt size is billed wholly at that row, as Claude Code 2.1.293 reports it (captured: $0.001300 under, $0.015750 over)", () => {
+  test("cost/claude-code: a prompt over a tier's long_prompt size is billed wholly at that row, as Claude Code 2.1.293 reports it (captured: $0.001300 under, $0.015750 over) #BUG-675/claude-2.1.293", () => {
     const price = claudePriceFromTier(build(as293).pricingTiers.haiku_55!);
     // Under: 1000 + 90,000 cache read = 91,000 prompt tokens, the usual row.
     expect(claudeCost(price, { input_tokens: 1000, output_tokens: 600, cache_read_input_tokens: 90_000 }).micros).toBe(1300);
@@ -1185,7 +1185,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     expect(claudeCost(price, { input_tokens: 1000, output_tokens: 0, server_tool_use: { web_search_requests: 1 }, cache_read_input_tokens: 200_000 }).micros).toBe(500 + 10_000 + 10_000);
   });
 
-  test("BUG-675/claude-2.1.293: the change guard reads a long_prompt row as prices: a new tier is no change of an old one, a long price that moved 4x is named", () => {
+  test("pricing/big-move: the change guard reads a long_prompt row as prices: a new tier is no change of an old one, a long price that moved 4x is named #BUG-675/claude-2.1.293", () => {
     const before = build(() => {}) as unknown as Record<string, unknown>;
     const after = build(as293) as unknown as Record<string, unknown>;
     expect(changeProblems("claude-catalog", before, after).gone).toEqual([]);
@@ -1196,7 +1196,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     expect(changeProblems("claude-catalog", after, dearer).moved.some((m) => m.includes("long_prompt.input"))).toBe(true);
   });
 
-  test("BUG-675/claude-2.1.293: the tracker prices a Haiku 5.5 request by its long row and its figure equals what Claude Code reported (no divergence)", () => {
+  test("cost/claude-code: the tracker prices a Haiku 5.5 request by its long row and its figure equals what Claude Code reported (no divergence) #BUG-675/claude-2.1.293", () => {
     const ledger = new Ledger();
     const claudeCatalog = { ...CLAUDE_CATALOG, ...build(as293), claudeCodeVersion: "2.1.293" } as typeof CLAUDE_CATALOG;
     const t = frozenTracker({ harness: "claude-code", conn: "anthropic", ledger, now: () => 1, claudeCatalog });
@@ -1206,7 +1206,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     expect(ledger.divergences()).toEqual([]);
   });
 
-  test("Haiku 5.5 outside Claude Code's catalog (2.1.289's, an OpenRouter id) is priced from models.dev's row, its context tier as the long-prompt row: the same figures as the catalog's", () => {
+  test("cost/claude-code: Haiku 5.5 outside Claude Code's catalog (2.1.289's, an OpenRouter id) is priced from models.dev's row, its context tier as the long-prompt row: the same figures as the catalog's", () => {
     for (const key of ["anthropic/claude-haiku-5-5", "amazon-bedrock/global.anthropic.claude-haiku-5-5", "openrouter/anthropic/claude-haiku-5.5"]) {
       const price = claudePriceFrom(priceEntry(key, MODELS_DEV)!.cost);
       expect([key, price.longPrompt?.abovePromptTokens, price.longPrompt?.inputTokens]).toEqual([key, 100_000, 0.5]);
@@ -1223,7 +1223,7 @@ describe("QA cost: the literal parser and the Claude catalog read from a binary"
     expect(t.figure()!.usd).toBeCloseTo(0.01575, 9);
   });
 
-  test("BUG-717/bedrock-price: on Bedrock a Claude model is priced from models.dev's amazon-bedrock row (AWS bills its own list, not Claude's); Claude's list price, its own figure, is the named cause of the difference", () => {
+  test("cost/by-connection: on Bedrock a Claude model is priced from models.dev's amazon-bedrock row (AWS bills its own list, not Claude's); Claude's list price, its own figure, is the named cause of the difference #BUG-717/bedrock-price", () => {
     const ledger = new Ledger();
     // The fixture's regional Sonnet 5.5 row (input $2.20, cache read $0.22) where Claude's catalog lists $2 and $0.20.
     const t = frozenTracker({ harness: "claude-code", conn: "bedrock", ledger, now: () => 1, table: MODELS_DEV, claudeCatalog: CLAUDE_CATALOG });

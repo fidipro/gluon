@@ -77,7 +77,7 @@ const claudeBytes = (fast: string, mutate: (c: Record<string, any>) => void = ad
 
 
 describe("BUG-500/fails-closed: under a test the tables reach no network and run no binary, unless a test names a server of its own", () => {
-  test("with no seam, nothing is fetched or spawned: the refreshes are no-ops that say so", async () => {
+  test("pricing/offline-under-test: with no seam, nothing is fetched or spawned: the refreshes are no-ops that say so #BUG-500/fails-closed", async () => {
     const w = world();
     const before = stored(w.dir);
     const realFetch = globalThis.fetch;
@@ -105,7 +105,7 @@ describe("BUG-500/fails-closed: under a test the tables reach no network and run
     expect(stored(w.dir)).toEqual(before);
   });
 
-  test("pricingSource: the seam names the server (loopback http only); a test build, the probes seam and NODE_ENV=test have none; a seam that doesn't read is no network", () => {
+  test("pricing/offline-under-test: pricingSource: the seam names the server (loopback http only); a test build, the probes seam and NODE_ENV=test have none; a seam that doesn't read is no network #BUG-500/fails-closed", () => {
     const dir = scratch();
     const seam = (body: unknown) => {
       const f = join(dir, `seam-${Math.random()}.json`);
@@ -124,7 +124,7 @@ describe("BUG-500/fails-closed: under a test the tables reach no network and run
     expect(pricingSource({ GLUON_TEST_PRICING: join(dir, "missing.json") })).toBeNull();
   });
 
-  test("the seam is compiled out of a release build (the file is not in the bundle) and kept in a test build; the pack and dist checks name it", async () => {
+  test("pricing/offline-under-test: the seam is compiled out of a release build (the file is not in the bundle) and kept in a test build; the pack and dist checks name it #BUG-500/fails-closed", async () => {
     const build = async (flavor: string) => {
       const r = await Bun.build({ entrypoints: [join(ROOT, "src/cost/refresh.ts")], target: "bun", minify: true, define: { GLUON_BUILD: JSON.stringify(flavor), "process.env.NODE_ENV": JSON.stringify("production") } });
       expect(r.success).toBe(true);
@@ -139,7 +139,7 @@ describe("BUG-500/fails-closed: under a test the tables reach no network and run
 });
 
 describe("BUG-501/offline: a source that doesn't answer keeps the last good table, whatever its age", () => {
-  test("no answer, a 404 or a throwing fetch: nothing written, the registry and the files are as they were, nothing is logged", async () => {
+  test("pricing/offline: no answer, a 404 or a throwing fetch: nothing written, the registry and the files are as they were, nothing is logged #BUG-501/offline", async () => {
     const w = world();
     const before = stored(w.dir);
     const was = w.tables();
@@ -153,7 +153,7 @@ describe("BUG-501/offline: a source that doesn't answer keeps the last good tabl
     expect(w.ledger).toEqual([]);
   });
 
-  test("an answer over its size cap or after a redirect is no answer (the real fetch, a local server)", async () => {
+  test("pricing/fetch: an answer over its size cap or after a redirect is no answer (the real fetch, a local server) #BUG-501/offline", async () => {
     const w = world();
     const before = stored(w.dir)["modelsdev.json"];
     const big = servePricing({ ...fixtureSources(), modelsDev: () => "x".repeat(16_100_000) });
@@ -170,7 +170,7 @@ describe("BUG-501/offline: a source that doesn't answer keeps the last good tabl
     expect(stored(w.dir)["modelsdev.json"]).toEqual(before);
   });
 
-  test("with no stored table at all, a failed refresh leaves none (the first run offline: no price, no window)", async () => {
+  test("pricing/offline: with no stored table at all, a failed refresh leaves none (the first run offline: no price, no window) #BUG-501/offline", async () => {
     const w = world({ seed: false });
     await refreshNetworkTables({ ...w.deps, source: SRC, fetchText: async () => null });
     expect([existsSync(w.dir), w.tables()]).toEqual([false, {}]);
@@ -178,7 +178,7 @@ describe("BUG-501/offline: a source that doesn't answer keeps the last good tabl
 });
 
 describe("BUG-502/malformed: a source whose answer is not what was expected is refused, and the store is left as it is", () => {
-  test("models.dev and OpenRouter's listing: not JSON, not an object, no models: refused, the stored table is as it was", async () => {
+  test("pricing/validated: models.dev and OpenRouter's listing: not JSON, not an object, no models: refused, the stored table is as it was #BUG-502/malformed", async () => {
     const cases: [string, Partial<Sources>][] = [
       ["models.dev is not JSON", { modelsDev: () => "<html>" }],
       ["models.dev is an array", { modelsDev: () => "[]" }],
@@ -196,7 +196,7 @@ describe("BUG-502/malformed: a source whose answer is not what was expected is r
     }
   });
 
-  test("a table that fails the schema is refused however small its change; `gluon pricing update` exits 1 and names it", async () => {
+  test("pricing/validated: a table that fails the schema is refused however small its change; `gluon pricing update` exits 1 and names it #BUG-502/malformed", async () => {
     const w = world();
     const out: string[] = [];
     const err: string[] = [];
@@ -209,7 +209,7 @@ describe("BUG-502/malformed: a source whose answer is not what was expected is r
 });
 
 describe("BUG-503/big-move: a big move is accepted and logged in the audit ledger, never refused", () => {
-  test("every Claude tier x10 and a model gone, read from the binary: written, said, and one `tables` entry names the largest moves", async () => {
+  test("pricing/big-move: every Claude tier x10 and a model gone, read from the binary: written, said, and one `tables` entry names the largest moves #BUG-503/big-move", async () => {
     const w = world();
     const gone = FIXTURE_TABLES["claude-catalog"].models[0]!.id;
     const x10 = (c: Record<string, any>) => {
@@ -240,7 +240,7 @@ describe("BUG-503/big-move: a big move is accepted and logged in the audit ledge
     expect(e.prices[0]!.to / e.prices[0]!.from).toBeCloseTo(10);
   });
 
-  test("the entry reaches the ledger file (private, one line) and reads back; a first table is no big move; a refresh that changes nothing logs nothing", async () => {
+  test("pricing/big-move: the entry reaches the ledger file (private, one line) and reads back; a first table is no big move; a refresh that changes nothing logs nothing #BUG-503/big-move", async () => {
     const w = world({ seed: false });
     const ledgerDir = join(w.root, "audit");
     const write = openLedgerFile(ledgerDir, { restrict: false })!;
@@ -262,7 +262,7 @@ describe("BUG-503/big-move: a big move is accepted and logged in the audit ledge
     expect(w2.ledger).toEqual([]);
   });
 
-  test("sanitize keeps a `tables` entry to its whitelist: a table and way Gluon knows, a digest prefix, a moment, bounded prices named by an id", () => {
+  test("ledger/entries: sanitize keeps a `tables` entry to its whitelist: a table and way Gluon knows, a digest prefix, a moment, bounded prices named by an id #BUG-503/big-move", () => {
     const good = { kind: "tables", t: 1_000, table: "modelsdev", via: "openrouter-row", digest: "ab12", fetchedAt: "2026-10-06T12:00:00.000Z", moved: 2, gone: 0, big: false, prices: [{ key: "openrouter/a/b.cost.input", from: 1, to: 2.5 }], harness: "claude-code" };
     expect(sanitize(good)).toEqual(good as never);
     const { harness: _h, ...none } = good;
@@ -280,7 +280,7 @@ describe("BUG-503/big-move: a big move is accepted and logged in the audit ledge
 });
 
 describe("BUG-504/dedupe: one network refresh at a time", () => {
-  test("a second call while one runs is the same promise, and each source is asked once", async () => {
+  test("pricing/when: a second call while one runs is the same promise, and each source is asked once #BUG-504/dedupe", async () => {
     const w = world();
     const f = fakeFetch();
     let release!: () => void;
@@ -300,7 +300,7 @@ describe("BUG-504/dedupe: one network refresh at a time", () => {
     expect(f.asked.filter((u) => u.endsWith("/api.json"))).toHaveLength(2);
   });
 
-  test("the endpoints of the models Gluon offers on OpenRouter are asked a few at a time, a failed one keeps the stored range, a 404 model none", async () => {
+  test("pricing/sources: the endpoints of the models Gluon offers on OpenRouter are asked a few at a time, a failed one keeps the stored range, a 404 model none #BUG-504/dedupe", async () => {
     const w = world();
     const f = fakeFetch();
     const wantedIds = Object.entries(FIXTURE_TABLES.modelsdev.entries).filter(([k, e]) => k.startsWith("openrouter/") && e.endpoints).map(([k]) => k.slice(11));
@@ -335,7 +335,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     return { deps, spawned, read };
   };
 
-  test("Codex: the stored version is not run again; a new one runs `debug models` in a neutral directory and stores the windows", async () => {
+  test("pricing/sources: Codex: the stored version is not run again; a new one runs `debug models` in a neutral directory and stores the windows #BUG-505/binary-version", async () => {
     const w = world();
     const { deps, spawned } = binary(w);
     const same = await refreshBinaryTables("codex", "0.159.3", deps);
@@ -355,7 +355,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(w.ledger).toEqual([expect.objectContaining({ kind: "tables", table: "codex-windows", via: "binary", harness: "codex" })]);
   });
 
-  test("Codex: not installed, a dump that prints nothing or has no model, an unknown version: skipped or refused, the stored table stays", async () => {
+  test("pricing/sources: Codex: not installed, a dump that prints nothing or has no model, an unknown version: skipped or refused, the stored table stays #BUG-505/binary-version", async () => {
     const w = world();
     const before = stored(w.dir);
     expect((await refreshBinaryTables("codex", "0.200.1", { ...binary(w).deps, bin: () => undefined })).reports[0]).toMatchObject({ status: "skipped", detail: expect.stringContaining("not installed") });
@@ -368,7 +368,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(stored(w.dir)).toEqual(before);
   });
 
-  test("a build that failed for a version is not tried again in this run (a binary is not read at every launch)", async () => {
+  test("pricing/sources: a build that failed for a version is not tried again in this run (a binary is not read at every launch) #BUG-505/binary-version", async () => {
     const w = world();
     const { deps, spawned } = binary(w, { spawn: async () => null });
     await refreshBinaryTables("codex", "0.300.0", deps);
@@ -381,7 +381,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(calls).toEqual(["/opt/codex debug models"]);
   });
 
-  test("Grok: the stored version is not read; a new one is read as bytes, over models.dev's seed, with the binary's windows", async () => {
+  test("pricing/sources: Grok: the stored version is not read; a new one is read as bytes, over models.dev's seed, with the binary's windows #BUG-505/binary-version", async () => {
     const w = world();
     const models = Object.entries(FIXTURE_TABLES["grok-models"].models).filter(([, m]) => m.source === "binary").map(([id, m]) => ({ id, context_window: m.context, auto_compact_threshold_percent: m.autoCompactPercent }));
     models.push({ id: "grok-test-1", context_window: 777_000, auto_compact_threshold_percent: 70 });
@@ -401,7 +401,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(w.tables().grokModels).toMatchObject({ grokVersion: "1.7.2" });
   });
 
-  test("BUG-604/grok: a binary model with a window of 5 (or a price over the bound) is skipped and named; the other models and the table are written", async () => {
+  test("pricing/validated: a binary model with a window of 5 (or a price over the bound) is skipped and named; the other models and the table are written #BUG-604/grok", async () => {
     const w = world();
     const models: Record<string, unknown>[] = Object.entries(FIXTURE_TABLES["grok-models"].models).filter(([, m]) => m.source === "binary").map(([id, m]) => ({ id, context_window: m.context }));
     models.push({ id: "grok-tiny", context_window: 5 }, { id: "grok-dear", context_window: 200_000, cost: { input: 9_000, output: 1 } }, { id: "grok-fine", context_window: 321_000, cost: { input: 1, output: 2 } });
@@ -416,7 +416,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(w.ledger).toEqual([expect.objectContaining({ kind: "tables", table: "grok-models", skipped: 2, skippedNames: ["grok-dear", "grok-tiny"] })]);
   });
 
-  test("Grok's seeded prices follow a new models.dev table without reading the binary again", async () => {
+  test("pricing/sources: Grok's seeded prices follow a new models.dev table without reading the binary again #BUG-505/binary-version", async () => {
     const w = world();
     const seeded = Object.entries(w.tables().grokModels!.models).find(([, m]) => m.costSource === "models.dev-seed" && m.cost)!;
     const f = fakeFetch();
@@ -433,7 +433,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     for (const [id, m] of Object.entries(FIXTURE_TABLES["grok-models"].models)) if (m.source === "binary") expect(w.tables().grokModels!.models[id]).toMatchObject({ context: m.context, source: "binary", ...(m.autoCompactPercent ? { autoCompactPercent: m.autoCompactPercent } : {}) });
   });
 
-  test("Claude: the whole table (catalog and fast-mode rows) is rebuilt from the installed binary when its version is new; the stored version is not read", async () => {
+  test("pricing/sources: Claude: the whole table (catalog and fast-mode rows) is rebuilt from the installed binary when its version is new; the stored version is not read #BUG-505/binary-version", async () => {
     const w = world();
     const rows = clone(FIXTURE_TABLES["claude-catalog"].fastPricing!);
     const first = Object.keys(rows)[0]!;
@@ -454,7 +454,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(w.tables().claudeCatalog).toMatchObject({ claudeCodeVersion: "2.9.9", fastPricing: rows });
   });
 
-  test("Claude's table is never fetched: the network refresh leaves it alone, whatever the binary table is (or isn't)", async () => {
+  test("pricing/sources: Claude's table is never fetched: the network refresh leaves it alone, whatever the binary table is (or isn't) #BUG-505/binary-version", async () => {
     const w = world({ seed: false });
     const rows = clone(FIXTURE_TABLES["claude-catalog"].fastPricing!);
     const { deps } = binary(w, { readBinary: () => claudeBytes(FAST(rows)) });
@@ -471,7 +471,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
     expect(none.tables().claudeCatalog).toBeUndefined();
   });
 
-  test("`gluon pricing update` runs the network refresh, then every installed harness's binary tables, and prints what was written and what moved", async () => {
+  test("pricing/command: `gluon pricing update` runs the network refresh, then every installed harness's binary tables, and prints what was written and what moved #BUG-505/binary-version", async () => {
     const w = world();
     const out: string[] = [];
     const sources = fixtureSources();
@@ -502,7 +502,7 @@ describe("BUG-505/binary-version: a binary table is read only when the binary's 
 
 describe("BUG-506/openrouter-row: a launch on an OpenRouter model refreshes that model's row and nothing else", () => {
   const ID = "anthropic/claude-haiku-4.5";
-  test("its price and endpoints are replaced on the stored table; every other entry is as it was; only the listing and its endpoints are asked", async () => {
+  test("pricing/when: its price and endpoints are replaced on the stored table; every other entry is as it was; only the listing and its endpoints are asked #BUG-506/openrouter-row", async () => {
     const w = world();
     const before = clone(w.tables().modelsdev!);
     const listing = openRouterListing();
@@ -524,7 +524,7 @@ describe("BUG-506/openrouter-row: a launch on an OpenRouter model refreshes that
     expect(w.ledger).toEqual([expect.objectContaining({ kind: "tables", table: "modelsdev", via: "openrouter-row", moved: 2, prices: expect.arrayContaining([expect.objectContaining({ key: `openrouter/${ID}.cost.input`, from: 1, to: 1.5 })]) })]);
   });
 
-  test("a model OpenRouter doesn't list, a failed answer, no stored table and an id that is no id: nothing is written", async () => {
+  test("pricing/when: a model OpenRouter doesn't list, a failed answer, no stored table and an id that is no id: nothing is written #BUG-506/openrouter-row", async () => {
     const w = world();
     const entries = clone(w.tables().modelsdev!.entries);
     const f = fakeFetch({ ...fixtureSources(), listing: () => JSON.stringify({ data: openRouterListing().data.filter((m) => m.id !== ID) }) });
@@ -546,7 +546,7 @@ describe("BUG-506/openrouter-row: a launch on an OpenRouter model refreshes that
 });
 
 describe("BUG-507/launch: a launch starts the refreshes and never waits for them", () => {
-  test("refreshOnLaunch returns at once while every source is still pending, and the work finishes behind it", async () => {
+  test("pricing/when: refreshOnLaunch returns at once while every source is still pending, and the work finishes behind it #BUG-507/launch", async () => {
     const w = world();
     const f = fakeFetch();
     let release!: () => void;
@@ -564,7 +564,7 @@ describe("BUG-507/launch: a launch starts the refreshes and never waits for them
     expect(f.asked.length).toBeGreaterThan(2);
   });
 
-  test("the network tables again only when none is running and the last success is more than 10 minutes old; an OpenRouter launch refreshes its row in between", async () => {
+  test("pricing/when: the network tables again only when none is running and the last success is more than 10 minutes old; an OpenRouter launch refreshes its row in between #BUG-507/launch", async () => {
     const w = world();
     const f = fakeFetch();
     const deps: RefreshDeps = { ...w.deps, source: SRC, live: true, bin: () => undefined, fetchText: f.fetchText };
@@ -590,7 +590,7 @@ describe("BUG-507/launch: a launch starts the refreshes and never waits for them
     expect(f.asked.slice(before).map((u) => new URL(u).pathname)).toContain("/api.json");
   });
 
-  test("a harness launch reads its binary table in the background for a new version", async () => {
+  test("pricing/when: a harness launch reads its binary table in the background for a new version #BUG-507/launch", async () => {
     const w = world();
     const spawned: string[] = [];
     const deps: RefreshDeps = { ...w.deps, source: SRC, live: true, bin: (h) => (h === "codex" ? "/opt/codex" : undefined), fetchText: async () => null, spawn: async (argv) => (spawned.push(argv.join(" ")), JSON.stringify({ models: [{ slug: "gpt-x", context_window: 200_000, max_context_window: 400_000, effective_context_window_percent: 90 }] })) };
@@ -603,7 +603,7 @@ describe("BUG-507/launch: a launch starts the refreshes and never waits for them
 });
 
 describe("BUG-508/full-path: the refresh against a local server, as Gluon reads it (a first run with no table)", () => {
-  test("the sources are fetched, built, validated, written private, and handed to the registry; the tables are the fixtures' prices", async () => {
+  test("pricing/store: the sources are fetched, built, validated, written private, and handed to the registry; the tables are the fixtures' prices #BUG-508/full-path", async () => {
     const w = world({ seed: false });
     const s = servePricing();
     try {
@@ -624,7 +624,7 @@ describe("BUG-508/full-path: the refresh against a local server, as Gluon reads 
     }
   });
 
-  test("the registry's listeners hear a new table; a refresh that changes nothing sets nothing new", async () => {
+  test("pricing/store: the registry's listeners hear a new table; a refresh that changes nothing sets nothing new #BUG-508/full-path", async () => {
     const w = world();
     const heard: number[] = [];
     const registry: Registry = { get: w.registry.get, set: (p) => (heard.push(Object.keys(p).length), w.registry.set(p)) };
@@ -639,7 +639,7 @@ describe("BUG-508/full-path: the refresh against a local server, as Gluon reads 
     }
   });
 
-  test("a table checked today stays 'current' without a write; one not rewritten for six hours gets its date moved", async () => {
+  test("pricing/store: a table checked today stays 'current' without a write; one not rewritten for six hours gets its date moved #BUG-508/full-path", async () => {
     const w = world({ seed: false });
     const deps = { ...w.deps, source: SRC, fetchText: fakeFetch().fetchText };
     await refreshNetworkTables(deps);
@@ -653,7 +653,7 @@ describe("BUG-508/full-path: the refresh against a local server, as Gluon reads 
     expect(JSON.parse(readFileSync(w.file("modelsdev"), "utf8")).fetchedAt).not.toBe(first);
   });
 
-  test("a directory that can't be written still gives this run the new prices", async () => {
+  test("pricing/store: a directory that can't be written still gives this run the new prices #BUG-508/full-path", async () => {
     const w = world({ seed: false });
     mkdirSync(join(w.root, "state", "gluon"), { recursive: true });
     writeFileSync(join(w.root, "state", "gluon", "tables"), "a file, not a directory");
@@ -681,7 +681,7 @@ describe("QA cost: a source's odd values", () => {
   for (const [what, row] of oddRows) {
     // One malformed model among the ~1000 of the providers OpenCode reaches makes `parseTable` refuse the WHOLE table (`modelsdev-catalog.ts` `select` copies a
     // row's `cost` and `limit` unchecked, `table-schema.ts` refuses the table), so no price anywhere is ever refreshed again until models.dev is fixed.
-    test(`BUG-604/QA-cost-01: ${what} in one model skips that model, never every price`, async () => {
+    test(`pricing/validated: ${what} in one model skips that model, never every price #BUG-604/QA-cost-01`, async () => {
       const w = world({ seed: false });
       const sources: Sources = { ...fixtureSources(), modelsDev: () => JSON.stringify(modelsDevCatalog((c) => ((c[provider] ??= { models: {} }).models["qa-odd-model"] = row))) };
       const r = await refreshNetworkTables({ ...w.deps, source: SRC, fetchText: fakeFetch(sources).fetchText });
@@ -698,7 +698,7 @@ describe("QA cost: a source's odd values", () => {
     return { w, r };
   };
 
-  test("BUG-604/variants: an Infinity (1e999 in the JSON), a missing cost, a null row and a malformed provider object skip only what is odd", async () => {
+  test("pricing/validated: an Infinity (1e999 in the JSON), a missing cost, a null row and a malformed provider object skip only what is odd #BUG-604/variants", async () => {
     const good = Object.keys(FIXTURE_TABLES.modelsdev.entries).find((k) => k.startsWith("anthropic/"))!;
     const { w, r } = await refreshWith(
       JSON.stringify(
@@ -724,7 +724,7 @@ describe("QA cost: a source's odd values", () => {
     expect(r.reports[0]!.detail).toContain("3 rows skipped as malformed (anthropic/qa-infinity, anthropic/qa-null, 1 with ids that are not plain names)");
   });
 
-  test("BUG-604/variants: select() leaves out a NaN and an Infinity, lists a skipped wanted key as missing too, and says what it skipped", () => {
+  test("pricing/validated: select() leaves out a NaN and an Infinity, lists a skipped wanted key as missing too, and says what it skipped #BUG-604/variants", () => {
     const wanted = new Set(["anthropic/a", "anthropic/b", "anthropic/c"]);
     const catalog = { anthropic: { models: { a: { cost: { input: Number.NaN, output: 1 } }, b: { cost: { input: 1, output: Number.POSITIVE_INFINITY } }, c: { cost: { input: 1, output: 2 } }, d: { cost: { input: 3, output: Number.NaN } } } } };
     const got = select(catalog, wanted, ["anthropic"]);
@@ -733,7 +733,7 @@ describe("QA cost: a source's odd values", () => {
     expect(got.skipped).toEqual(["anthropic/a", "anthropic/b", "anthropic/d"]);
   });
 
-  test("BUG-604/variants: an OpenRouter price over the table's bound skips that row, and an endpoint range over it leaves only the range off", async () => {
+  test("pricing/validated: an OpenRouter price over the table's bound skips that row, and an endpoint range over it leaves only the range off #BUG-604/variants", async () => {
     const key = [...wantedKeys()].find((k) => k.startsWith("openrouter/") && FIXTURE_TABLES.modelsdev.entries[k]?.endpoints)!;
     const id = key.slice("openrouter/".length);
     const dear = (n: number) => (n / 1e6).toString();
@@ -754,14 +754,14 @@ describe("QA cost: a source's odd values", () => {
     expect([(row as { priceSource?: string }).priceSource, (row as { endpoints?: unknown }).endpoints]).toEqual(["openrouter", undefined]);
   });
 
-  test("a table that is written without skipped rows says nothing of them (no `skipped`, no ledger field)", async () => {
+  test("pricing/validated: a table that is written without skipped rows says nothing of them (no `skipped`, no ledger field)", async () => {
     const { r, w } = await refreshWith(modelsDevCatalog());
     expect(r.reports[0]!.skipped).toBeUndefined();
     expect(r.reports[0]!.detail).not.toContain("skipped");
     expect(w.ledger).toEqual([expect.not.objectContaining({ skipped: expect.anything() })]);
   });
 
-  test("BUG-604/terminal: a source's ids and text never reach the report with a control character, and stay short", async () => {
+  test("pricing/command: a source's ids and text never reach the report with a control character, and stay short #BUG-604/terminal", async () => {
     const hostile = ["a\u001b[2Jb", "t\u001b]0;pwned\u0007x", "nul\u0000id", "line\nbreak\rid", "x".repeat(5000), `anthropic/${"y".repeat(100)}`];
     const { r, w } = await refreshWith(
       modelsDevCatalog((c) => {
@@ -782,7 +782,7 @@ describe("QA cost: a source's odd values", () => {
     expect(long.r.reports[0]!.detail).not.toContain("z".repeat(60));
   });
 
-  test("BUG-604/terminal: a parse error that quotes what the source sent is one plain line", async () => {
+  test("pricing/command: a parse error that quotes what the source sent is one plain line #BUG-604/terminal", async () => {
     for (const body of ["{\"a\": \u001b[2J\u0007\u0000}", "\u001b]0;pwned\u0007", "{\"a\": \u202e\u2066\u200f\u061c}", "\u202eevil"]) {
       const { r } = await refreshWith(body);
       expect(r.reports[0]!.status).toBe("refused");
@@ -791,13 +791,13 @@ describe("QA cost: a source's odd values", () => {
     }
   });
 
-  test("BUG-604/ledger: the rows skipped are a count and names in the `tables` entry", async () => {
+  test("ledger/entries: the rows skipped are a count and names in the `tables` entry #BUG-604/ledger", async () => {
     const { r, w } = await refreshWith(modelsDevCatalog((c) => void (c.anthropic.models["qa-odd"] = { cost: { input: -1, output: 2 } })));
     expect(r.reports[0]!.detail).toContain("1 row skipped as malformed (anthropic/qa-odd)");
     expect(w.ledger).toEqual([expect.objectContaining({ kind: "tables", table: "modelsdev", via: "network", skipped: 1, skippedNames: ["anthropic/qa-odd"] })]);
   });
 
-  test("odd values in OpenRouter's listing (negative, text, huge, missing) leave those models out and the table written", async () => {
+  test("pricing/validated: odd values in OpenRouter's listing (negative, text, huge, missing) leave those models out and the table written", async () => {
     const w = world({ seed: false });
     const listing = openRouterListing((l) => {
       l.data.push({ id: "qa/negative", context_length: 1000, pricing: { prompt: "-1", completion: "-1" } });
@@ -810,14 +810,14 @@ describe("QA cost: a source's odd values", () => {
     expect(r.reports.map((x) => x.status)).toEqual(["written"]);
   });
 
-  test("BUG-606/QA-cost-03: a null element in OpenRouter's listing is skipped, not a reason to refuse every price", async () => {
+  test("pricing/validated: a null element in OpenRouter's listing is skipped, not a reason to refuse every price #BUG-606/QA-cost-03", async () => {
     const w = world({ seed: false });
     const listing = openRouterListing((l) => void l.data.push(null as never));
     const r = await refreshNetworkTables({ ...w.deps, source: SRC, fetchText: fakeFetch({ ...fixtureSources(), listing: () => JSON.stringify(listing) }).fetchText });
     expect(r.reports.map((x) => x.status)).toEqual(["written"]);
   });
 
-  test("BUG-606/variants: non-object elements of every kind are skipped, but a listing with no usable model at all is still an error body (BUG-477)", async () => {
+  test("pricing/validated: non-object elements of every kind are skipped, but a listing with no usable model at all is still an error body (BUG-477) #BUG-606/variants", async () => {
     const odd = [null, 5, "free", true, [], [null], { id: null }];
     const w = world({ seed: false });
     const listing = openRouterListing((l) => void l.data.push(...(odd as never[])));
@@ -832,7 +832,7 @@ describe("QA cost: a source's odd values", () => {
     }
   });
 
-  test("BUG-608/QA-cost-02:a stored table dated in the future (a clock that was wrong) is rewritten like an old one, not 'current' for ever", async () => {
+  test("pricing/store: a stored table dated in the future (a clock that was wrong) is rewritten like an old one, not 'current' for ever #BUG-608/QA-cost-02", async () => {
     const w = world();
     const held = clone(readStoredTable("modelsdev", w.dir)!) as Record<string, unknown>;
     held.fetchedAt = "2099-01-01T00:00:00.000Z";
@@ -847,7 +847,7 @@ describe("QA cost: a source's odd values", () => {
     expect(JSON.parse(readFileSync(w.file("modelsdev"), "utf8")).fetchedAt).not.toBe("2099-01-01T00:00:00.000Z");
   });
 
-  test("BUG-608/variants: a stored date 1 minute or 1 year ahead is rewritten at once; a past one is current for six hours and then rewritten", async () => {
+  test("pricing/store: a stored date 1 minute or 1 year ahead is rewritten at once; a past one is current for six hours and then rewritten #BUG-608/variants", async () => {
     const dated = async (fetchedAt: string, advance = 0) => {
       const w = world();
       const held = clone(readStoredTable("modelsdev", w.dir)!) as Record<string, unknown>;
@@ -868,7 +868,7 @@ describe("QA cost: a source's odd values", () => {
     expect(await dated("2026-10-06T12:00:00.000Z")).toEqual(["current", "kept"]);
   });
 
-  test("a truncated, empty, newer-schema or non-JSON stored table is no table (and a refresh then writes a good one)", async () => {
+  test("pricing/store: a truncated, empty, newer-schema or non-JSON stored table is no table (and a refresh then writes a good one)", async () => {
     const w = world();
     const good = readFileSync(w.file("modelsdev"), "utf8");
     for (const bad of [good.slice(0, good.length / 2), "", good.replace('"schema": 1', '"schema": 2'), "not json", "[]", "null"]) {
@@ -883,7 +883,7 @@ describe("QA cost: a source's odd values", () => {
     expect(readStoredTable("modelsdev", empty.dir)).toBeDefined();
   });
 
-  test("three processes rewriting a table while another reads it: the reader never sees a torn or missing table", async () => {
+  test("pricing/store: three processes rewriting a table while another reads it: the reader never sees a torn or missing table", async () => {
     const w = world();
     const script = join(w.root, "writer.ts");
     writeFileSync(
@@ -908,7 +908,7 @@ for (let i = 0; i < 40; i++) writeStoredTable("modelsdev", { ...FIXTURE_MODELS_D
 describe("QA cost: a source that is only half reachable, or slow", () => {
   // A network that lets models.dev through and not openrouter.ai (a proxy's allow-list) leaves a first run with no table at all: `modelsDevTables` wants both before it
   // builds anything, so every request waits for a table that never comes and no figure is ever shown, for a user who has no OpenRouter key.
-  test("BUG-607/QA-cost-06: models.dev answers and OpenRouter does not: the table is built without its `openrouter/*` rows, not left unbuilt", async () => {
+  test("pricing/offline: models.dev answers and OpenRouter does not: the table is built without its `openrouter/*` rows, not left unbuilt #BUG-607/QA-cost-06", async () => {
     const w = world({ seed: false });
     const r = await refreshNetworkTables({ ...w.deps, source: SRC, fetchText: fakeFetch({ ...fixtureSources(), listing: () => null }).fetchText });
     expect(r.reports.map((x) => x.status)).toEqual(["written"]);
@@ -917,7 +917,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
     expect(keys.filter((k) => k.startsWith("openrouter/"))).toEqual([]);
   });
 
-  test("BUG-607/variants: with OpenRouter silent, the stored table's own OpenRouter rows stay (never models.dev's), and the report says so", async () => {
+  test("pricing/offline: with OpenRouter silent, the stored table's own OpenRouter rows stay (never models.dev's), and the report says so #BUG-607/variants", async () => {
     const w = world();
     const stored = w.tables().modelsdev!;
     const orKeys = Object.entries(stored.entries).filter(([, e]) => (e as { priceSource?: string }).priceSource === "openrouter").map(([k]) => k);
@@ -933,7 +933,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
     expect(Object.keys(entries).filter((k) => k.startsWith("openrouter/") && (entries[k] as { priceSource?: string }).priceSource !== "openrouter")).toEqual([]);
   });
 
-  test("BUG-607/stale: a kept OpenRouter row says since when it was not priced; the date holds while OpenRouter is silent and goes when it answers", async () => {
+  test("pricing/offline: a kept OpenRouter row says since when it was not priced; the date holds while OpenRouter is silent and goes when it answers #BUG-607/stale", async () => {
     const w = world();
     const silent = { ...fixtureSources(), listing: () => null };
     const answers = fixtureSources();
@@ -957,7 +957,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
     expect(JSON.stringify(w.tables().modelsdev)).not.toContain("staleSince");
   });
 
-  test("BUG-607/variants: the answers that are not 'no answer' are still refused: an empty listing, an error body, text (BUG-477)", async () => {
+  test("pricing/validated: the answers that are not 'no answer' are still refused: an empty listing, an error body, text (BUG-477) #BUG-607/variants", async () => {
     for (const body of ['{"data":[]}', '{"error":{"code":500}}', "<html>", "[]"]) {
       const w = world({ seed: false });
       const r = await refreshNetworkTables({ ...w.deps, source: SRC, fetchText: fakeFetch({ ...fixtureSources(), listing: () => body }).fetchText });
@@ -965,7 +965,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
     }
   });
 
-  test("OpenRouter's listing answers and models.dev does not: nothing is written and the stored table stays", async () => {
+  test("pricing/offline: OpenRouter's listing answers and models.dev does not: nothing is written and the stored table stays", async () => {
     const w = world();
     const before = stored(w.dir);
     const r = await refreshNetworkTables({ ...w.deps, source: SRC, fetchText: fakeFetch({ ...fixtureSources(), modelsDev: () => null }).fetchText });
@@ -973,7 +973,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
     expect(stored(w.dir)).toEqual(before);
   });
 
-  test("a server that sends its headers and then drips the body is cut at the timeout, not waited for", async () => {
+  test("pricing/fetch: a server that sends its headers and then drips the body is cut at the timeout, not waited for", async () => {
     const { defaultFetch } = await import("../src/cost/refresh.ts");
     const server = Bun.serve({
       port: 0,
@@ -1001,7 +1001,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
     }
   });
 
-  test("a wrong content type, an HTML error page or an empty body is the shape error, never a stored table", async () => {
+  test("pricing/validated: a wrong content type, an HTML error page or an empty body is the shape error, never a stored table", async () => {
     const w = world();
     const before = stored(w.dir);
     for (const body of ["<html>captive portal</html>", "", "null", "[]", "42", '"x"']) {
@@ -1014,7 +1014,7 @@ describe("QA cost: a source that is only half reachable, or slow", () => {
   // An outage that answers 200 with `{}` (or a catalog without the providers) replaces the stored table of ~700 models with the dozen OpenRouter rows: "705 models gone" is
   // accepted as a big move (`commit`), stored, and every model but those is `unknown-model` until a later refresh works. A table that loses nearly every model it had is no repricing.
   for (const body of ["{}", '{"data":[]}', '{"anthropic":{"models":{}}}']) {
-    test(`BUG-605/QA-cost-07: a catalog that answers ${body} does not replace the stored table (nearly every model gone is an outage, not a repricing)`, async () => {
+    test(`pricing/big-move: a catalog that answers ${body} does not replace the stored table (nearly every model gone is an outage, not a repricing) #BUG-605/QA-cost-07`, async () => {
       const w = world();
       const before = stored(w.dir);
       const had = Object.keys(w.tables().modelsdev!.entries).length;
@@ -1041,7 +1041,7 @@ describe("BUG-605/variants: how much of the stored table may be gone", () => {
   };
   const run = (w: ReturnType<typeof world>) => refreshNetworkTables({ ...w.deps, source: SRC, fetchText: fakeFetch().fetchText });
 
-  test("exactly half gone is a table that moved on (written); one more is an outage (refused, the stored table stays, the exit code says so)", async () => {
+  test("pricing/big-move: exactly half gone is a table that moved on (written); one more is an outage (refused, the stored table stays, the exit code says so) #BUG-605/variants", async () => {
     const half = heldOf(50);
     expect(Object.keys(half.tables().modelsdev!.entries)).toHaveLength(100);
     const ok = await run(half);
@@ -1061,7 +1061,7 @@ describe("BUG-605/variants: how much of the stored table may be gone", () => {
     expect(await pricingUpdate({ ...more.deps, source: SRC, fetchText: fakeFetch().fetchText, log: () => {}, error: () => {} })).toBe(1);
   });
 
-  test("the way out the refusal names works: with the stored file gone the same answer is a first table", async () => {
+  test("pricing/big-move: the way out the refusal names works: with the stored file gone the same answer is a first table #BUG-605/variants", async () => {
     const more = heldOf(49);
     expect((await run(more)).reports[0]!.status).toBe("refused");
     rmSync(more.file("modelsdev"));
@@ -1070,7 +1070,7 @@ describe("BUG-605/variants: how much of the stored table may be gone", () => {
     expect((await run(more)).reports[0]!.status).toBe("written");
   });
 
-  test("a repricing is still accepted whatever its size, and a first table (nothing stored) is never a wipe", async () => {
+  test("pricing/big-move: a repricing is still accepted whatever its size, and a first table (nothing stored) is never a wipe #BUG-605/variants", async () => {
     const w = world();
     const pricey = modelsDevCatalog((c) => {
       for (const p of Object.values(c)) for (const m of Object.values((p as { models: Record<string, any> }).models)) if (m.cost?.input) m.cost.input = Math.min(m.cost.input * 10, 4_000);
