@@ -20,13 +20,12 @@
   "test/e2e/adversarial-pkg0.e2e.test.ts": 4,
   "test/e2e/analytics.e2e.test.ts": 9,
   "test/e2e/auth.e2e.test.ts": 60,
-  "test/e2e/cli.e2e.test.ts": 7,
+  "test/e2e/cli.e2e.test.ts": 4,
   "test/e2e/gluon.e2e.test.ts": 6,
   "test/e2e/install.e2e.test.ts": 19,
   "test/e2e/kimi-cost.e2e.test.ts": 2,
   "test/e2e/openrouter-billed.e2e.test.ts": 1,
   "test/e2e/perf-smoke.e2e.test.ts": 1,
-  "test/e2e/startup.e2e.test.ts": 1,
   "test/e2e/tables-refresh.e2e.test.ts": 5,
   "test/effort.test.ts": 18,
   "test/figures.test.ts": 54,
@@ -36,11 +35,10 @@
   "test/grok.test.ts": 32,
   "test/harness-config.test.ts": 4,
   "test/install.test.ts": 14,
-  "test/intake.test.ts": 15,
-  "test/kimi-code.test.ts": 6,
+  "test/kimi-code.test.ts": 3,
   "test/kimi-usage.test.ts": 33,
   "test/openai.test.ts": 25,
-  "test/opencode-plan.test.ts": 4,
+  "test/opencode-plan.test.ts": 2,
   "test/openrouter-billed.test.ts": 64,
   "test/otlp-protobuf-fuzz.test.ts": 3,
   "test/pending-tables.test.ts": 13,
@@ -48,8 +46,6 @@
   "test/pty-session.test.ts": 3,
   "test/refresh.test.ts": 57,
   "test/route-schema.test.ts": 4,
-  "test/route.test.ts": 77,
-  "test/routing-upgrade.test.ts": 7,
   "test/rules.test.ts": 17,
   "test/secrets.test.ts": 45,
   "test/session.test.ts": 54,
@@ -90,7 +86,6 @@
   "test/brain.test.ts": [
    "src/agent/effort.ts",
    "src/brain.ts",
-   "src/models.ts",
    "src/verify.ts"
   ],
   "test/choices.test.ts": [
@@ -113,8 +108,7 @@
    "src/cost/ledger.ts",
    "src/cost/report.ts",
    "src/cost/table-schema.ts",
-   "src/cost/tracker.ts",
-   "src/models.ts"
+   "src/cost/tracker.ts"
   ],
   "test/dist.test.ts": [
    "src/analytics.ts"
@@ -132,8 +126,7 @@
    "src/cost/grok-usage.ts",
    "src/cost/ledger.ts",
    "src/cost/report.ts",
-   "src/cost/table-schema.ts",
-   "src/models.ts"
+   "src/cost/table-schema.ts"
   ],
   "test/forge.test.ts": [
    "src/agent/forge.ts"
@@ -156,9 +149,7 @@
   ],
   "test/intake.test.ts": [
    "src/agent/choices.ts",
-   "src/agent/prompt.ts",
-   "src/intake.ts",
-   "src/models.ts"
+   "src/agent/prompt.ts"
   ],
   "test/kimi-code.test.ts": [
    "src/agent/choices.ts",
@@ -166,7 +157,6 @@
    "src/cost/context.ts",
    "src/cost/keys.ts",
    "src/install.ts",
-   "src/models.ts",
    "src/status.ts"
   ],
   "test/kimi-usage.test.ts": [
@@ -183,7 +173,6 @@
   ],
   "test/opencode-plan.test.ts": [
    "src/gluon.ts",
-   "src/models.ts",
    "src/status.ts"
   ],
   "test/openrouter-billed.test.ts": [
@@ -242,9 +231,6 @@
   ],
   "test/status-login.test.ts": [
    "src/status.ts"
-  ],
-  "test/status.test.ts": [
-   "src/models.ts"
   ],
   "test/tables-hardening.test.ts": [
    "src/cost/grok-catalog.ts",

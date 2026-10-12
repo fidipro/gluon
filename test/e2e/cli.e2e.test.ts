@@ -31,7 +31,7 @@ describe("arguments (BUG-21/22)", () => {
     expect(r.stdout).not.toContain("undefined");
   });
 
-  test("BUG-454/routing: `routing path` says where routing.yaml is (next to the config), `routing check` reports a typo and exits 1, and a clean file exits 0 @full", async () => {
+  test("routing/commands: `routing path` says where routing.yaml is (next to the config), `routing check` reports a typo and exits 1, and a clean file exits 0 @full #BUG-454/routing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-routing-"));
     const env = { GLUON_CONFIG: join(dir, "config.yaml") };
     writeFileSync(env.GLUON_CONFIG, "connections: {}\n");
@@ -57,7 +57,7 @@ describe("arguments (BUG-21/22)", () => {
     expect((await cli(["--help"])).stdout).toContain("gluon routing check");
   });
 
-  test("BUG-454/routing: a missing routing.yaml is written from the default (private), and the default has no problems", async () => {
+  test("routing/file: a missing routing.yaml is written from the default (private), and the default has no problems #BUG-454/routing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-routing-"));
     const env = { GLUON_CONFIG: join(dir, "config.yaml") };
     writeFileSync(env.GLUON_CONFIG, "connections: {}\n");
@@ -67,7 +67,7 @@ describe("arguments (BUG-21/22)", () => {
     expect([r.code, r.stdout.trim()]).toEqual([0, `${join(dir, "routing.yaml")}: ok`]);
   });
 
-  test("BUG-463/routing default: prints the embedded default (writes nothing); `routing check` on an edited file of an older default says so", async () => {
+  test("routing/commands: `routing default` prints the embedded default (writes nothing); `routing check` on an edited file of an older default says so #BUG-463/routing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-routing-"));
     const env = { GLUON_CONFIG: join(dir, "config.yaml") };
     writeFileSync(env.GLUON_CONFIG, "connections: {}\n");
