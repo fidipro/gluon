@@ -38,7 +38,7 @@ const clock = (t = 1_000_000) => {
 };
 
 describe("the file", () => {
-  test("a first session creates the schema (user_version, the table, WAL) and one row", () => {
+  test("analytics/row-per-session: a first session creates the schema (user_version, the table, WAL) and one row", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     expect(existsSync(path)).toBe(false);
@@ -56,7 +56,7 @@ describe("the file", () => {
     expect(rows(path)).toHaveLength(1);
   });
 
-  test.skipIf(!POSIX)("the directory is 0700, the database and its -wal and -shm 0600, however loose the umask", () => {
+  test.skipIf(!POSIX)("analytics/private-file: the directory is 0700, the database and its -wal and -shm 0600, however loose the umask", () => {
     const { dir, path } = fresh();
     const old = process.umask(0);
     try {
@@ -75,7 +75,7 @@ describe("the file", () => {
     }
   });
 
-  test.skipIf(!POSIX)("a looser file or directory that was already there is made private again", () => {
+  test.skipIf(!POSIX)("analytics/private-file: a looser file or directory that was already there is made private again", () => {
     const { dir, path } = fresh();
     mkdirSync(join(dir, "state"), { recursive: true, mode: 0o755 });
     chmodSync(join(dir, "state"), 0o755);
@@ -91,7 +91,7 @@ describe("the file", () => {
   // On Windows the mode means nothing: the directory Gluon creates is limited to the user with icacls, and the file and its -wal and -shm
   // (SQLite makes them while a connection is open) must come out limited too. `isPrivate` reads each one's ACL by SID; the home it is
   // given is no parent of the path, so it checks (inside the real profile it would pass anything).
-  test.skipIf(POSIX)("Windows: the directory, the database and its -wal and -shm are limited to the user, SYSTEM and Administrators", () => {
+  test.skipIf(POSIX)("analytics/private-file: Windows: the directory, the database and its -wal and -shm are limited to the user, SYSTEM and Administrators", () => {
     const { dir, path } = fresh();
     const a = new Analytics({ enabled: true, path });
     try {
@@ -109,7 +109,7 @@ describe("the file", () => {
   // only the database file is limited (icacls); the -wal and -shm SQLite makes later inherit the directory's ACL, not the file's. Inside the profile that
   // is the profile's own; a directory elsewhere (XDG_STATE_HOME on another drive) may be readable by others, and then the -wal, which holds the spec of
   // the sessions not yet checkpointed, was: the database was private, its journal not. Gluon now limits each of them itself (the variants below run it on any OS).
-  (POSIX ? test.skip : test)("BUG-651/QA-win-03: in a state directory that already exists and others can read, the -wal and -shm are as private as the database", () => {
+  (POSIX ? test.skip : test)("analytics/private-file: in a state directory that already exists and others can read, the -wal and -shm are as private as the database #BUG-651/QA-win-03", () => {
     const { dir, path } = fresh();
     const state = join(dir, "state");
     mkdirSync(state, { recursive: true });
@@ -129,7 +129,7 @@ describe("the file", () => {
   });
 
   // The same fix on any OS, with the ACL call replaced: the database, its -wal and its -shm are each limited once, after they exist and before a row is written.
-  test("BUG-651/variants: with restrict on, the database, its -wal and its -shm are each limited once, when they exist and before a row is written", () => {
+  test("analytics/private-file: with restrict on, the database, its -wal and its -shm are each limited once, when they exist and before a row is written #BUG-651/variants", () => {
     const { path } = fresh();
     const calls: { path: string; exists: boolean; rows: number }[] = [];
     const rowCount = (): number => {
@@ -157,7 +157,7 @@ describe("the file", () => {
     expect(calls.every((c) => c.rows === 0)).toBe(true);
   });
 
-  test("BUG-651/variants: with restrict off nothing is limited, and a failing ACL call never stops recording", () => {
+  test("analytics/private-file: with restrict off nothing is limited, and a failing ACL call never stops recording #BUG-651/variants", () => {
     const off = fresh();
     const seen: string[] = [];
     const a = new Analytics({ enabled: true, path: off.path, restrict: false, restrictFile: (p) => seen.push(p) });
@@ -171,7 +171,7 @@ describe("the file", () => {
     expect(rows(on.path)).toHaveLength(1);
   });
 
-  test("enabled: false never creates a file or a directory", () => {
+  test("analytics/off: enabled: false never creates a file or a directory", () => {
     const { dir, path } = fresh();
     const a = new Analytics({ enabled: false, path });
     expect(a.begin(start())).toBeUndefined();
@@ -180,7 +180,7 @@ describe("the file", () => {
     expect(existsSync(dir)).toBe(false);
   });
 
-  test("nothing is created before the first session", () => {
+  test("analytics/row-per-session: nothing is created before the first session", () => {
     const { dir, path } = fresh();
     const a = new Analytics({ enabled: true, path });
     a.tick();
@@ -190,7 +190,7 @@ describe("the file", () => {
 });
 
 describe("a session's row", () => {
-  test("begin, set and end write the columns: identity, agent, routing, ids, cost, context, how it ended", () => {
+  test("analytics/row-per-session: begin, set and end write the columns: identity, agent, routing, ids, cost, context, how it ended", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -255,7 +255,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("a row is there from the start: a session with no figures yet is running, with NULL ends and costs", () => {
+  test("analytics/row-per-session: a row is there from the start: a session with no figures yet is running, with NULL ends and costs", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -266,7 +266,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("every begin is its own row (a restart of the same session is another)", () => {
+  test("analytics/row-per-session: every begin is its own row (a restart of the same session is another)", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     a.begin(start({ childKey: "k" }));
@@ -277,7 +277,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("a cost, a captured session id and the OpenRouter marks go in; context_pct keeps the last real reading", () => {
+  test("analytics/row-per-session: a cost, a captured session id and the OpenRouter marks go in; context_pct keeps the last real reading", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     const run = a.begin(start({ conn: "openrouter" }))!;
@@ -288,7 +288,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("end() with a cost and a context reading sets them, and only the first end counts", () => {
+  test("analytics/row-per-session: end() with a cost and a context reading sets them, and only the first end counts", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -300,7 +300,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("a set after the end writes through at once (a late cost) and leaves the end as it was", () => {
+  test("analytics/row-per-session: a set after the end writes through at once (a late cost) and leaves the end as it was", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -312,7 +312,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("a flush is the whole row from memory: the same one twice is the same row, never a second one", () => {
+  test("analytics/row-per-session: a flush is the whole row from memory: the same one twice is the same row, never a second one", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -329,7 +329,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("tick: changes wait for FLUSH_MS, and an open row's updated_at is refreshed at least that often (the heartbeat)", () => {
+  test("analytics/status: tick: changes wait for FLUSH_MS, and an open row's updated_at is refreshed at least that often (the heartbeat)", () => {
     const { path } = fresh();
     const c = clock(0);
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -352,7 +352,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("runStatus: ended, running (heartbeat within HEARTBEAT_MS) and unfinished (a crash left it)", () => {
+  test("analytics/status: runStatus: ended, running (heartbeat within HEARTBEAT_MS) and unfinished (a crash left it)", () => {
     const { path } = fresh();
     const c = clock(0);
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -365,7 +365,7 @@ describe("a session's row", () => {
     a.close();
   });
 
-  test("close() ends the sessions still open as quit, with no exit code, and a later set or begin does nothing", () => {
+  test("analytics/status: close() ends the sessions still open as quit, with no exit code, and a later set or begin does nothing", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -386,7 +386,7 @@ describe("a session's row", () => {
 describe("what goes in the row", () => {
   const KEY = "sk-ant-api03-abcdefghijklmnopqrstuvwx";
 
-  test("keys in the spec, the name, the paths and the routing lines are masked; the key itself is never in the file", () => {
+  test("analytics/masked: keys in the spec, the name, the paths and the routing lines are masked; the key itself is never in the file", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     const run = a.begin(start({ spec: `Use ${KEY} to call the API`, name: `n-${KEY}`, cwd: `/w/${KEY}`, repo: `r-${KEY}`, routingWhy: [`why ${KEY}`] }))!;
@@ -402,7 +402,7 @@ describe("what goes in the row", () => {
     if (existsSync(`${path}-wal`)) expect(readFileSync(`${path}-wal`).includes(KEY)).toBe(false);
   });
 
-  test("a spec is cut at SPEC_MAX (a key that straddles the cut is masked first)", () => {
+  test("analytics/masked: a spec is cut at SPEC_MAX (a key that straddles the cut is masked first)", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     a.begin(start({ spec: `${"x".repeat(SPEC_MAX - 10)}${KEY}${"y".repeat(500)}` }));
@@ -433,7 +433,7 @@ describe("recording never breaks anything", () => {
     return runs;
   }
 
-  test("the parent path is a file: no throw, and the recorder switches itself off after three failures in a row", () => {
+  test("analytics/never-breaks: the parent path is a file: no throw, and the recorder switches itself off after three failures in a row", () => {
     const { dir } = fresh();
     mkdirSync(dir, { recursive: true });
     const blocker = join(dir, "file");
@@ -446,7 +446,7 @@ describe("recording never breaks anything", () => {
     expect(readFileSync(blocker, "utf8")).toBe("x");
   });
 
-  test("a file that is not a database: no throw, left as it was", () => {
+  test("analytics/never-breaks: a file that is not a database: no throw, left as it was", () => {
     const { path, dir } = fresh();
     mkdirSync(join(dir, "state"), { recursive: true });
     writeFileSync(path, "this is not a sqlite file at all, just text".repeat(20));
@@ -457,7 +457,7 @@ describe("recording never breaks anything", () => {
 
   // BUG-650: a symlinked state directory (a dotfiles setup) is followed to the real directory, which gets the usual owner and mode checks (so it records there);
   // before, the directory half of this test asserted nothing was written through it. A symlink at the database file itself is still refused.
-  test.skipIf(!POSIX)("a symlinked directory is followed to its checked, private target, and a symlinked file is refused", () => {
+  test.skipIf(!POSIX)("analytics/private-file: a symlinked directory is followed to its checked, private target, and a symlinked file is refused", () => {
     const { dir, path } = fresh();
     mkdirSync(join(dir, "elsewhere"), { recursive: true });
     symlinkSync(join(dir, "elsewhere"), join(dir, "state"));
@@ -486,7 +486,7 @@ describe("recording never breaks anything", () => {
     }
   });
 
-  test("a write that fails is dropped and the next one heals the row (the table is dropped under it, then back)", () => {
+  test("analytics/never-breaks: a write that fails is dropped and the next one heals the row (the table is dropped under it, then back)", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -504,7 +504,7 @@ describe("recording never breaks anything", () => {
     a.close();
   });
 
-  test("a file of a newer schema is not written to at all: no row, no change, nothing thrown", () => {
+  test("analytics/never-breaks: a file of a newer schema is not written to at all: no row, no change, nothing thrown", () => {
     const { path, dir } = fresh();
     mkdirSync(join(dir, "state"), { recursive: true });
     const db = new Database(path);
@@ -533,7 +533,7 @@ describe("a write that failed is not the last word", () => {
     };
   };
 
-  test("BUG-563/analytics: a session's end that failed while the file was locked is written once the file is free (the row is not unfinished for ever)", () => {
+  test("analytics/never-breaks: a session's end that failed while the file was locked is written once the file is free (the row is not unfinished for ever) #BUG-563/analytics", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -552,7 +552,7 @@ describe("a write that failed is not the last word", () => {
     expect(row!.ended_at).not.toBeNull();
   });
 
-  test("BUG-563/analytics: an end that failed is also tried at close()", () => {
+  test("analytics/never-breaks: an end that failed is also tried at close() #BUG-563/analytics", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     const run = a.begin(start())!;
@@ -578,7 +578,7 @@ describe("a write that failed is not the last word", () => {
     }
   };
 
-  test("BUG-564/analytics: close() really closes the database: no -wal or -shm is left behind by this process, and the file is free", () => {
+  test("analytics/never-breaks: close() really closes the database: no -wal or -shm is left behind by this process, and the file is free #BUG-564/analytics", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     a.begin(start())?.end({ code: 0, reason: "exit" });
@@ -591,7 +591,7 @@ describe("a write that failed is not the last word", () => {
     expect(free(path)).toBe(true);
   });
 
-  test("BUG-564/analytics: a recorder that switches itself off closes the file too", () => {
+  test("analytics/never-breaks: a recorder that switches itself off closes the file too #BUG-564/analytics", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -611,7 +611,7 @@ describe("a write that failed is not the last word", () => {
 
   // macOS's system SQLite sleeps about twice a busy_timeout in a locked write (200 ms took 422 ms on a runner), and CI is slower than a desk.
   const PATIENCE = (process.platform === "darwin" ? 2 : 1) * (Number(process.env.GLUON_TEST_SLOW) || 1);
-  test("BUG-568/analytics: a locked file does not switch recording off, and a blocked write waits well under a second", () => {
+  test("analytics/never-breaks: a locked file does not switch recording off, and a blocked write waits well under a second #BUG-568/analytics", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -638,7 +638,7 @@ describe("a write that failed is not the last word", () => {
     expect(rows(path)).toHaveLength(3);
   }, 5000 * PATIENCE);
 
-  test("BUG-565/analytics: a session still running when the history is wiped does not write its row (spec and all) back", () => {
+  test("stats/delete: a session still running when the history is wiped does not write its row (spec and all) back #BUG-565/analytics", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     const done = a.begin(start({ name: "finished", spec: "FINISHED-PROMPT" }));
@@ -652,7 +652,7 @@ describe("a write that failed is not the last word", () => {
     expect(rows(path)).toEqual([]);
   });
 
-  test("BUG-565/analytics: a row whose first write failed is still inserted by a later one, and a row wiped after that stays wiped", () => {
+  test("stats/delete: a row whose first write failed is still inserted by a later one, and a row wiped after that stays wiped #BUG-565/analytics", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -674,7 +674,7 @@ describe("a write that failed is not the last word", () => {
 });
 
 describe("two Gluons at once", () => {
-  test("two recorders on one file, their writes interleaved: every session and every figure is there", () => {
+  test("analytics/two-gluons: two recorders on one file, their writes interleaved: every session and every figure is there", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -696,7 +696,7 @@ describe("two Gluons at once", () => {
     }
   });
 
-  test("three Gluon processes writing at once lose nothing @full", async () => {
+  test("analytics/two-gluons: three Gluon processes writing at once lose nothing @full", async () => {
     const { path } = fresh();
     const writer = join(import.meta.dir, "fixtures/analytics-writer.ts");
     const procs = ["a", "b", "c"].map((tag) => Bun.spawn([process.execPath, "--no-env-file", writer, path, tag, "40"], { stdout: "pipe", stderr: "pipe", env: process.env }));
@@ -721,7 +721,7 @@ describe("the analytics config key", () => {
     else process.env.GLUON_CONFIG = saved;
   });
 
-  test("on by default; on, off, true and false are read; anything else names the key", () => {
+  test("analytics/off: on by default; on, off, true and false are read; anything else names the key", () => {
     expect(defaults().analytics).toBe(true);
     expect(loadConfig().analytics).toBe(true);
     for (const [yaml, want] of [["analytics: on\n", true], ["analytics: off\n", false], ["analytics: true\n", true], ["analytics: false\n", false], ["analytics:\n", true]] as const) {
@@ -754,7 +754,7 @@ describe("QA analytics: what the spec keeps", () => {
     "a password= value": "password=hunter2-abcdef-0123456789",
   };
   for (const [what, secret] of Object.entries(SECRETS)) {
-    test(`BUG-588/spec-masks: ${what} pasted into a spec is not stored as typed`, () => {
+    test(`analytics/masked: ${what} pasted into a spec is not stored as typed #BUG-588/spec-masks`, () => {
       const { path } = fresh();
       const a = new Analytics({ enabled: true, path });
       a.begin(start({ spec: `Fix the deploy. Here is the thing I used: ${secret} thanks` }));
@@ -764,7 +764,7 @@ describe("QA analytics: what the spec keeps", () => {
     });
   }
 
-  test("the documented key shapes are masked in every field, and a 5 MB spec is masked in well under two seconds", () => {
+  test("analytics/masked: the documented key shapes are masked in every field, and a 5 MB spec is masked in well under two seconds", () => {
     const { path } = fresh();
     const a = new Analytics({ enabled: true, path });
     const keys = ["sk-ant-api03-abcdefghijklmnop", "sk-or-v1-0123456789abcdef0123456789abcdef", "AIzaSyA-abcdefghijklmnopqrstuvwxyz012345", "AKIAABCDEFGHIJKLMNOP", "ghp_abcdefghijklmnopqrstuvwxyz0123456789", "Bearer abcdefghijklmnopqrstuvwxyz", "hf_abcdefghijklmnopqrstuvwxyzABCDEFGH", "https://u:pw-abcdef-0123456789@h", "password=hunter2-abcdef-0123456789"];
@@ -792,7 +792,7 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
   // per poll for as long as the other connection holds the lock. One busy answer says the file is busy for the rest of that tick.
   // What one blocked write waits is the platform's (macOS's system SQLite sleeps about twice a busy_timeout: 422 ms for 200), so the bound is relative: one tick of a single session
   // against the lock is the measure of "once", and six sessions must not take much longer than that, where one wait per session would take six times as long.
-  test("BUG-649/QA-analytics-02: one tick against a locked file waits for the lock once, not once per open session", () => {
+  test("analytics/never-breaks: one tick against a locked file waits for the lock once, not once per open session #BUG-649/QA-analytics-02", () => {
     const SESSIONS = 6;
     const lockedTick = (sessions: number) => {
       const { path } = fresh();
@@ -814,7 +814,7 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
     expect(many).toBeLessThan(2.5 * once + 100 * (Number(process.env.GLUON_TEST_SLOW) || 1));
   });
 
-  (POSIX ? test : test.skip)("BUG-650/QA-analytics-03: a state directory that is a symlink (a dotfiles setup) still records", () => {
+  (POSIX ? test : test.skip)("analytics/private-file: a state directory that is a symlink (a dotfiles setup) still records #BUG-650/QA-analytics-03", () => {
     const root = join(ROOT, `link${++n}`);
     mkdirSync(join(root, "real"), { recursive: true });
     symlinkSync(join(root, "real"), join(root, "state"));
@@ -824,7 +824,7 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
     expect(existsSync(join(root, "real", "analytics.db"))).toBe(true);
   });
 
-  test("BUG-649/variants: a row skipped for a lock is written at the next tick, once the lock is gone", () => {
+  test("analytics/never-breaks: a row skipped for a lock is written at the next tick, once the lock is gone #BUG-649/variants", () => {
     const { path } = fresh();
     const c = clock();
     const a = new Analytics({ enabled: true, path, now: c.now });
@@ -838,7 +838,7 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
     expect(rows(path).map((r) => [r.name, r.context_pct]).sort()).toEqual([["s0", 7], ["s1", 7], ["s2", 7]]);
   });
 
-  test("BUG-650/variants: a link to a directory owned by someone else is still refused, and a loose real target is made private", () => {
+  test("analytics/private-file: a link to a directory owned by someone else is still refused, and a loose real target is made private #BUG-650/variants", () => {
     if (!POSIX || process.getuid?.() === 0) return;
     // `/` is root's: the owner check runs on the real directory, so the link is refused and nothing is written there.
     const root = join(ROOT, `link${++n}`);
@@ -860,7 +860,7 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
     expect(rows(join(loose, "analytics.db"))).toHaveLength(1);
   });
 
-  test("BUG-650/variants: a link at the database file inside a linked directory is still refused", () => {
+  test("analytics/private-file: a link at the database file inside a linked directory is still refused #BUG-650/variants", () => {
     if (!POSIX) return;
     const root = join(ROOT, `link${++n}`);
     mkdirSync(join(root, "real"), { recursive: true });
@@ -874,7 +874,7 @@ describe("QA analytics: a file that is busy or in an unusual place", () => {
     expect(statSync(target).size).toBe(0);
   });
 
-  test("a symlink where the database file should be is never followed", () => {
+  test("analytics/private-file: a symlink where the database file should be is never followed", () => {
     if (!POSIX) return;
     const { dir, path } = fresh();
     mkdirSync(join(dir, "state"), { recursive: true });

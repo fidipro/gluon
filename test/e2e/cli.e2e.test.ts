@@ -437,9 +437,19 @@ describe("subcommands inside a launched agent, and uninstall (issue #13)", () =>
     const gluon = join(state, "gluon");
     mkdirSync(gluon, { recursive: true });
     const files = ["analytics.db", "analytics.db-wal", "analytics.db-shm"].map((f) => join(gluon, f));
-    for (const f of files) writeFileSync(f, "x");
     writeFileSync(join(gluon, "other.txt"), "mine");
-    const r = await cli(["uninstall", "--yes"], { env: { ...s.env, XDG_STATE_HOME: state } });
+    const env = { ...s.env, XDG_STATE_HOME: state };
+    // Only what exists is named: none of them, then the database alone (no -wal or -shm yet).
+    const none = await cli(["uninstall", "--yes"], { env });
+    expect([none.code, none.stderr]).toEqual([0, ""]);
+    for (const f of files) expect(none.stdout).not.toContain(f);
+    writeFileSync(files[0]!, "x");
+    const db = await cli(["uninstall", "--yes"], { env });
+    expect([db.code, db.stderr]).toEqual([0, ""]);
+    expect(db.stdout).toContain(`Removed ${files[0]}\n`);
+    for (const f of files.slice(1)) expect(db.stdout).not.toContain(f);
+    for (const f of files) writeFileSync(f, "x");
+    const r = await cli(["uninstall", "--yes"], { env });
     expect([r.code, r.stderr]).toEqual([0, ""]);
     for (const f of files) {
       expect(existsSync(f)).toBe(false);
@@ -616,7 +626,7 @@ describe("gluon stats (local analytics)", () => {
     return { state, path, env: { XDG_STATE_HOME: state } };
   }
 
-  test("stats: a summary per agent; sessions --json; one session by id prefix; sql; --delete needs --yes without a terminal and then wipes @full", async () => {
+  test("stats/summary: a summary per agent; sessions --json; one session by id prefix; sql; --delete needs --yes without a terminal and then wipes @full", async () => {
     const s = await seeded();
     try {
       const sum = await cli(["stats"], { env: s.env });
@@ -643,7 +653,7 @@ describe("gluon stats (local analytics)", () => {
     }
   });
 
-  test("stats --delete while a Gluon holds the database open (its -wal and -shm there, Windows locks included): wipes it, never removes the file, and the recorder goes on", async () => {
+  test("stats/delete: stats --delete while a Gluon holds the database open (its -wal and -shm there, Windows locks included): wipes it, never removes the file, and the recorder goes on", async () => {
     const { Analytics } = await import("../../src/analytics.ts");
     const s = await seeded();
     // Gluon's recorder in this process, the CLI in another: two connections on one file.
@@ -667,7 +677,7 @@ describe("gluon stats (local analytics)", () => {
     }
   });
 
-  test("stats: no database says so (exit 0) and creates nothing; a bad flag exits 2; it is in --help and needs no config", async () => {
+  test("stats/no-database: no database says so (exit 0) and creates nothing; a bad flag exits 2; it is in --help and needs no config", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-stats-e2e-"));
     try {
       const none = await cli(["stats"], { env: { XDG_STATE_HOME: state } });

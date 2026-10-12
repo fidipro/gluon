@@ -85,6 +85,10 @@ export const SEAMS: Record<string, Seam> = {
     says: "a release (GitHub's `/latest` redirect, `SHA256SUMS`, its Sigstore bundle, a binary) and an executable → verified or refused, replaced or left as it was, and what is said at start",
     modules: ["src/update/update.ts", "src/update/verify.ts", "src/update/fetch.ts", "src/update/target.ts", "src/update/apply.ts"],
   },
+  analytics: {
+    says: "a session's start, its changes and its end → its row in `analytics.db` (the columns `gluon stats sql` queries, `MIGRATIONS` the schema); the database → what `gluon stats` prints, as text and as JSON",
+    modules: ["src/analytics.ts", "src/stats.ts", "src/stats-sql.ts"],
+  },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",
     modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts", "src/self.ts"],

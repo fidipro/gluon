@@ -23,7 +23,7 @@ It never holds a key, an environment or anything an agent's screen showed. Unlik
 
 ### Status
 
-A session's status is worked out when you read it, not stored. A running Gluon refreshes its open rows every few seconds. A session is:
+A session's status is worked out when you read it, not stored. A running Gluon refreshes its open rows at least every 15 seconds. A session is:
 
 - **running** while its row was refreshed in the last minute,
 - **ended** once it has an end,
