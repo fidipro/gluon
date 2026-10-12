@@ -5,7 +5,6 @@
   "test/adversarial-pkg-edfb.test.ts": 68,
   "test/adversarial-pkg0.test.ts": 18,
   "test/agy-settings.test.ts": 4,
-  "test/analytics.test.ts": 44,
   "test/brain-clients.test.ts": 30,
   "test/brain.test.ts": 39,
   "test/choices.test.ts": 31,
@@ -18,9 +17,8 @@
   "test/doctor.test.ts": 1,
   "test/e2e/adversarial-pkg-edfb.e2e.test.ts": 2,
   "test/e2e/adversarial-pkg0.e2e.test.ts": 4,
-  "test/e2e/analytics.e2e.test.ts": 9,
   "test/e2e/auth.e2e.test.ts": 60,
-  "test/e2e/cli.e2e.test.ts": 4,
+  "test/e2e/cli.e2e.test.ts": 1,
   "test/e2e/gluon.e2e.test.ts": 6,
   "test/e2e/install.e2e.test.ts": 19,
   "test/e2e/kimi-cost.e2e.test.ts": 2,
@@ -50,7 +48,6 @@
   "test/secrets.test.ts": 45,
   "test/session.test.ts": 54,
   "test/signin.test.tsx": 3,
-  "test/stats.test.ts": 51,
   "test/status-login.test.ts": 17,
   "test/status.test.ts": 23,
   "test/tables-hardening.test.ts": 29,
@@ -74,10 +71,6 @@
   "test/adversarial-pkg0.test.ts": [
    "src/cost/context.ts",
    "src/cost/ledger.ts"
-  ],
-  "test/analytics.test.ts": [
-   "src/analytics.ts",
-   "src/stats.ts"
   ],
   "test/brain-clients.test.ts": [
    "src/agent/subscription.ts",
@@ -109,9 +102,6 @@
    "src/cost/report.ts",
    "src/cost/table-schema.ts",
    "src/cost/tracker.ts"
-  ],
-  "test/dist.test.ts": [
-   "src/analytics.ts"
   ],
   "test/doctor.test.ts": [
    "src/brain.ts"
@@ -222,12 +212,6 @@
   ],
   "test/signin.test.tsx": [
    "src/ui/signin.tsx"
-  ],
-  "test/stats.test.ts": [
-   "src/analytics.ts",
-   "src/stats-sql.ts",
-   "src/stats.ts",
-   "src/uninstall.ts"
   ],
   "test/status-login.test.ts": [
    "src/status.ts"

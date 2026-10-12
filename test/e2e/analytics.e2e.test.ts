@@ -54,7 +54,7 @@ async function quit(app: App) {
 }
 
 describe("local analytics", () => {
-  test("a launched session is one row from the start (agent, spec, the id Gluon minted, routing); when the agent exits it has its end and exit code @full", async () => {
+  test("analytics/row-per-session: a launched session is one row from the start (agent, spec, the id Gluon minted, routing); when the agent exits it has its end and exit code @full", async () => {
     await withState(async (state, env) => {
       const app = await gluon(100, 30, { ...env, FAKE_EXIT: "3" });
       await launch(app, "alpha task");
@@ -92,7 +92,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("`gluon resume` records its sessions as resume rows with the saved agent session id, beside the first run's new row @full", async () => {
+  test("analytics/row-per-session: `gluon resume` records its sessions as resume rows with the saved agent session id, beside the first run's new row @full", async () => {
     await withState(async (state, env) => {
       const cfg = freshConfig("analytics-resume", ASK_YAML);
       const first = await gluon(100, 30, { ...env, GLUON_CONFIG: cfg });
@@ -110,7 +110,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("Codex's session id arrives by hook and is recorded as captured; quitting Gluon ends the open session as quit @full", async () => {
+  test("analytics/row-per-session: Codex's session id arrives by hook and is recorded as captured; quitting Gluon ends the open session as quit @full", async () => {
     await withState(async (state, env) => {
       const app = await launchAs("codex", { env });
       await say(app, "!event session 019a1b2c-d3e4-test", "EVENT session");
@@ -122,7 +122,7 @@ describe("local analytics", () => {
     });
   });
 
-  test.skipIf(MAC_STEALS || WIN)("without a pseudo-terminal (the agent has the terminal, one at a time) the row is written at the start and ended with the agent's exit code @full", async () => {
+  test.skipIf(MAC_STEALS || WIN)("analytics/row-per-session: without a pseudo-terminal (the agent has the terminal, one at a time) the row is written at the start and ended with the agent's exit code @full", async () => {
     await withState(async (state, env) => {
       const app = await start({ cwd: repo.tiny(), rows: 60, env: { ...env, GLUON_CONFIG: freshConfig("analytics-direct", "handoff:\n  on_clear: stay\n"), GLUON_TEST_NO_PTY: "1", FAKE_EXIT: "3" } });
       await toLaunch(app);
@@ -137,7 +137,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("`analytics: off` records nothing: no database, however many sessions run @full", async () => {
+  test("analytics/off: `analytics: off` records nothing: no database, however many sessions run @full", async () => {
     await withState(async (state, env) => {
       const app = await gluon(100, 30, { ...env, FAKE_EXIT: "0" }, `${ASK_YAML}analytics: off\n`);
       await launch(app, "alpha task");
@@ -150,7 +150,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("a one-shot --launch records a launch row with the agent's exit code; its --dry-run records nothing", async () => {
+  test("analytics/row-per-session: a one-shot --launch records a launch row with the agent's exit code; its --dry-run records nothing", async () => {
     await withState(async (state, env) => {
       const dry = await cli(["--launch", "claude-code", "--model", "sonnet", "--dry-run", "fix it"], { env, agents: ["claude"], cwd: repo.tiny() });
       expect(dry.code).toBe(0);
@@ -164,7 +164,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("BUG-567/analytics: a long --launch session keeps its row's heartbeat (updated_at moves), so `gluon stats` does not call it unfinished while it runs @full", async () => {
+  test("analytics/status: a long --launch session keeps its row's heartbeat (updated_at moves), so `gluon stats` does not call it unfinished while it runs @full #BUG-567/analytics", async () => {
     await withState(async (state, env) => {
       // FAKE_HANG: the fake agent stays up until it is killed.
       // Tracked: a failed wait must not leave gluon's agent running (BUG-573).
@@ -191,7 +191,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("BUG-569/analytics: a crash of Gluon ends the open sessions as quit instead of leaving them running @full", async () => {
+  test("analytics/status: a crash of Gluon ends the open sessions as quit instead of leaving them running @full #BUG-569/analytics", async () => {
     await withState(async (state, env) => {
       const app = await gluon(100, 30, { ...env, GLUON_TEST_PTY_FAIL: "1" });
       await launch(app, "alpha task");
@@ -203,7 +203,7 @@ describe("local analytics", () => {
     });
   });
 
-  test("a --launch with analytics off records nothing", async () => {
+  test("analytics/off: a --launch with analytics off records nothing", async () => {
     await withState(async (state, env) => {
       const r = await cli(["--launch", "claude-code", "--model", "sonnet", "fix it"], { env: { ...env, FAKE_EXIT: "0", GLUON_CONFIG: freshConfig("analytics-off-launch", "analytics: off\n") }, agents: ["claude"], cwd: repo.tiny() });
       expect(r.code).toBe(0);

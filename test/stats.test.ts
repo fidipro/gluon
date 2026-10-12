@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GLUON, SLOW, SYSTEM_ENV } from "./e2e/harness.ts";
 import { WIN } from "./e2e/fixtures.ts";
-import { uninstallTargets } from "../src/uninstall.ts";
 import { HEARTBEAT_MS, MIGRATIONS, runStatus, type SessionRow } from "../src/analytics.ts";
 import { SQL_CHILD_ENV, SQL_CHILD_MEMORY_ENV, SQL_MEMORY_MARK } from "../src/stats-sql.ts";
 import { detailJson, durationLabel, findSession, formatTable, newestSessions, openStats, parseWhen, queryJson, runQuery, selectSessions, sqlProblem, StatsError, statsCommand, summarize, wipe } from "../src/stats.ts";
@@ -84,7 +83,7 @@ async function stats(path: string, argv: string[], extra: { now?: number; tty?: 
 }
 
 describe("when and how long", () => {
-  test("parseWhen: a day is local midnight (the end of that day for until), a span counts back from now, an ISO datetime is taken as is", () => {
+  test("stats/filters: parseWhen: a day is local midnight (the end of that day for until), a span counts back from now, an ISO datetime is taken as is", () => {
     expect(parseWhen("2026-03-09", NOW, "since")).toBe(local(2026, 3, 9, 0));
     expect(parseWhen("2026-03-09", NOW, "until")).toBe(local(2026, 3, 10, 0) - 1);
     expect(parseWhen("7d", NOW, "since")).toBe(NOW - 7 * 86_400_000);
@@ -95,7 +94,7 @@ describe("when and how long", () => {
     for (const bad of ["yesterday", "2026-02-30", "7", "d7", "2026-13-01", ""]) expect(() => parseWhen(bad, NOW, "since")).toThrow(/--since/);
   });
 
-  test("BUG-566/analytics: a date and time of a day that does not exist (2026-02-30T10:00) is refused like the date alone, not moved to 2 March", () => {
+  test("stats/filters: a date and time of a day that does not exist (2026-02-30T10:00) is refused like the date alone, not moved to 2 March #BUG-566/analytics", () => {
     for (const edge of ["since", "until"] as const) {
       expect(() => parseWhen("2026-02-30", NOW, edge)).toThrow(StatsError);
       for (const text of ["2026-02-30T10:00", "2026-02-31 10:00", "2026-04-31T08:15", "2026-13-01T10:00"]) expect(() => parseWhen(text, NOW, edge)).toThrow(StatsError);
@@ -103,7 +102,7 @@ describe("when and how long", () => {
     expect(parseWhen("2026-02-28T10:00", NOW, "since")).toBe(local(2026, 2, 28, 10));
   });
 
-  test("durationLabel", () => {
+  test("stats/sessions: durationLabel", () => {
     expect([null, 0, 45_000, 303_000, 3_900_000, 90 * 3_600_000].map(durationLabel)).toEqual(["—", "0s", "45s", "5m03s", "1h05m", "3d18h"]);
   });
 });
@@ -115,7 +114,7 @@ describe("summary", () => {
   afterAll(() => db.close());
   const sum = (by: "agent" | "model" | "day" | "repo", f = {}) => summarize(selectSessions(db, f), by, NOW);
 
-  test("by agent: sessions, time (an unfinished row counts to its last heartbeat), cost (approx flagged) and unfinished", () => {
+  test("stats/summary: by agent: sessions, time (an unfinished row counts to its last heartbeat), cost (approx flagged) and unfinished", () => {
     const { groups, total } = sum("agent");
     expect(groups.map((g) => [g.key, g.sessions, g.duration_ms, g.cost_usd, g.cost_approx_usd, g.unfinished])).toEqual([
       ["claude-code", 2, 7_200_000, 5, 3, 0],
@@ -124,14 +123,14 @@ describe("summary", () => {
     expect([total.sessions, total.duration_ms, total.cost_usd, total.unfinished]).toEqual([4, 9_000_000, 5.5, 1]);
   });
 
-  test("by model, repo (repo, else the directory) and day (local days, newest first)", () => {
+  test("stats/summary: by model, repo (repo, else the directory) and day (local days, newest first)", () => {
     expect(sum("model").groups.map((g) => [g.key, g.sessions])).toEqual([["gpt-6-luna", 2], ["opus", 1], ["sonnet", 1]]);
     expect(sum("repo").groups.map((g) => g.key)).toEqual(["alpha", "/y/loose", "Beta"]);
     // 23:30 local on the 8th is the 8th, though it is the 8th-11th in UTC.
     expect(sum("day").groups.map((g) => [g.key, g.sessions])).toEqual([["2026-03-10", 1], ["2026-03-09", 1], ["2026-03-08", 2]]);
   });
 
-  test("filters: since, until, agent, repo (any case, repo or directory), and together", () => {
+  test("stats/filters: filters: since, until, agent, repo (any case, repo or directory), and together", () => {
     const keys = (f: object) => selectSessions(db, f).map((r) => r.name);
     expect(keys({ since: local(2026, 3, 9, 0) })).toEqual(["three", "four"]);
     expect(keys({ until: local(2026, 3, 9, 0) })).toEqual(["one", "two"]);
@@ -141,7 +140,7 @@ describe("summary", () => {
     expect(keys({ repo: "alp", agent: "claude-code", since: local(2026, 3, 8, 12) })).toEqual(["two"]);
   });
 
-  test("the text output has a header, a row per group and a total; a cost with an estimate in it is marked ~", async () => {
+  test("stats/summary: the text output has a header, a row per group and a total; a cost with an estimate in it is marked ~", async () => {
     const r = await stats(path, []);
     expect(r.code).toBe(0);
     const lines = r.out.split("\n");
@@ -151,7 +150,7 @@ describe("summary", () => {
     expect(lines[3]).toMatch(/^total\s+4\s+2h30m\s+~\$5\.50\s+1$/);
   });
 
-  test("--limit cuts the groups and says so; the total stays whole", async () => {
+  test("stats/summary: --limit cuts the groups and says so; the total stays whole", async () => {
     const r = await stats(path, ["--by", "day", "--limit", "1"]);
     expect(r.out).toContain("2026-03-10");
     expect(r.out).not.toContain("2026-03-09");
@@ -159,7 +158,7 @@ describe("summary", () => {
     expect(r.out).toContain("(2 more days: --limit)");
   });
 
-  test("--json: groups with sessions, duration_ms, cost_usd, cost_approx_usd, unfinished, and the total", async () => {
+  test("stats/json: --json: groups with sessions, duration_ms, cost_usd, cost_approx_usd, unfinished, and the total", async () => {
     const r = await stats(path, ["--json", "--by", "model", "--agent", "claude-code"]);
     const j = JSON.parse(r.out);
     expect(j.by).toBe("model");
@@ -170,7 +169,7 @@ describe("summary", () => {
     expect(j.total.sessions).toBe(2);
   });
 
-  test("a filter that matches nothing says so", async () => {
+  test("stats/filters: a filter that matches nothing says so", async () => {
     expect((await stats(path, ["--repo", "zzz"])).out).toBe("No recorded session matches.");
   });
 });
@@ -183,7 +182,7 @@ describe("sessions and one session", () => {
     { id: "abcd5678-0000-4000-8000-000000000002", name: "p2", started_at: local(2026, 3, 2) },
   ]);
 
-  test("newest first, limited, with the status of each row from the injected clock", async () => {
+  test("stats/sessions: newest first, limited, with the status of each row from the injected clock", async () => {
     const r = await stats(path, ["sessions", "--limit", "3"]);
     const lines = r.out.split("\n");
     expect(lines[0]).toMatch(/^id\s+started\s+time\s+agent\s+cost\s+status\s+repo\s+name$/);
@@ -195,7 +194,7 @@ describe("sessions and one session", () => {
     expect(lines.at(-1)).toBe("(3 older: --limit)");
   });
 
-  test("status: running while the heartbeat is fresh, unfinished past it, ended with an end", () => {
+  test("analytics/status: status: running while the heartbeat is fresh, unfinished past it, ended with an end", () => {
     const p = fresh();
     seed(p, [
       { name: "live", ended_at: null, duration_ms: null, updated_at: NOW - HEARTBEAT_MS + 1 },
@@ -208,7 +207,7 @@ describe("sessions and one session", () => {
     expect(Object.fromEntries(rows.map((r) => [r.name, detailJson(r, NOW).status]))).toEqual({ live: "running", dead: "unfinished", done: "ended" });
   });
 
-  test("an id prefix of 4+ characters, an exact id, or the agent's session id finds it; an ambiguous prefix lists the candidates (exit 1)", async () => {
+  test("stats/one-session: an id prefix of 4+ characters, an exact id, or the agent's session id finds it; an ambiguous prefix lists the candidates (exit 1)", async () => {
     const full = await stats(path, ["abcd1"]);
     expect(full.code).toBe(0);
     expect(full.out).toContain("id:            abcd1234-0000-4000-8000-000000000001");
@@ -228,19 +227,19 @@ describe("sessions and one session", () => {
     }
   });
 
-  test("findSession: a prefix under 4 characters finds nothing unless it is an exact id", () => {
+  test("stats/one-session: findSession: a prefix under 4 characters finds nothing unless it is an exact id", () => {
     const db = openStats(path)!;
     expect(findSession(db, "abc")).toEqual({ none: true });
     expect("row" in findSession(db, "abcd1")).toBe(true);
     db.close();
   });
 
-  test("--json of one session: the JSON columns parsed, and a status", async () => {
+  test("stats/json: --json of one session: the JSON columns parsed, and a status", async () => {
     const j = JSON.parse((await stats(path, ["abcd1", "--json"])).out);
     expect([j.routing_types, j.routing_why, j.status, j.spec.startsWith("line one")]).toEqual([["feature", "fix"], ["strong model", "small repo"], "ended", true]);
   });
 
-  test("BUG-571/analytics: an agent session id shared by several rows (a resumed session) lists them, not 'use more of the id'", async () => {
+  test("stats/one-session: an agent session id shared by several rows (a resumed session) lists them, not 'use more of the id' #BUG-571/analytics", async () => {
     const p = fresh();
     const SHARED = "11111111-2222-4333-8444-555566667777";
     seed(p, [
@@ -262,7 +261,7 @@ describe("sessions and one session", () => {
     db.close();
   });
 
-  test("--json of the list: rows with status, newest first", async () => {
+  test("stats/json: --json of the list: rows with status, newest first", async () => {
     const j = JSON.parse((await stats(path, ["sessions", "--json", "--limit", "2"])).out);
     expect(j.map((r: SessionRow & { status: string }) => [r.name, r.status])).toEqual([["four", "unfinished"], ["three", "ended"]]);
   });
@@ -272,7 +271,7 @@ describe("what the summary and the list read", () => {
   const path = fresh();
   seed(path, [...SET, { name: "big", spec: "S".repeat(100_000), started_at: local(2026, 3, 11) }]);
 
-  test("BUG-570/analytics: the summary and the list read no spec (up to 100 KB a row); the list's limit is applied in SQL", async () => {
+  test("stats/sessions: the summary and the list read no spec (up to 100 KB a row); the list's limit is applied in SQL #BUG-570/analytics", async () => {
     const db = openStats(path)!;
     try {
       expect(selectSessions(db, {}).every((r) => !("spec" in r))).toBe(true);
@@ -300,12 +299,12 @@ describe("sql", () => {
   const path = fresh();
   seed(path, SET);
 
-  test("sqlProblem: SELECT, WITH, EXPLAIN and VALUES alone; one statement; quotes and comments don't count", () => {
+  test("stats/sql: sqlProblem: SELECT, WITH, EXPLAIN and VALUES alone; one statement; quotes and comments don't count", () => {
     for (const ok of ["SELECT 1", "select 1;", " /* c */ SELECT 1 -- x", "WITH a AS (SELECT 1) SELECT * FROM a", "EXPLAIN SELECT 1", "VALUES (1)", "SELECT ';' AS s", 'SELECT "a;b"', "SELECT 1; /* tail */ ;", "SELECT 'it''s; fine'"]) expect([ok, sqlProblem(ok)]).toEqual([ok, null]);
     for (const bad of ["INSERT INTO sessions VALUES (1)", "ATTACH ':memory:' AS m", "VACUUM", "PRAGMA user_version=5", "DELETE FROM sessions", "SELECT 1; DROP TABLE sessions", "SELECT 1; SELECT 2", "SELECT 1;\nDELETE FROM sessions", "(SELECT 1)", "", "   ", "-- SELECT 1", "CREATE TABLE x(a)", "REPLACE INTO sessions SELECT 1"]) expect([bad, typeof sqlProblem(bad)]).toEqual([bad, "string"]);
   });
 
-  test("a query runs: a table of aligned columns, --json an array of objects", async () => {
+  test("stats/sql: a query runs: a table of aligned columns, --json an array of objects", async () => {
     const t = await stats(path, ["sql", "SELECT harness, count(*) AS n FROM sessions GROUP BY harness ORDER BY harness"]);
     expect(t.code).toBe(0);
     expect(t.out.split("\n")).toEqual(["harness      n", "claude-code  2", "codex        2", "(2 rows)"]);
@@ -315,7 +314,7 @@ describe("sql", () => {
     expect(JSON.parse((await stats(path, ["sql", "WITH x AS (SELECT 1 AS a) SELECT a FROM x", "--json"])).out)).toEqual([{ a: 1 }]);
   });
 
-  test("refused statements exit 2 and change nothing; a bad query exits 1", async () => {
+  test("stats/sql: refused statements exit 2 and change nothing; a bad query exits 1", async () => {
     for (const q of ["INSERT INTO sessions (id) VALUES ('x')", "ATTACH 'x.db' AS m", "VACUUM", "PRAGMA user_version=9", "SELECT 1; DROP TABLE sessions", "SELECT 1; DELETE FROM sessions"]) {
       const r = await stats(path, ["sql", q]);
       expect([q, r.code, r.err.startsWith("gluon: ")]).toEqual([q, 2, true]);
@@ -329,7 +328,7 @@ describe("sql", () => {
     db.close();
   });
 
-  test("even with the guard bypassed, the handle itself cannot write", () => {
+  test("stats/sql: even with the guard bypassed, the handle itself cannot write", () => {
     const db = openStats(path)!;
     for (const q of ["DELETE FROM sessions", "INSERT INTO sessions (id) VALUES ('x')", "DROP TABLE sessions", "UPDATE sessions SET name='x'", "CREATE TABLE y(a)", "PRAGMA user_version=7"]) {
       let wrote = true;
@@ -347,7 +346,7 @@ describe("sql", () => {
     check.close();
   });
 
-  test("runQuery/queryJson: a NULL prints as NULL; duplicate column names don't collapse the table", () => {
+  test("stats/sql: runQuery/queryJson: a NULL prints as NULL; duplicate column names don't collapse the table", () => {
     const db = openStats(path)!;
     const r = runQuery(db, "SELECT 1, 1, NULL");
     db.close();
@@ -358,7 +357,7 @@ describe("sql", () => {
 });
 
 describe("delete, a missing database, bad arguments", () => {
-  test("--delete without --yes: refused without a terminal; on one, a 'no' deletes nothing", async () => {
+  test("stats/delete: --delete without --yes: refused without a terminal; on one, a 'no' deletes nothing", async () => {
     const path = fresh();
     seed(path, SET);
     const refused = await stats(path, ["--delete"]);
@@ -368,7 +367,7 @@ describe("delete, a missing database, bad arguments", () => {
     expect(wipe(path)).toBe(4);
   });
 
-  test("--delete: asks with the count; --yes wipes through a write connection and never removes the file", async () => {
+  test("stats/delete: --delete: asks with the count; --yes wipes through a write connection and never removes the file", async () => {
     const path = fresh();
     seed(path, SET);
     const asked: string[] = [];
@@ -385,7 +384,7 @@ describe("delete, a missing database, bad arguments", () => {
     expect(statSync(path).size).toBeGreaterThan(0);
   });
 
-  test("a missing database: 'No analytics recorded yet.', exit 0, and the file is not created", async () => {
+  test("stats/no-database: a missing database: 'No analytics recorded yet.', exit 0, and the file is not created", async () => {
     const path = join(dir, "never.db");
     for (const argv of [[], ["sessions"], ["sql", "SELECT 1"], ["--delete", "--yes"], ["abcd1234"]]) {
       const r = await stats(path, argv);
@@ -397,13 +396,13 @@ describe("delete, a missing database, bad arguments", () => {
     expect(existsSync(`${path}-wal`)).toBe(false);
   });
 
-  test("a database of a newer Gluon (user_version above ours) is still read", async () => {
+  test("stats/no-database: a database of a newer Gluon (user_version above ours) is still read", async () => {
     const path = fresh();
     seed(path, SET, MIGRATIONS.length + 3);
     expect((await stats(path, [])).out).toMatch(/total\s+4/);
   });
 
-  test("a file that is no database: exit 1 with the path; one without the table: nothing recorded", async () => {
+  test("stats/no-database: a file that is no database: exit 1 with the path; one without the table: nothing recorded", async () => {
     const junk = join(dir, "junk.db");
     await Bun.write(junk, "this is not sqlite, not at all, not even close, nope nope nope".repeat(10));
     const r = await stats(junk, []);
@@ -413,7 +412,7 @@ describe("delete, a missing database, bad arguments", () => {
     expect((await stats(empty, [])).out).toBe("No analytics recorded yet.");
   });
 
-  test("bad arguments: `gluon: <message>` on stderr, exit 2, nothing on stdout", async () => {
+  test("stats/output: bad arguments: `gluon: <message>` on stderr, exit 2, nothing on stdout", async () => {
     const path = fresh();
     seed(path, SET);
     const bads = [
@@ -426,12 +425,12 @@ describe("delete, a missing database, bad arguments", () => {
     }
   });
 
-  test("--help prints the help (exit 0)", async () => {
+  test("stats/output: --help prints the help (exit 0)", async () => {
     const r = await stats(fresh(), ["--help"]);
     expect([r.code, r.out.startsWith("gluon stats [options]")]).toEqual([0, true]);
   });
 
-  test("text from the database is printed without control characters", async () => {
+  test("stats/output: text from the database is printed without control characters", async () => {
     const path = fresh();
     seed(path, [{ name: "evil\x1b]0;title\x07name\x1b[2J", repo: "re\x07po" }]);
     const r = await stats(path, ["sessions"]);
@@ -440,34 +439,10 @@ describe("delete, a missing database, bad arguments", () => {
   });
 });
 
-describe("uninstall", () => {
-  test("uninstallTargets names analytics.db and its -wal and -shm when they exist, and not before", () => {
-    const state = mkdtempSync(join(tmpdir(), "gluon-stats-un-"));
-    const was = process.env.XDG_STATE_HOME;
-    process.env.XDG_STATE_HOME = state;
-    try {
-      const names = ["analytics.db", "analytics.db-wal", "analytics.db-shm"].map((f) => join(state, "gluon", f));
-      const targets = () => uninstallTargets(join(state, "no-tmp"));
-      for (const f of names) expect(targets()).not.toContain(f);
-      mkdirSync(join(state, "gluon"), { recursive: true });
-      writeFileSync(names[0]!, "");
-      expect(targets()).toContain(names[0]!);
-      expect(targets()).not.toContain(names[1]!);
-      writeFileSync(names[1]!, "");
-      writeFileSync(names[2]!, "");
-      for (const f of names) expect(targets()).toContain(f);
-    } finally {
-      if (was === undefined) delete process.env.XDG_STATE_HOME;
-      else process.env.XDG_STATE_HOME = was;
-      rmSync(state, { recursive: true, force: true });
-    }
-  });
-});
-
 // ---- QA of `gluon stats` (B4) ----
 
 describe("QA analytics: sql cannot write or reach outside the file", () => {
-  test("ATTACH, writable_schema, VACUUM INTO, load_extension, a CTE with INSERT or DELETE, and statements after a semicolon change nothing and write no file", async () => {
+  test("stats/sql: ATTACH, writable_schema, VACUUM INTO, load_extension, a CTE with INSERT or DELETE, and statements after a semicolon change nothing and write no file", async () => {
     const path = fresh();
     seed(path, SET);
     const out = join(dir, `qa-out-${n}`);
@@ -505,7 +480,7 @@ describe("QA analytics: sql cannot write or reach outside the file", () => {
 });
 
 describe("QA analytics: times and zones", () => {
-  test("a day is the local day in a zone with a 23-hour and a 25-hour day, and in one with a half-hour offset", () => {
+  test("stats/summary: a day is the local day in a zone with a 23-hour and a 25-hour day, and in one with a half-hour offset", () => {
     for (const [zone, day, hours] of [["America/New_York", [2026, 3, 8], 23], ["America/New_York", [2026, 11, 1], 25], ["Asia/Kolkata", [2026, 6, 15], 24], ["Pacific/Chatham", [2026, 4, 5], 25]] as const) {
       process.env.TZ = zone;
       const [y, m, d] = day;
@@ -522,12 +497,12 @@ describe("QA analytics: times and zones", () => {
     }
   });
 
-  test("an end that is exactly one heartbeat old is unfinished, one millisecond younger is running", () => {
+  test("analytics/status: an end that is exactly one heartbeat old is unfinished, one millisecond younger is running", () => {
     const r = { ended_at: null, updated_at: 1_000_000 };
     expect([runStatus(r, 1_000_000 + HEARTBEAT_MS - 1), runStatus(r, 1_000_000 + HEARTBEAT_MS), runStatus(r, 1_000_000 - 5)]).toEqual(["running", "unfinished", "running"]);
   });
 
-  test("--since later than --until is an empty answer, not an error", async () => {
+  test("stats/filters: --since later than --until is an empty answer, not an error", async () => {
     const path = fresh();
     seed(path, SET);
     const r = await stats(path, ["--since", "2026-03-10", "--until", "2026-03-01"]);
@@ -536,7 +511,7 @@ describe("QA analytics: times and zones", () => {
 });
 
 describe("QA analytics: output shapes", () => {
-  test("--json: the summary, the list and one session keep their keys (a script can rely on them)", async () => {
+  test("stats/json: --json: the summary, the list and one session keep their keys (a script can rely on them)", async () => {
     const path = fresh();
     seed(path, SET);
     const sum = JSON.parse((await stats(path, ["--json"])).out);
@@ -550,7 +525,7 @@ describe("QA analytics: output shapes", () => {
     expect([typeof one.routing_types, one.routing_types]).toEqual(["object", null]);
   });
 
-  test("--repo text with LIKE wildcards or a quote is matched literally", async () => {
+  test("stats/filters: --repo text with LIKE wildcards or a quote is matched literally", async () => {
     const path = fresh();
     seed(path, SET);
     for (const needle of ["%", "_", "a_pha", "al%", "'", "alpha' OR '1'='1"]) {
@@ -559,7 +534,7 @@ describe("QA analytics: output shapes", () => {
     }
   });
 
-  test("BUG-598/QA-analytics-04: `gluon stats <id> --json` with no database prints null, not [] (a session is an object); exit 0 like the text path's \"nothing recorded\"", async () => {
+  test("stats/json: `gluon stats <id> --json` with no database prints null, not [] (a session is an object); exit 0 like the text path's \"nothing recorded\" #BUG-598/QA-analytics-04", async () => {
     const path = join(dir, "never-created.db");
     const r = await stats(path, ["abcd1234", "--json"]);
     expect([r.code, r.out]).toEqual([0, "null"]);
@@ -568,7 +543,7 @@ describe("QA analytics: output shapes", () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  test("--delete leaves a newer Gluon's schema version alone", async () => {
+  test("stats/delete: --delete leaves a newer Gluon's schema version alone", async () => {
     const path = fresh();
     seed(path, SET, MIGRATIONS.length + 3);
     const r = await stats(path, ["--delete", "--yes"]);
@@ -580,7 +555,7 @@ describe("QA analytics: output shapes", () => {
 });
 
 describe("QA analytics: what --delete leaves", () => {
-  test("with a recorder still holding the file open, no old spec is left in the file or its -wal (and the running session keeps recording)", async () => {
+  test("stats/delete: with a recorder still holding the file open, no old spec is left in the file or its -wal (and the running session keeps recording)", async () => {
     const { Analytics } = await import("../src/analytics.ts");
     const path = fresh();
     const a = new Analytics({ enabled: true, path });
@@ -659,7 +634,7 @@ describe("gluon stats sql: limits", () => {
     }
   };
 
-  test("BUG-597/rows: more than 10000 rows are cut, and the cut is said (a table's last line; JSON: on stderr, the array stays valid)", async () => {
+  test("stats/sql-limits: more than 10000 rows are cut, and the cut is said (a table's last line; JSON: on stderr, the array stays valid) #BUG-597/rows", async () => {
     const r = inProcess(COUNT_TO(10_500));
     expect([r.values.length, r.cut, r.values.at(-1)]).toEqual([10_000, "rows", [10_000]]);
     expect(inProcess(COUNT_TO(10_000)).cut).toBeUndefined();
@@ -672,7 +647,7 @@ describe("gluon stats sql: limits", () => {
     expect(j.err).toContain("gluon: first 10000 rows; add LIMIT");
   });
 
-  test("BUG-597/deadline: a query still running at the deadline is stopped, with a clear error and a non-zero exit", async () => {
+  test("stats/sql-limits: a query still running at the deadline is stopped, with a clear error and a non-zero exit #BUG-597/deadline", async () => {
     // 20 million rows: about 3 s of one core, bounded. The seam shortens the 10 s deadline.
     const r = await gluonStats(["sql", `SELECT count(*) FROM (${COUNT_TO(20_000_000)})`], { GLUON_TEST_SQL_DEADLINE_MS: "700" });
     expect(r.timedOut).toBe(false);
@@ -682,7 +657,7 @@ describe("gluon stats sql: limits", () => {
     expect(r.ms).toBeLessThan(2_500 * SLOW);
   });
 
-  test("BUG-597/memory: one huge value is an out-of-memory error at once, not its size in RAM @full", async () => {
+  test("stats/sql-limits: one huge value is an out-of-memory error at once, not its size in RAM @full #BUG-597/memory", async () => {
     // The instrument first: a 100 MB value fits under the cap, and the sampler sees it (about 240 MB for the pair).
     const control = await gluonStats(["sql", "SELECT zeroblob(100000000) AS z"]);
     expect([control.code, control.out.includes("<blob 100000000 bytes>")]).toEqual([0, true]);
@@ -696,7 +671,7 @@ describe("gluon stats sql: limits", () => {
     }
   }, 30_000 * SLOW);
 
-  test.skipIf(WIN)("BUG-597/macos-memory: where SQLite ignores its heap limit (macOS), the child's watchdog ends it past its memory cap, with the mark the parent reads as out of memory", async () => {
+  test.skipIf(WIN)("stats/sql-limits: where SQLite ignores its heap limit (macOS), the child's watchdog ends it past its memory cap, with the mark the parent reads as out of memory #BUG-597/macos-memory", async () => {
     // Forced here with a small cap: on Linux SQLite's own limit (256 MB) lets a 100 MB value through, the 30 MB cap doesn't. Random bytes:
     // building them takes long enough for the watchdog to see (macOS's SQLite returns a zeroblob before its first look).
     const dir = mkdtempSync(join(tmpdir(), "gluon-sql-memory-"));
@@ -715,7 +690,7 @@ describe("gluon stats sql: limits", () => {
     }
   }, 30_000 * SLOW);
 
-  test.skipIf(WIN)("BUG-597/Ctrl+C: an interrupt ends the command and its child at once", async () => {
+  test.skipIf(WIN)("stats/sql-limits: an interrupt ends the command and its child at once #BUG-597/Ctrl+C", async () => {
     const r = await gluonStats(["sql", `SELECT count(*) FROM (${COUNT_TO(60_000_000)})`], {}, 20_000 * SLOW, { afterMs: 800 * SLOW });
     expect(r.timedOut).toBe(false);
     expect(r.code).toBe(130);
@@ -731,7 +706,7 @@ describe("gluon stats sql: limits", () => {
     }
   };
 
-  test.skipIf(process.platform !== "linux")("BUG-597/orphan: a SIGKILLed command leaves no query running; the child ends itself within a second", async () => {
+  test.skipIf(process.platform !== "linux")("stats/sql-limits: a SIGKILLed command leaves no query running; the child ends itself within a second #BUG-597/orphan", async () => {
     const state = join(dir, `state${++n}`);
     mkdirSync(join(state, "gluon"), { recursive: true });
     seed(join(state, "gluon", "analytics.db"), SET);
@@ -763,7 +738,7 @@ describe("gluon stats sql: limits", () => {
     }
   });
 
-  test.skipIf(WIN)("BUG-597/hard limit: the child ends itself at its own limit, parent or no parent", async () => {
+  test.skipIf(WIN)("stats/sql-limits: the child ends itself at its own limit, parent or no parent #BUG-597/hard-limit", async () => {
     const state = join(dir, `state${++n}`);
     mkdirSync(join(state, "gluon"), { recursive: true });
     const db = join(state, "gluon", "analytics.db");
@@ -784,7 +759,7 @@ describe("gluon stats sql: limits", () => {
     expect([code === 0, child.signalCode, took < 3_500 * SLOW]).toEqual([false, "SIGKILL", true]);
   });
 
-  test("BUG-597/shape: a normal query is unchanged through the child: columns, blobs, text, order, comments, a trailing semicolon", async () => {
+  test("stats/sql-limits: a normal query is unchanged through the child: columns, blobs, text, order, comments, a trailing semicolon #BUG-597/shape", async () => {
     const t = await gluonStats(["sql", "SELECT harness, count(*) AS n FROM sessions GROUP BY harness ORDER BY harness DESC; -- done"]);
     expect([t.code, t.out.trimEnd().split("\n")]).toEqual([0, ["harness      n", "codex        2", "claude-code  2", "(2 rows)"]]);
     const j = await gluonStats(["sql", "SELECT 1 AS a, 2.5 AS b, NULL AS c, 'x' AS d, zeroblob(3) AS e, 9e999 AS f, 7 AS g --", "--json"]);
@@ -794,7 +769,7 @@ describe("gluon stats sql: limits", () => {
     expect((await gluonStats(["sql", "DELETE FROM sessions"])).code).toBe(2);
   });
 
-  test("BUG-597/shape: a blob shows its size, a very long text is cut and says so, EXPLAIN, VALUES, and no row at all still work", () => {
+  test("stats/sql-limits: a blob shows its size, a very long text is cut and says so, EXPLAIN, VALUES, and no row at all still work #BUG-597/shape", () => {
     expect(inProcess("SELECT zeroblob(5) AS z, x'0102' AS b").values).toEqual([["<blob 5 bytes>", "<blob 2 bytes>"]]);
     const long = inProcess("SELECT hex(zeroblob(1500000)) AS h").values[0]![0] as string;
     expect([long.length < 1_000_100, long.endsWith("... [cut: 3000000 characters in all]"), long.startsWith("0000")]).toEqual([true, true, true]);
@@ -806,7 +781,7 @@ describe("gluon stats sql: limits", () => {
     expect(inProcess("WITH t AS (SELECT name FROM sessions ORDER BY name DESC) SELECT * FROM t").values.map((r) => r[0])).toEqual(["two", "three", "one", "four"]);
   });
 
-  test("BUG-597/output: rows whose text adds up past 32 MB are cut like rows, and say so", () => {
+  test("stats/sql-limits: rows whose text adds up past 32 MB are cut like rows, and say so #BUG-597/output", () => {
     const r = inProcess(`SELECT hex(zeroblob(400000)) AS h FROM (${COUNT_TO(100)})`);
     expect(r.cut).toBe("bytes");
     expect(r.values.length).toBeLessThan(100);
