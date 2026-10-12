@@ -14,8 +14,8 @@ export type Seam = {
 
 export const SEAMS: Record<string, Seam> = {
   routing: {
-    says: "routing.yaml + the brain's classification → agent · model · effort, and why",
-    modules: ["src/routing.ts", "src/routing-config.ts"],
+    says: "routing.yaml, the model catalog and the brain's classification → agent · model · effort, and why; the intake's proposal checked against them",
+    modules: ["src/routing.ts", "src/routing-config.ts", "src/intake.ts", "src/models.ts"],
   },
   adapters: {
     says: "a launch's context → the harness's argv, env and files; a hook's call → its result (`Adapter`, src/adapters/types.ts, and each harness's own hook, plugin and settings formats)",
