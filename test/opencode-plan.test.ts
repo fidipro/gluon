@@ -37,7 +37,7 @@ const fake = async <T>(env: Record<string, string>, f: () => Promise<T>): Promis
 };
 
 describe("the plan's sign-in", () => {
-  test("a stored sign-in of the opencode-go integration is the plan; nothing listed is not", async () => {
+  test("subscriptions/official-binaries-only: a stored sign-in of the opencode-go integration is the plan; nothing listed is not", async () => {
     expect(await fake({}, opencodePlanStatus)).toEqual({ installed: true, loggedIn: true, detail: "OpenCode Go plan" });
     expect(await fake({ FAKE_OPENCODE_LOGGED_OUT: "1" }, opencodePlanStatus)).toEqual({ installed: true, loggedIn: false });
     // `loginStatus` is the same check for OpenCode.
@@ -50,13 +50,13 @@ describe("the plan's sign-in", () => {
     expect(s).toMatchObject({ installed: true, loggedIn: false, error: expect.stringContaining("needs to be signed in to again") });
   });
 
-  test("other stored sign-ins are counted for doctor's note, not as the plan", async () => {
+  test("subscriptions/official-binaries-only: other stored sign-ins are counted for doctor's note, not as the plan", async () => {
     expect(await fake({ FAKE_OPENCODE_CREDENTIALS: "2", FAKE_OPENCODE_LOGGED_OUT: "1" }, opencodeCredentials)).toBe(2);
     expect(await fake({ FAKE_OPENCODE_CREDENTIALS: "2", FAKE_OPENCODE_LOGGED_OUT: "1" }, opencodePlanStatus)).toMatchObject({ loggedIn: false });
     expect(await fake({}, opencodeCredentials)).toBe(0);
   });
 
-  test("not installed: not installed, never a sign-in", async () => {
+  test("subscriptions/official-binaries-only: not installed: not installed, never a sign-in", async () => {
     const path = process.env.PATH;
     process.env.PATH = TMP;
     try {
@@ -68,7 +68,7 @@ describe("the plan's sign-in", () => {
 });
 
 describe("the plan as a connection", () => {
-  test("a subscription of the OpenCode vendor: signed in by `opencode auth login opencode-go`, no key, launched with none", () => {
+  test("launch/environment: a subscription of the OpenCode vendor: signed in by `opencode auth login opencode-go`, no key, launched with none", () => {
     expect(isPlanConn("opencode-go")).toBe(true);
     expect(isPlanConn("openrouter")).toBe(false);
     expect(subscriptionOf("opencode", "opencode-go")).toMatchObject({ vendor: "opencode", loginArgv: ["opencode", "auth", "login", "opencode-go"] });
@@ -123,20 +123,20 @@ describe("OpenCode's effort: the model's `settings` in its config", () => {
   const flash = DEFAULT_MODELS.opencode[0]!;
   const muse = DEFAULT_MODELS.opencode[1]!;
 
-  test("OpenRouter: reasoning.effort; the plan: reasoningEffort; no effort, no settings", () => {
+  test("launch/environment: OpenRouter: reasoning.effort; the plan: reasoningEffort; no effort, no settings", () => {
     expect(opencodeEffort("openrouter", "deepseek/deepseek-v4.1-flash", flash, "max")).toEqual({ providers: { openrouter: { models: { "deepseek/deepseek-v4.1-flash": { settings: { reasoning: { effort: "max" } } } } } } });
     expect(opencodeEffort("opencode-go", "deepseek-v4.1-flash", flash, "low")).toEqual({ providers: { "opencode-go": { models: { "deepseek-v4.1-flash": { settings: { reasoningEffort: "low" } } } } } });
     expect(opencodeEffort("openrouter", "meta/muse-spark-1.3", muse, undefined)).toEqual({});
   });
 
-  test("Muse on the plan has no max: it is asked for xhigh; DeepSeek on the plan keeps max; OpenRouter's Muse keeps max", () => {
+  test("launch/environment: Muse on the plan has no max: it is asked for xhigh; DeepSeek on the plan keeps max; OpenRouter's Muse keeps max", () => {
     const settings = (r: ReturnType<typeof opencodeEffort>, provider: string, id: string) => (r.providers as any)[provider].models[id].settings;
     expect(settings(opencodeEffort("opencode-go", "muse-spark-1.3-contributor", muse, "max"), "opencode-go", "muse-spark-1.3-contributor")).toEqual({ reasoningEffort: "xhigh" });
     expect(settings(opencodeEffort("opencode-go", "deepseek-v4.1-flash", flash, "max"), "opencode-go", "deepseek-v4.1-flash")).toEqual({ reasoningEffort: "max" });
     expect(settings(opencodeEffort("openrouter", "meta/muse-spark-1.3", muse, "max"), "openrouter", "meta/muse-spark-1.3")).toEqual({ reasoning: { effort: "max" } });
   });
 
-  test("a mode's config joins the effort's `providers` without replacing `model` or it", () => {
+  test("modes/per-harness: a mode's config joins the effort's `providers` without replacing `model` or it", () => {
     const config = { ...defaults(), connections: { opencode: { auth: "api", providers: ["opencode-go"] } } } as ReturnType<typeof defaults>;
     const content = JSON.parse(buildCommand(config, { harness: "opencode", model: "deepseek-flash", effort: "high", mode: "explore", spec: "x", reason: "" }).env.OPENCODE_CONFIG_CONTENT!);
     expect(content.model).toBe("opencode-go/deepseek-v4.1-flash");

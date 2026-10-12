@@ -24,7 +24,7 @@ const ESC = "\x1b";
 const RLO = String.fromCharCode(0x202e);
 
 describe("status events", () => {
-  test("parsed strictly: an object of known fields with the right types and bounds; unknown fields dropped", () => {
+  test("events/strict: parsed strictly: an object of known fields with the right types and bounds; unknown fields dropped", () => {
     expect(parseEvent('status {"state":"working","activity":"Bash: bun test"}')).toEqual({ name: "status", status: { state: "working", activity: "Bash: bun test" } });
     expect(parseEvent('status {"costUsd":0.42,"contextTokens":41512.4,"contextWindow":1000000,"model":"claude-opus-5-5[1m]","extra":true}')).toEqual({
       name: "status",
@@ -59,7 +59,7 @@ describe("status events", () => {
     expect(parseEvent("compact c1")).toEqual({ name: "compact", id: "c1" });
   });
 
-  test("the activity is one line safe to draw: escapes, controls and bidi overrides gone, at most 120 characters", () => {
+  test("events/strict: the activity is one line safe to draw: escapes, controls and bidi overrides gone, at most 120 characters", () => {
     expect(safeLine(`Bash: ${ESC}[2J${ESC}]0;title${String.fromCharCode(7)}ls\r\n-la\t${RLO}x${ESC}P1;2|x${ESC}\\ end`)).toBe("Bash: ls -la x end");
     expect(safeLine(`${String.fromCharCode(0x9b)}31mred${String.fromCharCode(0x9d)}8;;evil${String.fromCharCode(0x9c)} ok`)).toBe("red ok");
     const long = safeLine(`Read ${"a".repeat(300)}`);
@@ -70,7 +70,7 @@ describe("status events", () => {
     expect(parseStatus(JSON.stringify({ activity: "Bash: curl -H 'x-api-key: sk-ant-api03-abcdefghijklmnopqrstuvwxyz' api" }))!.activity).toBe("Bash: curl -H 'x-api-key: sk-ant-••••' api");
   });
 
-  test("BUG-169/F: every format character goes from an activity line — the Arabic letter mark, bidi marks and isolates, zero-width and invisible characters", () => {
+  test("events/strict: every format character goes from an activity line — the Arabic letter mark, bidi marks and isolates, zero-width and invisible characters #BUG-169/F", () => {
     const fmt = [0x061c, 0x200b, 0x200e, 0x200f, 0x202a, 0x202d, 0x202e, 0x2060, 0x2066, 0x2069, 0xfeff, 0xfff9, 0xe0041];
     for (const cp of fmt) expect([cp.toString(16), safeLine(`a${String.fromCodePoint(cp)}b`)]).toEqual([cp.toString(16), "a b"]);
     // A zero-width joiner only goes: the emoji's pieces stay next to each other.
@@ -78,7 +78,7 @@ describe("status events", () => {
     expect(safeLine(`x${String.fromCharCode(0x2028)}y${String.fromCharCode(0x2029)}z`)).toBe("x y z");
   });
 
-  test("BUG-177/F: a backlog of status files drains a batch per read, and the seen names stay only while their files do", () => {
+  test("frame/events-read: a backlog of status files drains a batch per read, and the seen names stay only while their files do #BUG-177/F", () => {
     const dir = eventsDir();
     for (let i = 0; i < 450; i++) writeFileSync(join(dir, `${String(i).padStart(6, "0")}.event`), 'status {"state":"working"}');
     writeFileSync(join(dir, "zzzzzz.event"), "back");
@@ -94,7 +94,7 @@ describe("status events", () => {
     expect(seen.size).toBe(0);
   });
 
-  test.skipIf(process.platform === "win32")("BUG-165/F: a symlink or a directory named like an event is never read or followed", () => {
+  test.skipIf(process.platform === "win32")("events/strict: a symlink or a directory named like an event is never read or followed #BUG-165/F", () => {
     const dir = eventsDir();
     const outside = join(TMP, `outside-${n}`);
     writeFileSync(outside, "back");
@@ -105,7 +105,7 @@ describe("status events", () => {
     expect(existsSync(outside)).toBe(true);
   });
 
-  test("caps: a status up to 4 KB, the others 256 bytes; a larger file is never read; writeEvent refuses what wouldn't be read", () => {
+  test("events/strict: caps: a status up to 4 KB, the others 256 bytes; a larger file is never read; writeEvent refuses what wouldn't be read", () => {
     const dir = eventsDir();
     const big: StatusInfo = { activity: "x".repeat(MAX_STATUS_BYTES) };
     expect(writeEvent(dir, { name: "status", status: big })).toBe(false);
@@ -117,7 +117,7 @@ describe("status events", () => {
     expect(got.map((e) => [e.name, e.status?.state, e.status?.activity?.length])).toEqual([["status", "done", ACTIVITY_MAX]]);
   });
 
-  test("written and read back in order; status files are removed once read, the others stay", () => {
+  test("frame/events-read: written and read back in order; status files are removed once read, the others stay", () => {
     const dir = eventsDir();
     expect(writeEvent(dir, { name: "status", status: { state: "working", activity: "Read src/cli.tsx" } })).toBe(true);
     expect(writeEvent(dir, { name: "compact", id: "c1" })).toBe(true);
@@ -133,7 +133,7 @@ describe("status events", () => {
     expect(formatEvent({ name: "status", status: { state: "done" } })).toBe('status {"state":"done"}');
   });
 
-  test("BUG-296/resume: a session event is removed once read (Codex sends one with every hook; a long session must not fill the directory)", () => {
+  test("frame/events-read: a session event is removed once read (Codex sends one with every hook; a long session must not fill the directory) #BUG-296/resume", () => {
     const dir = eventsDir();
     for (let i = 0; i < 50; i++) expect(writeEvent(dir, { name: "session", id: "019f3a2c-7b1e" })).toBe(true);
     expect(writeEvent(dir, { name: "back" })).toBe(true);
@@ -145,7 +145,7 @@ describe("status events", () => {
     expect(readEvents(dir, seen)).toEqual([]);
   });
 
-  test("the activity line from a tool call, in the harnesses' shapes", () => {
+  test("session-state/activity: the activity line from a tool call, in the harnesses' shapes", () => {
     expect(toolActivity("Bash", { command: "bun test\nsecond line" })).toBe("Bash: bun test\nsecond line");
     expect(toolActivity("Edit", { file_path: "/w/r/src/a.ts", old_string: "x" }, "/w/r/")).toBe("Edit src/a.ts");
     expect(toolActivity("Edit", { file_path: "/w/rx/src/a.ts" }, "/w/r")).toBe("Edit /w/rx/src/a.ts");
@@ -159,7 +159,7 @@ describe("status events", () => {
     expect(statusHook("anything-else", {})).toBeNull();
   });
 
-  test("BUG-186/live: Gluon's own return command is no activity: the hook says working, the activity before it stays", () => {
+  test("session-state/activity: Gluon's own return command is no activity: the hook says working, the activity before it stays #BUG-186/live", () => {
     for (const command of [RETURN_COMMAND.posix, RETURN_COMMAND.powershell, RETURN_COMMAND.posix.replaceAll('"', ""), '"${GLUON_SELF}" signal back', "/home/me/.local/bin/gluon signal back", '"C:\\Program Files\\Gluon\\gluon.exe" signal back', `cd /w && ${RETURN_COMMAND.posix}`]) {
       expect(toolActivity("Bash", { command })).toBeUndefined();
       expect(statusHook("tool", { tool_name: "Bash", tool_input: { command } })).toEqual({ events: [{ name: "status", status: { state: "working" } }] });
@@ -168,7 +168,7 @@ describe("status events", () => {
     expect(toolActivity("Bash", { command: "gluon signal back --help && ls" })).toBe("Bash: gluon signal back --help && ls");
   });
 
-  test("the hook round trip: `gluon hook <agent> <name>` turns the harness's input into one status event, prints nothing, exits 0", async () => {
+  test("session-state/hooks: the hook round trip: `gluon hook <agent> <name>` turns the harness's input into one status event, prints nothing, exits 0", async () => {
     const dir = eventsDir();
     const hook = async (agent: string, name: string, input: object) => {
       // The shebang's Bun flags (on Windows an empty bunfig, not /dev/null).
@@ -475,7 +475,7 @@ describe("context windows", () => {
   });
 });
 
-test("status events stay out of the events directory's remains: a launch's directory holds only what's still to read", () => {
+test("frame/events-read: status events stay out of the events directory's remains: a launch's directory holds only what's still to read", () => {
   const dir = eventsDir();
   for (let i = 0; i < 50; i++) writeEvent(dir, { name: "status", status: { state: "working", activity: `Bash: step ${i}` } });
   expect(readEvents(dir, new Set()).length).toBe(50);

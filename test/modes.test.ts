@@ -16,7 +16,7 @@ const tmp = mkdtempSync(join(tmpdir(), "gluon-modes-"));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
 describe("buildCommand", () => {
-  test("build adds nothing: no mode flag, no mode on the command, the same argv and env as no mode at all", () => {
+  test("modes/per-harness: build adds nothing: no mode flag, no mode on the command, the same argv and env as no mode at all", () => {
     for (const h of HARNESSES) {
       const none = buildCommand(config, choice(h, undefined, h === "opencode" ? undefined : "low"));
       const build = buildCommand(config, choice(h, "build", h === "opencode" ? undefined : "low"));
@@ -29,7 +29,7 @@ describe("buildCommand", () => {
     expect(buildCommand(config, choice("opencode", "build")).env.OPENCODE_CONFIG_CONTENT).toBe('{"model":"opencode-go/deepseek-v4.1-flash"}');
   });
 
-  test("explore and plan: the mode's options come before the spec, which stays last; the command says its mode", () => {
+  test("modes/per-harness: explore and plan: the mode's options come before the spec, which stays last; the command says its mode", () => {
     for (const h of HARNESSES) {
       for (const mode of ["explore", "plan"] as const) {
         // A mode the harness can't run is refused (Kimi Code's explore: BUG-432).
@@ -49,7 +49,7 @@ describe("buildCommand", () => {
     }
   });
 
-  test("argv per harness", () => {
+  test("modes/per-harness: argv per harness", () => {
     const argv = (h: Harness, mode: Mode, effort?: LaunchChoice["effort"]) => buildCommand(config, choice(h, mode, effort, "x")).argv;
     expect(argv("claude-code", "explore", "high")).toEqual([
       "claude", "--model", "sonnet", "--effort", "high",
@@ -67,13 +67,13 @@ describe("buildCommand", () => {
     expect(argv("opencode", "plan")).toEqual(["opencode", "--standalone", "--prompt=x"]);
   });
 
-  test("an adapter's options come after the mode's, and the spec is still last", () => {
+  test("launch/spec-last: an adapter's options come after the mode's, and the spec is still last", () => {
     const adapter = { argv: ["--settings", "ADAPTER"], env: {}, files: {} };
     const argv = buildCommand(config, choice("claude-code", "plan", "high", "x"), adapter).argv;
     expect(argv).toEqual(["claude", "--model", "sonnet", "--effort", "high", "--permission-mode", "plan", "--settings", "ADAPTER", "--", "x"]);
   });
 
-  test("OpenCode: the mode's config is merged into the one passed in the environment", () => {
+  test("modes/per-harness: OpenCode: the mode's config is merged into the one passed in the environment", () => {
     const explore = JSON.parse(buildCommand(config, choice("opencode", "explore")).env.OPENCODE_CONFIG_CONTENT!);
     expect(explore.model).toBe("opencode-go/deepseek-v4.1-flash");
     expect(explore.default_agent).toBe("gluon-explore");
@@ -87,7 +87,7 @@ describe("buildCommand", () => {
     for (const h of HARNESSES.filter((x) => x !== "opencode" && !HARNESS_INFO[x].modes.explore.unavailable)) expect(buildCommand(config, choice(h, "explore", "low")).env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
   });
 
-  test("the mode's config never replaces `model` or `providers`", () => {
+  test("modes/per-harness: the mode's config never replaces `model` or `providers`", () => {
     const info = HARNESS_INFO.opencode;
     const was = info.modes.explore;
     info.modes.explore = { opencodeConfig: { model: "evil/model", providers: { evil: {} }, default_agent: "x" } };
@@ -98,7 +98,7 @@ describe("buildCommand", () => {
     }
   });
 
-  test("Codex plan: typed /plan, the effort of plan mode follows the effort, no flag of its own", () => {
+  test("frame/brief-line: Codex plan: typed /plan, the effort of plan mode follows the effort, no flag of its own", () => {
     const cmd = buildCommand(config, choice("codex", "plan", "high", "x"));
     expect(cmd.firstLine).toBe("/plan");
     expect(cmd.mode).toBe("plan");
@@ -107,7 +107,7 @@ describe("buildCommand", () => {
     for (const h of HARNESSES.filter((x) => !HARNESS_INFO[x].modes.explore.unavailable)) expect([h, buildCommand(config, choice(h, "explore", "low")).firstLine]).toEqual([h, HARNESS_INFO[h].typedSpec ? "" : undefined]);
   });
 
-  test("Grok plan: typed /plan like Codex, and no Codex-only plan effort; its refusal names Grok Build", () => {
+  test("frame/brief-line: Grok plan: typed /plan like Codex, and no Codex-only plan effort; its refusal names Grok Build", () => {
     const cmd = buildCommand(config, choice("grok-build", "plan", "high", "x"));
     expect(cmd.firstLine).toBe("/plan");
     expect(cmd.mode).toBe("plan");
@@ -119,7 +119,7 @@ describe("buildCommand", () => {
     expect(typedModeProblem("claude-code", "plan")).toBeNull();
   });
 
-  test("BUG-612/resume-modes: a resume applies explore's launch-time enforcement again (never a typed line, a spec or a brief), plan nothing, build nothing", () => {
+  test("modes/on-resume: a resume applies explore's launch-time enforcement again (never a typed line, a spec or a brief), plan nothing, build nothing #BUG-612/resume-modes", () => {
     const id = "11111111-2222-4333-8444-555555555555";
     const ref = { id, resume: true };
     for (const h of HARNESSES) {
@@ -145,19 +145,22 @@ describe("buildCommand", () => {
     expect(buildCommand(config, choice("codex", "plan", "high"), undefined, ref).firstLine).toBeUndefined();
   });
 
-  test("BUG-612/resume-modes: Codex explore resumes with -s read-only -a never, before the --, the id last", () => {
+  // QA-live-02, live (Codex 0.160.0 on Bedrock, OpenCode 2.0.21 on OpenRouter): after `gluon resume`, a session started in explore was no longer read-only.
+  // Codex's /status said "Read Only (never)" at the launch and "Workspace (never)" after the resume; OpenCode's footer said Build, not
+  // Gluon-Explore (its deny rules gone). Claude Code keeps its permission mode in the session, so it stayed read-only.
+  test("modes/on-resume: Codex explore resumes with -s read-only -a never, before the --, the id last #BUG-612/resume-modes", () => {
     const id = "019a1b2c-d3e4";
     const cmd = buildCommand(config, choice("codex", "explore", "high"), undefined, { id, resume: true });
     expect(cmd.argv).toEqual(["codex", "resume", "-m", "gpt-6.1-sol", "-c", 'model_reasoning_effort="high"', "-s", "read-only", "-a", "never", "--", id]);
   });
 
-  test("BUG-612/resume-modes: Grok Build explore resumes under its sandbox and deny rules (a launch-time process profile, not kept by the session)", () => {
+  test("modes/on-resume: Grok Build explore resumes under its sandbox and deny rules (a launch-time process profile, not kept by the session) #BUG-612/resume-modes", () => {
     const id = "11111111-2222-4333-8444-555555555555";
     const argv = buildCommand(config, choice("grok-build", "explore", "high"), undefined, { id, resume: true }).argv;
     expect(argv).toEqual(["grok", "-m", "grok-4.7", "--reasoning-effort", "high", ...HARNESS_INFO["grok-build"].modes.explore.argv!, `--resume=${id}`]);
   });
 
-  test("BUG-612/resume-modes: OpenCode explore resumes with the gluon-explore agent as default and its deny rules; OpenCode plan and build resume with neither; the model and effort stay Gluon's", () => {
+  test("modes/on-resume: OpenCode explore resumes with the gluon-explore agent as default and its deny rules; OpenCode plan and build resume with neither; the model and effort stay Gluon's #BUG-612/resume-modes", () => {
     const id = "ses_3f2a9c0d1e8b";
     const cfgOf = (mode?: Mode) => JSON.parse(buildCommand(config, choice("opencode", mode, "high"), undefined, { id, resume: true }).env.OPENCODE_CONFIG_CONTENT!);
     const explore = cfgOf("explore");
@@ -174,7 +177,7 @@ describe("buildCommand", () => {
     expect(cmd.argv).toEqual(["opencode", "--standalone", `--session=${id}`]);
   });
 
-  test("BUG-612/resume-modes: modeLostOnResume names the harnesses whose explore is in the launch and that can resume: Codex, Grok Build, OpenCode", () => {
+  test("modes/on-resume: modeLostOnResume names the harnesses whose explore is in the launch and that can resume: Codex, Grok Build, OpenCode #BUG-612/resume-modes", () => {
     expect(HARNESSES.filter((h) => modeLostOnResume(h))).toEqual(["codex", "grok-build", "opencode"]);
   });
 });
@@ -184,7 +187,7 @@ describe("permissions (ctrl+p, --permissions): who approves the agent's commands
   const argv = (h: Harness, permissions: Permissions, mode?: Mode, session?: { id: string; resume: true }) =>
     buildCommand(config, { ...choice(h, mode, effortOf(h), "x"), permissions }, undefined, session).argv;
 
-  test("BUG-712/permissions: a level passes the harness's own flag before the spec; `own` is the harness as it is", () => {
+  test("modes/permissions: a level passes the harness's own flag before the spec; `own` is the harness as it is #BUG-712/permissions", () => {
     expect(argv("claude-code", "accept-edits")).toEqual(["claude", "--model", "sonnet", "--effort", "low", "--permission-mode", "acceptEdits", "--", "x"]);
     expect(argv("claude-code", "auto")).toEqual(["claude", "--model", "sonnet", "--effort", "low", "--permission-mode", "auto", "--", "x"]);
     expect(argv("antigravity", "accept-edits")).toEqual(["agy", "--model=gemini-3.8-flash-low", "--mode=accept-edits", "--prompt-interactive=x"]);
@@ -195,7 +198,7 @@ describe("permissions (ctrl+p, --permissions): who approves the agent's commands
     for (const h of HARNESSES) expect([h, argv(h, "own")]).toEqual([h, buildCommand(config, choice(h, undefined, effortOf(h), "x")).argv]);
   });
 
-  test("BUG-712/permissions: the levels each harness offers; Codex and OpenCode don't ask before every command or edit, so only their own", () => {
+  test("modes/permissions: the levels each harness offers; Codex and OpenCode don't ask before every command or edit, so only their own #BUG-712/permissions", () => {
     expect(Object.fromEntries(HARNESSES.map((h) => [h, permissionLevels(h)]))).toEqual({
       "claude-code": ["own", "accept-edits", "auto"],
       codex: ["own"],
@@ -206,14 +209,14 @@ describe("permissions (ctrl+p, --permissions): who approves the agent's commands
     });
   });
 
-  test("BUG-712/permissions: a level the harness doesn't have is refused; explore and plan keep their own flags and ignore it", () => {
+  test("modes/permissions: a level the harness doesn't have is refused; explore and plan keep their own flags and ignore it #BUG-712/permissions", () => {
     expect(() => argv("codex", "never-ask")).toThrow("Codex has no never-ask permissions");
     expect(validateChoice(config, { ...choice("opencode", undefined, undefined, "x"), permissions: "auto" })).toContain("OpenCode has no auto permissions");
     expect(validateChoice(config, { ...choice("claude-code", undefined, "low", "x"), permissions: "auto" })).toBeNull();
     for (const mode of ["explore", "plan"] as const) expect(argv("claude-code", "auto", mode)).toEqual(buildCommand(config, choice("claude-code", mode, "low", "x")).argv);
   });
 
-  test("BUG-712/permissions-resume: a resumed build session gets its permissions flag again", () => {
+  test("modes/permissions: a resumed build session gets its permissions flag again #BUG-712/permissions-resume", () => {
     const id = "11111111-2222-4333-8444-555555555555";
     expect(argv("claude-code", "accept-edits", undefined, { id, resume: true }).join(" ")).toContain("--permission-mode acceptEdits");
     expect(argv("grok-build", "never-ask", undefined, { id, resume: true })).toContain("--always-approve");
@@ -221,29 +224,17 @@ describe("permissions (ctrl+p, --permissions): who approves the agent's commands
 });
 
 describe("explore can't run things", () => {
-  test("BUG-714/explore-runs: explore's brief says commands that write (tests and builds too) may be refused or fail, so read the code and say what couldn't run", () => {
+  test("modes/explore-read-only: explore's brief says commands that write (tests and builds too) may be refused or fail, so read the code and say what couldn't run #BUG-714/explore-runs", () => {
     expect(modeBrief("explore")).toContain("If the goal above asks for a change, report what it would take instead of making it. Commands that write anything, tests and builds included, may be refused or fail here: read the code instead, and say what you couldn't run.");
   });
 
-  test("BUG-714/explore-runs: the intake keeps an explore session's Done when to what reading the code can show", () => {
+  test("modes/explore-read-only: the intake keeps an explore session's Done when to what reading the code can show #BUG-714/explore-runs", () => {
     expect(systemPrompt(defaults(), repoContext(mkdtempSync(join(tmp, "repo-"))))).toContain("- If route returns explore mode, the session can read but may not be able to run tests, builds or scripts: keep Done when to what reading the code can show.\n");
   });
 });
 
-describe("a resumed explore session (QA-live-02)", () => {
-  // Live (Codex 0.160.0 on Bedrock, OpenCode 2.0.21 on OpenRouter): after `gluon resume`, a session started in explore was no longer read-only.
-  // Codex's /status said "Read Only (never)" at the launch and "Workspace (never)" after the resume; OpenCode's footer said Build, not
-  // Gluon-Explore (its deny rules gone). Claude Code keeps its permission mode in the session, so it stayed read-only.
-  test("BUG-612/resume-modes: resuming an explore session of Codex keeps -s read-only -a never", () => {
-    const id = "11111111-2222-4333-8444-555555555555";
-    const argv = buildCommand(config, choice("codex", "explore", "high"), undefined, { id, resume: true }).argv;
-    expect(argv.join(" ")).toContain("-s read-only");
-    expect(argv.join(" ")).toContain("-a never");
-  });
-});
-
 describe("launchPlan with a typed first line", () => {
-  test("the spec goes into a private file and out of argv (and its `--`); the line names the file", () => {
+  test("frame/brief-line: the spec goes into a private file and out of argv (and its `--`); the line names the file", () => {
     const cmd = buildCommand(config, choice("codex", "plan", "high", "- fix the bug\n- and more"));
     const plan = launchPlan(cmd, "/usr/bin/codex", { tmp });
     try {
@@ -257,7 +248,7 @@ describe("launchPlan with a typed first line", () => {
     }
   });
 
-  test("through a Windows shim: the file path is cmd-safe and the argv passes assertShimArgs (an effort's quotes are refused there, as for build)", () => {
+  test("launch/windows-shim: through a Windows shim: the file path is cmd-safe and the argv passes assertShimArgs (an effort's quotes are refused there, as for build)", () => {
     const plan = launchPlan(buildCommand(config, choice("codex", "plan")), "C:\\npm\\codex.cmd", { tmp });
     try {
       expect(plan.argv).toEqual(["C:\\npm\\codex.cmd", "-m", "gpt-6.1-sol"]);
@@ -269,7 +260,7 @@ describe("launchPlan with a typed first line", () => {
     expect(() => launchPlan(buildCommand(config, choice("codex", "plan", "high")), "C:\\npm\\codex.cmd", { tmp })).toThrow("which cmd.exe would act on");
   });
 
-  test("a command without a first line is as before: no firstLine, the spec in argv", () => {
+  test("frame/brief-line: a command without a first line is as before: no firstLine, the spec in argv", () => {
     const plan = launchPlan(buildCommand(config, choice("claude-code", "explore", "high")), "/usr/bin/claude", { tmp });
     expect(plan.firstLine).toBeUndefined();
     expect(plan.specFile).toBeUndefined();
@@ -278,7 +269,7 @@ describe("launchPlan with a typed first line", () => {
 });
 
 describe("where nothing can type", () => {
-  test("handOff and handOffSession refuse a command with a first line, before anything starts", async () => {
+  test("modes/needs-frame: handOff and handOffSession refuse a command with a first line, before anything starts", async () => {
     const cmd = buildCommand(config, choice("codex", "plan", "high"));
     await expect(handOff(cmd)).rejects.toThrow(typedModeRefusal("codex"));
     await expect(handOffSession(cmd, handoffFor(config.handoff, "codex"), undefined, tmp)).rejects.toThrow(typedModeRefusal("codex"));
@@ -288,7 +279,7 @@ describe("where nothing can type", () => {
 });
 
 describe("BUG-410/launch-modes: the brief says what the mode allows, whatever the spec says", () => {
-  test("build adds nothing; explore and plan add a short block after the spec, naming no harness", () => {
+  test("modes/brief-block: build adds nothing; explore and plan add a short block after the spec, naming no harness #BUG-410/launch-modes", () => {
     expect(withMode("Do it.", undefined)).toBe("Do it.");
     expect(withMode("Do it.", "build")).toBe("Do it.");
     expect(modeBrief("build")).toBeNull();
@@ -307,6 +298,6 @@ describe("BUG-410/launch-modes: the brief says what the mode allows, whatever th
   });
 });
 
-test("every mode has a launch for every harness", () => {
+test("modes/per-harness: every mode has a launch for every harness", () => {
   for (const h of HARNESSES) for (const m of MODES.filter((x) => x !== "build")) expect([h, m, HARNESS_INFO[h].modes[m]]).toEqual([h, m, expect.any(Object)]);
 });

@@ -1,10 +1,10 @@
 {
  "untagged": {
-  "test/adapters-claude-codex.test.ts": 31,
-  "test/adapters-opencode.test.ts": 18,
+  "test/adapters-claude-codex.test.ts": 3,
+  "test/adapters-opencode.test.ts": 1,
   "test/adversarial-pkg-edfb.test.ts": 68,
   "test/adversarial-pkg0.test.ts": 18,
-  "test/agy-settings.test.ts": 19,
+  "test/agy-settings.test.ts": 4,
   "test/analytics.test.ts": 44,
   "test/brain-clients.test.ts": 30,
   "test/brain.test.ts": 39,
@@ -23,11 +23,8 @@
   "test/e2e/auth.e2e.test.ts": 60,
   "test/e2e/cli.e2e.test.ts": 55,
   "test/e2e/gluon.e2e.test.ts": 6,
-  "test/e2e/handoff.e2e.test.ts": 45,
   "test/e2e/install.e2e.test.ts": 19,
   "test/e2e/kimi-cost.e2e.test.ts": 2,
-  "test/e2e/launch-line.e2e.test.ts": 4,
-  "test/e2e/launch-modes.e2e.test.ts": 6,
   "test/e2e/openrouter-billed.e2e.test.ts": 1,
   "test/e2e/perf-smoke.e2e.test.ts": 1,
   "test/e2e/resume-hostile.e2e.test.ts": 10,
@@ -42,26 +39,21 @@
   "test/gluon-qa-frame.test.ts": 1,
   "test/gluon.test.ts": 3,
   "test/grok.test.ts": 32,
-  "test/handoff.test.ts": 13,
   "test/harness-config.test.ts": 4,
   "test/hook-import-graph.test.ts": 2,
   "test/install.test.ts": 14,
   "test/intake.test.ts": 15,
-  "test/kimi-code.test.ts": 37,
+  "test/kimi-code.test.ts": 6,
   "test/kimi-usage.test.ts": 33,
-  "test/modes.test.ts": 26,
   "test/openai.test.ts": 25,
-  "test/opencode-plan.test.ts": 11,
+  "test/opencode-plan.test.ts": 4,
   "test/openrouter-billed.test.ts": 64,
   "test/otlp-protobuf-fuzz.test.ts": 3,
   "test/pending-tables.test.ts": 13,
   "test/perf/typing.perf.test.ts": 1,
-  "test/permanent.test.ts": 19,
   "test/platform.test.ts": 14,
   "test/pty-session.test.ts": 3,
   "test/refresh.test.ts": 57,
-  "test/resume-argv.test.ts": 10,
-  "test/return.test.ts": 11,
   "test/route-schema.test.ts": 4,
   "test/route.test.ts": 77,
   "test/routing-upgrade.test.ts": 7,
@@ -71,8 +63,7 @@
   "test/signin.test.tsx": 3,
   "test/stats.test.ts": 51,
   "test/status-login.test.ts": 17,
-  "test/status-matrix.test.ts": 7,
-  "test/status.test.ts": 35,
+  "test/status.test.ts": 23,
   "test/tables-hardening.test.ts": 29,
   "test/tools.test.ts": 89,
   "test/update.test.ts": 35,
@@ -82,21 +73,9 @@
  },
  "pastSeams": {
   "test/adapters-claude-codex.test.ts": [
-   "src/adapters/claude-code.ts",
-   "src/adapters/codex.ts",
-   "src/adapters/common.ts",
-   "src/adapters/types.ts",
-   "src/detect.ts",
    "src/pty/types.ts"
   ],
-  "test/adapters-opencode.test.ts": [
-   "src/adapters/opencode.ts",
-   "src/adapters/types.ts",
-   "src/detect.ts"
-  ],
   "test/adversarial-pkg-edfb.test.ts": [
-   "src/adapters/agy-settings.ts",
-   "src/adapters/antigravity.ts",
    "src/cost/context.ts",
    "src/cost/grok-catalog.ts",
    "src/cost/ledger.ts",
@@ -109,13 +88,8 @@
    "src/cost/context.ts",
    "src/cost/ledger.ts"
   ],
-  "test/agy-settings.test.ts": [
-   "src/adapters/agy-settings.ts",
-   "src/adapters/antigravity.ts"
-  ],
   "test/analytics.test.ts": [
    "src/analytics.ts",
-   "src/detect.ts",
    "src/stats.ts"
   ],
   "test/brain-clients.test.ts": [
@@ -130,11 +104,7 @@
   ],
   "test/choices.test.ts": [
    "src/agent/choices.ts",
-   "src/agent/prompt.ts",
-   "src/workspaces.ts"
-  ],
-  "test/claude-otel.test.ts": [
-   "src/detect.ts"
+   "src/agent/prompt.ts"
   ],
   "test/codex.test.ts": [
    "src/brain.ts",
@@ -155,9 +125,6 @@
    "src/cost/tracker.ts",
    "src/models.ts"
   ],
-  "test/detect.test.ts": [
-   "src/detect.ts"
-  ],
   "test/dist.test.ts": [
    "src/analytics.ts"
   ],
@@ -171,8 +138,6 @@
    "src/brain.ts"
   ],
   "test/figures.test.ts": [
-   "src/adapters/antigravity.ts",
-   "src/adapters/opencode.ts",
    "src/cost/context.ts",
    "src/cost/grok-usage.ts",
    "src/cost/ledger.ts",
@@ -192,14 +157,10 @@
    "src/cost/ledger.ts",
    "src/otlp-protobuf.ts"
   ],
-  "test/handoff.test.ts": [
-   "src/workspaces.ts"
-  ],
   "test/harness-config.test.ts": [
    "src/cost/harness-config.ts"
   ],
   "test/install.test.ts": [
-   "src/detect.ts",
    "src/install.ts",
    "src/ui/signin.tsx"
   ],
@@ -254,16 +215,11 @@
    "src/openrouter-billed.ts"
   ],
   "test/permanent.test.ts": [
-   "src/adapters/antigravity.ts",
-   "src/adapters/common.ts",
-   "src/adapters/grok-build.ts",
-   "src/adapters/permanent.ts",
    "src/doctor.ts"
   ],
   "test/platform.test.ts": [
    "src/auth.ts",
-   "src/cost/tables-store.ts",
-   "src/detect.ts"
+   "src/cost/tables-store.ts"
   ],
   "test/pty-session.test.ts": [
    "src/cost/ledger.ts",
@@ -277,22 +233,13 @@
    "src/cost/refresh.ts",
    "src/cost/tables-store.ts"
   ],
-  "test/resume-argv.test.ts": [
-   "src/adapters/types.ts"
-  ],
-  "test/return.test.ts": [
-   "src/adapters/types.ts",
-   "src/detect.ts"
-  ],
   "test/route.test.ts": [
    "src/agent/prompt.ts"
   ],
   "test/rules.test.ts": [
-   "src/adapters/permanent.ts",
    "src/agent/prompt.ts",
    "src/agent/subscription.ts",
-   "src/auth.ts",
-   "src/detect.ts"
+   "src/auth.ts"
   ],
   "test/session.test.ts": [
    "src/ui/editor.ts"
@@ -309,12 +256,7 @@
   "test/status-login.test.ts": [
    "src/status.ts"
   ],
-  "test/status-matrix.test.ts": [
-   "src/adapters/codex.ts",
-   "src/adapters/permanent.ts"
-  ],
   "test/status.test.ts": [
-   "src/adapters/common.ts",
    "src/models.ts"
   ],
   "test/tables-hardening.test.ts": [
@@ -344,12 +286,10 @@
   ],
   "test/windows.test.ts": [
    "src/agent/subscription.ts",
-   "src/detect.ts",
    "src/self.ts"
   ],
   "test/workspaces.test.ts": [
-   "src/uninstall.ts",
-   "src/workspaces.ts"
+   "src/uninstall.ts"
   ]
  }
 }

@@ -58,11 +58,11 @@ async function compactHook(adapter: Adapter, answer: boolean | null, c = hookCtx
 const CLAUDE_PROMPT = (prompt: string) => JSON.stringify({ session_id: "b200d418-9522-4b31-98d3-df97c5c52494", transcript_path: "/t/x.jsonl", cwd: "/w", permission_mode: "auto", hook_event_name: "UserPromptSubmit", prompt });
 
 describe("the waiting compaction question (askBeforeCompact)", () => {
-  test("its timeouts: the harness gives the hook more time than the hook waits, which is more than Gluon asks", () => {
+  test("clear-compact/auto-compact: its timeouts: the harness gives the hook more time than the hook waits, which is more than Gluon asks", () => {
     expect(COMPACT_HOOK_TIMEOUT_S * 1000).toBeGreaterThanOrEqual(COMPACT_TIMEOUT_MS + 10_000);
   });
 
-  test("writes `compact <id>` and resolves with the answer; no answer in time → compact", async () => {
+  test("clear-compact/auto-compact: writes `compact <id>` and resolves with the answer; no answer in time → compact", async () => {
     for (const answer of [true, false]) {
       const c = hookCtx();
       const run = askBeforeCompact(c.eventsDir, c.pieces, 5000);
@@ -81,7 +81,7 @@ describe("the waiting compaction question (askBeforeCompact)", () => {
     expect(Date.now() - t).toBeGreaterThanOrEqual(150);
   });
 
-  test("BUG-151: the events directory gone while it waits (Gluon ended the agent on a yes): it ends quietly, at once", async () => {
+  test("clear-compact/auto-compact: the events directory gone while it waits (Gluon ended the agent on a yes): it ends quietly, at once #BUG-151", async () => {
     const c = hookCtx();
     const run = askBeforeCompact(c.eventsDir, c.pieces, 5000);
     for (let i = 0; i < 200 && !readEvents(c.eventsDir, new Set()).length; i++) await Bun.sleep(10);
@@ -91,7 +91,7 @@ describe("the waiting compaction question (askBeforeCompact)", () => {
     expect(Date.now() - t).toBeLessThan(1000 * SLOW);
   });
 
-  test("never asks with the piece off or an events directory that can't be written", async () => {
+  test("clear-compact/auto-compact: never asks with the piece off or an events directory that can't be written", async () => {
     const c = hookCtx(["clear"]);
     expect(await askBeforeCompact(c.eventsDir, c.pieces, 5000)).toBe(false);
     expect(readdirSync(c.eventsDir)).toEqual([]);
@@ -108,7 +108,7 @@ describe("Claude Code adapter", () => {
   const status = (name: string) => [{ hooks: [{ type: "command", command: command(name), timeout: 10, async: true }] }];
   const STATUS = { PreToolUse: status("tool"), PostToolUse: status("tool-done"), Notification: status("notify"), Stop: status("stop"), PermissionRequest: status("permission"), Elicitation: status("permission"), StopFailure: status("stop") };
 
-  test("everything on: the plugin (waiting PreCompact, /gluon) and the settings that allow the return command", () => {
+  test("launch/adapter: everything on: the plugin (waiting PreCompact, /gluon) and the settings that allow the return command", () => {
     const out = claudeCode.build(ctx("claude-code", "2.1.286"));
     expect(out.argv).toEqual(["--plugin-dir", `${ADAPTER_DIR}/claude-plugin`, "--settings", `${ADAPTER_DIR}/claude-settings.json`]);
     expect([CLAUDE_PLUGIN_DIR, CLAUDE_SETTINGS]).toEqual([`${ADAPTER_DIR}/claude-plugin`, `${ADAPTER_DIR}/claude-settings.json`]);
@@ -135,7 +135,7 @@ describe("Claude Code adapter", () => {
     expect(JSON.parse(out.files["claude-settings.json"]!)).toEqual({ disableAgentView: true, permissions: { allow: ['Bash("$GLUON_SELF" signal back)', "Bash($GLUON_SELF signal back)"] } });
   });
 
-  test("BUG-207/live: every launch turns Claude Code's agent view off (← ←, /background, --bg), whatever the settings", () => {
+  test("launch/adapter: every launch turns Claude Code's agent view off (← ←, /background, --bg), whatever the settings #BUG-207/live", () => {
     for (const handoff of [{}, { on_clear: "stay" }, { on_clear: "stay", on_compact: "stay" }] as const) {
       const out = claudeCode.build(ctx("claude-code", "2.1.287", handoff));
       expect(out.argv).toEqual(["--plugin-dir", `${ADAPTER_DIR}/claude-plugin`, "--settings", `${ADAPTER_DIR}/claude-settings.json`]);
@@ -145,7 +145,7 @@ describe("Claude Code adapter", () => {
     expect(JSON.parse(none.files["claude-settings.json"]!)).toEqual({ disableAgentView: true, permissions: { allow: returnRules(false) } });
   });
 
-  test.if(process.platform !== "win32")("BUG-207/live: a hook run without GLUON_SELF (outside the launch) does nothing, quietly; inside it runs Gluon", () => {
+  test.if(process.platform !== "win32")("events/inert-outside-launch: a hook run without GLUON_SELF (outside the launch) does nothing, quietly; inside it runs Gluon #BUG-207/live", () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-claude-hook-"));
     try {
       const self = join(dir, "self with space");
@@ -162,27 +162,27 @@ describe("Claude Code adapter", () => {
     }
   });
 
-  test("the allowed command is exactly Gluon's return command, and nothing wider", () => {
+  test("launch/adapter: the allowed command is exactly Gluon's return command, and nothing wider", () => {
     expect(returnRules(false)).toEqual([`Bash(${RETURN_COMMAND.posix})`, "Bash($GLUON_SELF signal back)"]);
     expect(returnRules(true)).toEqual([...returnRules(false), `PowerShell(${RETURN_COMMAND.powershell})`]);
     // No wildcard, no prefix rule.
     for (const rule of returnRules(true)) expect(rule).not.toContain("*");
   });
 
-  test("each setting off drops its part; the /gluon command and the status always stay", () => {
+  test("clear-compact/settings: each setting off drops its part; the /gluon command and the status always stay", () => {
     expect(Object.keys(hooks(ctx("claude-code", "2.1.286", { on_clear: "stay" })))).toEqual(["PreCompact", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "Stop", "PermissionRequest", "Elicitation", "StopFailure"]);
     expect(hooks(ctx("claude-code", "2.1.286", { on_compact: "stay" }))).toEqual({ UserPromptSubmit: [{ hooks: cmd("prompt") }], ...STATUS });
     const none = { ...ctx("claude-code", "2.1.286"), handoff: NONE };
     expect(hooks(none)).toEqual({ UserPromptSubmit: [{ hooks: cmd("prompt") }], ...STATUS });
   });
 
-  test("v1's routes are gone: no SessionEnd, SessionStart, MCP server", () => {
+  test("launch/adapter: v1's routes are gone: no SessionEnd, SessionStart, MCP server", () => {
     const out = claudeCode.build(ctx("claude-code", "2.1.286"));
     const text = JSON.stringify(out);
     for (const gone of ["SessionEnd", "SessionStart", ".mcp.json", "mcpServers", '"mcp"']) expect(text).not.toContain(gone);
   });
 
-  test("on Windows the hooks run in PowerShell and pass their input on; PowerShell's return command is allowed too", () => {
+  test("launch/adapter: on Windows the hooks run in PowerShell and pass their input on; PowerShell's return command is allowed too", () => {
     const c = ctx("claude-code", "2.1.286", {}, "win32");
     const h = hooks(c);
     expect(h.PreCompact[0].hooks).toEqual([{ type: "command", shell: "powershell", command: "if ($env:GLUON_SELF) { $input | & $env:GLUON_SELF hook claude-code pre-compact }", timeout: COMPACT_HOOK_TIMEOUT_S }]);
@@ -190,14 +190,14 @@ describe("Claude Code adapter", () => {
     expect(JSON.parse(files(c)["claude-settings.json"]!).permissions.allow).toContain("PowerShell(& $env:GLUON_SELF signal back)");
   });
 
-  test("version gate: nothing below 2.1.139 or when the version is unknown", () => {
+  test("launch/version-gate: version gate: nothing below 2.1.139 or when the version is unknown", () => {
     expect(claudeCode.minVersion).toBe("2.1.139");
     expect(adapterOutput(ctx("claude-code", "2.1.138 (Claude Code)"))).toBe(NO_ADAPTER);
     expect(adapterOutput(ctx("claude-code", null))).toBe(NO_ADAPTER);
     expect(adapterOutput(ctx("claude-code", "2.1.139 (Claude Code)")).argv[0]).toBe("--plugin-dir");
   });
 
-  test("pre-compact: yes blocks the compaction, no or no answer lets it go on", async () => {
+  test("clear-compact/auto-compact: pre-compact: yes blocks the compaction, no or no answer lets it go on", async () => {
     const yes = await compactHook(claudeCode, true);
     expect(yes.asked.map((e) => e.name)).toEqual(["compact"]);
     expect(yes.result).toEqual({ stdout: JSON.stringify({ decision: "block", reason: COMPACT_STOP_REASON }) });
@@ -210,7 +210,7 @@ describe("Claude Code adapter", () => {
     expect(readdirSync(off.eventsDir)).toEqual([]);
   });
 
-  test("/gluon: blocked before the model, and back to Gluon whatever the settings", async () => {
+  test("tabs/back-event: /gluon: blocked before the model, and back to Gluon whatever the settings", async () => {
     const back: HookResult = { events: [{ name: "back" }], stdout: JSON.stringify({ decision: "block", reason: "Back to Gluon…" }) };
     for (const p of ["/gluon:gluon", "/gluon", " /gluon:gluon ", "/gluon:gluon now"]) expect([p, await claudeCode.hook!("prompt", CLAUDE_PROMPT(p), hookCtx([]))]).toEqual([p, back]);
     // Any other prompt goes on (no output), and the agent is working.
@@ -221,7 +221,7 @@ describe("Claude Code adapter", () => {
     for (const gone of ["unknown", "session-end-clear", "session-start", "session-start-compact"]) expect(await claudeCode.hook!(gone, "{}", hookCtx())).toEqual({});
   });
 
-  test("status hooks: working, the activity line, awaiting, done; never any output", async () => {
+  test("session-state/hooks: status hooks: working, the activity line, awaiting, done; never any output", async () => {
     const base = { session_id: "s", transcript_path: "/t/x.jsonl", cwd: "/w/repo", permission_mode: "default" };
     const run = (name: string, input: object) => claudeCode.hook!(name, JSON.stringify({ ...base, ...input }), hookCtx());
     const st = (status: object): HookResult => ({ events: [{ name: "status", status }] });
@@ -237,7 +237,7 @@ describe("Claude Code adapter", () => {
     expect(await run("stop", { hook_event_name: "Stop", stop_hook_active: false })).toEqual(st({ state: "done" }));
   });
 
-  test("notes say what's on and off", () => {
+  test("session-settings/doctor: notes say what's on and off", () => {
     const on = claudeCode.notes(ctx("claude-code", "2.1.286"));
     expect(on).toContain("auto-compaction asks first whether to end the session instead");
     expect(on).toContain("Gluon's return command (`signal back`) runs without a permission prompt");
@@ -247,7 +247,7 @@ describe("Claude Code adapter", () => {
     expect([...on, ...off].join("\n")).not.toMatch(/task|\/clear/);
   });
 
-  test("its arguments pass through a Windows .cmd shim (plain paths)", () => {
+  test("launch/windows-shim: its arguments pass through a Windows .cmd shim (plain paths)", () => {
     const argv = claudeCode.build(ctx("claude-code", "2.1.286", {}, "win32")).argv.map((a) => a.replaceAll(ADAPTER_DIR, "C:\\Temp\\gluon-adapter-x"));
     for (const a of argv) expect([a, unsafeChar(a)]).toEqual([a, null]);
     expect(() => assertShimArgs(["C:\\npm\\claude.cmd", ...argv])).not.toThrow();
@@ -318,7 +318,7 @@ describe("Codex adapter", () => {
     "-c", `hooks.Stop=[{hooks=[${H("stop", 10)}]}]`,
   ];
 
-  test("one -c override per hook event: the waiting PreCompact hook and the status hooks; nothing else", () => {
+  test("launch/adapter: one -c override per hook event: the waiting PreCompact hook and the status hooks; nothing else", () => {
     const out = codex.build(ctx("codex", "0.159.3"));
     expect(out).toEqual({ argv: SET, env: {}, files: {} });
     // PreCompact's bytes are the ones users already approved before the status hooks came.
@@ -329,7 +329,7 @@ describe("Codex adapter", () => {
     for (const gone of ["developer_instructions", "SessionEnd", "SessionStart", "thread_unload_delay_secs", "mcp_servers"]) expect(out.argv.join(" ")).not.toContain(gone);
   });
 
-  test("the hook set is ONE constant, the same bytes whatever the settings, platform and launch (Codex's approval is keyed by it)", () => {
+  test("launch/adapter: the hook set is ONE constant, the same bytes whatever the settings, platform and launch (Codex's approval is keyed by it)", () => {
     const one = codex.build(ctx("codex", "0.159.3"));
     expect(codex.build(ctx("codex", "0.159.3", {}, "win32"))).toEqual(one);
     expect(codex.build(ctx("codex", "0.160.0", { on_clear: "stay" }))).toEqual(one);
@@ -339,13 +339,13 @@ describe("Codex adapter", () => {
     expect(codex.build(ctx("codex", "0.159.3")).argv).not.toBe(codex.build(ctx("codex", "0.159.3")).argv);
   });
 
-  test("version gate: nothing below 0.159 or when the version is unknown", () => {
+  test("launch/version-gate: version gate: nothing below 0.159 or when the version is unknown", () => {
     expect(adapterOutput(ctx("codex", "codex-cli 0.158.9"))).toBe(NO_ADAPTER);
     expect(adapterOutput(ctx("codex", null))).toBe(NO_ADAPTER);
     expect(adapterOutput(ctx("codex", "codex-cli 0.159.0")).argv).toEqual(SET);
   });
 
-  test("pre-compact: yes stops Codex (continue:false), no or no answer lets it compact; off: no question", async () => {
+  test("clear-compact/auto-compact: pre-compact: yes stops Codex (continue:false), no or no answer lets it compact; off: no question", async () => {
     expect((await compactHook(codex, true)).result).toEqual({ stdout: JSON.stringify({ continue: false, stopReason: COMPACT_STOP_REASON }) });
     expect((await compactHook(codex, false)).result).toEqual({});
     expect((await compactHook(codex, null)).result).toEqual({});
@@ -356,7 +356,7 @@ describe("Codex adapter", () => {
     for (const gone of ["session-end", "session-start-compact"]) expect(await codex.hook!(gone, "{}", hookCtx())).toEqual({});
   });
 
-  test("status hooks, with Codex's inputs (its hook schemas): working, the activity line, awaiting, done; never any output", async () => {
+  test("session-state/hooks: status hooks, with Codex's inputs (its hook schemas): working, the activity line, awaiting, done; never any output", async () => {
     const base = { session_id: "s", turn_id: "t", transcript_path: null, cwd: "/w/repo", model: "gpt-6-sol", permission_mode: "default" };
     const run = (name: string, input: object) => codex.hook!(name, JSON.stringify({ ...base, ...input }), hookCtx());
     // Every Codex hook payload has `session_id`: it goes out with the status (`session` event, BUG-311).
@@ -369,7 +369,7 @@ describe("Codex adapter", () => {
     expect(await run("stop", { hook_event_name: "Stop", stop_hook_active: false, last_assistant_message: "done" })).toEqual(st({ state: "done" }));
   });
 
-  test("BUG-311/resume: each hook sends the payload's session_id as a `session` event; none without one, with an unusable one, or from a sub-agent", async () => {
+  test("resume/session-id: each hook sends the payload's session_id as a `session` event; none without one, with an unusable one, or from a sub-agent #BUG-311/resume", async () => {
     const id = "019f3a2c-7b1e-7c40-9d2a-5e8f01234567";
     const run = (name: string, input: object, c = hookCtx()) => codex.hook!(name, JSON.stringify(input), c);
     expect(await run("prompt", { session_id: id })).toEqual({ events: [{ name: "session", id }, { name: "status", status: { state: "working" } }] });
@@ -382,7 +382,7 @@ describe("Codex adapter", () => {
     expect(await codex.hook!("prompt", "not json", hookCtx())).toEqual({ events: [{ name: "status", status: { state: "working" } }] });
   });
 
-  test("BUG-311/resume: the PreCompact hook sends the session id before it waits, so a yes (the agent ends) loses nothing", async () => {
+  test("resume/session-id: the PreCompact hook sends the session id before it waits, so a yes (the agent ends) loses nothing #BUG-311/resume", async () => {
     const c = hookCtx();
     expect(await codex.hook!("pre-compact", JSON.stringify({ session_id: "sess-1" }), { ...c, answerTimeoutMs: 100 })).toEqual({});
     const got = readEvents(c.eventsDir, new Set());
@@ -395,7 +395,7 @@ describe("Codex adapter", () => {
     expect(readEvents(off.eventsDir, new Set())).toEqual([{ name: "session", id: "sess-2" }, { name: "status", status: { compacting: true } }]);
   });
 
-  test("notes: the one-time hook review, always (the set is constant)", () => {
+  test("session-settings/doctor: notes: the one-time hook review, always (the set is constant)", () => {
     expect(codex.notes(ctx("codex", "0.159.3")).join("\n")).toContain("Hooks need review");
     expect(codex.notes(ctx("codex", "0.159.3", { on_compact: "stay" }))).toEqual([
       "auto-compaction: Codex compacts (on_compact: stay)",
@@ -404,7 +404,7 @@ describe("Codex adapter", () => {
     ]);
   });
 
-  test("its TOML arguments can't go through a .cmd shim: Codex on Windows runs as codex.exe", () => {
+  test("launch/windows-shim: its TOML arguments can't go through a .cmd shim: Codex on Windows runs as codex.exe", () => {
     const argv = codex.build(ctx("codex", "0.159.3", {}, "win32")).argv;
     expect(() => assertShimArgs(["C:\\npm\\codex.cmd", ...argv])).toThrow("cmd.exe would act on");
     expect(() => assertShimArgs(["C:\\npm\\node_modules\\@openai\\codex-win32-x64\\vendor\\codex.exe", ...argv])).not.toThrow();
@@ -417,7 +417,7 @@ describe("buildCommand with an adapter", () => {
     return [config, config.models[h].find((m) => m.ids.plan)!.id];
   };
 
-  test("the adapter's options go before the spec, which stays last", () => {
+  test("launch/spec-last: the adapter's options go before the spec, which stays last", () => {
     for (const h of ["claude-code", "codex"] as const) {
       const [config, model] = subscription(h);
       const adapter = adapterOutput(ctx(h, h === "codex" ? "0.159.3" : "2.1.286"));
@@ -431,7 +431,7 @@ describe("buildCommand with an adapter", () => {
   });
 });
 
-test("BUG-142/v1 fixes: Claude Code's /gluon command is the user's only, never offered to the model", () => {
+test("tabs/back-event: Claude Code's /gluon command is the user's only, never offered to the model #BUG-142/v1", () => {
   const md = claudeCode.build(ctx("claude-code", "2.1.286")).files["claude-plugin/commands/gluon.md"]!;
   expect(md.split("---\n")[1]!.split("\n")).toContain("disable-model-invocation: true");
 });

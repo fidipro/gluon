@@ -101,14 +101,14 @@ for (const [harness, cases] of Object.entries(CASES) as [Harness, Case[]][]) {
     const hooks = registered(harness);
     const adapter = ADAPTERS[harness];
 
-    test("every event it registers is classified here (a new hook needs a decision), and every case names a registered event", () => {
+    test("session-state/hooks: every event it registers is classified here (a new hook needs a decision), and every case names a registered event", () => {
       const status = [...hooks.keys()].filter((e) => !e.startsWith("PreCompact"));
       expect([...new Set(cases.map((c) => c.event))].sort()).toEqual(status.sort());
     });
 
     for (const c of cases) {
       const label = `${c.event}${c.input && "notification_type" in c.input ? ` (${c.input.notification_type})` : ""}: ${c.why} → ${c.state ?? "nothing"}${c.state ? `, shown ${GROUP[c.state]}` : ""}`;
-      test(label, async () => {
+      test(`session-state/hooks: ${label}`, async () => {
         const name = hooks.get(c.event);
         expect(name).toBeDefined();
         const r = await adapter.hook!(name!, JSON.stringify(c.input), hookCtx());
@@ -133,7 +133,7 @@ for (const [harness, cases] of Object.entries(CASES) as [Harness, Case[]][]) {
 }
 
 describe("what no hook can say", () => {
-  test("a subagent's own hooks (Grok Build's `subagentType`) say nothing about the session, whatever they are", async () => {
+  test("session-state/hooks: a subagent's own hooks (Grok Build's `subagentType`) say nothing about the session, whatever they are", async () => {
     const hooks = registered("grok-build");
     for (const [event, name] of hooks) {
       if (event.startsWith("PreCompact")) continue;
@@ -142,21 +142,21 @@ describe("what no hook can say", () => {
     }
   });
 
-  test("Antigravity writes no hook file: its group comes from the screen alone (pty-session.test.ts); its one hook is the opt-in status line's figures", async () => {
+  test("session-state/screen-fallback: Antigravity writes no hook file: its group comes from the screen alone (pty-session.test.ts); its one hook is the opt-in status line's figures", async () => {
     expect(await ADAPTERS.antigravity.hook!("prompt", "{}", hookCtx())).toEqual({});
     const out = adapterOutput({ harness: "antigravity", version: "1.2.14", handoff: handoffFor(handoffDefaults(), "antigravity"), env: {}, platform: "linux" });
     expect(out.files).toEqual({});
     expect(out.argv).toEqual([]);
   });
 
-  test("OpenCode reports through a plugin on its event stream, not hooks (adapters-opencode.test.ts)", () => {
+  test("session-state/hooks: OpenCode reports through a plugin on its event stream, not hooks (adapters-opencode.test.ts)", () => {
     expect(ADAPTERS.opencode.hook).toBeUndefined();
   });
 });
 
 /** Gaps found live on Claude Code 2.1.289 (header of `src/adapters/claude-code.ts`, issue #40), now reported. */
 describe("claude-code: gaps found live (issue #40)", () => {
-  test("BUG-652/issue-40-url-elicitation: an MCP link dialog (`elicitation_url_dialog`) waits for the user → awaiting", async () => {
+  test("session-state/hooks: an MCP link dialog (`elicitation_url_dialog`) waits for the user → awaiting #BUG-652/issue-40-url-elicitation", async () => {
     const name = registered("claude-code").get("Notification");
     const input = { ...base, notification_type: "elicitation_url_dialog", message: "Claude Code needs your input" };
     const r = await ADAPTERS["claude-code"].hook!(name!, JSON.stringify(input), hookCtx());
@@ -164,14 +164,14 @@ describe("claude-code: gaps found live (issue #40)", () => {
     expect(r.events?.[0]?.status?.activity).toBe("Claude Code needs your input");
   });
 
-  test("BUG-653/issue-40-stop-failure: a turn that ends in an API error fires `StopFailure`, not `Stop` → registered, done", async () => {
+  test("session-state/hooks: a turn that ends in an API error fires `StopFailure`, not `Stop` → registered, done #BUG-653/issue-40-stop-failure", async () => {
     const name = registered("claude-code").get("StopFailure");
     expect(name).toBeDefined();
     const r = await ADAPTERS["claude-code"].hook!(name!, JSON.stringify({ ...base, hook_event_name: "StopFailure" }), hookCtx());
     expect(r.events?.[0]?.status?.state).toBe("done");
   });
 
-  test("BUG-653/variants: a dialog's own hooks (`PermissionRequest`, `Elicitation`) are registered and wait for the user at once, before `Notification` 6 s later", async () => {
+  test("session-state/hooks: a dialog's own hooks (`PermissionRequest`, `Elicitation`) are registered and wait for the user at once, before `Notification` 6 s later #BUG-653/variants", async () => {
     for (const event of ["PermissionRequest", "Elicitation"]) {
       const name = registered("claude-code").get(event);
       expect(name).toBeDefined();

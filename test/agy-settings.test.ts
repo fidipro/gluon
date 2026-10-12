@@ -27,7 +27,7 @@ function setup(settings?: string) {
 const read = (f: string) => JSON.parse(readFileSync(f, "utf8")) as Record<string, unknown>;
 
 describe("adding Gluon's status line", () => {
-  test.skipIf(process.platform === "win32")("only the statusLine member is spliced in: every other byte of the user's settings stays where it is, mode kept; the script is inert and executable", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: only the statusLine member is spliced in: every other byte of the user's settings stays where it is, mode kept; the script is inert and executable", () => {
     const original = '{"zeta":{"b":1,"a":[1,2]},"theme":"dark","trustedWorkspaces":["/w"]}';
     const s = setup(original);
     chmodSync(s.file, 0o600);
@@ -47,7 +47,7 @@ describe("adding Gluon's status line", () => {
     expect(readFileSync(lines.file, "utf8")).toBe(`{\n  "theme": "dark",\n  "statusLine": {\n    "command": ${JSON.stringify(lines.script)},\n    "stack_with_default": true,\n    "type": "command"\n  }\n}\n`);
   });
 
-  test.skipIf(process.platform === "win32")("the script does nothing outside a Gluon launch and hands stdin to `gluon hook antigravity statusline` inside one", () => {
+  test.skipIf(process.platform === "win32")("events/inert-outside-launch: the script does nothing outside a Gluon launch and hands stdin to `gluon hook antigravity statusline` inside one", () => {
     const s = setup("{}");
     ensureAgyStatusLine(s.o);
     const run = (env: Record<string, string>) => Bun.spawnSync(["sh", s.script], { env: { PATH: process.env.PATH ?? "", ...env }, stdin: Buffer.from('{"x":1}'), stdout: "pipe" });
@@ -57,7 +57,7 @@ describe("adding Gluon's status line", () => {
     expect(run({ GLUON_EVENTS: "/e", GLUON_SELF: "/bin/echo" }).stdout.toString().trim()).toBe("hook antigravity statusline");
   });
 
-  test.skipIf(process.platform === "win32")("a status line of the user's own stays: nothing is written, and the note says so", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: a status line of the user's own stays: nothing is written, and the note says so", () => {
     const own = '{"statusLine":{"type":"command","command":"/home/me/mine.sh"}}';
     const s = setup(own);
     expect(ensureAgyStatusLine(s.o)).toContain("a status line of your own");
@@ -65,7 +65,7 @@ describe("adding Gluon's status line", () => {
     expect(existsSync(s.script)).toBe(false);
   });
 
-  test.skipIf(process.platform === "win32")("the guards: not strict JSON (agy stops at startup on it), not an object, a symbolic link, no file yet, Windows, a path with spaces: nothing is written", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: the guards: not strict JSON (agy stops at startup on it), not an object, a symbolic link, no file yet, Windows, a path with spaces: nothing is written", () => {
     for (const bad of ['{"a":1,}', '{"a":1 /* c */}', "[]", "null", "", "{oops"]) {
       const s = setup(bad);
       expect(ensureAgyStatusLine(s.o)).toMatch(/isn't (strict JSON|a JSON object)/);
@@ -88,7 +88,7 @@ describe("adding Gluon's status line", () => {
   });
 
   // The writer is skipped on Windows by design (the status line command is a shell script): the note says so, whatever the file holds.
-  test("on Windows nothing is written, and the note says why, before any file is looked at", () => {
+  test("subscriptions/never-edit-other-tools-files: on Windows nothing is written, and the note says why, before any file is looked at", () => {
     for (const settings of [undefined, "{}", '{"statusLine":{"command":"/home/me/mine.sh"}}', '{"a":1,}']) {
       const s = setup(settings);
       expect(ensureAgyStatusLine({ ...s.o, platform: "win32" })).toContain("aren't shown on Windows");
@@ -97,7 +97,7 @@ describe("adding Gluon's status line", () => {
     }
   });
 
-  test.skipIf(process.platform === "win32")("agy rewriting the file between the read and the replace is not overwritten (compare and swap): a note, the file as agy left it, no script claimed", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: agy rewriting the file between the read and the replace is not overwritten (compare and swap): a note, the file as agy left it, no script claimed", () => {
     const s = setup('{"theme":"dark"}');
     const note = ensureAgyStatusLine({ ...s.o, onStaged: () => writeFileSync(s.file, '{"theme":"light"}') });
     expect(note).toContain("changed its settings");
@@ -109,7 +109,7 @@ describe("adding Gluon's status line", () => {
 });
 
 describe("removing it (gluon uninstall)", () => {
-  test.skipIf(process.platform === "win32")("only Gluon's own statusLine goes (the command exactly ours), with its script; the rest of the settings stays; a user's own line stays", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: only Gluon's own statusLine goes (the command exactly ours), with its script; the rest of the settings stays; a user's own line stays", () => {
     const s = setup('{"theme":"dark"}');
     ensureAgyStatusLine(s.o);
     expect(agyStatusLineInstalled(s.o)).toBe(s.file);
@@ -130,7 +130,7 @@ describe("removing it (gluon uninstall)", () => {
 
 describe("BUG-351: install then removal is a splice of one member", () => {
   const inline = (s: ReturnType<typeof setup>) => `{"command":${JSON.stringify(s.script)},"stack_with_default":true,"type":"command"}`;
-  test.skipIf(process.platform === "win32")("BUG-351/exact-original-bytes: odd formatting, key order, unicode, CRLF, a nested statusLine, an empty object, a trailing newline or none: removal gives back the original bytes", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: odd formatting, key order, unicode, CRLF, a nested statusLine, an empty object, a trailing newline or none: removal gives back the original bytes #BUG-351/exact-original-bytes", () => {
     const cases = [
       '{\n\t"zeta" : {"b":1,\n"a":[1,2]} ,\n\t"n\u00e5me":"é ☃ \\u00e9 😀",\n\t"theme" :"dark"\n}\n',
       '{"b":1,"a":2}',
@@ -152,7 +152,7 @@ describe("BUG-351: install then removal is a splice of one member", () => {
     }
   });
 
-  test.skipIf(process.platform === "win32")("BUG-351/edits-in-between-stay: what the user changed after the install stays, only statusLine goes (last, middle, first and only member)", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: what the user changed after the install stays, only statusLine goes (last, middle, first and only member) #BUG-351/edits-in-between-stay", () => {
     const s = setup('{\n  "a": 1,\n  "theme": "dark"\n}\n');
     ensureAgyStatusLine(s.o);
     const edited = readFileSync(s.file, "utf8").replace('"theme": "dark"', '"theme": "light", "new": [1,\n 2]').replace('{\n  "a"', '{\n  "editor": "vim",\n  "a"');
@@ -173,7 +173,7 @@ describe("BUG-351: install then removal is a splice of one member", () => {
     }
   });
 
-  test.skipIf(process.platform === "win32")("a twice-named statusLine, or an install over the user's own, writes nothing; a file changed after the read (content or only its mtime) is not overwritten", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: a twice-named statusLine, or an install over the user's own, writes nothing; a file changed after the read (content or only its mtime) is not overwritten", () => {
     const twice = '{"statusLine":{"command":"/mine"},"a":1,"statusLine":{"command":"/mine2"}}';
     const t = setup(twice);
     expect(ensureAgyStatusLine(t.o)).toContain("a status line of your own");
@@ -192,7 +192,7 @@ describe("BUG-351: install then removal is a splice of one member", () => {
 });
 
 describe("BUG-352: Gluon writes through no symbolic link", () => {
-  test.skipIf(process.platform === "win32")("BUG-352/symlinked-parent-refused: a parent directory that is a link leading outside HOME is refused and said so (install writes nothing, removal leaves the file); one inside HOME is fine", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: a parent directory that is a link leading outside HOME is refused and said so (install writes nothing, removal leaves the file); one inside HOME is fine #BUG-352/symlinked-parent-refused", () => {
     for (const link of ["gemini", "agy"]) {
       const s = setup();
       rmSync(join(s.home, ".gemini"), { recursive: true });
@@ -224,7 +224,7 @@ describe("BUG-352: Gluon writes through no symbolic link", () => {
     expect(readFileSync(join(dots, "antigravity-cli", "settings.json"), "utf8")).toContain('"statusLine"');
   });
 
-  test.skipIf(process.platform === "win32")("BUG-352/symlinked-script-refused: a link at the status-line script's path is refused and said so; its target and the settings stay untouched", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: a link at the status-line script's path is refused and said so; its target and the settings stay untouched #BUG-352/symlinked-script-refused", () => {
     const s = setup('{"theme":"dark"}');
     mkdirSync(s.configDir, { recursive: true });
     const target = join(TMP, "somebody-elses-file");
@@ -236,7 +236,7 @@ describe("BUG-352: Gluon writes through no symbolic link", () => {
     expect(lstatSync(s.script).isSymbolicLink()).toBe(true);
   });
 
-  test("BUG-352/windows-skipped-with-the-note: on Windows nothing is read or written, and the note says why", () => {
+  test("subscriptions/never-edit-other-tools-files: on Windows nothing is read or written, and the note says why #BUG-352/windows-skipped-with-the-note", () => {
     const s = setup('{"theme":"dark"}');
     const note = ensureAgyStatusLine({ ...s.o, platform: "win32" });
     expect(note).toContain("aren't shown on Windows");
@@ -294,7 +294,7 @@ describe("what the status line's command sends (real stdin of agy 1.2.16 against
 describe("BUG-404/405: the script and the key go together", () => {
   const dup = (s: ReturnType<typeof setup>) => `{"statusLine":{"command":${JSON.stringify(s.script)}},"statusLine":{"command":${JSON.stringify(s.script)}}}`;
 
-  test.skipIf(process.platform === "win32")("BUG-405/no-orphan-script: a layout the splice can't take (the key twice), and a settings file agy rewrites meanwhile, leave no script Gluon just wrote; one that was already there stays", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: a layout the splice can't take (the key twice), and a settings file agy rewrites meanwhile, leave no script Gluon just wrote; one that was already there stays #BUG-405/no-orphan-script", () => {
     const twice = setup("{}");
     writeFileSync(twice.file, dup(twice));
     expect(ensureAgyStatusLine(twice.o)).toContain("a layout Gluon can't add");
@@ -310,7 +310,7 @@ describe("BUG-404/405: the script and the key go together", () => {
     expect(existsSync(earlier.script)).toBe(true);
   });
 
-  test.skipIf(process.platform === "win32")("BUG-404/script-stays-with-its-key: when the key can't be removed (a layout the splice can't take, or agy rewriting the file meanwhile) the script stays, the key is still reported installed, and a later removal finishes", () => {
+  test.skipIf(process.platform === "win32")("subscriptions/never-edit-other-tools-files: when the key can't be removed (a layout the splice can't take, or agy rewriting the file meanwhile) the script stays, the key is still reported installed, and a later removal finishes #BUG-404/script-stays-with-its-key", () => {
     const twice = setup("{}");
     ensureAgyStatusLine(twice.o);
     writeFileSync(twice.file, dup(twice));

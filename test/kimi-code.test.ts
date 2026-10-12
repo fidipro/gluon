@@ -48,7 +48,7 @@ const choice = (model: string, over: Partial<LaunchChoice> = {}): LaunchChoice =
 describe("the harness", () => {
   const info = HARNESS_INFO["kimi-code"];
 
-  test("the binary `kimi`, Moonshot's installers verbatim, AGENTS.md (not CLAUDE.md), no prompt in argv", () => {
+  test("install/verbatim-no-sudo: the binary `kimi`, Moonshot's installers verbatim, AGENTS.md (not CLAUDE.md), no prompt in argv", () => {
     expect(info).toMatchObject({ binary: "kimi", vendor: "Moonshot AI", typedSpec: true });
     expect(info.instructionFiles).toEqual({ files: ["AGENTS.md"] });
     expect(installMethods("kimi-code", "linux").map((m) => m.command)).toEqual(["curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"]);
@@ -72,7 +72,7 @@ describe("the harness", () => {
   });
 
   // `sh` is looked up on the host's PATH: a Windows host has none (the installer there is PowerShell).
-  test.skipIf(process.platform === "win32")("the install argv is the constant, run as it is", () => {
+  test.skipIf(process.platform === "win32")("install/verbatim-no-sudo: the install argv is the constant, run as it is", () => {
     const [m] = installMethods("kimi-code", "linux");
     const argv = installArgv(m!, { platform: "linux" });
     expect(argv?.slice(1)).toEqual(["-c", m!.command]);
@@ -98,7 +98,7 @@ describe("the harness", () => {
     expect(validateChoice(on("openrouter"), choice("kimi-k2.7-code", { effort: "low" }))).toContain("takes no effort");
   });
 
-  test("BUG-433/K3 takes no effort over OpenRouter: Kimi's effort variable reaches only its own provider, an OpenRouter one (type openai) ignores it", () => {
+  test("launch/environment: K3 takes no effort over OpenRouter: Kimi's effort variable reaches only its own provider, an OpenRouter one (type openai) ignores it #BUG-433", () => {
     const config = on("openrouter");
     expect(validateChoice(config, choice("kimi-k3"))).toBeNull();
     expect(validateChoice(config, choice("kimi-k3"), { requireEffort: true })).toBeNull();
@@ -115,7 +115,7 @@ describe("the harness", () => {
     for (const h of Object.keys(DEFAULT_MODELS) as (keyof typeof DEFAULT_MODELS)[]) for (const m of DEFAULT_MODELS[h]) if (m.id !== "kimi-k3") expect([h, m.id, m.effortConns]).toEqual([h, m.id, undefined]);
   });
 
-  test("BUG-433/the proposal's Tab (`cycleEffort`, `cycleModel`) over the offered agents: K3's effort cycles on the plan only, and a model picked by Tab starts without one over OpenRouter", () => {
+  test("agent-choice/model-effort: the proposal's Tab (`cycleEffort`, `cycleModel`) over the offered agents: K3's effort cycles on the plan only, and a model picked by Tab starts without one over OpenRouter #BUG-433", () => {
     const agents = (conn: "plan" | "openrouter") => offeredAgents(on(conn), { installed: () => true });
     const k3 = { harness: "kimi-code", model: "kimi-k3", effort: "high" } as const;
     expect(cycleEffort(k3, agents("plan")).effort).toBe("max");
@@ -150,14 +150,14 @@ describe("the harness", () => {
     expect(ownWindow("kimi-code", "no-such-model").window).toBeUndefined();
   });
 
-  test("no resume: Kimi can't be given a session id and has no hook that reports one", () => {
+  test("resume/argv: no resume: Kimi can't be given a session id and has no hook that reports one", () => {
     expect(info.resume).toBeUndefined();
     expect(() => buildCommand(on("openrouter"), choice("kimi-k3"), undefined, { id: "11111111-2222-4333-8444-555555555555", resume: true })).toThrow("Kimi Code can't resume a session");
   });
 });
 
 describe("the launch: OpenRouter", () => {
-  test("Kimi's environment model: its own variable names, OpenRouter's endpoint, the model's id and window; the key is the only secret and no OPENROUTER_API_KEY is passed", () => {
+  test("launch/environment: Kimi's environment model: its own variable names, OpenRouter's endpoint, the model's id and window; the key is the only secret and no OPENROUTER_API_KEY is passed", () => {
     const cmd = buildCommand(on("openrouter"), choice("kimi-k3"));
     expect(cmd.env).toEqual({
       KIMI_CODE_NO_AUTO_UPDATE: "1",
@@ -173,18 +173,18 @@ describe("the launch: OpenRouter", () => {
     expect(cmd.resumed).toBeUndefined();
   });
 
-  test("BUG-433/no effort variable over OpenRouter, even for a caller that names one: it would do nothing there", () => {
+  test("launch/environment: no effort variable over OpenRouter, even for a caller that names one: it would do nothing there #BUG-433", () => {
     expect(buildCommand(on("openrouter"), choice("kimi-k3", { effort: "max" })).env.KIMI_MODEL_THINKING_EFFORT).toBeUndefined();
   });
 
-  test("K2.7 Code: its own id and window, no effort variable", () => {
+  test("launch/environment: K2.7 Code: its own id and window, no effort variable", () => {
     const env = buildCommand(on("openrouter"), choice("kimi-k2.7-code")).env;
     expect(env.KIMI_MODEL_NAME).toBe("moonshotai/kimi-k2.7-code");
     expect(env.KIMI_MODEL_MAX_CONTEXT_SIZE).toBe("262144");
     expect(env.KIMI_MODEL_THINKING_EFFORT).toBeUndefined();
   });
 
-  test("without a key Kimi is given none (the launch problem says so first)", () => {
+  test("launch/environment: without a key Kimi is given none (the launch problem says so first)", () => {
     const key = process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
     try {
@@ -197,7 +197,7 @@ describe("the launch: OpenRouter", () => {
 });
 
 describe("the launch: Moonshot's own API (issue #107)", () => {
-  test("BUG-700/Kimi's environment model with Moonshot's key: no base URL (the default is Moonshot's global API), type `kimi` pinned, the model's own id and window; the key is the only secret", () => {
+  test("launch/environment: Kimi's environment model with Moonshot's key: no base URL (the default is Moonshot's global API), type `kimi` pinned, the model's own id and window; the key is the only secret #BUG-700", () => {
     const cmd = buildCommand(on("moonshot"), choice("kimi-k3"));
     expect(cmd.env).toEqual({
       KIMI_CODE_NO_AUTO_UPDATE: "1",
@@ -217,21 +217,21 @@ describe("the launch: Moonshot's own API (issue #107)", () => {
     expect(Object.values(buildCommand(on("openrouter"), choice("kimi-k3")).env)).not.toContain(process.env.MOONSHOT_API_KEY);
   });
 
-  test("K2.7 Code is served on Moonshot's key too (the plan has none): its own id and window", () => {
+  test("launch/environment: K2.7 Code is served on Moonshot's key too (the plan has none): its own id and window", () => {
     const env = buildCommand(on("moonshot"), choice("kimi-k2.7-code")).env;
     expect(env.KIMI_MODEL_NAME).toBe("kimi-k2.7-code");
     expect(env.KIMI_MODEL_MAX_CONTEXT_SIZE).toBe("262144");
     expect(env.KIMI_MODEL_THINKING_EFFORT).toBeUndefined();
   });
 
-  test("BUG-701/no effort on Moonshot's key either (same as OpenRouter's: K3's effort is the plan's alone), even for a caller that names one", () => {
+  test("launch/environment: no effort on Moonshot's key either (same as OpenRouter's: K3's effort is the plan's alone), even for a caller that names one #BUG-701", () => {
     expect(buildCommand(on("moonshot"), choice("kimi-k3", { effort: "max" })).env.KIMI_MODEL_THINKING_EFFORT).toBeUndefined();
     expect(validateChoice(on("moonshot"), choice("kimi-k3"))).toBeNull();
     expect(validateChoice(on("moonshot"), choice("kimi-k3", { effort: "low" }))).toBe("Kimi Code's kimi-k3 takes no effort; omit it");
     expect(effortsOn(DEFAULT_MODELS["kimi-code"][1]!, "moonshot")).toEqual([]);
   });
 
-  test("without a key Kimi is given none (the launch problem says so first, naming Moonshot's variable)", () => {
+  test("launch/environment: without a key Kimi is given none (the launch problem says so first, naming Moonshot's variable)", () => {
     const key = process.env.MOONSHOT_API_KEY;
     delete process.env.MOONSHOT_API_KEY;
     try {
@@ -242,7 +242,7 @@ describe("the launch: Moonshot's own API (issue #107)", () => {
     }
   });
 
-  test("BUG-703/a Moonshot key is masked wherever Gluon prints a launch, whatever its shape (Kimi's own variable name too)", () => {
+  test("keys/masked-when-printed: a Moonshot key is masked wherever Gluon prints a launch, whatever its shape (Kimi's own variable name too) #BUG-703", () => {
     const shaped = process.env.MOONSHOT_API_KEY!;
     const plain = "plainMoonshotKeyNoKnownShape42";
     process.env.MOONSHOT_API_KEY = plain;
@@ -254,14 +254,14 @@ describe("the launch: Moonshot's own API (issue #107)", () => {
     }
   });
 
-  test("a model is resolved to its id on the connection configured: Moonshot's own, not OpenRouter's `moonshotai/…`", () => {
+  test("launch/environment: a model is resolved to its id on the connection configured: Moonshot's own, not OpenRouter's `moonshotai/…`", () => {
     expect(resolveModel(on("moonshot"), "kimi-code", "kimi-k3")).toEqual({ conn: "moonshot", id: "kimi-k3" });
     expect(resolveModel(on("openrouter"), "kimi-code", "kimi-k3")).toEqual({ conn: "openrouter", id: "moonshotai/kimi-k3" });
   });
 });
 
 describe("the launch: the Kimi Code plan", () => {
-  test("the model by Kimi's alias (`kimi-code/k3`), no key, no URL: only the auto-update switch and the effort", () => {
+  test("launch/environment: the model by Kimi's alias (`kimi-code/k3`), no key, no URL: only the auto-update switch and the effort", () => {
     const cmd = buildCommand(on("plan"), choice("kimi-k3", { effort: "low" }));
     expect(cmd.argv).toEqual(["kimi", "-m", "kimi-code/k3"]);
     expect(cmd.env).toEqual({ KIMI_CODE_NO_AUTO_UPDATE: "1", KIMI_MODEL_THINKING_EFFORT: "low" });
@@ -273,7 +273,7 @@ describe("the launch: the Kimi Code plan", () => {
 });
 
 describe("the brief is typed", () => {
-  test("every launch types the brief line (an empty prefix), the spec is in no argument, and the command says so", () => {
+  test("frame/brief-line: every launch types the brief line (an empty prefix), the spec is in no argument, and the command says so", () => {
     for (const conn of ["plan", "openrouter"] as const) {
       for (const mode of [undefined, "build", "plan"] as const) {
         const cmd = buildCommand(on(conn), choice(conn === "plan" ? "kimi-k3" : "kimi-k2.7-code", { ...(mode ? { mode } : {}), spec: "- fix the bug" }));
@@ -283,7 +283,7 @@ describe("the brief is typed", () => {
     }
   });
 
-  test("launchPlan: the spec goes into a private file, argv stays as built (its last argument too), the line is the brief alone", () => {
+  test("frame/brief-line: launchPlan: the spec goes into a private file, argv stays as built (its last argument too), the line is the brief alone", () => {
     const cmd = buildCommand(on("plan"), choice("kimi-k3", { mode: "plan", spec: "- fix the bug\n- and more" }));
     const plan = launchPlan(cmd, "/usr/bin/kimi", { tmp: TMP });
     try {
@@ -298,7 +298,7 @@ describe("the brief is typed", () => {
     }
   });
 
-  test("where nothing can type (`--launch`, no pseudo-terminal) it is refused in every mode, before anything starts", async () => {
+  test("modes/needs-frame: where nothing can type (`--launch`, no pseudo-terminal) it is refused in every mode, before anything starts", async () => {
     for (const mode of [undefined, "build", "explore", "plan"] as const) expect([mode, typedModeProblem("kimi-code", mode)]).toEqual([mode, expect.stringContaining("Kimi Code takes no prompt on its command line")]);
     const cmd = buildCommand(on("plan"), choice("kimi-k3"));
     await expect(handOff(cmd)).rejects.toThrow("takes no prompt on its command line");
@@ -309,12 +309,12 @@ describe("the brief is typed", () => {
 
 describe("modes", () => {
   const info = HARNESS_INFO["kimi-code"];
-  test("plan: `--plan`, nothing else", () => {
+  test("modes/per-harness: plan: `--plan`, nothing else", () => {
     expect(buildCommand(on("plan"), choice("kimi-k3", { mode: "plan" })).argv).toEqual(["kimi", "-m", "kimi-code/k3", "--plan"]);
     expect(buildCommand(on("openrouter"), choice("kimi-k3", { mode: "plan" })).argv).toEqual(["kimi", "--plan"]);
   });
 
-  test("BUG-432/explore is unavailable: Kimi's interactive mode ignores `--agent-file` and `--agent`, so nothing could take its writing and shell tools away", () => {
+  test("modes/per-harness: explore is unavailable: Kimi's interactive mode ignores `--agent-file` and `--agent`, so nothing could take its writing and shell tools away #BUG-432", () => {
     const explore = info.modes.explore;
     expect(explore.unavailable).toContain("ignores an agent file");
     expect(explore.argv).toBeUndefined();
@@ -339,14 +339,14 @@ describe("modes", () => {
     expect(typeof mixed === "string" ? mixed : mixed.choices.map((c) => c.harness)).toEqual(["codex"]);
   });
 
-  test("BUG-432/the brain is told, per harness, that Kimi Code can't run explore (and nothing is said of the agent file)", () => {
+  test("modes/per-harness: the brain is told, per harness, that Kimi Code can't run explore (and nothing is said of the agent file) #BUG-432", () => {
     const config = { ...on("openrouter"), agents: offeredAgents(on("openrouter"), { installed: () => true }) };
     const text = systemPrompt(config, { cwd: "/r", isRepo: false, branch: null, topLevel: [], instructions: [] });
     expect(text).toContain("- kimi-code (Kimi Code)\n  models: kimi-k2.7-code (Kimi K2.7 Code), kimi-k3 (Kimi K3)\n  can't run explore mode: never route such a session to it");
     expect(info.modes.plan).toEqual({ argv: ["--plan"] });
   });
 
-  test("BUG-432/no explore agent file is written: no file, no skills directory, no `--agent-file` in any argv", () => {
+  test("modes/per-harness: no explore agent file is written: no file, no skills directory, no `--agent-file` in any argv #BUG-432", () => {
     for (const conn of ["plan", "openrouter"] as const) for (const mode of [undefined, "build", "plan"] as const) {
       const cmd = buildCommand(on(conn), choice(conn === "plan" ? "kimi-k3" : "kimi-k2.7-code", mode ? { mode } : {}));
       expect(cmd.argv.some((a) => a.startsWith("--agent") || a === "--skills-dir")).toBe(false);
@@ -355,7 +355,7 @@ describe("modes", () => {
     expect(adapterOutput({ harness: "kimi-code", version: "2.1.1", handoff: handoffFor(handoffDefaults(), "kimi-code") })).toEqual({ argv: [], env: {}, files: {} });
   });
 
-  test("build adds nothing: no agent file, no skills directory", () => {
+  test("modes/per-harness: build adds nothing: no agent file, no skills directory", () => {
     const cmd = buildCommand(on("plan"), choice("kimi-k3"));
     expect(cmd.argv.some((a) => a.startsWith("--agent") || a === "--skills-dir")).toBe(false);
     expect(cmd.adapter).toBeUndefined();
@@ -363,7 +363,7 @@ describe("modes", () => {
 });
 
 describe("the key variable", () => {
-  test("BUG-431/KIMI_MODEL_API_KEY is Kimi Code's key on OpenRouter or Moonshot only: no other harness, connection or caller may carry it", () => {
+  test("subscriptions/no-token-forwarding: KIMI_MODEL_API_KEY is Kimi Code's key on OpenRouter or Moonshot only: no other harness, connection or caller may carry it #BUG-431", () => {
     const env = { KIMI_MODEL_API_KEY: "sk-or-v1-x" };
     expect(() => assertSafeEnv(env, "openrouter", "kimi-code")).not.toThrow();
     expect(() => assertSafeEnv(env, "moonshot", "kimi-code")).not.toThrow();
@@ -372,7 +372,7 @@ describe("the key variable", () => {
     }
   });
 
-  test("BUG-702/Moonshot's endpoint is never set by Gluon: a base URL on Kimi + Moonshot is refused, whatever its name or value (the default endpoint needs none)", () => {
+  test("subscriptions/base-url-allowlist: Moonshot's endpoint is never set by Gluon: a base URL on Kimi + Moonshot is refused, whatever its name or value (the default endpoint needs none) #BUG-702", () => {
     for (const k of ["KIMI_MODEL_BASE_URL", "KIMI_BASE_URL", "KIMI_CODE_BASE_URL", "MOONSHOT_BASE_URL", "OPENAI_BASE_URL"]) {
       for (const url of ["https://api.moonshot.ai/v1", "https://api.moonshot.cn/v1", "https://api.kimi.com/coding/v1", "https://openrouter.ai/api/v1"]) {
         expect(() => assertSafeEnv({ [k]: url }, "moonshot", "kimi-code"), `${k}=${url}`).toThrow("only an API-key aggregator's documented endpoint is allowed");
@@ -394,18 +394,18 @@ describe("the plan's sign-in (`kimi provider list`)", () => {
     }
   };
 
-  test("a provider whose source is `oauth` is the plan; `No providers configured.` is signed out", async () => {
+  test("subscriptions/official-binaries-only: a provider whose source is `oauth` is the plan; `No providers configured.` is signed out", async () => {
     expect(await fake({}, kimiPlanStatus)).toEqual({ installed: true, loggedIn: true, detail: "Kimi Code plan" });
     expect(await fake({ FAKE_KIMI_LOGGED_OUT: "1" }, kimiPlanStatus)).toEqual({ installed: true, loggedIn: false });
     expect((await fake({}, () => loginStatus("kimi-code"))).loggedIn).toBe(true);
   });
 
-  test("an answer Gluon can't read says nothing about it: not signed in, but `transient` (the models stay offered, the user can launch and `/login`)", async () => {
+  test("subscriptions/official-binaries-only: an answer Gluon can't read says nothing about it: not signed in, but `transient` (the models stay offered, the user can launch and `/login`)", async () => {
     const s = await fake({ FAKE_KIMI_LIST_ODD: "1" }, kimiPlanStatus);
     expect(s).toMatchObject({ installed: true, loggedIn: false, transient: true, error: expect.stringContaining("no answer Gluon can read") });
   });
 
-  test("the parse: keyed providers alone are not the plan; colours and blank lines pass; junk is unknown", () => {
+  test("subscriptions/official-binaries-only: the parse: keyed providers alone are not the plan; colours and blank lines pass; junk is unknown", () => {
     expect(parseKimiProviders("managed:kimi-code  type=kimi  models=3  source=oauth\n")).toEqual({ signedIn: true });
     expect(parseKimiProviders("\x1b[1mmanaged:kimi-code\x1b[0m  type=kimi  models=3  source=oauth\nmine  type=openai  models=1  source=inline\n")).toEqual({ signedIn: true });
     expect(parseKimiProviders("mine  type=openai  models=1  source=inline\nother  type=kimi  models=2  source=apiJson(https://x.test/api.json)\n")).toEqual({ signedIn: false });
@@ -415,13 +415,13 @@ describe("the plan's sign-in (`kimi provider list`)", () => {
     for (const odd of ["", "error: unknown command 'provider'", "providers: none", "No providers configured, but see the docs"]) expect(parseKimiProviders(odd)).toBeNull();
   });
 
-  test("BUG-430/managed id only counts for the plan when its source isn't a key or a registry: `managed:kimi-code` with `inline` or `apiJson` is not a sign-in", () => {
+  test("subscriptions/official-binaries-only: managed id only counts for the plan when its source isn't a key or a registry: `managed:kimi-code` with `inline` or `apiJson` is not a sign-in #BUG-430", () => {
     expect(parseKimiProviders("managed:kimi-code  type=kimi  models=1  source=inline\n")).toEqual({ signedIn: false });
     expect(parseKimiProviders("managed:kimi-code  type=kimi  models=2  source=apiJson(https://x.test/api.json)\n")).toEqual({ signedIn: false });
     expect(parseKimiProviders("managed:kimi-code  type=kimi  models=3  source=inline\nmanaged:kimi-code  type=kimi  models=3  source=oauth\n")).toEqual({ signedIn: true });
   });
 
-  test("not installed: not installed, never a sign-in", async () => {
+  test("subscriptions/official-binaries-only: not installed: not installed, never a sign-in", async () => {
     const path = process.env.PATH;
     process.env.PATH = TMP;
     try {
