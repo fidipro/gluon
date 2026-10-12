@@ -50,9 +50,11 @@ const seeds = process.env.GLUON_MONKEY_SEED ? [Number(process.env.GLUON_MONKEY_S
 for (const seed of seeds)
   for (const fake of FAKES) {
     // `@full`: only claude's walk is in `bun run regression`; `regression:full` runs every fake.
-    const name = `monkey: ${fake} seed ${seed}${fake === "claude" ? "" : " @full"}`;
+    const run = `monkey: ${fake} seed ${seed}${fake === "claude" ? "" : " @full"}`;
+    const name = `whole-app/random-walk: ${run}`;
+    // The entry in the title as written: test/catalog.ts reads titles from the source.
     test(
-      name,
+      `whole-app/random-walk: ${run}`,
       async () => {
         const c = configFor(fake, seed);
         const actions = generate(M.initialState(modelConfig(c)), seed, STEPS);

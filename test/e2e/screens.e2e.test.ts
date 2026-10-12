@@ -38,7 +38,7 @@ async function sceneProblems(chain: Chain, scene: string): Promise<string[]> {
 for (const chain of CHAINS) {
   for (const scene of chain.shots) {
     test.serial(
-      `screens: lint ${scene} (${chain.id}) @full`,
+      `whole-app/screens-lint: lint ${scene} (${chain.id}) @full`,
       async () => {
         prefetch(JOBS, JOBS.findIndex((j) => j.chain === chain));
         const problems = await sceneProblems(chain, scene);
@@ -58,6 +58,7 @@ for (const check of RESIZE_CHECKS) {
     if (!f) throw fresh.error ?? new Error(`no fresh ${check.scene} at ${sizeName(check.to)}`);
     expect(comparable(after)).toBe(comparable(f));
   };
-  if (check.bug) test.serial.failing(name, body, TEST_TIMEOUT_MS);
-  else test.serial(name, body, TEST_TIMEOUT_MS);
+  // The entry in the title as written: test/catalog.ts reads titles from the source.
+  if (check.bug) test.serial.failing(`frame/resize: ${name}`, body, TEST_TIMEOUT_MS);
+  else test.serial(`frame/resize: ${name}`, body, TEST_TIMEOUT_MS);
 }

@@ -36,7 +36,7 @@ const named = (id: string) => {
 
 test("the test titles are found (the scan works)", () => {
   expect(TITLES.length).toBeGreaterThan(500);
-  expect(TITLES.some((t) => t.startsWith("GLUON-1:"))).toBe(true);
+  expect(named("GLUON-1")).toBe(true);
 });
 
 test("every cell is resolved", () => {

@@ -873,9 +873,9 @@ async function runGroup(g: Group) {
 
 // `@full`: left out of `bun run regression` (none stays: cc's line alone took 20 s of an e2e run's wall); `regression:full` runs it.
 for (const g of groups())
-  test(`matrix (${FULL ? "full" : "smoke"}): ${g.name}${/^((codex|oc|agy|grok): |cc: (the line|overflow|three tabs|the alternate screen)|home: |home with a session: )/.test(g.name) ? " @full" : ""}`, () => runGroup(g));
+  test(`whole-app/input-matrix: matrix (${FULL ? "full" : "smoke"}): ${g.name}${/^((codex|oc|agy|grok): |cc: (the line|overflow|three tabs|the alternate screen)|home: |home with a session: )/.test(g.name) ? " @full" : ""}`, () => runGroup(g));
 
-test.skipIf(!!ONLY)("every smoke cell's state is in a group", () => {
+test.skipIf(!!ONLY)("whole-app/input-matrix: every smoke cell's state is in a group", () => {
   const grouped = new Set(groups().flatMap((g) => g.states));
   const smoke = [...table].flatMap(([s, row]) => ([...row.values()].some((c) => c && "tier" in c && c.tier === "smoke") ? [s] : []));
   expect(smoke.filter((s) => !grouped.has(s))).toEqual([]);

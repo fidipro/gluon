@@ -22,10 +22,7 @@
   "test/e2e/analytics.e2e.test.ts": 9,
   "test/e2e/auth.e2e.test.ts": 60,
   "test/e2e/cli.e2e.test.ts": 55,
-  "test/e2e/gluon-matrix.e2e.test.ts": 3,
-  "test/e2e/gluon-more.e2e.test.ts": 12,
-  "test/e2e/gluon-qa-frame.e2e.test.ts": 25,
-  "test/e2e/gluon.e2e.test.ts": 21,
+  "test/e2e/gluon.e2e.test.ts": 6,
   "test/e2e/handoff.e2e.test.ts": 45,
   "test/e2e/install.e2e.test.ts": 19,
   "test/e2e/kimi-cost.e2e.test.ts": 2,
@@ -36,19 +33,14 @@
   "test/e2e/resume-hostile.e2e.test.ts": 10,
   "test/e2e/resume-qa.e2e.test.ts": 11,
   "test/e2e/resume.e2e.test.ts": 32,
-  "test/e2e/scoped.e2e.test.ts": 4,
-  "test/e2e/screens.e2e.test.ts": 1,
   "test/e2e/startup.e2e.test.ts": 3,
   "test/e2e/tables-refresh.e2e.test.ts": 5,
   "test/e2e/update.e2e.test.ts": 5,
   "test/effort.test.ts": 18,
   "test/figures.test.ts": 54,
   "test/forge.test.ts": 24,
-  "test/gluon-layout.test.ts": 40,
-  "test/gluon-matrix.test.ts": 13,
-  "test/gluon-qa-frame.test.ts": 9,
-  "test/gluon.test.ts": 14,
-  "test/grok.test.ts": 33,
+  "test/gluon.test.ts": 3,
+  "test/grok.test.ts": 32,
   "test/handoff.test.ts": 13,
   "test/harness-config.test.ts": 4,
   "test/hook-import-graph.test.ts": 2,
@@ -65,18 +57,13 @@
   "test/perf/typing.perf.test.ts": 1,
   "test/permanent.test.ts": 19,
   "test/platform.test.ts": 14,
-  "test/polling.test.ts": 11,
-  "test/pty-chrome.test.ts": 31,
-  "test/pty-compositor.test.ts": 72,
   "test/pty-first-line.test.ts": 1,
   "test/pty-intercept.test.ts": 20,
   "test/pty-keys.test.ts": 57,
   "test/pty-modes.test.ts": 10,
   "test/pty-paint.test.ts": 10,
   "test/pty-readers.test.ts": 30,
-  "test/pty-route-matrix.test.ts": 12,
   "test/pty-screen.test.ts": 15,
-  "test/pty-selection-qa.test.ts": 16,
   "test/pty-selection.test.ts": 9,
   "test/pty-session.test.ts": 65,
   "test/refresh.test.ts": 57,
@@ -94,11 +81,11 @@
   "test/status-matrix.test.ts": 7,
   "test/status.test.ts": 35,
   "test/tables-hardening.test.ts": 29,
-  "test/tools.test.ts": 90,
+  "test/tools.test.ts": 89,
   "test/update.test.ts": 35,
   "test/usage.test.ts": 2,
   "test/windows.test.ts": 29,
-  "test/workspaces.test.ts": 78
+  "test/workspaces.test.ts": 77
  },
  "pastSeams": {
   "test/adapters-claude-codex.test.ts": [
@@ -107,14 +94,12 @@
    "src/adapters/common.ts",
    "src/adapters/types.ts",
    "src/detect.ts",
-   "src/events.ts",
    "src/pty/types.ts"
   ],
   "test/adapters-opencode.test.ts": [
    "src/adapters/opencode.ts",
    "src/adapters/types.ts",
-   "src/detect.ts",
-   "src/events.ts"
+   "src/detect.ts"
   ],
   "test/adversarial-pkg-edfb.test.ts": [
    "src/adapters/agy-settings.ts",
@@ -133,8 +118,7 @@
   ],
   "test/agy-settings.test.ts": [
    "src/adapters/agy-settings.ts",
-   "src/adapters/antigravity.ts",
-   "src/events.ts"
+   "src/adapters/antigravity.ts"
   ],
   "test/analytics.test.ts": [
    "src/analytics.ts",
@@ -201,30 +185,16 @@
    "src/cost/ledger.ts",
    "src/cost/report.ts",
    "src/cost/table-schema.ts",
-   "src/events.ts",
    "src/models.ts"
   ],
   "test/forge.test.ts": [
    "src/agent/forge.ts"
   ],
-  "test/gluon-layout.test.ts": [
-   "src/events.ts",
-   "src/repo.ts",
-   "src/ui/layout.ts",
-   "src/ui/mark.tsx"
-  ],
-  "test/gluon-matrix.test.ts": [
-   "src/ui/layout.ts"
-  ],
   "test/gluon-qa-frame.test.ts": [
-   "src/pty/chrome.ts",
-   "src/pty/modes.ts",
-   "src/pty/session.ts",
-   "src/ui/layout.ts"
+   "src/pty/session.ts"
   ],
   "test/gluon.test.ts": [
-   "src/gluon.ts",
-   "src/ui/layout.ts"
+   "src/gluon.ts"
   ],
   "test/grok.test.ts": [
    "src/cost/context.ts",
@@ -233,7 +203,6 @@
    "src/otlp-protobuf.ts"
   ],
   "test/handoff.test.ts": [
-   "src/events.ts",
    "src/workspaces.ts"
   ],
   "test/harness-config.test.ts": [
@@ -299,27 +268,12 @@
    "src/adapters/common.ts",
    "src/adapters/grok-build.ts",
    "src/adapters/permanent.ts",
-   "src/doctor.ts",
-   "src/events.ts"
+   "src/doctor.ts"
   ],
   "test/platform.test.ts": [
    "src/auth.ts",
    "src/cost/tables-store.ts",
    "src/detect.ts"
-  ],
-  "test/polling.test.ts": [
-   "src/events.ts",
-   "src/files-poll.ts"
-  ],
-  "test/pty-chrome.test.ts": [
-   "src/gluon.ts",
-   "src/pty/chrome.ts",
-   "src/pty/types.ts",
-   "src/ui/layout.ts"
-  ],
-  "test/pty-compositor.test.ts": [
-   "src/pty/modes.ts",
-   "src/ui/layout.ts"
   ],
   "test/pty-first-line.test.ts": [
    "src/pty/session.ts"
@@ -327,26 +281,12 @@
   "test/pty-intercept.test.ts": [
    "src/pty/intercept.ts"
   ],
-  "test/pty-modes.test.ts": [
-   "src/pty/modes.ts"
-  ],
   "test/pty-paint.test.ts": [
    "src/pty/paint.ts"
-  ],
-  "test/pty-route-matrix.test.ts": [
-   "src/pty/chrome.ts",
-   "src/pty/modes.ts"
-  ],
-  "test/pty-selection-qa.test.ts": [
-   "src/pty/selection.ts"
-  ],
-  "test/pty-selection.test.ts": [
-   "src/pty/selection.ts"
   ],
   "test/pty-session.test.ts": [
    "src/cost/ledger.ts",
    "src/cost/tracker.ts",
-   "src/events.ts",
    "src/pty/session.ts"
   ],
   "test/refresh.test.ts": [
@@ -395,7 +335,6 @@
   ],
   "test/status.test.ts": [
    "src/adapters/common.ts",
-   "src/events.ts",
    "src/models.ts"
   ],
   "test/tables-hardening.test.ts": [

@@ -175,12 +175,12 @@ const unitCells: { s: StateId; i: InputId; e: Expect }[] = [];
 for (const [s, row] of table) for (const [i, cell] of row) if (cell && "expect" in cell && cell.tier === "unit") unitCells.push({ s, i, e: cell.expect });
 
 describe("the matrix's unit tier (route)", () => {
-  test("the unit cells are session states (route is the session view's)", () => {
+  test("whole-app/input-matrix: the unit cells are session states (route is the session view's)", () => {
     expect(unitCells.length).toBeGreaterThan(15_000);
     expect(unitCells.filter((c) => !c.s.startsWith("s.")).map((c) => `${c.s} × ${c.i}`)).toEqual([]);
   });
 
-  test("the states' strips are what they say: one tab, three, five scrolled both ways at 60 columns", () => {
+  test("whole-app/input-matrix: the states' strips are what they say: one tab, three, five scrolled both ways at 60 columns", () => {
     expect(stateModel("idle").ctx.strip!.tabs).toHaveLength(1);
     expect(stateModel("midTab").ctx.strip!.tabs).toHaveLength(3);
     const o = stateModel("overflow").ctx.strip!;
@@ -191,7 +191,7 @@ describe("the matrix's unit tier (route)", () => {
   const byState = new Map<StateId, typeof unitCells>();
   for (const c of unitCells) byState.set(c.s, [...(byState.get(c.s) ?? []), c]);
   for (const [s, cells] of byState) {
-    test(`${s}: every unit cell`, () => {
+    test(`whole-app/input-matrix: ${s}: every unit cell`, () => {
       const state = s.split(".")[2] as SessionState;
       const m = stateModel(state);
       const wrong: string[] = [];
@@ -291,7 +291,7 @@ function randomInput(r: () => number, c: { cols: number; rows: number }): { kind
 describe("route: seeded properties", () => {
   const RUNS = 4000;
 
-  test(`a paste never goes home, switches or shows a tab; it reaches the agent whole or not at all (seed ${SEED})`, () => {
+  test(`frame/keys-to-agent: a paste never goes home, switches or shows a tab; it reaches the agent whole or not at all (seed ${SEED})`, () => {
     const r = rng(SEED);
     for (let n = 0; n < RUNS; n++) {
       const { ctx } = randomContext(r);
@@ -306,7 +306,7 @@ describe("route: seeded properties", () => {
     }
   });
 
-  test(`a terminal reply gives nothing, in any context (seed ${SEED + 1})`, () => {
+  test(`frame/keys-to-agent: a terminal reply gives nothing, in any context (seed ${SEED + 1})`, () => {
     const r = rng(SEED + 1);
     for (let n = 0; n < RUNS; n++) {
       const { ctx } = randomContext(r);
@@ -317,7 +317,7 @@ describe("route: seeded properties", () => {
     }
   });
 
-  test(`with a question up only Enter, Esc and Ctrl+C answer it; other keys and pastes are dropped (Gluon's own keys still work) (seed ${SEED + 2})`, () => {
+  test(`clear-compact/answer: with a question up only Enter, Esc and Ctrl+C answer it; other keys and pastes are dropped (Gluon's own keys still work) (seed ${SEED + 2})`, () => {
     const r = rng(SEED + 2);
     for (let n = 0; n < RUNS; n++) {
       const m = randomContext(r);
@@ -335,7 +335,7 @@ describe("route: seeded properties", () => {
     }
   });
 
-  test(`a mouse report outside the interior reaches the agent only as a release or a drag held at the edge, after a press it got (seed ${SEED + 3})`, () => {
+  test(`frame/mouse-to-agent: a mouse report outside the interior reaches the agent only as a release or a drag held at the edge, after a press it got (seed ${SEED + 3})`, () => {
     const r = rng(SEED + 3);
     let outside = 0;
     for (let n = 0; n < RUNS * 2; n++) {
@@ -364,7 +364,7 @@ describe("route: seeded properties", () => {
     expect(outside).toBeGreaterThan(100);
   });
 
-  test(`BUG-279/route: Alt+PgUp / Alt+PgDn never switch, go home or start a prefix, whatever the context: the agent's, or dropped by a question (seed ${SEED + 4})`, () => {
+  test(`frame/keys-to-agent: Alt+PgUp / Alt+PgDn never switch, go home or start a prefix, whatever the context: the agent's, or dropped by a question (seed ${SEED + 4}) #BUG-279/route`, () => {
     const r = rng(SEED + 4);
     const forms = [KEYS.altPgup, KEYS.altPgdn, "\x1b[57421;3u", "\x1b[57422;3u", "\x1b[5;3:2~", "\x1b[34;81;0;1;2;1_", "\x1b[33;73;0;1;1;1_"];
     for (const bytes of forms) expect(decode(bytes).map((k) => k.name)).toEqual(["other"]);
@@ -379,7 +379,7 @@ describe("route: seeded properties", () => {
     }
   });
 
-  test(`the home key starts the prefix whatever the context (nothing pending): never home at once (seed ${SEED + 5})`, () => {
+  test(`tabs/home-key: the home key starts the prefix whatever the context (nothing pending): never home at once (seed ${SEED + 5})`, () => {
     const r = rng(SEED + 5);
     for (let n = 0; n < RUNS; n++) {
       const { ctx } = randomContext(r);
@@ -388,7 +388,7 @@ describe("route: seeded properties", () => {
     }
   });
 
-  test(`BUG-279/route: with the prefix pending, in any context: ←/→ switch, the home key goes home, z zooms, Esc cancels, any other key ends it and is routed as if alone; replies and focus reports wait on (seed ${SEED + 7})`, () => {
+  test(`tabs/home-key: with the prefix pending, in any context: ←/→ switch, the home key goes home, z zooms, Esc cancels, any other key ends it and is routed as if alone; replies and focus reports wait on (seed ${SEED + 7}) #BUG-279/route`, () => {
     const r = rng(SEED + 7);
     const states = { switchPrev: 0, switchNext: 0, home: 0, cancel: 0, other: 0, wait: 0 };
     for (let n = 0; n < RUNS * 2; n++) {
@@ -424,7 +424,7 @@ describe("route: seeded properties", () => {
     expect(Object.values(states).every((n) => n > 5)).toBe(true);
   });
 
-  test(`BUG-280/route: on an untouched line plain ←/→ switch, Alt+←/→ are dropped (nothing for the agent); touched, all four are the agent's (seed ${SEED + 8})`, () => {
+  test(`tabs/arrows: on an untouched line plain ←/→ switch, Alt+←/→ are dropped (nothing for the agent); touched, all four are the agent's (seed ${SEED + 8}) #BUG-280/route`, () => {
     const r = rng(SEED + 8);
     for (let n = 0; n < RUNS; n++) {
       const { ctx } = randomContext(r);
@@ -492,7 +492,7 @@ function stubSession(modes: Partial<ModesState> = {}) {
 }
 
 describe("the compositor under random input (fake streams)", () => {
-  test(`seeded: Gluon's keys move the view as the ring says; a paste never moves it; nothing reaches a session not shown (seed ${SEED + 6})`, async () => {
+  test(`whole-app/input-matrix: seeded: Gluon's keys move the view as the ring says; a paste never moves it; nothing reaches a session not shown (seed ${SEED + 6})`, async () => {
     const r = rng(SEED + 6);
     for (let round = 0; round < 6; round++) {
       const out = new FakeOut(100, 30);

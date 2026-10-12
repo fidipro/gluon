@@ -19,7 +19,7 @@ function counting(by: Record<string, Map<string, string> | null>) {
 }
 
 describe("files changed: one snapshot per work tree", () => {
-  test("BUG-668/QA-perf-03: sessions in the work tree Gluon runs in share one snapshot, each counted from its own start", async () => {
+  test("perf/polling: sessions in the work tree Gluon runs in share one snapshot, each counted from its own start #BUG-668/QA-perf-03", async () => {
     const c = counting({ "/repo": snap("a", "b", "c") });
     const sessions: PolledSession[] = [1, 2, 3, 4, 5].map((id) => ({ id, base: id === 1 ? new Map() : snap("a") }));
     const r = await pollChanges("/repo", sessions, c.snapshot);
@@ -28,13 +28,13 @@ describe("files changed: one snapshot per work tree", () => {
     expect([...r!.changed]).toEqual([[1, 3], [2, 2], [3, 2], [4, 2], [5, 2]]);
   });
 
-  test("an unreadable work tree for Gluon polls nothing", async () => {
+  test("frame/files-changed: an unreadable work tree for Gluon polls nothing", async () => {
     const none = counting({});
     expect(await pollChanges("/repo", [{ id: 1, base: new Map() }], none.snapshot)).toBeNull();
     expect(none.asked).toEqual(["/repo"]);
   });
 
-  test.skipIf(WIN)("BUG-668/QA-perf-03: git processes per poll: three for the work tree, whatever the number of sessions", async () => {
+  test.skipIf(WIN)("perf/polling: git processes per poll: three for the work tree, whatever the number of sessions #BUG-668/QA-perf-03", async () => {
     const real = Bun.which("git")!;
     const repo = join(TMP, "repo");
     mkdirSync(repo);
@@ -85,7 +85,7 @@ describe("an events directory", () => {
   /** Past the file system's timestamp tick, so the next change leaves a different time (the clock above is fake; in Gluon a change within `RACY_MS` is never trusted). */
   const tick = () => Bun.sleep(25);
 
-  test("BUG-668/QA-perf-03: a directory that did not change is not listed again; a new event is read at once", async () => {
+  test("perf/polling: a directory that did not change is not listed again; a new event is read at once #BUG-668/QA-perf-03", async () => {
     const dir = fresh();
     try {
       const { w, scans } = watch(dir);
@@ -103,7 +103,7 @@ describe("an events directory", () => {
     }
   });
 
-  test("BUG-668/QA-perf-03: a status file is removed once read; the listing that follows is the last one until something changes", async () => {
+  test("perf/polling: a status file is removed once read; the listing that follows is the last one until something changes #BUG-668/QA-perf-03", async () => {
     const dir = fresh();
     try {
       const { w, scans } = watch(dir);
@@ -120,7 +120,7 @@ describe("an events directory", () => {
     }
   });
 
-  test("BUG-668/QA-perf-03: a change within the racy window is never taken as 'nothing new' (same clock tick as the listing)", () => {
+  test("frame/events-read: a change within the racy window is never taken as 'nothing new' (same clock tick as the listing) #BUG-668/QA-perf-03", () => {
     const dir = fresh();
     try {
       const { w, scans } = watch(dir, 0); // the clock is the real one: the directory changed just now
@@ -138,7 +138,7 @@ describe("an events directory", () => {
     }
   });
 
-  test("BUG-668/QA-perf-03: a backlog cut by the limit keeps being read although the directory does not change", () => {
+  test("frame/events-read: a backlog cut by the limit keeps being read although the directory does not change #BUG-668/QA-perf-03", () => {
     const dir = fresh();
     try {
       const { w, scans } = watch(dir);
@@ -154,7 +154,7 @@ describe("an events directory", () => {
     }
   });
 
-  test.each([1000, 2000])("BUG-668/QA-perf-03: on a file system with %i ms timestamps an event written after a listing is read within the forced-listing interval", (GRAN) => {
+  test.each([1000, 2000])("frame/events-read: on a file system with %i ms timestamps an event written after a listing is read within the forced-listing interval #BUG-668/QA-perf-03", (GRAN) => {
     const dir = fresh();
     try {
       let t = 10 * GRAN; // a fake clock, ms
@@ -181,7 +181,7 @@ describe("an events directory", () => {
     }
   });
 
-  test("an unchanged directory is listed at least every FULL_LIST_MS, and not more often than the poll", () => {
+  test("perf/polling: an unchanged directory is listed at least every FULL_LIST_MS, and not more often than the poll", () => {
     const dir = fresh();
     try {
       let t = 1_000_000;
@@ -195,7 +195,7 @@ describe("an events directory", () => {
     }
   });
 
-  test("the wiring: the files-changed poll goes through pollChanges and a session's events through EventsWatch (both live inside closures a unit test can't reach)", () => {
+  test("perf/polling: the wiring: the files-changed poll goes through pollChanges and a session's events through EventsWatch (both live inside closures a unit test can't reach)", () => {
     const gluon = readFileSync(join(import.meta.dir, "..", "src", "gluon.ts"), "utf8");
     expect(gluon).toMatch(/await pollChanges\(cwd,/);
     expect(gluon).not.toMatch(/statusSnapshot\(wt/);
@@ -205,7 +205,7 @@ describe("an events directory", () => {
     expect(session).not.toMatch(/readEvents\(/);
   });
 
-  test("a missing directory gives nothing and never throws; with skipping off every read lists (Windows)", () => {
+  test("frame/events-read: a missing directory gives nothing and never throws; with skipping off every read lists (Windows)", () => {
     const dir = fresh();
     try {
       const gone = watch(join(dir, "nope"));

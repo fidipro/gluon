@@ -101,14 +101,14 @@ describe("the ratchet (test/catalog.baseline.json only goes down)", () => {
 });
 
 describe("the checks' own cases", () => {
-  test("titles: any modifier, a conditional test, a built title cut at its first `${`; not a describe", () => {
+  test("titles: any modifier, a conditional test, a built title cut at its first `${`; not a describe, nor `re.test(…)`", () => {
     // One line with its expect: the samples switch tests off on purpose, and scripts/test-guard.ts skips an assertion's line.
-    expect(testTitles(['test("a/b: one", () => {});', 'test.skipIf(WIN)("a/c: two", () => {});', '(QUICK ? test.skip : test)("three", () => {});', "it.concurrent(`a/d: ${x} four`, () => {});", 'describe("not a test", () => {});'].join("\n"))).toEqual(["a/b: one", "a/c: two", "three", "a/d: "]);
+    expect(testTitles(['test("a/b: one", () => {});', 'test.skipIf(WIN)("a/c: two", () => {});', '(QUICK ? test.skip : test)("three", () => {});', "it.concurrent(`a/d: ${x} four`, () => {});", 'describe("not a test", () => {});', "ONLY.test(`not ${a} test`);"].join("\n"))).toEqual(["a/b: one", "a/c: two", "three", "a/d: "]);
     expect(["a/b: one", "BUG-1/x: no", "Feature/x: no", "three"].map(entryOf)).toEqual(["a/b", undefined, undefined, undefined]);
   });
 
   test("past the seams: value imports of src/ modules that aren't seams; type-only, seam and support imports are fine", () => {
-    const text = ['import type { A } from "../src/a.ts";', 'import { type B } from "../src/b.ts";', 'import { route } from "../src/routing.ts";', 'import { HARNESSES } from "../src/harnesses.ts";', 'import { x } from "../src/ui/layout.ts";', 'import { y } from "./fixtures/z.ts";'].join("\n");
-    expect(pastSeams("test/x.test.ts", text)).toEqual(["src/ui/layout.ts"]);
+    const text = ['import type { A } from "../src/a.ts";', 'import { type B } from "../src/b.ts";', 'import { route } from "../src/routing.ts";', 'import { HARNESSES } from "../src/harnesses.ts";', 'import { x } from "../src/gluon.ts";', 'import { y } from "./fixtures/z.ts";'].join("\n");
+    expect(pastSeams("test/x.test.ts", text)).toEqual(["src/gluon.ts"]);
   });
 });

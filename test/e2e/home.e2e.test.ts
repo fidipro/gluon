@@ -53,6 +53,17 @@ describe("first run", () => {
     expect(short.screen()).toContain("Agents available");
     assertInvariants(short, { view: "home" });
   });
+
+  test("home/first-run: an API-key connection whose key isn't set reads `key missing`; one whose key is set is ready on it; OpenCode is the open-weight lane; the agents in the brief's order #BUG-182/F", async () => {
+    const yaml = "connections:\n  claude-code: { auth: subscription }\n  codex: { auth: api, provider: openai }\n  grok-build: { auth: api, provider: xai }\n  opencode: { providers: [openrouter] }\n";
+    const app = await start({ cwd: repo.tiny(), rows: 40, agents: ["claude", "codex", "grok", "opencode", "kimi"], env: { GLUON_CONFIG: config("first-run-keys", yaml), OPENAI_API_KEY: undefined, XAI_API_KEY: "xai-test-key", OPENROUTER_API_KEY: "sk-or-test" } });
+    await app.waitFor(/● +opencode +ready · open-weight models · api key/, 10_000);
+    const rows = app.lines().filter((l) => /^ +[●○◌] /.test(l));
+    expect(rows.map((l) => l.replace(/^ +[●○◌] +/, "").split(/ {2,}/)[0])).toEqual(["claude code", "codex", "grok build", "antigravity", "opencode", "kimi code"]);
+    expect(rows[1]).toMatch(/○ +codex +key missing$/);
+    expect(rows[2]).toMatch(/● +grok build +ready · api key$/);
+    expect(rows[3]).toMatch(/○ +antigravity +not installed$/);
+  });
 });
 
 describe("the terminal's size", () => {

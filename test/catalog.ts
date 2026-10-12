@@ -42,15 +42,15 @@ export const CATALOG: Record<string, Feature> = {
       header: b("given a repository (git, no commits, a detached HEAD, no git), when Gluon starts, then the header shows the mark, `Gluon v<version>`, repo · branch (or commit) · n modified, then `workspace <id>` once a session launched; short of columns its lines are cut, never wrapped"),
       "header-counts": b("given sessions, then the header counts them by state (`1 awaiting input · 2 working · …`), `no sessions yet` before the first, `no sessions running` once all ended"),
       "first-run": b("given no session yet, when Gluon starts, then it shows the agents available with each one's readiness, the intake agent's first line and `› describe the session you want`; on a short terminal the greeting stays whole and the agent list is cut first"),
-      "fits-terminal": b("given any terminal size (down to a few cells) and any resize, then the home view is exactly rows − 1 tall, nothing wider than the terminal or wrapped, the composer on screen with one rule over it"),
+      "fits-terminal": b("given any terminal size (down to a few cells) and any resize, then the home view is exactly rows − 1 tall, nothing wider than the terminal or wrapped, the composer on screen with one rule over it", ["e2e", "seam"]),
       "short-terminal-priority": b("given a short terminal and a conversation going on, then the open question or agent choice (lead, options, hint) wins over the list; the list keeps its column header and group label before its blank rows go; at 80×24 two groups and a question show every row"),
       "no-full-redraw": b("when keys are typed, a turn runs or a huge draft is edited, then Gluon never clears the screen or the scrollback"),
-      theme: b("given a dark or a light terminal (its OSC 11 answer, else COLORFGBG), then Gluon picks the matching theme and paints its own ground on every cell, the spec box's borders included"),
+      theme: b("given a dark or a light terminal (its OSC 11 answer, else COLORFGBG), then Gluon picks the matching theme and paints its own ground on every cell, the spec box's borders included", ["e2e", "seam"]),
       "hint-line": b("given what is selected or open (a run, a group label, the draft, text typed, the intake agent working, a question, the agent choice, an ended run without a terminal), then the hint line names only the keys that act on it, ending in `? for keys`; short of columns whole keys go from the end, never enter/esc or `? for keys`"),
       "one-highlight": b("while a question or the agent choice is open, then only the option Enter acts on is highlighted, never the list's row too; closed, the list's row is again"),
-      "key-list": b("given an empty composer, when `?` is pressed, then every key is listed (sessions, in a session with the configured home key, the intake chat) in columns that fit; cut, it says `↓ N more` and pgdn/pgup scroll it; esc or `?` close it, any other key closes it and acts; with text typed or options open `?` is text"),
+      "key-list": b("given an empty composer, when `?` is pressed, then every key is listed (sessions, in a session with the configured home key, the intake chat) in columns that fit; cut, it says `↓ N more` and pgdn/pgup scroll it; esc or `?` close it, any other key closes it and acts; with text typed or options open `?` is text", ["e2e", "seam"]),
       "key-list-mouse": b("given `handoff.mouse_capture: false`, then the key list names no click, wheel or text selection; with it on, it names them"),
-      "own-question": b("given Gluon's own question at home (end a session, discard the chat, quit, resume, start again), then the hint line names its keys, the composer shows no cursor, and only keys pressed once it shows answer it: Enter yes; esc or ctrl+c no; y/n nothing"),
+      "own-question": b("given Gluon's own question at home (end a session, discard the chat, quit, resume, start again), then the hint line names its keys, the composer shows no cursor, and only keys pressed once it shows answer it: Enter yes; esc or ctrl+c no; y/n nothing", ["e2e", "seam"]),
       quit: b("given a draft, ctrl+c clears it; twice on an empty composer quits with 130 and gives the terminal back (cursor, paste mode, main screen); with sessions running it asks first"),
       "text-widths-exact": { kind: "invariant", says: "given any text (emoji, CJK, marks, box glyphs), then the patched string-width (its speed pre-check, patches/) measures it exactly as the unpatched module", at: ["code"] },
       readable: b("in either theme, on truecolor or 256 colours, then box borders stand at least 3:1 off the ground and dim text on the selection bar stays readable", ["seam"]),
@@ -60,11 +60,11 @@ export const CATALOG: Record<string, Feature> = {
   "sessions-list": {
     says: "the rows of the sessions home (docs/guides/sessions.md)",
     entries: {
-      groups: b("given sessions in several states, then rows are grouped under Awaiting input, Working, Done, Drafting (`?` `●` `✓` `◌`), a column header names the right-hand columns, nothing wraps at any width, the selected row is a full-width bar"),
-      "row-columns": b("given a session, then its row shows its name, triple, latest activity, its mode (`· explore`, `· plan`, nothing for build), cost and context, as the width allows"),
+      groups: b("given sessions in several states, then rows are grouped under Awaiting input, Working, Done, Drafting (`?` `●` `✓` `◌`), a column header names the right-hand columns, nothing wraps at any width, the selected row is a full-width bar", ["e2e", "seam"]),
+      "row-columns": b("given a session, then its row shows its name, triple, latest activity, its mode (`· explore`, `· plan`, nothing for build), cost and context, as the width allows", ["e2e", "seam"]),
       "row-live": b("when a session's state or activity changes (a hook or its screen), then its row, its group and the header counts follow; a finished turn reads awaiting input, never Done"),
       "draft-row": b("given a chat being drafted, then a Drafting row named from the proposal (`(untitled)` before) reads `Waiting for your pick` while the agent choice is open, `Waiting for your answer` while a question waits, `Talking it through` otherwise; Enter on it says `That's this chat`"),
-      select: b("when ↑↓ are pressed, then the selection moves over rows and group labels; a list longer than its rows shows `… N more`, and ↓ past the window moves it one line, the selection kept in view"),
+      select: b("when ↑↓ are pressed, then the selection moves over rows and group labels; a list longer than its rows shows `… N more`, and ↓ past the window moves it one line, the selection kept in view", ["e2e", "seam"]),
       open: b("when Enter is pressed on a row, then that session opens; → on an empty composer opens the first tab; digits on the home composer are text, never a tab; without a pseudo-terminal a session that ended leaves no row, and nothing offers to open one"),
       collapse: b("when Enter is pressed on a group label, then it collapses to `▸ Working (N)` and expands again"),
       "mark-done": b("when ctrl+d is pressed, then the selected session is marked done, again not done, the selection following its row; never with text in the composer, never the drafting row"),
@@ -86,14 +86,14 @@ export const CATALOG: Record<string, Feature> = {
       "esc-esc-clears": b("when esc is pressed on a draft, then it stays and Gluon says `Press esc again to clear the draft`; a second esc clears it"),
       "batched-keys": b("given keys arriving in one read, then they act as keys (Enter submits, control keys edit); a double Enter sends once"),
       placeholder: b("given an empty composer, then its placeholder says what Enter does: `describe the session you want`, `describe another session`, `reply to the intake agent`"),
-      "terminal-noise": b("given a late terminal reply (OSC 11) or a focus report, then it is never typed into the composer; a typed `]` still is"),
+      "terminal-noise": b("given a late terminal reply (OSC 11) or a focus report, then it is never typed into the composer; a typed `]` still is", ["e2e", "seam"]),
     },
   },
   "intake-chat": {
     says: "talking to the intake agent at home (docs/getting-started/quickstart.md)",
     entries: {
       send: b("when Enter is pressed on a draft, then it shows in the chat on a full-width bar after `›`, hanging under its text; an empty or blank draft sends nothing"),
-      working: b("while the intake agent works, then a line says what it does and `esc to interrupt`; once it speaks, its tool calls show as one `◇` line (reads, searches, git commands, failures counted)"),
+      working: b("while the intake agent works, then a line says what it does and `esc to interrupt`; once it speaks, its tool calls show as one `◇` line (reads, searches, git commands, failures counted)", ["e2e", "seam"]),
       queue: b("when Enter is pressed while it works, then the message is queued above the box and sent when the turn ends; esc cancels it before it interrupts; a question or proposal at the turn's end keeps it queued and Enter sends it as the answer; a draft left as a question arrives is flagged"),
       interrupt: b("when esc or ctrl+c is pressed while it works, then it is interrupted (`Interrupted — tell the intake agent what to do instead.`) without quitting, and the chat goes on"),
       scroll: b("when pgup/pgdn or the wheel are used, then the chat scrolls back to its first line and forward again"),
@@ -129,10 +129,10 @@ export const CATALOG: Record<string, Feature> = {
   mouse: {
     says: "the mouse on the home view (docs/guides/keyboard.md)",
     entries: {
-      "click-row": b("when a row is clicked, then it is selected; a click on the selected row, or a double-click, opens it, never scrolling the list; a click anywhere else, a release or another button does nothing and types nothing"),
+      "click-row": b("when a row is clicked, then it is selected; a click on the selected row, or a double-click, opens it, never scrolling the list; a click anywhere else, a release or another button does nothing and types nothing", ["e2e", "seam"]),
       "click-group": b("when a group label is clicked, then it folds or unfolds; a double-click folds it once"),
       "click-option": b("when an option of the question or the agent choice is clicked, then it is picked as its digit + Enter would; a click on `keep talking` closes the choice"),
-      "drag-copy": b("when home text is dragged over, then it is copied with OSC 52 (the spec box's edges left out), highlighted, and Gluon says so; a key ends the selection"),
+      "drag-copy": b("when home text is dragged over, then it is copied with OSC 52 (the spec box's edges left out), highlighted, and Gluon says so; a key ends the selection", ["e2e", "seam"]),
       "capture-setting": b("given `handoff.mouse_capture` (on by default), then false leaves clicks and the wheel to the terminal, anything else is refused, and it is never per agent", ["seam", "e2e"]),
     },
   },
@@ -305,10 +305,11 @@ export const entryOf = (title: string): string | undefined => /^([a-z][a-z0-9-]*
 
 /**
  * Each test (`test(` / `it(`, any modifier, and `(c ? test.skip : test)(`) in a file's text: its title as written, cut at
- * the first `${` of a built one (the entry is at the start, so a built title still names it). Not a `describe`.
+ * the first `${` of a built one (the entry is at the start, so a built title still names it). Not a `describe`, nor a
+ * method of the same name (`re.test(…)`).
  */
 export function testTitles(text: string): string[] {
-  const re = /\b(?:test|it)(?:\.\w+)*(?:\([^)]*\))?\)?\(\s*(["'`])((?:(?!\1)[^\\]|\\.)*)\1/g;
+  const re = /(?<![.\w])(?:test|it)(?:\.\w+)*(?:\([^)]*\))?\)?\(\s*(["'`])((?:(?!\1)[^\\]|\\.)*)\1/g;
   return [...text.matchAll(re)].map((m) => (m[1] === "`" ? m[2]!.split("${")[0]! : m[2]!));
 }
 
