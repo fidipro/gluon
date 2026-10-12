@@ -28,13 +28,12 @@ export const KEYS_HINT = "? for keys";
  * list, with the home key and quitting; BUG-216). A run: Enter opens it, Ctrl+D marks it done or
  * not (BUG-193), Delete ends it (after asking, BUG-164); the drafting row: Delete discards the chat;
  * a group label: what Enter does to it (BUG-194). The open question's or choice's keys are the
- * essential ones of the hint under it, in the same words (`talk`: `keep talking` highlighted; BUG-225). Without a pseudo-terminal (`canOpen` false) a
- * session can't be shown again once it ended: no Enter for a run. While a question or the agent
+ * essential ones of the hint under it, in the same words (`talk`: `keep talking` highlighted; BUG-225). While a question or the agent
  * choice is open, its keys (BUG-217). With text typed (or options open) `?` is text: no `? for keys`.
  * `option`: the option a lone digit names (`pick`). While the home view's own question is up
  * (`end`, `discard`, `quit`, `resume`), what Enter and Esc do to it (BUG-224).
  */
-export function homeHint(about: HintFor, canOpen = true, option = 1): string {
+export function homeHint(about: HintFor, option = 1): string {
   switch (about) {
     case "typing":
       return hintText(questionHints("text"));
@@ -55,7 +54,7 @@ export function homeHint(about: HintFor, canOpen = true, option = 1): string {
       return ["del discards it", KEYS_HINT].join(" · ");
     case "run":
     case "done":
-      return [...(canOpen ? ["enter opens it"] : []), `ctrl+d ${about === "done" ? "unmarks" : "marks"} done`, "del ends it", KEYS_HINT].join(" · ");
+      return ["enter opens it", `ctrl+d ${about === "done" ? "unmarks" : "marks"} done`, "del ends it", KEYS_HINT].join(" · ");
     case "empty":
       return KEYS_HINT;
     case "end":

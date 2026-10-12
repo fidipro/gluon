@@ -8,9 +8,12 @@ All notable changes to Gluon are listed here. The format follows
 
 ### Changed
 - `gluon --demo`'s intake agent shows more of the UI when the task asks for it: a task with the word `questions` gets three
-  questions asked together (`(1/3)` …), and one about the repository's `history` or `git` reads its recent commits.
+  questions asked together (`(1/3)` …), one about the repository's `history` or `git` reads its recent commits, and one that asks to `talk` gets a plain reply first.
 
 ### Fixed
+- On a narrow terminal (about 30 columns) the first run's agent list no longer runs an agent's name into its readiness (`claude codesign-in ne…`): the readiness is cut instead.
+- On a narrow terminal (under about 60 columns) the keys under the question and the agent choice keep `enter …` and `esc …`, dropping `↑↓ choose` first, as the hint line above the list does.
+- The sessions guide no longer says each home row shows the files changed: they are on the session's line in the frame, and the home header counts the checkout's modified files.
 - A paste into the home view's composer drops escape sequences and control characters, as typing does, instead of keeping them in the draft (a pasted control character left the composer row's last cell on the terminal's own background). Line breaks (CR and CRLF too) and tabs are kept.
 
 ## [1.2.0] - 2026-10-10

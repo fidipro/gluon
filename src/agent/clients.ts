@@ -110,10 +110,10 @@ function demoMode(task: string): Record<string, unknown> {
 /**
  * What else the demo does, from the task's words, so every kind of turn can be walked to: a task about the repository's
  * history (`history`, `recent`, `git`) also reads the git log; one that asks for `questions` gets three at once, after a
- * line with Markdown in it.
+ * line with Markdown in it; one that asks to `talk` first gets a plain reply, a turn that ends with no question or proposal.
  */
-function demoExtras(task: string): { history: boolean; batch: boolean } {
-  return { history: /\b(history|recent|recently|git)\b/i.test(task), batch: /\bquestions\b/i.test(task) };
+function demoExtras(task: string): { history: boolean; batch: boolean; talk: boolean } {
+  return { history: /\b(history|recent|recently|git)\b/i.test(task), batch: /\bquestions\b/i.test(task), talk: /\btalk\b/i.test(task) };
 }
 
 /** The demo's spec, built from the developer's task, the files it listed and their answer. */
@@ -146,6 +146,7 @@ function demoSpec(messages: Anthropic.MessageParam[]): string {
  */
 export function demoClient(routing: RoutingConfig = defaultRouting()): ModelClient {
   let turn = 0;
+  let talked = false;
   const types = Object.entries(routing.types ?? {});
   // The first type of that mode (`other` when the routing.yaml has no such type: any one will do).
   const typeFor = (mode: Mode) => (types.find(([, t]) => t.mode === mode) ?? types[0])?.[0] ?? "other";
@@ -164,6 +165,10 @@ export function demoClient(routing: RoutingConfig = defaultRouting()): ModelClie
     return HARNESSES.find((h) => new RegExp(`\\b(${h}|${HARNESS_INFO[h].binary})\\b`, "i").test(reply));
   };
   const script = (messages: Anthropic.MessageParam[]): Turn => {
+    if (turn === 0 && !talked && demoExtras(demoTask(messages)).talk) {
+      talked = true;
+      return { text: "Happy to talk it through first. Tell me more about what you want changed." };
+    }
     switch (turn++) {
       case 0:
         return { text: "Let me look at how this repo is laid out.", tools: [{ name: "list_files", input: {} }] };

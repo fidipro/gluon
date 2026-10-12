@@ -659,6 +659,11 @@ export function readinessSegs(r: Readiness, nameWidth: number): Seg[] {
   ];
 }
 
-/** The readiness name column: the longest harness word plus a gap, as in the mockup (18). */
-export const readinessNameWidth = (rows: readonly Readiness[], width: number) =>
-  Math.min(18, Math.max(...rows.map((r) => sw(HARNESS_WORD[r.harness]) + 2), 8), Math.max(8, Math.floor(width / 3)));
+/**
+ * The readiness name column: the longest harness word plus a gap, as in the mockup (18). Narrow, a third of the width,
+ * but never less than the longest word and one space: the readiness is cut, never run into the name.
+ */
+export const readinessNameWidth = (rows: readonly Readiness[], width: number) => {
+  const longest = Math.max(...rows.map((r) => sw(HARNESS_WORD[r.harness])), 6);
+  return Math.min(18, longest + 2, Math.max(longest + 1, Math.floor(width / 3)));
+};

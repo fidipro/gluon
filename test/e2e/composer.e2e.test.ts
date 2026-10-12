@@ -218,6 +218,22 @@ describe("while the intake agent works", () => {
     expect(app.screen()).not.toContain("›  also check mul");
   });
 
+  test("intake-chat/queue: a turn that ends with no question or proposal sends the queued message then, as the next turn", async () => {
+    // The demo's `talk` task: a first reply of plain text. A third of its pace: a turn long enough to queue in.
+    const app = await start({ cwd: repo.tiny(), rows: 40, env: { GLUON_TEST_DEMO_PACE: "0.3" } });
+    await app.enter("let's talk about the add bug");
+    await app.press(KEY.enter);
+    await app.waitFor("esc to interrupt");
+    await app.enter("it returns a - b");
+    await app.press(KEY.enter);
+    await app.waitFor("queued: sent when the intake agent is done");
+    await app.waitFor((x) => x.includes("›  it returns a - b") && !x.includes("queued:"), 10_000);
+    const s = app.screen();
+    expect(s.indexOf("›  it returns a - b")).toBeGreaterThan(s.indexOf("Happy to talk it through first."));
+    // Sent as a message of its own: the intake agent goes on with it.
+    await app.waitFor("Let me look at how this repo is laid out.", 10_000);
+  });
+
   test("intake-chat/queue: a question at the turn's end keeps the queued message, says Enter sends it as the answer, and only Enter sends it #BUG-716", async () => {
     // A third of the demo's pace: a turn long enough to queue in, short enough for the fast tier.
     const app = await start({ cwd: repo.tiny(), rows: 40, env: { GLUON_TEST_DEMO_PACE: "0.3" } });

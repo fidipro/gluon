@@ -159,12 +159,24 @@ export function OptionList({ options, selected, palette, rowsRef }: { options: r
 }
 
 /**
+ * The hints that fit `room` columns, in their order: whole keys go from the end (the optional ones come last), Enter's and
+ * Esc's last of all, as the home view's hint line drops them (`fitHint`; BUG-225).
+ */
+export function fitKeyHints(hints: readonly [string, string][], room: number): [string, string][] {
+  const shown = [...hints];
+  while (shown.length > 1 && Bun.stringWidth(hintText(shown, false)) > room) {
+    const i = shown.findLastIndex(([key]) => !/^(enter|esc)\b/.test(key));
+    shown.splice(i >= 0 ? i : shown.length - 1, 1);
+  }
+  return shown;
+}
+
+/**
  * A hint line: key caps bold and bright, labels dim, ` · ` between (brief, section 4). Short of
- * columns whole keys go from the end (the optional ones come last), never cut in the middle (BUG-225).
+ * columns whole keys go (`fitKeyHints`), never cut in the middle (BUG-225).
  */
 export function KeyHint({ hints, palette, indent = OPTIONS_INDENT + 2 }: { hints: [string, string][]; palette: GluonPalette; indent?: number }) {
-  const room = useWidth() - indent;
-  const shown = hints.filter((_, i) => i === 0 || Bun.stringWidth(hintText(hints.slice(0, i + 1), false)) <= room);
+  const shown = fitKeyHints(hints, useWidth() - indent);
   return (
     <Box paddingLeft={indent} flexShrink={0}>
       <Text wrap="truncate-end">
