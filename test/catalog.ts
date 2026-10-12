@@ -115,7 +115,7 @@ export const CATALOG: Record<string, Feature> = {
       shows: b("given a proposal, then the lead line with its reason, the spec box (`spec — what the agent will get`), the recommended harness × model × effort first, up to two alternatives, `keep talking` and the hint show; its first frame already lists the agents and names the drafting row"),
       "recommended-mark": b("given a proposal, then `· recommended` marks the first option only while it is the intake agent's own"),
       start: b("when Enter is pressed on an option, then that harness × model × effort starts (with its mode and permissions) in Gluon's frame; ↑↓ wrap through the options"),
-      "model-effort": b("when Tab or Shift+Tab is pressed, then the highlighted option's model or effort cycles, the others keep theirs; the hint names each key only when the highlighted agent has another"),
+      "model-effort": b("when Tab or Shift+Tab is pressed, then the highlighted option's model or effort cycles, the others keep theirs; the hint names each key only when the highlighted agent has another", ["e2e", "seam"]),
       mode: b("when ctrl+t is pressed at the choice, then build → explore → plan cycles for every option, shown on each row (a proposal's own mode shown from the start), and Enter starts in it; with no choice open ctrl+t does nothing"),
       "mode-unsupported": b("given a mode the highlighted agent can't run, then ctrl+t skips it (explore for Kimi Code), and Enter on an agent that can't run the chosen mode is refused with its advice first, nothing started"),
       permissions: b("when ctrl+p is pressed, then the highlighted agent's permissions cycle (its own first), shown on its row and started with; an agent with none, or explore/plan, says why and changes nothing; the hint names ctrl+p only where it acts"),
@@ -202,10 +202,10 @@ export const CATALOG: Record<string, Feature> = {
     entries: {
       asks: b("given a typed `/clear` or `/new` (`/compact`), when Enter is pressed (on the agent's slash-menu item too, after edits or Tab, typed as kitty CSI-u keys, longer than 64 characters, after composed input), then the bottom bar asks `… ends this session in Gluon — end it?` (`End this session instead of compacting?`); a paste never asks; per harness (Antigravity has no `/compact`)", ["e2e", "seam"]),
       answer: b("Enter says yes (the session ends; keys typed right after go to the home composer); esc or ctrl+c sends nothing, the command stays typed and the line touched; other keys and pastes are dropped while it is up", ["e2e", "seam"]),
-      bar: b("the question says what happens in Gluon; short of columns it keeps the command and what a yes does, its keys shrink then go; never `End G…`; a cut leaves no blank before its `…`", ["seam"]),
+      bar: b("the question says what happens in Gluon; short of columns it keeps the command and what a yes does, its keys shrink then go; never `End G…`; a cut leaves no blank before its `…`; a resize while it is up redraws it", ["seam", "e2e"]),
       "reads-line": b("given any harness's screen as its release draws it (captured), then Gluon reads the typed line (rows the agent wrapped joined; a placeholder, a completion ghost or a grey hint is not input) and the slash menu's highlighted item; a screen it can't read for sure (no box, no highlight, two) is unsure", ["seam"]),
       settings: b("given `on_clear` / `on_compact` set to go on as the agent's own, then that command's Enter is never held and nothing asks", ["seam"]),
-      "auto-compact": b("given Claude Code, Codex or Grok Build about to compact on its own (its `PreCompact` hook waits), then Gluon asks the same question; yes ends the session, no (or no answer) lets it compact", ["seam"]),
+      "auto-compact": b("given Claude Code, Codex or Grok Build about to compact on its own (its `PreCompact` hook waits), then Gluon asks the same question; yes ends the session, no (or no answer) lets it compact", ["seam", "e2e"]),
     },
   },
   "session-end": {
@@ -214,7 +214,68 @@ export const CATALOG: Record<string, Feature> = {
       closes: b("given an agent that exits (before drawing anything too), then its session closes: home shows, its row is gone, the other sessions stay, and the chat says how it ended (`exited (code 3)`); its End question, if up, goes with it", ["e2e", "seam"]),
       "on-exit-quit": b("given `on_exit: quit`, when the last session's agent exits, then Gluon exits with the agent's code"),
       signals: b("SIGTERM, SIGHUP or SIGINT to Gluon ends every agent (a grace, then SIGKILL) and gives the terminal back (normal screen, mouse and focus off, line mode, cursor); a second signal while it waits gives it back at once; in the setup menus a signal restores line mode and the cursor and exits 128 + n"),
-      "agent-ends": b("when a session is ended (Delete, a yes at its question, quitting), then its agent gets SIGTERM, then SIGKILL after the grace; nothing is written to it after it exits, and keys for it are dropped", ["seam"]),
+      "agent-ends": b("when a session is ended (Delete, a yes at its question, quitting), then its agent gets SIGTERM, then SIGKILL after the grace; nothing is written to it after it exits, and keys for it are dropped", ["seam", "e2e"]),
+    },
+  },
+  launch: {
+    says: "how Gluon starts each harness: its argv, environment, adapter and private files (docs/guides/harnesses/*, docs/concepts/architecture.md, src/AGENTS.md)",
+    entries: {
+      "spec-last": b("given any spec (one starting with `-` too), then the harness gets it as its prompt's value, last (after `--`, or as `--prompt=` / `--prompt-interactive=`), the adapter's and the mode's options before it; Gluon's tokens are replaced in argv, env and files, never in the spec", ["seam", "e2e"]),
+      environment: b("given a harness and a connection, then the launch's environment is the user's plus only the saved key of the model's provider and what makes the harness use it (its own variable names, the model and its window; OpenCode's inline config); an effort only where the connection takes one", ["seam", "e2e"]),
+      "instruction-file": b("given a repository with an instruction file the chosen harness doesn't load itself (`CLAUDE.md` for Codex…), then the spec ends with a line telling it to read that file; only then"),
+      adapter: b("given a launch from Gluon, then the harness gets Gluon's adapter for that launch only (Claude Code's plugin and settings, Codex's `-c` per hook event, OpenCode's inline plugin), nothing written to the user's settings or workspace; Codex's hook set is one constant; the only command allowed is Gluon's own return command, exactly", ["seam"]),
+      "version-gate": b("given a harness older than its adapter supports (or a version Gluon can't tell), then it gets no adapter; OpenCode before 2.x isn't started and the spec is printed with the command that installs 2.x", ["seam", "e2e"]),
+      "windows-shim": b("given a harness installed as a Windows `.cmd` shim, then its arguments pass `assertShimArgs`, a spec goes in a private file named by a one-line prompt, and Codex runs as `codex.exe`", ["seam"]),
+      "private-dirs": b("a launch's private directories (events, adapter files, a typed line's spec, the neutral cwd) are 0700 outside the repository and go when the agent ends; a stale one (its Gluon gone, or a day old) is swept, never a running Gluon's", ["seam", "e2e"]),
+    },
+  },
+  modes: {
+    says: "build, explore and plan per harness, and the permissions (docs/guides/modes.md)",
+    entries: {
+      "per-harness": b("given explore or plan, then each harness starts as modes.md says, its own flags or settings before the spec (Kimi Code: `--plan`, no explore); build adds nothing; a mode's config never replaces the model's", ["seam"]),
+      "needs-frame": b("given a launch that needs a typed line (Codex and Grok Build plan, Kimi Code always), then where nothing can type (`--launch`, no pseudo-terminal) it is refused before anything starts, a dry run too, naming the harness", ["seam", "e2e"]),
+      "brief-block": b("given explore or plan, then the spec ends with a short block saying what the mode allows, whatever the spec said and naming no harness; build adds none", ["seam"]),
+      "explore-read-only": b("given explore, then the brief says commands that write (tests and builds too) may be refused or fail, so the agent reads the code and says what it couldn't run; the intake keeps the session's Done to what reading can show", ["seam"]),
+      permissions: b("given a permission level, then the harness starts with its own flag for it (its own: nothing); a level it doesn't have is refused; explore and plan keep their own flags; a resumed build session gets its level again", ["seam"]),
+      "on-resume": b("given a resumed session, then explore's launch-time enforcement is applied again, plan and build nothing, never a typed line, a spec or a brief; a Codex, Grok Build or OpenCode session saved with no mode is refused (a Claude Code one resumes)", ["seam", "e2e"]),
+    },
+  },
+  resume: {
+    says: "reopening a harness's own session (docs/concepts/architecture.md \"Saved sessions and resume\", the harness guides)",
+    entries: {
+      argv: b("given a saved session, then it is reopened with its harness's own resume under its id, with no spec; Antigravity and Kimi Code can't be resumed; an id that could read as an option never reaches argv", ["seam"]),
+      "session-id": b("given a harness that makes its own session id (Codex, OpenCode), then its hook or plugin sends it as a `session` event (the top-level session's only; before a compaction waits); an id outside the fixed pattern is dropped", ["seam"]),
+    },
+  },
+  events: {
+    says: "the events channel between a launched agent and Gluon (docs/concepts/architecture.md \"The events channel\")",
+    entries: {
+      "inert-outside-launch": rule("given a hook, plugin or command of Gluon's run outside a launch from Gluon (no `GLUON_EVENTS` or `GLUON_SELF`, or half of them), then it does nothing and prints nothing (exit 0); inside one it runs this Gluon with the harness's input", ["seam"]),
+      strict: b("an event is read strictly: fixed names, bounded sizes (a larger file is never read), known fields of the right types; a FIFO, a symlink or a directory is never read or followed; the activity line is made safe to draw (no escapes, controls, bidi or format characters, at most 120 characters); anything else is ignored", ["seam"]),
+    },
+  },
+  "session-settings": {
+    says: "the config's `handoff` section (docs/guides/sessions.md \"Settings for sessions in Gluon\")",
+    entries: {
+      defaults: b("the defaults are: close the session on exit, ask at `/clear` and `/compact`, `ctrl+\\` (a saved `ctrl+]` kept); a mapping under `agents` overrides any of them for that agent; first-version values are updated, the user's other values and comments kept", ["seam"]),
+      refused: b("a bad value, an unknown setting or an unknown agent is refused naming the allowed ones; an earlier version's `nudge` is accepted and ignored", ["seam"]),
+      "added-at-first-launch": b("the section is added, with a comment for each value, at the first launch from the UI, never before, only to a config that has none, never making a valid config invalid", ["seam", "e2e"]),
+      doctor: b("`gluon doctor` shows, per connected agent, the settings in effect and what its adapter does with them, and the permanent files; never a ✗ for them", ["seam"]),
+    },
+  },
+  "no-pty": {
+    says: "a session without a pseudo-terminal (docs/concepts/architecture.md \"Without a pseudo-terminal\")",
+    entries: {
+      "hands-terminal": b("given no pseudo-terminal, when a session starts, then the agent gets the terminal itself and the home view comes back when it ends (its exit code said, the terminal reset, keys it never read kept from the composer); `back` ends it at once with a note; a status event never ends it", ["seam", "e2e"]),
+      "no-questions": b("given no pseudo-terminal, then `/clear` and `/compact` don't ask, and a waiting compaction hook gets no at once", ["seam"]),
+    },
+  },
+  "direct-launch": {
+    says: "`gluon --launch` (docs/reference/cli.md, docs/guides/modes.md)",
+    entries: {
+      terminal: b("`gluon --launch` gives the agent the terminal directly: no events channel, no adapter files, no line about returning, the handoff settings ignored; Gluon exits with the agent's code; a signal to Gluon ends the agent too"),
+      mode: b("`--mode` takes build, explore or plan, and only with `--launch`; explore and plan add the harness's own options before the spec; build adds nothing"),
+      refused: b("a bad model, harness or effort is refused naming the valid choices; an agent that isn't installed fails with 127 and prints the spec"),
     },
   },
   "whole-app": {

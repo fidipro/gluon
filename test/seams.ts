@@ -18,8 +18,20 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/routing.ts", "src/routing-config.ts"],
   },
   adapters: {
-    says: "a launch's context → the harness's argv, env and files; a hook's call → its result",
-    modules: ["src/adapters/index.ts"],
+    says: "a launch's context → the harness's argv, env and files; a hook's call → its result (`Adapter`, src/adapters/types.ts, and each harness's own hook, plugin and settings formats)",
+    modules: [
+      "src/adapters/index.ts",
+      "src/adapters/types.ts",
+      "src/adapters/common.ts",
+      "src/adapters/claude-code.ts",
+      "src/adapters/codex.ts",
+      "src/adapters/opencode.ts",
+      "src/adapters/grok-build.ts",
+      "src/adapters/kimi-code.ts",
+      "src/adapters/antigravity.ts",
+      "src/adapters/permanent.ts",
+      "src/adapters/agy-settings.ts",
+    ],
   },
   readers: {
     says: "a harness's screen → its state (the input line, ready, awaiting a choice, plan mode), the Enter held or forwarded, and the bytes that paint it",
@@ -54,8 +66,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/secrets.ts"],
   },
   files: {
-    says: "a file an older (or this) version wrote → today's state: the config, the sessions, the cost ledger",
-    modules: ["src/config.ts", "src/sessions.ts", "src/cost/ledger-file.ts"],
+    says: "a file an older (or this) version wrote → today's state: the config, the sessions, the workspaces, the cost ledger",
+    modules: ["src/config.ts", "src/sessions.ts", "src/workspaces.ts", "src/cost/ledger-file.ts"],
   },
   "text-layout": {
     says: "text, a theme and a width → the rows it is drawn in: wrapped at words with no separator left dangling, Markdown's rows counted as drawn; the home list's columns, header and key list, the frame's tab strip, info line and bars",
@@ -66,8 +78,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/files-poll.ts", "src/events.ts"],
   },
   launch: {
-    says: "a spec, a harness and the OS → the command line and the spec's hand-off",
-    modules: ["src/launchers.ts", "src/handoff.ts"],
+    says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory and the stale sweep",
+    modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts"],
   },
 };
 

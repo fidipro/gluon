@@ -81,9 +81,9 @@ breaks one won't be merged.
 - **Only the vendor's official binary** signs in or checks login (`claude`, `codex`, `agy`, `grok`,
   `opencode`, `kimi`).
 - **Never read another tool's credentials** (`~/.claude`, `~/.codex/auth.json`, keychains, …) and never
-  edit another tool's files: tell the user what to set. The one exception is a file or folder of Gluon's
-  own in Grok Build's hooks dir and Antigravity's plugins dir (`src/adapters/permanent.ts`), inert unless
-  `GLUON_EVENTS` is set; `gluon uninstall` removes it.
+  edit another tool's files: tell the user what to set. The one exception is a file of Gluon's own in
+  Grok Build's hooks dir (`src/adapters/permanent.ts`), inert unless `GLUON_EVENTS` is set; `gluon uninstall`
+  removes it.
 - **No token forwarding and no base URL on a subscription.** The only base URLs are OpenRouter's, for
   Claude Code and Kimi Code on that connection alone (`assertSafeEnv`), and Codex's OpenAI one.
 - **No impersonation**: no prompt claims to be another vendor's product.
