@@ -25,7 +25,7 @@ function binDir(name: string, progs: string[]): string {
 }
 
 describe("the official commands", () => {
-  test("installHint: the recommended command per platform", () => {
+  test("install/official-commands: installHint: the recommended command per platform", () => {
     expect(installHint("claude-code", "linux")).toBe("curl -fsSL https://claude.ai/install.sh | bash");
     expect(installHint("claude-code", "darwin")).toBe("curl -fsSL https://claude.ai/install.sh | bash");
     expect(installHint("claude-code", "win32")).toBe("irm https://claude.ai/install.ps1 | iex");
@@ -39,28 +39,28 @@ describe("the official commands", () => {
     expect(installHint("opencode", "win32")).toBe("npm install -g @opencode/cli");
   });
 
-  test("codex and opencode have npm as their alternative; opencode is 2.x (@opencode/cli)", () => {
+  test("install/official-commands: codex and opencode have npm as their alternative; opencode is 2.x (@opencode/cli)", () => {
     expect(installMethods("codex", "linux").map((m) => m.command)).toEqual(["curl -fsSL https://chatgpt.com/codex/install.sh | sh", "npm install -g @openai/codex"]);
     expect(installMethods("codex", "win32")[1]!.argv).toEqual(["npm", "install", "-g", "@openai/codex"]);
     expect(installMethods("opencode", "linux").map((m) => m.command)).toEqual(["curl -fsSL https://opencode.ai/v2/install | bash", "npm install -g @opencode/cli"]);
     expect(installMethods("opencode", "win32")[0]!.argv).toEqual(["npm", "install", "-g", "@opencode/cli"]);
   });
 
-  test("a harness by id or binary name", () => {
+  test("install/command: a harness by id or binary name", () => {
     expect(harnessNamed("claude")).toBe("claude-code");
     expect(harnessNamed("grok-build")).toBe("grok-build");
     expect(harnessNamed("agy")).toBe("antigravity");
     expect(harnessNamed("gemini")).toBeUndefined();
   });
 
-  test("every npm command passes through cmd.exe as it is (npm is npm.cmd on Windows)", () => {
+  test("install/verbatim-no-sudo: every npm command passes through cmd.exe as it is (npm is npm.cmd on Windows)", () => {
     for (const h of HARNESSES) for (const p of ["linux", "win32"] as const) for (const m of installMethods(h, p)) if (m.argv) expect(() => assertShimArgs(["C:\\nodejs\\npm.cmd", ...m.argv!.slice(1)])).not.toThrow();
   });
 });
 
 describe.skipIf(WIN)("methodsFor: prerequisites (POSIX)", () => {
   const sh = Bun.which("sh")!;
-  test("all there: sh -c <the command>, sh by its absolute path", () => {
+  test("install/verbatim-no-sudo: all there: sh -c <the command>, sh by its absolute path", () => {
     const d = binDir("all", ["curl", "bash", "npm"]);
     symlinkSync(sh, join(d, "sh"));
     const [curl, npm] = methodsFor("codex", { PATH: d, wsl: false });
@@ -69,7 +69,7 @@ describe.skipIf(WIN)("methodsFor: prerequisites (POSIX)", () => {
     expect(npm!.argv).toEqual([join(d, "npm"), "install", "-g", "@openai/codex"]);
   });
 
-  test("missing ones are named, and nothing runs", () => {
+  test("install/official-commands: missing ones are named, and nothing runs", () => {
     const d = binDir("nocurl", []);
     symlinkSync(sh, join(d, "sh"));
     const [curl, npm] = methodsFor("codex", { PATH: d, wsl: false });
@@ -79,13 +79,13 @@ describe.skipIf(WIN)("methodsFor: prerequisites (POSIX)", () => {
     expect(methodsFor("claude-code", { PATH: d, wsl: false })[0]!.missing).toEqual(["curl", "bash"]);
   });
 
-  test("a relative PATH entry doesn't count (it would be the user's repository)", () => {
+  test("repo/spawn-via-binpath: a relative PATH entry doesn't count (it would be the user's repository)", () => {
     const d = binDir("relative", ["curl", "bash"]);
     expect(methodsFor("claude-code", { PATH: `.${delimiter}${d}`, wsl: false })[0]!.missing).toEqual([]);
     expect(methodsFor("claude-code", { PATH: ".", wsl: false })[0]!.missing).toEqual(["curl", "bash"]);
   });
 
-  test("an unchecked method is never runnable", () => {
+  test("install/official-commands: an unchecked method is never runnable", () => {
     const d = binDir("unverified", ["curl", "bash"]);
     symlinkSync(sh, join(d, "sh"));
     const saved = HARNESS_INFO["grok-build"].install;
@@ -102,7 +102,7 @@ describe.skipIf(WIN)("methodsFor: prerequisites (POSIX)", () => {
 });
 
 describe("Windows PowerShell", () => {
-  test("by its full path under SystemRoot, -NoProfile, the command as one argument", () => {
+  test("install/verbatim-no-sudo: by its full path under SystemRoot, -NoProfile, the command as one argument", () => {
     const env = { SystemRoot: "D:\\Win" };
     const m = installMethods("claude-code", "win32")[0]!;
     expect(powershellPath(env)).toBe("D:\\Win\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
@@ -112,7 +112,7 @@ describe("Windows PowerShell", () => {
     expect(o!.missing).toEqual(["Windows PowerShell"]);
   });
 
-  test.skipIf(!WIN)("real Windows: the argv runs a constant command with a pipe in it", () => {
+  test.skipIf(!WIN)("install/verbatim-no-sudo: real Windows: the argv runs a constant command with a pipe in it", () => {
     const argv = installArgv({ shell: "powershell", command: "Write-Output 'gluon-ok' | Write-Output", needs: ["powershell"], host: "example.invalid", docs: "", verified: true })!;
     const r = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" });
     expect(r.exitCode).toBe(0);
@@ -121,7 +121,7 @@ describe("Windows PowerShell", () => {
 });
 
 describe("after an install", () => {
-  test("installDirs: where each installer puts its binary", () => {
+  test("install/after: installDirs: where each installer puts its binary", () => {
     expect(installDirs("claude-code", { platform: "linux", env: {}, home: "/h" })).toEqual(["/h/.local/bin"]);
     expect(installDirs("opencode", { platform: "linux", env: {}, home: "/h" })).toEqual(["/h/.opencode/bin"]);
     expect(installDirs("grok-build", { platform: "linux", env: { GROK_BIN_DIR: "/g" }, home: "/h" })).toEqual(["/g"]);
@@ -130,7 +130,7 @@ describe("after an install", () => {
     expect(installDirs("claude-code", { platform: "win32", env: { USERPROFILE: "C:\\U" } })).toEqual(["C:\\U\\.local\\bin"]);
   });
 
-  test("on PATH, in an install dir not on PATH (not used, only named), or nowhere", () => {
+  test("install/after: on PATH, in an install dir not on PATH (not used, only named), or nowhere", () => {
     const on = binDir("on", ["opencode"]);
     const off = binDir("off", ["opencode"]);
     const none = binDir("none", []);
@@ -143,7 +143,7 @@ describe("after an install", () => {
 });
 
 describe("review of phase 4", () => {
-  test.skipIf(WIN)("BUG-116: on WSL, a Windows npm on PATH is named as not usable, not just missing", () => {
+  test.skipIf(WIN)("install/official-commands: on WSL, a Windows npm on PATH is named as not usable, not just missing #BUG-116", () => {
     const d = binDir("wsl-npm", ["npm"]);
     const [o] = methodsFor("opencode", { platform: "win32" });
     expect(o!.method.argv![0]).toBe("npm");
@@ -151,7 +151,7 @@ describe("review of phase 4", () => {
     expect(npm!.missing).toEqual(["npm (Node.js) inside WSL (only a Windows one is on PATH)"]);
   });
 
-  test("BUG-115: a clipped menu body keeps whole lines, from the first", () => {
+  test("setup/menus-fit: a clipped menu body keeps whole lines, from the first #BUG-115", () => {
     const body = ["`curl -fsSL https://chatgpt.com/codex/install.sh | sh`", "Downloads OpenAI's official installer from chatgpt.com and runs it, as you (no sudo).", "", "Docs"];
     expect(wholeLines(body, null, 40)).toEqual(body);
     expect(wholeLines(body, 2, 60)).toEqual(body.slice(0, 1));

@@ -39,15 +39,15 @@ afterAll(() => {
 });
 
 describe("the small pure pieces", () => {
-  test("isTransient: a timeout, the network, a limit or a 5xx pass; a signed-out answer or a rejected key doesn't", () => {
+  test("connections/reachable: isTransient: a timeout, the network, a limit or a 5xx pass; a signed-out answer or a rejected key doesn't", () => {
     for (const m of ["timed out", "request timeout", "fetch failed", "ECONNRESET", "getaddrinfo ENOTFOUND api.x.com", "rate limit exceeded", "429 Too Many Requests", "503 Service Unavailable", "server error", "overloaded", "try again later", "usage limit reached"]) expect(isTransient(m), m).toBe(true);
     for (const m of ["not logged in", "invalid API key", "401 Unauthorized", "model not found", "access denied"]) expect(isTransient(m), m).toBe(false);
   });
-  test("firstLine is the first line of the trimmed text; empty for nothing", () => {
+  test("sign-in/status-read: firstLine is the first line of the trimmed text; empty for nothing", () => {
     expect(firstLine("\n  hello\nworld")).toBe("hello");
     expect(firstLine("")).toBe("");
   });
-  test("planLabel / onPlan: a plan by its type or by claude.ai; a key or another method is not a plan", () => {
+  test("sign-in/plan-only: planLabel / onPlan: a plan by its type or by claude.ai; a key or another method is not a plan", () => {
     const s = (o: Partial<ClaudeStatus>): ClaudeStatus => ({ installed: true, loggedIn: true, ...o });
     expect(planLabel(s({ subscriptionType: "max" }))).toBe("Claude Max plan");
     expect(planLabel(s({ authMethod: "claude.ai" }))).toBe("Claude plan");
@@ -69,14 +69,14 @@ describe.skipIf(!POSIX)("run", () => {
     expect(v).toBe("VAR=x");
     expect(r.code).toBe(0);
   });
-  test("a command that hangs is killed at its timeout (code null) and a child holding the pipe doesn't hold the call", async () => {
+  test("sign-in/status-read: a command that hangs is killed at its timeout (code null) and a child holding the pipe doesn't hold the call", async () => {
     const dir = fakes({ hang: "sleep 30 &\nsleep 30" });
     const t = performance.now();
     const r = await run([join(dir, "hang")], 300);
     expect(r.code).toBeNull();
     expect(performance.now() - t).toBeLessThan(3000 * SLOW);
   });
-  test("a binary killed by a signal is null too; a plain non-zero exit keeps its code and both streams", async () => {
+  test("sign-in/status-read: a binary killed by a signal is null too; a plain non-zero exit keeps its code and both streams", async () => {
     const dir = fakes({ boom: "echo out; echo err >&2; exit 7", sig: "kill -9 $$" });
     expect(await run([join(dir, "boom")], 5000)).toEqual({ stdout: "out\n", stderr: "err\n", code: 7 });
     expect((await run([join(dir, "sig")], 5000)).code).toBeNull();
@@ -84,28 +84,28 @@ describe.skipIf(!POSIX)("run", () => {
 });
 
 describe.skipIf(!POSIX)("claude auth status", () => {
-  test("not installed", async () => {
+  test("sign-in/status-read: not installed", async () => {
     fakes({});
     expect(await claudeStatus()).toEqual({ installed: false, loggedIn: false });
     expect(await loginStatus("claude-code")).toEqual({ installed: false, loggedIn: false });
   });
-  test("signed in to a plan: its label, and nothing of the account (an email in the JSON never comes through)", async () => {
+  test("sign-in/status-read: signed in to a plan: its label, and nothing of the account (an email in the JSON never comes through)", async () => {
     fakes({ claude: `echo '{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"max","email":"me@example.com","orgId":"org-123"}'` });
     const s = await claudeStatus();
     expect(s).toEqual({ installed: true, loggedIn: true, authMethod: "claude.ai", subscriptionType: "max" });
     expect(JSON.stringify(s)).not.toContain("me@example.com");
     expect(await loginStatus("claude-code")).toEqual({ installed: true, loggedIn: true, detail: "Claude Max plan" });
   });
-  test("signed in with an API key: signed in, but the wrong method", async () => {
+  test("sign-in/plan-only: signed in with an API key: signed in, but the wrong method", async () => {
     fakes({ claude: `echo '{"loggedIn":true,"authMethod":"api_key"}'` });
     const s = await loginStatus("claude-code");
     expect(s).toMatchObject({ installed: true, loggedIn: true, detail: "api_key (not a Claude plan)", wrongMethod: expect.stringContaining("not a Claude plan") });
   });
-  test("signed out is a definitive answer (no error, not transient)", async () => {
+  test("sign-in/status-read: signed out is a definitive answer (no error, not transient)", async () => {
     fakes({ claude: `echo '{"loggedIn":false}'; exit 1` });
     expect(await loginStatus("claude-code")).toEqual({ installed: true, loggedIn: false });
   });
-  test("garbage, an empty answer and a crash are transient failures that say what the binary printed, with keys masked", async () => {
+  test("sign-in/status-read: garbage, an empty answer and a crash are transient failures that say what the binary printed, with keys masked", async () => {
     fakes({ claude: "echo 'oops sk-ant-api03-abcdefghijklmnopqrstuvwx' >&2; exit 3" });
     const a = await loginStatus("claude-code");
     expect(a).toMatchObject({ installed: true, loggedIn: false, transient: true });
@@ -116,7 +116,7 @@ describe.skipIf(!POSIX)("claude auth status", () => {
     fakes({ claude: "echo '<html>captive portal</html>'" });
     expect((await loginStatus("claude-code")).error).toContain("<html>captive portal</html>");
   });
-  test("a JSON that isn't an object (`null`, `[]`, `7`) is read as garbage, never as a crash", async () => {
+  test("sign-in/status-read: a JSON that isn't an object (`null`, `[]`, `7`) is read as garbage, never as a crash", async () => {
     for (const out of ["null", "[]", "7", '"x"']) {
       fakes({ claude: `echo '${out}'` });
       const s = await claudeStatus();
@@ -126,12 +126,12 @@ describe.skipIf(!POSIX)("claude auth status", () => {
 });
 
 describe.skipIf(!POSIX)("agy models / grok models", () => {
-  test("agy: its tab-separated list is signed in, with the ids", async () => {
+  test("sign-in/status-read: agy: its tab-separated list is signed in, with the ids", async () => {
     fakes({ agy: "printf 'gemini-3.8-pro\\tGemini 3.8 Pro\\ngemini-3.8-flash\\tGemini Flash\\n'" });
     expect(await listedModels("agy")).toEqual({ loggedIn: true, models: ["gemini-3.8-pro", "gemini-3.8-flash"] });
     expect(await loginStatus("antigravity")).toMatchObject({ installed: true, loggedIn: true, detail: "Google account", models: ["gemini-3.8-pro", "gemini-3.8-flash"] });
   });
-  test("grok: the default marker, colour codes and the account line are understood; ids without a digit are not models", async () => {
+  test("sign-in/status-read: grok: the default marker, colour codes and the account line are understood; ids without a digit are not models", async () => {
     fakes({ grok: "printf '\\033[1mFetching available models...\\033[0m\\nlogged in with SuperGrok.\\n* grok-build-1 (default)\\n  grok-build-2\\n  notes\\n'" });
     const r = await listedModels("grok");
     expect(r.models).toEqual(["grok-build-1", "grok-build-2"]);
@@ -139,7 +139,7 @@ describe.skipIf(!POSIX)("agy models / grok models", () => {
     expect(r.account).toBe("SuperGrok");
     expect(await loginStatus("grok-build")).toMatchObject({ detail: "SuperGrok account" });
   });
-  test("signed out: a non-zero exit or an empty list says why, as one masked line; a rate limit is transient, a sign-out is not", async () => {
+  test("sign-in/status-read: signed out: a non-zero exit or an empty list says why, as one masked line; a rate limit is transient, a sign-out is not", async () => {
     fakes({ grok: "echo 'Not logged in. Run grok login.' >&2; exit 1" });
     expect(await loginStatus("grok-build")).toMatchObject({ installed: true, loggedIn: false, error: "Not logged in. Run grok login." });
     expect((await loginStatus("grok-build")).transient).toBeUndefined();
@@ -148,7 +148,7 @@ describe.skipIf(!POSIX)("agy models / grok models", () => {
     fakes({ agy: "exit 0" });
     expect(await listedModels("agy")).toMatchObject({ loggedIn: false, models: [], error: "exit 0" });
   });
-  test("not installed", async () => {
+  test("sign-in/status-read: not installed", async () => {
     fakes({});
     expect(await listedModels("grok")).toMatchObject({ loggedIn: false, error: "grok is not installed (not found on PATH)" });
     expect(await loginStatus("grok-build")).toEqual({ installed: false, loggedIn: false });
@@ -161,7 +161,7 @@ describe.skipIf(!POSIX)("agy models / grok models", () => {
 });
 
 describe.skipIf(!POSIX)("versionOf", () => {
-  test("the first number of the first line; stderr when stdout is empty; null on failure or silence", async () => {
+  test("doctor/checks: the first number of the first line; stderr when stdout is empty; null on failure or silence", async () => {
     fakes({ claude: "echo '2.1.140 (Claude Code)'" });
     expect(await versionOf("claude-code")).toBe("2.1.140");
     fakes({ codex: "echo 'codex-cli 0.159.0-beta.1' >&2" });
@@ -173,7 +173,7 @@ describe.skipIf(!POSIX)("versionOf", () => {
     fakes({});
     expect(await versionOf("claude-code")).toBeNull();
   });
-  test("a binary that prints a version with no number is shown as it is", async () => {
+  test("doctor/checks: a binary that prints a version with no number is shown as it is", async () => {
     fakes({ claude: "echo 'nightly'" });
     expect(await versionOf("claude-code")).toBe("nightly");
   });

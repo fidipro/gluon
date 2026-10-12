@@ -95,13 +95,13 @@ describe("the plan as a connection", () => {
     expect(resolveModel(probed, "opencode", "deepseek-flash")?.conn).toBe("openrouter");
   });
 
-  test("menu order: the API-key provider (OpenRouter) is listed above the plan, as for every harness; routing is unaffected", () => {
+  test("connections/choice: menu order: the API-key provider (OpenRouter) is listed above the plan, as for every harness; routing is unaffected", () => {
     expect(HARNESS_INFO.opencode.providers).toEqual(["openrouter", "opencode-go"]);
     const config = { ...defaults(), connections: { opencode: { auth: "api", providers: ["openrouter", "opencode-go"] } } } as ReturnType<typeof defaults>;
     expect(resolveModel(config, "opencode", "deepseek-flash")?.conn).toBe("opencode-go");
   });
 
-  test("readiness: the plan is asked of OpenCode itself; an OpenRouter key that works makes it ready without that", () => {
+  test("connections/reachable: readiness: the plan is asked of OpenCode itself; an OpenRouter key that works makes it ready without that", () => {
     const connected = (providers: string[]) => ({ ...defaults(), connections: { opencode: { auth: "api", providers } } }) as ReturnType<typeof defaults>;
     const opencode = (providers: string[]) => initialReadiness(connected(providers), (h) => h === "opencode").find((r) => r.harness === "opencode")!.state;
     const key = process.env.OPENROUTER_API_KEY;

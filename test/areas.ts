@@ -52,7 +52,7 @@ export const AREAS: Record<string, Area> = {
     doc: "connecting the agents: sign-in checks, keys, installs, status of each harness",
     live: "harness",
     src: ["src/auth.ts", "src/status.ts", "src/verify.ts", "src/install.ts", "src/detect.ts", "src/secrets.ts", "src/harnesses.ts", "src/ui/signin.tsx", "src/ui/menu-fit.ts"],
-    unit: ["test/install.test.ts", "test/detect.test.ts", "test/secrets.test.ts", "test/status-login.test.ts", "test/signin.test.tsx"],
+    unit: ["test/install.test.ts", "test/detect.test.ts", "test/secrets.test.ts", "test/status-login.test.ts", "test/menus-fit.test.ts"],
     e2e: ["test/e2e/auth.e2e.test.ts", "test/e2e/install.e2e.test.ts"],
     e2eOnly: ["src/auth.ts", "src/verify.ts", "src/install.ts"],
   },
