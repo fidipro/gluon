@@ -184,7 +184,7 @@ describe("QA pass 2", () => {
   let dryN = 0;
   const dry = async (yaml: string, args: string[], env: Record<string, string | undefined> = {}) => cli(["--launch", ...args, "--dry-run", "--", "- a spec"], { env: { GLUON_CONFIG: conn(`dry-${++dryN}-${args.join("-")}`, yaml), ...env } });
 
-  test("repo/bun-autoloads-nothing: a repository's bunfig.toml preload never runs inside gluon #BUG-56", async () => {
+  test("repo/bun-autoloads-nothing: a repository's bunfig.toml preload never runs inside gluon", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-bunfig-"));
     const marker = join(dir, "PRELOAD-RAN");
     writeFileSync(join(dir, "bunfig.toml"), 'preload = ["./p.ts"]\n');

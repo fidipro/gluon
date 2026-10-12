@@ -11,7 +11,7 @@ import { tablesDir } from "../src/cost/tables-store.ts";
 import { loadSecrets, outsideProfile, windowsTool, parseEnv, parseSid, renameOver, saveSecrets, secret, secretSource, storageNote, useSecrets } from "../src/secrets.ts";
 
 describe("configPath", () => {
-  test("GLUON_CONFIG > XDG_CONFIG_HOME > %APPDATA% on Windows > ~/.config", () => {
+  test("config/paths: GLUON_CONFIG > XDG_CONFIG_HOME > %APPDATA% on Windows > ~/.config", () => {
     expect(configPath({ GLUON_CONFIG: "/x/c.yaml", XDG_CONFIG_HOME: "/xdg" }, "linux", "/home/me")).toBe("/x/c.yaml");
     expect(configPath({ XDG_CONFIG_HOME: "/xdg" }, "linux", "/home/me")).toBe("/xdg/gluon/config.yaml");
     expect(configPath({}, "linux", "/home/me")).toBe("/home/me/.config/gluon/config.yaml");
@@ -21,7 +21,7 @@ describe("configPath", () => {
     expect(configPath({ XDG_CONFIG_HOME: "D:\\cfg", APPDATA: "C:\\a" }, "win32", "C:\\Users\\me")).toBe("D:\\cfg\\gluon\\config.yaml");
   });
 
-  test("a relative XDG_CONFIG_HOME or XDG_STATE_HOME is ignored, on every platform", () => {
+  test("config/paths: a relative XDG_CONFIG_HOME or XDG_STATE_HOME is ignored, on every platform", () => {
     expect(configPath({ XDG_CONFIG_HOME: "rel" }, "linux", "/home/me")).toBe("/home/me/.config/gluon/config.yaml");
     expect(configPath({ XDG_CONFIG_HOME: "." }, "darwin", "/Users/me")).toBe("/Users/me/.config/gluon/config.yaml");
     expect(configPath({ XDG_CONFIG_HOME: "rel", APPDATA: "C:\\a" }, "win32", "C:\\Users\\me")).toBe("C:\\a\\gluon\\config.yaml");
@@ -37,13 +37,13 @@ describe("configPath", () => {
 });
 
 describe("saved keys on Windows", () => {
-  test("the SID comes from whoami's CSV, never the user name", () => {
+  test("windows/private-keys: the SID comes from whoami's CSV, never the user name", () => {
     expect(parseSid('"desktop-1\\\\me","S-1-5-21-1004336348-1177238915-682003330-1001"\r\n')).toBe("S-1-5-21-1004336348-1177238915-682003330-1001");
     expect(parseSid('"me","S-1-5-18"')).toBe("S-1-5-18");
     expect(parseSid("ERROR: access denied")).toBeNull();
     expect(parseSid('"S-1-5-21-1","x"')).toBeNull();
   });
-  test("outside the profile: another drive, a UNC share, a sibling; inside: under it, in any case", () => {
+  test("windows/private-keys: outside the profile: another drive, a UNC share, a sibling; inside: under it, in any case", () => {
     const home = "C:\\Users\\me";
     const outside = (path: string) => outsideProfile(path, home, (p) => p);
     expect(outside("C:\\Users\\me\\AppData\\Roaming\\gluon\\.env")).toBe(false);
@@ -53,7 +53,7 @@ describe("saved keys on Windows", () => {
     expect(outside("C:\\Users\\me2\\.env")).toBe(true);
     expect(outside("C:\\ProgramData\\gluon\\.env")).toBe(true);
   });
-  test("BUG-132: an 8.3 short path is compared in its long form (GitHub's TEMP is C:\\Users\\RUNNER~1\\…, the profile C:\\Users\\runneradmin)", () => {
+  test("windows/private-keys: an 8.3 short path is compared in its long form (GitHub's TEMP is C:\\Users\\RUNNER~1\\…, the profile C:\\Users\\runneradmin) #BUG-132", () => {
     const long = (p: string) => p.replace(/^C:\\Users\\RUNNER~1(?=\\|$)/i, "C:\\Users\\runneradmin");
     const temp = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\gluon-keys-x\\.env";
     expect(outsideProfile(temp, "C:\\Users\\runneradmin", long)).toBe(false);
@@ -62,7 +62,7 @@ describe("saved keys on Windows", () => {
     // Elsewhere, paths are left as they are.
     if (!WIN) expect(longPath(temp)).toBe(temp);
   });
-  test.skipIf(!WIN)("BUG-132: on Windows, a real short name and its long name are the same place", () => {
+  test.skipIf(!WIN)("windows/private-keys: on Windows, a real short name and its long name are the same place #BUG-132", () => {
     const home = mkdtempSync(join(tmpdir(), "gluon long profile name-"));
     mkdirSync(join(home, "a long directory name"));
     const short = shortPath(join(home, "a long directory name"));
@@ -78,7 +78,7 @@ describe("saved keys on Windows", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
-  test("BUG-132: the tests' privacy check reads the DACL by SID: the user, SYSTEM and Administrators only; a label grants nothing", () => {
+  test("windows/private-keys: the tests' privacy check reads the DACL by SID: the user, SYSTEM and Administrators only; a label grants nothing #BUG-132", () => {
     const me = "S-1-5-21-1-2-3-1001";
     expect(aclProblem(`D:PAI(A;;FA;;;${me})`, me)).toBe(true);
     // Elevated (GitHub's runneradmin): an integrity label, listed by icacls, is no access.
@@ -93,19 +93,19 @@ describe("saved keys on Windows", () => {
     expect(aclProblem("D:PAI(A;;FA;;;SY)", me)).toStartWith("not granted to the user");
     expect(aclProblem("", me)).toStartWith("no DACL");
   });
-  test("BUG-96/P1: whoami and icacls run from System32 by full path, never by bare name from the repo", () => {
+  test("repo/spawn-via-binpath: whoami and icacls run from System32 by full path, never by bare name from the repo #BUG-96/P1", () => {
     expect(windowsTool("whoami", { SystemRoot: "D:\\Win" })).toBe("D:\\Win\\System32\\whoami.exe");
     expect(windowsTool("icacls", {})).toBe("C:\\Windows\\System32\\icacls.exe");
     const src = readFileSync(join(import.meta.dir, "../src/secrets.ts"), "utf8");
     expect(src).not.toMatch(/spawnSync\(\[\s*"(whoami|icacls)"/);
   });
-  test("the wording says what each OS actually does", () => {
+  test("windows/private-keys: the wording says what each OS actually does", () => {
     expect(storageNote("linux")).toBe("readable only by you (mode 600)");
     expect(storageNote("darwin")).toBe("readable only by you (mode 600)");
     expect(storageNote("win32", "C:\\Users\\me\\AppData\\Roaming\\gluon\\.env", "C:\\Users\\me")).toBe("in your Windows profile, readable by your account and administrators");
     expect(storageNote("win32", "D:\\cfg\\.env", "C:\\Users\\me")).toBe("limited to your account and administrators (icacls)");
   });
-  test("a rename refused for a moment (EPERM/EBUSY) is retried; anything else, or too many, throws", () => {
+  test("keys/private-files-directory-first: a rename refused for a moment (EPERM/EBUSY) is retried; anything else, or too many, throws", () => {
     const fail = (codes: string[]) => {
       let calls = 0;
       const rename = () => {
@@ -133,7 +133,7 @@ describe("keys: saved > environment, and nothing from Gluon's source directory",
     else process.env.GLUON_CONFIG = saved;
     loadSecrets();
   });
-  test("a dev key file is used only when handed in, and named as the source", () => {
+  test("keys/only-next-to-config: a dev key file is used only when handed in, and named as the source", () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-keys-"));
     process.env.GLUON_CONFIG = join(dir, "config.yaml");
     loadSecrets();
@@ -156,7 +156,7 @@ describe("saving keys (review of phase 3)", () => {
     loadSecrets();
   });
 
-  test("BUG-104: a rename that fails leaves the .env as it was and no copy of the keys anywhere", () => {
+  test("keys/private-files-directory-first: a rename that fails leaves the .env as it was and no copy of the keys anywhere #BUG-104", () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-keys-"));
     process.env.GLUON_CONFIG = join(dir, "config.yaml");
     writeFileSync(join(dir, ".env"), "OLD_KEY=1\n");
@@ -168,7 +168,7 @@ describe("saving keys (review of phase 3)", () => {
     expect(readFileSync(join(dir, ".env"), "utf8")).toBe("OLD_KEY=1\n");
   });
 
-  test("BUG-105: the key file is private before the key is in it (made inside a private directory), with a random name", () => {
+  test("keys/private-files-directory-first: the key file is private before the key is in it (made inside a private directory), with a random name #BUG-105", () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-keys-"));
     process.env.GLUON_CONFIG = join(dir, "config.yaml");
     const seen: string[] = [];
@@ -188,7 +188,7 @@ describe("saving keys (review of phase 3)", () => {
     expect(isPrivate(join(dir, ".env"), homedir())).toBe(true);
   });
 
-  test("BUG-104: the setup saves the keys before the config; keys that can't be saved leave the config untouched and say so", async () => {
+  test("keys/private-files-directory-first: the setup saves the keys before the config; keys that can't be saved leave the config untouched and say so #BUG-104", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-keys-"));
     process.env.GLUON_CONFIG = join(dir, "config.yaml");
     writeFileSync(process.env.GLUON_CONFIG, "# mine\n");

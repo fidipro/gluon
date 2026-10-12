@@ -25,8 +25,8 @@ export type Entry = {
 };
 export type Feature = { says: string; entries: Record<string, Entry> };
 
-const b = (says: string, at: Layer[] = ["e2e"]): Entry => ({ kind: "behaviour", says, at });
-const rule = (says: string, at: Layer[] = ["code", "seam"]): Entry => ({ kind: "invariant", says, at });
+const b = (says: string, at: Layer[] = ["e2e"], platforms?: Entry["platforms"]): Entry => ({ kind: "behaviour", says, at, ...(platforms ? { platforms } : {}) });
+const rule = (says: string, at: Layer[] = ["code", "seam"], platforms?: Entry["platforms"]): Entry => ({ kind: "invariant", says, at, ...(platforms ? { platforms } : {}) });
 const perf = (says: string, at: Layer[] = ["perf"], platforms?: Entry["platforms"]): Entry => ({ kind: "perf", says, at, ...(platforms ? { platforms } : {}) });
 
 export const CATALOG: Record<string, Feature> = {
@@ -225,7 +225,8 @@ export const CATALOG: Record<string, Feature> = {
       "instruction-file": b("given a repository with an instruction file the chosen harness doesn't load itself (`CLAUDE.md` for Codex…), then the spec ends with a line telling it to read that file; only then"),
       adapter: b("given a launch from Gluon, then the harness gets Gluon's adapter for that launch only (Claude Code's plugin and settings, Codex's `-c` per hook event, OpenCode's inline plugin), nothing written to the user's settings or workspace; Codex's hook set is one constant; the only command allowed is Gluon's own return command, exactly", ["seam"]),
       "version-gate": b("given a harness older than its adapter supports (or a version Gluon can't tell), then it gets no adapter; OpenCode before 2.x isn't started and the spec is printed with the command that installs 2.x", ["seam", "e2e"]),
-      "windows-shim": b("given a harness installed as a Windows `.cmd` shim, then its arguments pass `assertShimArgs`, a spec goes in a private file named by a one-line prompt, and Codex runs as `codex.exe`", ["seam"]),
+      "windows-shim": b("given a harness installed as an npm `.cmd` shim, then the native exe behind it runs when there is one (inside the shim's own `node_modules`, for this machine's arch: Claude Code, OpenCode, Codex's platform package); otherwise its arguments pass `assertShimArgs` (nothing cmd.exe acts on: refused naming the character, no file left) and the spec goes in a private file named by a one-line prompt, as it does on an exe for a spec too long for a command line; a temp path cmd.exe would act on goes by its 8.3 short name", ["seam"], ["windows"]),
+      "self-command": b("given a launch, then the harness's hooks and plugin reach this Gluon through `GLUON_SELF`; on Windows a `.cmd` wrapper that quotes every word, doubles `%` and turns delayed expansion off runs Gluon with exactly its words from cmd.exe, PowerShell and `Bun.spawn`, whatever its path holds; a word it can't quote is refused", ["seam"], ["windows"]),
       "private-dirs": b("a launch's private directories (events, adapter files, a typed line's spec, the neutral cwd) are 0700 outside the repository and go when the agent ends; a stale one (its Gluon gone, or a day old) is swept, never a running Gluon's", ["seam", "e2e"]),
     },
   },
@@ -310,7 +311,7 @@ export const CATALOG: Record<string, Feature> = {
     entries: {
       refused: b("a config that is no valid config (not YAML, not a mapping, a wrong type, an unknown harness, route or provider, a first version's `auth:` with a malformed `connections:`, a path that can't be read) is refused naming the key and what is allowed (or that it's unreadable), exit 2, no stack trace"),
       "defaults-and-migration": b("an empty config uses the defaults; a first version's config is migrated (on disk; in memory with one warning when the file can't be written, the output and exit code as usual); a key no longer read (`models:`) is ignored with one notice"),
-      paths: b("the config is at `GLUON_CONFIG` (made absolute at start) or under `XDG_CONFIG_HOME` (a relative one ignored, as the XDG spec says), else the platform's default; the keys and `routing.yaml` go next to it, never into the repository Gluon runs in"),
+      paths: b("the config is at `GLUON_CONFIG` (made absolute at start) or under `XDG_CONFIG_HOME` (a relative one ignored, as the XDG spec says), else `%APPDATA%\\gluon` on Windows, `~/.config/gluon` elsewhere; the keys and `routing.yaml` go next to it, never into the repository Gluon runs in; the state (the ledger, the tables) under `XDG_STATE_HOME` (a relative one ignored), `%LOCALAPPDATA%\\gluon` on Windows, else `~/.local/state/gluon`", ["e2e", "seam"]),
     },
   },
   doctor: {
@@ -327,6 +328,13 @@ export const CATALOG: Record<string, Feature> = {
       asks: b("in a terminal it lists what it removes and asks `[y/N]` (anything but y keeps everything); without one it needs `--yes` and removes nothing; it takes only `--yes` (and `--help`)"),
       removes: b("it removes the config, the saved keys, `routing.yaml` and the saved sessions next to it, Gluon's files in the agents' directories, the cost audit ledger, the price tables, the analytics database (with `-wal`, `-shm`) and its stale temporary directories, then the default config directory once empty, saying `Removed <path>` for each; with nothing left to remove it still succeeds"),
       "only-gluons": b("it never removes anything else: with `GLUON_CONFIG`, only Gluon's files there (never that directory, the user's own files, their `.env` minus Gluon's keys, their own `.gluon-*` or workspace-named files), the state directory around Gluon's, a running launch's spec and neutral directories; a symlink at a path it removes is never followed; it says it removed only what it removed"),
+    },
+  },
+  windows: {
+    says: "Gluon on native Windows (docs/concepts/platforms.md \"Windows\", src/AGENTS.md \"Windows\")",
+    entries: {
+      "process-trees": b("on Windows, a process Gluon stops or times out (an agent, a check, a probe, a tool) is ended with its children: `taskkill /T /F` by full path, `kill()` when that can't run; a process that already exited is left alone (its PID may be reused)", ["seam"], ["windows"]),
+      "private-keys": b("on Windows, the saved keys and every private file are limited to the user: inside the profile by its ACL, outside it (another drive, a UNC share, a sibling profile) by `icacls` to the user's SID (from `whoami`'s CSV, never the user name), set before a key is written; an 8.3 short path is compared in its long form; the setup says what each OS does (`storageNote`), never \"readable only by you\" on Windows", ["seam"], ["windows"]),
     },
   },
   "whole-app": {
@@ -381,6 +389,7 @@ export const CATALOG: Record<string, Feature> = {
       "never-in-process-env": rule("given keys in Gluon's .env or an AWS profile, when they are loaded, then process.env stays as it was"),
       "masked-when-printed": rule("given a key or token in text Gluon prints (an error, a probe's output), then it is masked, by shape and by value"),
       "private-files-directory-first": rule("when a private file is written, then it is made in a fresh 0700 directory and renamed into place, and nothing is left behind on a failure"),
+      "only-next-to-config": rule("the keys are read only from the `.env` next to the config (a saved key beats the environment); a dev key file is used only when handed in, and named as the source; nothing comes from Gluon's own source directory"),
     },
   },
   pty: {

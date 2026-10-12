@@ -45,7 +45,6 @@
   "test/otlp-protobuf-fuzz.test.ts": 3,
   "test/pending-tables.test.ts": 13,
   "test/perf/typing.perf.test.ts": 1,
-  "test/platform.test.ts": 14,
   "test/pty-session.test.ts": 3,
   "test/refresh.test.ts": 57,
   "test/route-schema.test.ts": 4,
@@ -61,7 +60,7 @@
   "test/tables-hardening.test.ts": 29,
   "test/tools.test.ts": 89,
   "test/usage.test.ts": 1,
-  "test/windows.test.ts": 29
+  "test/windows.test.ts": 1
  },
  "pastSeams": {
   "test/adapters-claude-codex.test.ts": [
@@ -265,8 +264,7 @@
    "src/usage.ts"
   ],
   "test/windows.test.ts": [
-   "src/agent/subscription.ts",
-   "src/self.ts"
+   "src/agent/subscription.ts"
   ]
  }
 }
