@@ -234,7 +234,7 @@ export const AREAS: Record<string, Area> = {
       "test/docker/**",
       "test/install-ps1.ps1",
     ],
-    unit: ["test/dist.test.ts", "test/release.test.ts", "test/dco.test.ts", "test/live-script.test.ts", "test/harness-cache.test.ts", "test/live-stage.test.ts"],
+    unit: ["test/dist.test.ts", "test/installers.test.ts", "test/release.test.ts", "test/dco.test.ts", "test/live-script.test.ts", "test/harness-cache.test.ts", "test/live-stage.test.ts"],
     e2e: [],
   },
   update: {

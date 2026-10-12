@@ -81,14 +81,18 @@ export const SEAMS: Record<string, Seam> = {
     says: "a config, the probes' answers (`GLUON_TEST_PROBES`) and the agents on PATH → the lines `gluon doctor` and `gluon brain` print, and their exit code",
     modules: ["src/doctor.ts"],
   },
+  update: {
+    says: "a release (GitHub's `/latest` redirect, `SHA256SUMS`, its Sigstore bundle, a binary) and an executable → verified or refused, replaced or left as it was, and what is said at start",
+    modules: ["src/update/update.ts", "src/update/verify.ts", "src/update/fetch.ts", "src/update/target.ts", "src/update/apply.ts"],
+  },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory and the stale sweep",
     modules: ["src/launchers.ts", "src/handoff.ts", "src/detect.ts"],
   },
 };
 
-/** Imported for a test's setup, not tested through: the harness list and the state paths. */
-export const SUPPORT = ["src/harnesses.ts", "src/xdg.ts"];
+/** Imported for a test's setup, not tested through: the harness list, the state paths and the repository's slug. */
+export const SUPPORT = ["src/harnesses.ts", "src/xdg.ts", "src/repo.ts"];
 
 /**
  * Tests of the repository itself, not of Gluon: its tooling, docs and test infrastructure. Outside the catalog and the
