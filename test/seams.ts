@@ -54,8 +54,8 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/agent/clients.ts", "src/agent/openai.ts", "src/agent/bedrock-converse.ts", "src/agent/codex.ts"],
   },
   "repo-tools": {
-    says: "a tool call → its result: read-only, inside the repository, secret files refused",
-    modules: ["src/agent/tools.ts"],
+    says: "a tool call → its result: read-only, inside the repository, secret files refused; the secret-file rule, the hardened git argv and the forge CLIs' fixed argv",
+    modules: ["src/agent/tools.ts", "src/agent/scan.ts", "src/agent/git.ts", "src/agent/forge.ts"],
   },
   cost: {
     says: "captured real telemetry and the price tables → the cost figures",
