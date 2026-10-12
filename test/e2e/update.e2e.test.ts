@@ -38,7 +38,7 @@ function sandbox(opts: { exe?: boolean } = {}) {
   return { dir, server, exe, env, release, done: () => (release(), server.stop(), rmSync(dir, { recursive: true, force: true })) };
 }
 
-test("update/e2e: notify says at start that a newer Gluon exists, without waiting for it", async () => {
+test("update/at-start: notify says at start that a newer Gluon exists, without waiting for it", async () => {
   const s = sandbox();
   try {
     const app = await gluon(110, 30, { ...s.env, GLUON_UPDATES: "notify" });
@@ -51,7 +51,7 @@ test("update/e2e: notify says at start that a newer Gluon exists, without waitin
   }
 });
 
-test("update/e2e: off asks GitHub nothing", async () => {
+test("update/at-start: off asks GitHub nothing", async () => {
   const s = sandbox();
   try {
     const app = await gluon(110, 30, { ...s.env, GLUON_UPDATES: "off" });
@@ -63,7 +63,7 @@ test("update/e2e: off asks GitHub nothing", async () => {
   }
 });
 
-test.skipIf(WIN)("update/e2e: auto installs the new release in the background and says it starts next time", async () => {
+test.skipIf(WIN)("update/at-start: auto installs the new release in the background and says it starts next time", async () => {
   const s = sandbox({ exe: true });
   try {
     const app = await gluon(110, 30, s.env);
@@ -75,7 +75,7 @@ test.skipIf(WIN)("update/e2e: auto installs the new release in the background an
   }
 });
 
-test.skipIf(WIN)("update/e2e: gluon update --check, then gluon update replaces the executable", async () => {
+test.skipIf(WIN)("update/command: gluon update --check, then gluon update replaces the executable", async () => {
   const s = sandbox({ exe: true });
   try {
     s.release();
@@ -92,7 +92,7 @@ test.skipIf(WIN)("update/e2e: gluon update --check, then gluon update replaces t
   }
 });
 
-test("update/e2e: without the seam a test run reaches no network", async () => {
+test("update/hosts: without the seam a test run reaches no network", async () => {
   const r = await cli(["update", "--check"], {});
   expect(r.code).toBe(1);
   expect(r.stderr).toContain("this run reaches no network");
