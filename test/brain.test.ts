@@ -41,7 +41,7 @@ const probeFile = (answers: Record<string, true | string>) => {
 };
 
 describe("labels", () => {
-  test("model names read well from every provider's id", () => {
+  test("brain/labels: model names read well from every provider's id", () => {
     expect(modelName("claude-sonnet-5-5")).toBe("Sonnet 5.5");
     expect(modelName("us.anthropic.claude-sonnet-4-6")).toBe("Sonnet 4.6");
     expect(modelName("anthropic/claude-sonnet-5.5")).toBe("Sonnet 5.5");
@@ -50,7 +50,7 @@ describe("labels", () => {
     expect(modelName("something-else")).toBe("something-else");
   });
 
-  test("each route's label says where the brain runs", () => {
+  test("brain/labels: each route's label says where the brain runs", () => {
     const labels = defaults().brain.order.map(stepLabel);
     expect(labels).toEqual([
       "Sonnet 5.5 on your Claude plan (personal)",
@@ -66,7 +66,7 @@ describe("labels", () => {
     ]);
   });
 
-  test("a model-unavailable error is told apart from others", () => {
+  test("brain/fallback: a model-unavailable error is told apart from others", () => {
     expect(modelUnavailable("access denied to us.openai.gpt-6-sol in us-east-1")).toBe(true);
     expect(modelUnavailable("model not found or not available to this key (404)")).toBe(true);
     expect(modelUnavailable("There's an issue with the selected model (x). It may not exist or you may not have access to it.")).toBe(true);
@@ -78,7 +78,7 @@ describe("labels", () => {
 describe("the brain order", () => {
   const with_ = (patch: Partial<Config>): Config => ({ ...defaults(), ...patch });
 
-  test("a plan step needs its harness connected on the plan (no notice); key steps need the key", () => {
+  test("brain/first-working-step: a plan step needs its harness connected on the plan (no notice); key steps need the key", () => {
     const order = defaults().brain.order;
     expect(notConnected(defaults(), order[0]!)).toContain("not connected");
     expect(notConnected(with_({ connections: { "claude-code": { auth: "subscription" } } }), order[0]!)).toBeNull();
@@ -91,7 +91,7 @@ describe("the brain order", () => {
     expect(notConnected(with_({ connections: { codex: { auth: "api", provider: "bedrock" } } }), order[4]!)).toBeNull();
   });
 
-  test("the first connected step whose probe works becomes brain.active, saved to the config", async () => {
+  test("brain/first-working-step: the first connected step whose probe works becomes brain.active, saved to the config", async () => {
     process.env.OPENAI_API_KEY = "sk-proj-test0123456789abcdef";
     process.env.OPENROUTER_API_KEY = "sk-or-v1-test0123456789abcdef";
     probeFile({ "openai-api/gpt-6-sol": "model not found (404)" });
@@ -106,7 +106,7 @@ describe("the brain order", () => {
     expect(activeStep(loadConfig())).toEqual({ route: "openrouter", model: "anthropic/claude-sonnet-5.5" });
   });
 
-  test("`all` probes every connected step (doctor); nothing working clears brain.active", async () => {
+  test("brain/first-working-step: `all` probes every connected step (doctor); nothing working clears brain.active", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-api03-test0123456789";
     probeFile({ "anthropic-api/*": "the API key was rejected (401)" });
     writeFileSync(process.env.GLUON_CONFIG!, "brain: { active: 2 }\n");
@@ -117,7 +117,7 @@ describe("the brain order", () => {
     expect(readFileSync(process.env.GLUON_CONFIG!, "utf8")).not.toContain("active");
   });
 
-  test("the active step is dropped once it is no longer connected", () => {
+  test("brain/first-working-step: the active step is dropped once it is no longer connected", () => {
     const config = with_({ brain: { order: defaults().brain.order, active: 3 } });
     expect(activeStep(config)).toBeNull();
     process.env.OPENAI_API_KEY = "sk-proj-test0123456789abcdef";
@@ -129,7 +129,7 @@ describe("offered models", () => {
   const installed = () => true;
   const cfg = (patch: Partial<Config>): Config => ({ ...defaults(), ...patch });
 
-  test("nothing connected: nothing offered (the demo offers every installed harness's main models)", () => {
+  test("routing/catalog: nothing connected: nothing offered (the demo offers every installed harness's main models)", () => {
     expect(offeredAgents(defaults(), { installed })).toEqual([]);
     const demo = offeredAgents(defaults(), { installed, demo: true });
     expect(demo.map((a) => a.harness)).toEqual(HARNESSES);
@@ -137,14 +137,14 @@ describe("offered models", () => {
     expect(offeredAgents(defaults(), { installed: (h) => h === "codex", demo: true }).map((a) => a.harness)).toEqual(["codex"]);
   });
 
-  test("a connection never probed offers its configured models; once probed, one that failed is hidden", () => {
+  test("routing/catalog: a connection never probed offers its configured models; once probed, one that failed is hidden", () => {
     const connections: Config["connections"] = { "claude-code": { auth: "subscription" } };
     expect(offeredAgents(cfg({ connections }), { installed })[0]!.models.map((m) => m.id)).toEqual(["haiku", "sonnet", "opus", "fable"]);
     const probed = cfg({ connections, checked: { "claude-code/plan": "2026-09-29" }, verified: { "claude-code/plan/sonnet": "2026-09-29", "claude-code/plan/haiku": "2026-09-29" }, unreached: { "claude-code/plan/opus": "2026-09-29", "claude-code/plan/fable": "2026-09-29" } });
     expect(offeredAgents(probed, { installed })[0]!.models.map((m) => m.id)).toEqual(["haiku", "sonnet"]);
   });
 
-  test("BUG-425/old config: a model id the connection never probed (new in this catalog) is offered on a checked connection; one that failed stays hidden", () => {
+  test("routing/catalog: a model id the connection never probed (new in this catalog) is offered on a checked connection; one that failed stays hidden #BUG-425/old-config", () => {
     const connections: Config["connections"] = { codex: { auth: "api", provider: "bedrock" } };
     // An old file: the connection was checked when the ids were `us.openai.*`; there is no `unreached` key at all.
     const old = cfg({ connections, checked: { "codex/bedrock": "2026-09-01" }, verified: { "codex/bedrock/us.openai.gpt-6-luna": "2026-09-01" } });
@@ -160,7 +160,7 @@ describe("offered models", () => {
     expect(loadConfig().unreached["codex/bedrock/global.openai.gpt-6.1-sol"]).toBeUndefined();
   });
 
-  test("an installed harness only; OpenCode offers a model when any of its providers reaches it (the plan's id and OpenRouter's differ)", () => {
+  test("routing/catalog: an installed harness only; OpenCode offers a model when any of its providers reaches it (the plan's id and OpenRouter's differ)", () => {
     const connections: Config["connections"] = { opencode: { auth: "api", providers: ["opencode-go", "openrouter"] }, codex: { auth: "subscription" } };
     const checked = { "opencode/opencode-go": "d", "opencode/openrouter": "d" };
     const verified = { "opencode/opencode-go/deepseek-v4.1-flash": "d", "opencode/openrouter/meta/muse-spark-1.3": "d" };
@@ -169,7 +169,7 @@ describe("offered models", () => {
     expect(offered[0]!.models.map((m) => m.id)).toEqual(["deepseek-flash", "muse-spark-1.3"]);
   });
 
-  test("a model with an opt-in (the contributor: Meta gets the code) is offered only where the opt-in is on; never by default", () => {
+  test("routing/opt-in: a model with an opt-in (the contributor: Meta gets the code) is offered only where the opt-in is on; never by default", () => {
     const connections: Config["connections"] = { opencode: { auth: "api", providers: ["opencode-go"] } };
     const ids = (opts?: { optedIn: (k: string) => boolean }) => offeredAgents(cfg({ connections }), { installed, ...opts })[0]!.models.map((m) => m.id);
     expect(ids()).toEqual(["deepseek-flash"]);
@@ -177,7 +177,7 @@ describe("offered models", () => {
     expect(ids({ optedIn: (k) => k === "something_else" })).toEqual(["deepseek-flash"]);
   });
 
-  test("a connection that couldn't be probed (signed out) is checked and offers nothing", () => {
+  test("routing/catalog: a connection that couldn't be probed (signed out) is checked and offers nothing", () => {
     const config = cfg({ connections: { codex: { auth: "subscription" } }, verified: { "codex/plan/gpt-6.1-sol": "2026-01-01" } });
     expect(offeredAgents(config, { installed })[0]!.models.length).toBe(3);
     recordProbes(config, [{ harness: "codex", conn: "plan", problem: "not signed in", models: [] }]);
@@ -187,7 +187,7 @@ describe("offered models", () => {
     expect(loadConfig().checked["codex/plan"]).toBeTruthy();
   });
 
-  test("a launch resolves an alias to the id of the first connection that reaches it; the plan needs no key in env", () => {
+  test("routing/catalog: a launch resolves an alias to the id of the first connection that reaches it; the plan needs no key in env", () => {
     const connections: Config["connections"] = { opencode: { auth: "api", providers: ["opencode-go", "openrouter"] } };
     const checked = { "opencode/opencode-go": "d", "opencode/openrouter": "d" };
     const config = cfg({ connections, checked, verified: { "opencode/openrouter/deepseek/deepseek-v4.1-flash": "d" }, unreached: { "opencode/opencode-go/deepseek-v4.1-flash": "d" } });
@@ -205,7 +205,7 @@ describe("offered models", () => {
     expect(onPlan.conn).toBe("opencode-go");
   });
 
-  test("the catalog maps every model to the vendors' published ids", () => {
+  test("routing/catalog: the catalog maps every model to the vendors' published ids", () => {
     const sonnet = DEFAULT_MODELS["claude-code"].find((m) => m.id === "sonnet")!;
     expect(sonnet.ids).toEqual({ plan: "sonnet", anthropic: "claude-sonnet-5-5", bedrock: "global.anthropic.claude-sonnet-5-5", openrouter: "anthropic/claude-sonnet-5.5" });
     // Bedrock's Claude ids are `global.` inference profiles; Codex's are the runtime ones, `global.openai.*`.
@@ -224,7 +224,7 @@ describe("offered models", () => {
     for (const models of Object.values(DEFAULT_MODELS)) for (const m of models) if (m.defaultEffort) expect([m.id, m.efforts.includes(m.defaultEffort)]).toEqual([m.id, true]);
   });
 
-  test("the maintainers' Sonnet 4.6 exists only behind the seam, on Claude Code over Bedrock only", () => {
+  test("routing/catalog: the maintainers' Sonnet 4.6 exists only behind the seam, on Claude Code over Bedrock only", () => {
     expect(defaults().models["claude-code"].map((m) => m.id)).not.toContain("sonnet-4.6");
     process.env.GLUON_TEST_MAINTAINER_MODELS = "1";
     try {
@@ -238,7 +238,7 @@ describe("offered models", () => {
 });
 
 describe("config migration", () => {
-  test("first-pass keys map to connections and bedrock, once; brain.subscriptionNotice goes", () => {
+  test("config/defaults-and-migration: first-pass keys map to connections and bedrock, once; brain.subscriptionNotice goes", () => {
     const text = "brain: { provider: subscription, model: sonnet, subscriptionNotice: 2026-09-01 }\nauth: { opencode: api }\naws: { profile: dev }\n";
     const out = parse(migrate(text)!);
     expect(out.connections).toEqual({ "claude-code": { auth: "subscription" } });
@@ -251,7 +251,7 @@ describe("config migration", () => {
     expect(migrate("connections: {}\nbrain: { order: [] }\n")).toBeNull();
   });
 
-  test("BUG-71/9.1: brain.model becomes the first step, comments come along, no empty OpenCode connection", () => {
+  test("config/defaults-and-migration: brain.model becomes the first step, comments come along, no empty OpenCode connection #BUG-71/9.1", () => {
     const dir = join(import.meta.dir, "fixtures");
     const a = migrate(readFileSync(join(dir, "first-pass-a.yaml"), "utf8"))!;
     expect(a).toContain("# my gluon config (first pass)");
@@ -271,7 +271,7 @@ describe("config migration", () => {
     expect(c.bedrock).toEqual({ region: "us-west-2", profile: "work" });
   });
 
-  test("loadConfig migrates the file, and a second load changes nothing", () => {
+  test("config/defaults-and-migration: loadConfig migrates the file, and a second load changes nothing", () => {
     const path = process.env.GLUON_CONFIG!;
     writeFileSync(path, "# keep me\nbrain: { provider: anthropic, model: claude-sonnet-5 }\nauth: { claude-code: api }\n");
     const config = loadConfig();
@@ -285,7 +285,7 @@ describe("config migration", () => {
 });
 
 describe("runtime fallback", () => {
-  test("a model that turns out unavailable moves the session to the next brain, and says so", async () => {
+  test("brain/fallback: a model that turns out unavailable moves the session to the next brain, and says so", async () => {
     const failing: ModelClient = async () => {
       throw new Error("access denied to us.openai.gpt-6-sol in us-east-1");
     };
@@ -311,7 +311,7 @@ describe("runtime fallback", () => {
     expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "Hi from the next brain." });
   });
 
-  test("with no next brain, the error is shown as before", async () => {
+  test("brain/fallback: with no next brain, the error is shown as before", async () => {
     const failing: ModelClient = async () => {
       throw new Error("model not found (404)");
     };
@@ -325,7 +325,7 @@ describe("runtime fallback", () => {
 
 describe("QA pass 2", () => {
   const with_ = (patch: Partial<Config>): Config => ({ ...defaults(), ...patch });
-  test("BUG-74: Bedrock ids read as model names; long AWS errors keep the part that matters", () => {
+  test("brain/labels: Bedrock ids read as model names; long AWS errors keep the part that matters #BUG-74", () => {
     expect(modelName("openai.gpt-oss-120b-1:0")).toBe("gpt-oss-120b");
     expect(modelName("us.anthropic.claude-haiku-4-5-20251001-v1:0")).toBe("Haiku 4.5");
     expect(modelName("us.anthropic.claude-opus-4-6-v1")).toBe("Opus 4.6");
@@ -336,7 +336,7 @@ describe("QA pass 2", () => {
     expect(clip(`see ${"x".repeat(20)} https://aws.amazon.com/contact-us/sales-support/`, 40)).toBe(`see ${"x".repeat(20)}…`);
   });
 
-  test("BUG-624/QA-config-01: with no AWS_REGION and no configured region, Bedrock uses the AWS config profile's region, not us-east-1", () => {
+  test("connections/aws-setup: with no AWS_REGION and no configured region, Bedrock uses the AWS config profile's region, not us-east-1 #BUG-624/QA-config-01", () => {
     const home = mkdtempSync(join(TMP, "aws-home-"));
     const names = ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_PROFILE", "AWS_CONFIG_FILE"];
     const env = Object.fromEntries(names.map((k) => [k, process.env[k]]));
@@ -355,7 +355,7 @@ describe("QA pass 2", () => {
     }
   });
 
-  test("BUG-624/variants: the AWS config's region follows the profile and the default path, and the configured and the environment's regions come first", () => {
+  test("connections/aws-setup: the AWS config's region follows the profile and the default path, and the configured and the environment's regions come first #BUG-624/variants", () => {
     const home = mkdtempSync(join(TMP, "aws-home-"));
     const names = ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_PROFILE", "AWS_CONFIG_FILE"];
     const env = Object.fromEntries(names.map((k) => [k, process.env[k]]));
@@ -381,7 +381,7 @@ describe("QA pass 2", () => {
     }
   });
 
-  test("BUG-68: one AWS profile and region for the brain, the probes and the launches", () => {
+  test("connections/aws-setup: one AWS profile and region for the brain, the probes and the launches #BUG-68", () => {
     process.env.AWS_PROFILE = "personal";
     const config = with_({ bedrock: { profile: "work", region: "eu-west-1" }, connections: { "claude-code": { auth: "api", provider: "bedrock" } } });
     expect(awsSetup(config)).toEqual({ profile: "work", region: "eu-west-1" });
@@ -400,7 +400,7 @@ describe("QA pass 2", () => {
     delete process.env.AWS_PROFILE;
   });
 
-  test("BUG-53/5.4: OpenRouter's public model listing never verifies a key: its key endpoint does", async () => {
+  test("connections/check-method: OpenRouter's public model listing never verifies a key: its key endpoint does #BUG-53/5.4", async () => {
     delete process.env.GLUON_TEST_PROBES;
     const realFetch = globalThis.fetch;
     const calls: { url: string; method: string }[] = [];
@@ -427,7 +427,7 @@ describe("QA pass 2", () => {
     }
   });
 
-  test("the OpenCode plan: signed in by OpenCode's own `auth list`, its models from the plan's public listing (no key is ever sent)", async () => {
+  test("connections/check-method: the OpenCode plan: signed in by OpenCode's own `auth list`, its models from the plan's public listing (no key is ever sent)", async () => {
     delete process.env.GLUON_TEST_PROBES;
     const realFetch = globalThis.fetch;
     const calls: { url: string; auth: string | null }[] = [];
@@ -451,7 +451,7 @@ describe("QA pass 2", () => {
 });
 
 describe("key listings (BUG-75)", () => {
-  test("BUG-75: an alias counts as listed when the listing names only its dated snapshot", async () => {
+  test("connections/check-method: an alias counts as listed when the listing names only its dated snapshot #BUG-75", async () => {
     const { isListed } = await import("../src/verify.ts");
     const listed = new Set(["claude-sonnet-5-5", "claude-haiku-4-5-20251001", "claude-opus-4-5-20251101"]);
     expect(isListed(listed, "claude-haiku-4-5")).toBe(true);
@@ -465,7 +465,7 @@ describe("key listings (BUG-75)", () => {
 });
 
 describe("review of PR #1", () => {
-  test("BUG-76/1: the runtime fallback fires on the providers' raw 'no access' errors, not on any 404", async () => {
+  test("brain/fallback: the runtime fallback fires on the providers' raw 'no access' errors, not on any 404 #BUG-76/1", async () => {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const { default: OpenAI } = await import("openai");
     const { AccessDeniedException, ValidationException, ResourceNotFoundException, ThrottlingException } = await import("@aws-sdk/client-bedrock-runtime");
@@ -518,7 +518,7 @@ describe("review of PR #1", () => {
     expect(s.snapshot.brain).toBe("next");
   });
 
-  test("BUG-77/2: a transient probe failure keeps a connection's verified models; a definitive one clears them", async () => {
+  test("connections/reachable: a transient probe failure keeps a connection's verified models; a definitive one clears them #BUG-77/2", async () => {
     const connections: Config["connections"] = { codex: { auth: "api", provider: "openai" }, "claude-code": { auth: "subscription" } };
     const verified = { "codex/openai/gpt-6.1-sol": "2026-09-01", "claude-code/plan/sonnet": "2026-09-01", "claude-code/bedrock/global.anthropic.claude-sonnet-5-5": "2026-09-01", "claude-code/bedrock/global.anthropic.claude-opus-5-5": "2026-09-01" };
     const checked = { "codex/openai": "2026-09-01", "claude-code/plan": "2026-09-01", "claude-code/bedrock": "2026-09-01" };
@@ -570,7 +570,7 @@ describe("review of PR #1", () => {
     }
   });
 
-  test("a `models:` key in the config is ignored with one notice: the catalog is Gluon's own, an extra model is never offered", () => {
+  test("config/defaults-and-migration: a `models:` key in the config is ignored with one notice: the catalog is Gluon's own, an extra model is never offered", () => {
     writeFileSync(process.env.GLUON_CONFIG!, "connections: { claude-code: { auth: subscription } }\nmodels:\n  claude-code:\n    - { id: sonnet }\n    - { id: claude-next-preview, label: Next, note: trial }\n");
     const seen: string[] = [];
     setConfigNotices((m) => seen.push(m));
@@ -585,7 +585,7 @@ describe("review of PR #1", () => {
     }
   });
 
-  test("BUG-422/connections-retired-providers: OpenCode's old providers (Zen, Moonshot, …) are dropped with a notice, not an error: what remains still loads", () => {
+  test("config/defaults-and-migration: OpenCode's old providers (Zen, Moonshot, …) are dropped with a notice, not an error: what remains still loads #BUG-422/connections-retired-providers", () => {
     writeFileSync(process.env.GLUON_CONFIG!, "connections: { opencode: { auth: api, providers: [opencode-zen, moonshot, openrouter, opencode-go] } }\n");
     const seen: string[] = [];
     setConfigNotices((m) => seen.push(m));
@@ -597,7 +597,7 @@ describe("review of PR #1", () => {
     }
   });
 
-  test("BUG-84/9: a first-pass `agents:` block isn't dropped silently: the user is told once what it listed", () => {
+  test("config/defaults-and-migration: a first-pass `agents:` block isn't dropped silently: the user is told once what it listed #BUG-84/9", () => {
     const text = readFileSync(join(import.meta.dir, "fixtures", "first-pass-a.yaml"), "utf8");
     const warnings: string[] = [];
     expect(parse(migrate(text, warnings)!).agents).toBeUndefined();
@@ -621,7 +621,7 @@ describe("review of PR #1", () => {
     expect(errors).toEqual([expect.stringContaining("`agents:` list was dropped")]);
   });
 
-  test("BUG-88: agy's listing counts a model only by its own id plus an effort, not a longer model's id", async () => {
+  test("connections/check-method: agy's listing counts a model only by its own id plus an effort, not a longer model's id #BUG-88", async () => {
     const { offersModel } = await import("../src/verify.ts");
     expect(offersModel("gemini-3.8-flash-high", "gemini-3.8-flash")).toBe(true);
     expect(offersModel("gemini-3.8-flash", "gemini-3.8-flash")).toBe(true);
@@ -649,7 +649,7 @@ describe("QA: what counts as a model that can't be used (the runtime fallback's 
   const http = (status: number, message: string) => Object.assign(new Error(message), { status });
   const aws = (name: string, message: string) => Object.assign(new Error(message), { name });
 
-  test("the providers' own wording for a missing or refused model moves the order on; rate limits, outages, bad keys and plan limits don't", () => {
+  test("brain/fallback: the providers' own wording for a missing or refused model moves the order on; rate limits, outages, bad keys and plan limits don't", () => {
     const unavailable: [string, unknown][] = [
       ["Anthropic 404", http(404, '404 {"type":"error","error":{"type":"not_found_error","message":"model: claude-foo"}}')],
       ["OpenAI 404", http(404, "404 The model `gpt-9` does not exist or you do not have access to it.")],
@@ -682,24 +682,24 @@ describe("QA: what counts as a model that can't be used (the runtime fallback's 
   });
 });
 
-test("BUG-626/QA-brain-07: OpenRouter's answer to an id it doesn't know (400, \"… is not a valid model ID\") counts as an unavailable model, so the order moves on and the probe says the model isn't reachable", () => {
+test("brain/fallback: OpenRouter's answer to an id it doesn't know (400, \"… is not a valid model ID\") counts as an unavailable model, so the order moves on and the probe says the model isn't reachable #BUG-626/QA-brain-07", () => {
   const e = Object.assign(new Error('400 {"error":{"message":"anthropic/claude-foo is not a valid model ID","code":400}}'), { status: 400 });
   expect(modelUnavailable(e)).toBe(true);
 });
 
-test("BUG-627/QA-brain-08: a too-long prompt (Bedrock's ValidationException \"Input is too long for requested model\") is not read as 'that model isn't available': the order must not move on, nor say so", () => {
+test("brain/fallback: a too-long prompt (Bedrock's ValidationException \"Input is too long for requested model\") is not read as 'that model isn't available': the order must not move on, nor say so #BUG-627/QA-brain-08", () => {
   const e = Object.assign(new Error("Input is too long for requested model."), { name: "ValidationException" });
   expect(modelUnavailable(e)).toBe(false);
 });
 
-test("BUG-627/variants: a ValidationException about the model's id still moves the order on; one about the prompt's size doesn't, in the words of either provider", () => {
+test("brain/fallback: a ValidationException about the model's id still moves the order on; one about the prompt's size doesn't, in the words of either provider #BUG-627/variants", () => {
   const aws = (message: string) => Object.assign(new Error(message), { name: "ValidationException" });
   expect(modelUnavailable(aws("The provided model identifier is invalid."))).toBe(true);
   for (const m of ["Input is too long for requested model.", "Too many input tokens for this model.", "The input exceeds the maximum context length of the model."]) expect([m, modelUnavailable(aws(m))]).toEqual([m, false]);
   expect(modelUnavailable("Input is too long for requested model.")).toBe(false);
 });
 
-test("QA: every default brain step sends an effort its model takes, or none where the model takes none (the ChatGPT plan's catalog is read at run time)", async () => {
+test("brain/effort: every default brain step sends an effort its model takes, or none where the model takes none (the ChatGPT plan's catalog is read at run time)", async () => {
   const { sentEffort, stepEfforts } = await import("../src/agent/effort.ts");
   for (const step of DEFAULT_ORDER) {
     const takes = stepEfforts(step);

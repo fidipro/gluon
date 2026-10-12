@@ -30,22 +30,22 @@ function roundTrips(sent: unknown) {
   for (const b of bad) expect(zod.safeParse(b).success, JSON.stringify(b)).toBe(false);
 }
 
-test("route's schema reaches the OpenAI Responses tools whole", () => {
+test("brain/requests: route's schema reaches the OpenAI Responses tools whole", () => {
   const t = toResponsesTools(TOOLS).find((x) => x.name === "route")!;
   roundTrips(t.parameters);
 });
 
-test("route's schema reaches the Chat Completions tools whole", () => {
+test("brain/requests: route's schema reaches the Chat Completions tools whole", () => {
   const t = toChatTools(TOOLS).find((x) => (x as { function: { name: string } }).function.name === "route") as { function: { parameters: unknown } };
   roundTrips(t.function.parameters);
 });
 
-test("route's schema reaches Bedrock Converse whole", () => {
+test("brain/requests: route's schema reaches Bedrock Converse whole", () => {
   const t = toConverseTools(TOOLS).find((x) => x.toolSpec?.name === "route")!;
   roundTrips((t.toolSpec!.inputSchema as { json: unknown }).json);
 });
 
-test("route's schema reaches Codex's dynamicTools whole", () => {
+test("brain/requests: route's schema reaches Codex's dynamicTools whole", () => {
   const t = threadStartParams("gpt-6-luna", "/tmp", "system").dynamicTools.find((x) => x.name === "route")!;
   roundTrips(t.inputSchema);
 });

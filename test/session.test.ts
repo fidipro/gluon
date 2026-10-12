@@ -42,7 +42,7 @@ const intake = { name: "fix-the-thing", reason: "fits", spec: "Do the thing.", t
 const ROUTE = { types: [{ type: "feature", model_steps: 0, effort_steps: 0 }], pinned: "claude-code/sonnet@medium" };
 const route = (id: string, input: object = ROUTE) => tool(id, "route", input);
 
-test("nothing launches until the developer confirms, and a reply goes back to the brain", async () => {
+test("intake/confirm-first: nothing launches until the developer confirms, and a reply goes back to the brain", async () => {
   const { client, requests } = scripted([[route("r1"), tool("p1", "propose_launch", intake)], [route("r2", { ...ROUTE, pinned: "claude-code/opus@high" }), tool("p2", "propose_launch", intake)]]);
   const s = new Session(client, config, "sys", root);
 
@@ -60,7 +60,7 @@ test("nothing launches until the developer confirms, and a reply goes back to th
   expect(choice).toMatchObject({ model: "opus", effort: "high" });
 });
 
-test("confirm carries the proposal's routing data (route's types and why lines) for the local analytics", async () => {
+test("intake/confirm-first: confirm carries the proposal's routing data (route's types and why lines) for the local analytics", async () => {
   const { client } = scripted([[route("r1"), tool("p1", "propose_launch", intake)]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("fix the bug");
@@ -72,14 +72,14 @@ test("confirm carries the proposal's routing data (route's types and why lines) 
   expect(choice.why).toEqual(pending?.kind === "proposal" ? pending.why : undefined);
 });
 
-test("confirm returns null when nothing is proposed", async () => {
+test("intake/confirm-first: confirm returns null when nothing is proposed", async () => {
   const { client } = scripted([[{ type: "text", text: "What do you mean?", citations: null }]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("hmm");
   expect(s.confirm()).toBeNull();
 });
 
-test("an invalid proposal is sent back as an error, not shown", async () => {
+test("intake/proposal-checked: an invalid proposal is sent back as an error, not shown", async () => {
   const { client, requests } = scripted([[route("r1"), tool("p1", "propose_launch", { ...intake, spec: " " })], [tool("p2", "propose_launch", intake)]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("go");
@@ -88,7 +88,7 @@ test("an invalid proposal is sent back as an error, not shown", async () => {
   expect(s.snapshot.pending?.kind).toBe("proposal");
 });
 
-test("answers to ask_user come back as that tool's result, alongside repo tool results", async () => {
+test("intake/questions: answers to ask_user come back as that tool's result, alongside repo tool results", async () => {
   const { client, requests } = scripted([
     [tool("r1", "read_file", { path: "package.json" }), tool("q1", "ask_user", { question: "Which?", options: [{ label: "A" }, { label: "B" }] })],
   ]);
@@ -101,7 +101,7 @@ test("answers to ask_user come back as that tool's result, alongside repo tool r
   expect(results[1]!.content).toBe("The developer answered: B");
 });
 
-test("issue-55: several questions in one ask_user come one by one, and the brain gets all the answers together after the last", async () => {
+test("intake/questions: several questions in one ask_user come one by one, and the brain gets all the answers together after the last #issue-55", async () => {
   const opts = [{ label: "A" }, { label: "B" }];
   const { client, requests } = scripted([
     [tool("q1", "ask_user", { question: "First?", options: opts, next_questions: [{ question: "Second?", options: opts }, { question: "Third?", options: [{ label: "Other — I'll say" }, ...opts] }] })],
@@ -124,7 +124,7 @@ test("issue-55: several questions in one ask_user come one by one, and the brain
   expect(s.snapshot.items.map((i) => i.kind)).toEqual(["user", "question", "user", "question", "user", "question", "user"]);
 });
 
-test("issue-55: a lone question has no step; a bad next_questions entry is refused with a reason", async () => {
+test("intake/questions: a lone question has no step; a bad next_questions entry is refused with a reason #issue-55", async () => {
   const opts = [{ label: "A" }, { label: "B" }];
   const { client, requests } = scripted([
     [tool("q1", "ask_user", { question: "First?", options: opts, next_questions: [{ question: "", options: opts }] })],
@@ -137,7 +137,7 @@ test("issue-55: a lone question has no step; a bad next_questions entry is refus
   expect((s.snapshot.pending as { question: object }).question).not.toHaveProperty("step");
 });
 
-test("repo tools refuse paths outside the repository", async () => {
+test("repo-tools/sandbox-within: repo tools refuse paths outside the repository", async () => {
   const { client, requests } = scripted([[tool("r1", "read_file", { path: "../../../etc/passwd" })]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("task");
@@ -146,14 +146,14 @@ test("repo tools refuse paths outside the repository", async () => {
   expect(String(result.content)).toContain("outside the repository");
 });
 
-test("BUG-134: OpenCode before 2.x is refused, with the command that installs 2.x; an unknown version passes", () => {
+test("launch/version-gate: OpenCode before 2.x is refused, with the command that installs 2.x; an unknown version passes #BUG-134", () => {
   expect(tooOld("opencode", "1.18.34", "linux")).toBe("OpenCode 1.18.34 is too old for Gluon (it needs 2.x): curl -fsSL https://opencode.ai/v2/install | bash");
   expect(tooOld("opencode", "1.18.34", "win32")).toEndWith(": npm install -g @opencode/cli");
   for (const v of ["2.0.21", "3.1.0", null, "dev"]) expect(tooOld("opencode", v)).toBeNull();
   expect(tooOld("codex", "0.1.0")).toBeNull();
 });
 
-test("launch commands", () => {
+test("launch/model-effort: launch commands", () => {
   expect(buildCommand(config, { ...proposal, harness: "claude-code", effort: "high" } as never).argv).toEqual([
     "claude", "--model", "sonnet", "--effort", "high", "--", "Do the thing.",
   ]);
@@ -171,7 +171,7 @@ test("launch commands", () => {
   expect(buildCommand(config, { harness: "grok-build", model: "grok-4.7", effort: "high", spec: "x", reason: "" }).argv).toEqual(["grok", "-m", "grok-4.7", "--reasoning-effort", "high", "--", "x"]);
 });
 
-test("editor", () => {
+test("composer/editing: editor", () => {
   let d = ed.insert(ed.EMPTY, "hello world");
   d = ed.deleteWordBack(d);
   expect(d).toEqual({ text: "hello ", cursor: 6 });
@@ -181,7 +181,7 @@ test("editor", () => {
   expect(ed.killToStart(d)).toEqual({ text: "hello a\n", cursor: 8 });
 });
 
-test("invalid proposals stop after two tries, and the next message keeps the conversation valid", async () => {
+test("intake/proposal-checked: invalid proposals stop after two tries, and the next message keeps the conversation valid", async () => {
   const bad = { ...intake, spec: "" };
   const { client, requests } = scripted([[route("r1"), tool("p1", "propose_launch", bad)], [tool("p2", "propose_launch", bad)], [route("r3"), tool("p3", "propose_launch", intake)]]); // a message from the developer goes back through route (BUG-458)
   const s = new Session(client, config, "sys", root);
@@ -198,7 +198,7 @@ test("invalid proposals stop after two tries, and the next message keeps the con
   expect(s.snapshot.pending?.kind).toBe("proposal");
 });
 
-test("a turn stops after too many model calls", async () => {
+test("intake/turn-limits: a turn stops after too many model calls", async () => {
   const client: ModelClient = async () => ({ content: [tool(`r${Math.random()}`, "list_files", {})], stop_reason: "tool_use" });
   const s = new Session(client, config, "sys", root);
   await s.submit("go");
@@ -206,7 +206,7 @@ test("a turn stops after too many model calls", async () => {
   expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "notice", tone: "error" });
 });
 
-test("propose_launch without a route is an error that says to call route; a failed route leaves nothing to propose from", async () => {
+test("intake/route-then-propose: propose_launch without a route is an error that says to call route; a failed route leaves nothing to propose from", async () => {
   const { client, requests } = scripted([
     [tool("p1", "propose_launch", intake)],
     [route("r2", { types: [{ type: "nonesuch", model_steps: 0, effort_steps: 0 }] }), tool("p2", "propose_launch", intake)],
@@ -224,7 +224,7 @@ test("propose_launch without a route is an error that says to call route; a fail
   expect(s.snapshot.items.some((i) => i.kind === "notice")).toBe(false); // not counted as an invalid proposal
 });
 
-test("route's result is what a proposal offers: its agents, its mode, why; a reply goes back through route", async () => {
+test("intake/route-then-propose: route's result is what a proposal offers: its agents, its mode, why; a reply goes back through route", async () => {
   const unpinned = { types: [{ type: "feature", model_steps: 1, effort_steps: 0, reasons: "several modules" }] };
   const { client, requests } = scripted([
     [route("r1", unpinned), tool("p1", "propose_launch", intake)],
@@ -247,7 +247,7 @@ test("route's result is what a proposal offers: its agents, its mode, why; a rep
   expect(s.confirm()?.mode).toBe("plan");
 });
 
-test("BUG-458/route: a message from the developer after a route (no proposal yet) needs a new route; the old one can't carry it", async () => {
+test("intake/route-then-propose: a message from the developer after a route (no proposal yet) needs a new route; the old one can't carry it #BUG-458/route", async () => {
   const { client, requests } = scripted([
     [route("r1")],
     [], // the brain stops (text only); the developer then asks for another agent
@@ -262,7 +262,7 @@ test("BUG-458/route: a message from the developer after a route (no proposal yet
   expect(s.confirm()).toMatchObject({ harness: "codex", model: "gpt-6.1-sol" });
 });
 
-test("one batch of questions per proposal round, enforced in code; a proposal starts a new round", async () => {
+test("intake/questions: one batch of questions per proposal round, enforced in code; a proposal starts a new round", async () => {
   const q = (id: string, question: string) => tool(id, "ask_user", { question, options: [{ label: "A" }, { label: "B" }] });
   const { client, requests } = scripted([
     [q("q1", "First?")],
@@ -280,7 +280,7 @@ test("one batch of questions per proposal round, enforced in code; a proposal st
   expect(s.snapshot.pending).toMatchObject({ kind: "question", question: { question: "After the proposal?" } });
 });
 
-test("the brain's own 'Other' option is dropped; the spec is trimmed and printed into the history", async () => {
+test("intake/questions: the brain's own 'Other' option is dropped; the spec is trimmed and printed into the history", async () => {
   const { client } = scripted([
     [tool("q1", "ask_user", { question: "Which?", options: [{ label: "A" }, { label: "B" }, { label: "Other — I'll say" }] })],
     [route("r1"), tool("p1", "propose_launch", { ...intake, spec: "\n\nDo the thing.\n" })],
@@ -294,7 +294,7 @@ test("the brain's own 'Other' option is dropped; the spec is trimmed and printed
   expect(s.snapshot.items.some((i) => i.kind === "proposal" && i.choice.spec === s.confirm()?.spec)).toBe(true);
 });
 
-test("a proposal shows its name and options; confirm starts the option picked, adjusted, with the name", async () => {
+test("intake/confirm-first: a proposal shows its name and options; confirm starts the option picked, adjusted, with the name", async () => {
   const cfg = defaults();
   const { client } = scripted([[route("r1", { types: [{ type: "feature", model_steps: 1, effort_steps: 0 }] }), tool("p1", "propose_launch", { ...intake, name: "Thing Fix" })]]);
   const s = new Session(client, cfg, "sys", root);
@@ -326,7 +326,7 @@ test("a proposal shows its name and options; confirm starts the option picked, a
   expect(s.confirm(0, { effort: "turbo" as never })).toBeNull();
 });
 
-test("a proposal without a name gets one from its spec", async () => {
+test("intake/name: a proposal without a name gets one from its spec", async () => {
   const { name: _, ...unnamed } = intake;
   const { client } = scripted([[route("r1"), tool("p1", "propose_launch", { ...unnamed, spec: "Fix the flaky launcher test." })]]);
   const s = new Session(client, config, "sys", root);
@@ -335,7 +335,7 @@ test("a proposal without a name gets one from its spec", async () => {
   expect(s.confirm()?.name).toBe("Gluon-fix-flaky-launcher");
 });
 
-test("launch modes: the developer's start carries route's mode; the override from ctrl+t wins; build is none", async () => {
+test("intake/confirm-first: launch modes: the developer's start carries route's mode; the override from ctrl+t wins; build is none", async () => {
   const { client } = scripted([[route("r1", { ...ROUTE, mode: "explore" }), tool("p1", "propose_launch", intake)]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("how does it work");
@@ -349,7 +349,7 @@ test("launch modes: the developer's start carries route's mode; the override fro
   expect(t.confirm(0, { mode: "plan" })?.mode).toBe("plan");
 });
 
-test("the spec Gluon launches is the brain's, with no line about returning to Gluon added (also on a revision and for Codex)", async () => {
+test("intake/confirm-first: the spec Gluon launches is the brain's, with no line about returning to Gluon added (also on a revision and for Codex)", async () => {
   const cfg = defaults();
   const { client } = scripted([
     [route("r1"), tool("p1", "propose_launch", { ...intake, spec: "Do the thing." })],
@@ -366,7 +366,7 @@ test("the spec Gluon launches is the brain's, with no line about returning to Gl
   expect(s.confirm()?.spec).toBe("Do it in Codex.");
 });
 
-test("failed repo tools show in the Explored group", async () => {
+test("intake-chat/working: failed repo tools show in the Explored group", async () => {
   const { client } = scripted([[tool("r1", "read_file", { path: "no-such-file.txt" })]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("task");
@@ -374,7 +374,7 @@ test("failed repo tools show in the Explored group", async () => {
   expect(explored?.kind === "explored" && explored.rows[0]).toMatchObject({ kind: "read", text: "no-such-file.txt", error: expect.stringContaining("does not exist") });
 });
 
-test("a spec starting with a dash is never read as an option", () => {
+test("launch/spec-last: a spec starting with a dash is never read as an option", () => {
   const spec = "- fix the thing";
   expect(buildCommand(config, { ...proposal, spec } as never).argv.slice(-2)).toEqual(["--", spec]);
   expect(buildCommand(config, { harness: "opencode", model: "deepseek-flash", spec, reason: "" }).argv.at(-1)).toBe(`--prompt=${spec}`);
@@ -383,7 +383,7 @@ test("a spec starting with a dash is never read as an option", () => {
   expect(buildCommand(config, { harness: "antigravity", model: "gemini-3.8-flash", spec, reason: "" }).argv.at(-1)).toBe(`--prompt-interactive=${spec}`);
 });
 
-test("editor: emoji, Delete, and moving between lines", () => {
+test("composer/graphemes: editor: emoji, Delete, and moving between lines", () => {
   let d = ed.move(ed.insert(ed.EMPTY, "ab😀cd"), -2);
   d = ed.backspace(d);
   expect(d).toEqual({ text: "abcd", cursor: 2 });
@@ -393,7 +393,7 @@ test("editor: emoji, Delete, and moving between lines", () => {
   expect(ed.moveLine(d, -1).cursor).toBe(2);
 });
 
-test("BUG-59/6.3: a brain that fails after a tool call hands the next brain a valid history", async () => {
+test("brain/fallback: a brain that fails after a tool call hands the next brain a valid history #BUG-59/6.3", async () => {
   let calls = 0;
   const first: ModelClient = async () => {
     if (++calls === 1) return { content: [tool("t1", "list_files", {})], stop_reason: "tool_use" };
@@ -419,7 +419,7 @@ test("BUG-59/6.3: a brain that fails after a tool call hands the next brain a va
   expect(seen.at(-1)!.map((m) => [m.role, m.content])).toEqual([["user", "fix the bug"]]);
 });
 
-test("BUG-59/6.3: … also when the failure comes after the developer answered a question", async () => {
+test("brain/fallback: also when the failure comes after the developer answered a question #BUG-59/6.3", async () => {
   let calls = 0;
   const first: ModelClient = async () => {
     calls++;
@@ -442,7 +442,7 @@ test("BUG-59/6.3: … also when the failure comes after the developer answered a
   expect(last.at(-1)).toEqual({ type: "text", text: "A, please" });
 });
 
-test("BUG-59/6.3: a switch between a loop brain and a model client starts the next one fresh", async () => {
+test("brain/fallback: a switch between a loop brain and a model client starts the next one fresh #BUG-59/6.3", async () => {
   const loop = { send: async () => Promise.reject(new Error("404 model not found")), close: () => {} };
   const { client, requests } = scripted([[{ type: "text", text: "hi", citations: null }]]);
   const s = new Session(loop, config, "sys", root, () => "", async () => ({ client, label: "Next brain" }));
@@ -454,7 +454,7 @@ test("BUG-59/6.3: a switch between a loop brain and a model client starts the ne
   expect(s.snapshot.workingSince).toBeNull();
 });
 
-test("BUG-78/3: a loop brain asking two questions at once gets one answered, the other skipped, and the turn ends", async () => {
+test("intake/questions: a loop brain asking two questions at once gets one answered, the other skipped, and the turn ends #BUG-78/3", async () => {
   const results: string[] = [];
   const brain: LoopBrain = {
     async send(_text, _system, hooks) {
@@ -476,7 +476,7 @@ test("BUG-78/3: a loop brain asking two questions at once gets one answered, the
   expect(s.snapshot.workingSince).toBeNull();
 });
 
-test("a git_log call shows as a Git row of the Explored group (issue #17)", async () => {
+test("intake-chat/working: a git_log call shows as a Git row of the Explored group (issue #17) #issue-17", async () => {
   const { client, requests } = scripted([[tool("g1", "git_log", { path: "src", count: 1 })]]);
   // A fixture repo: the Docker suite's copy of this one has no .git.
   const s = new Session(client, config, "sys", repo.tiny());
@@ -488,7 +488,7 @@ test("a git_log call shows as a Git row of the Explored group (issue #17)", asyn
   expect(String(result[0]!.content)).toMatch(/^[0-9a-f]{7,} \d{4}-\d\d-\d\d /);
 });
 
-test("BUG-136/issue 11: a repo tool's result carries the nested AGENTS.md on its path, once", async () => {
+test("repo-tools/instruction-files: a repo tool's result carries the nested AGENTS.md on its path, once #BUG-136/issue-11", async () => {
   const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
   const { join } = await import("node:path");
   const { tmpdir } = await import("node:os");
@@ -523,7 +523,7 @@ function apiProblem(messages: Anthropic.MessageParam[]): string | null {
   return null;
 }
 
-test("BUG-613/empty reply: a reply with no text and no tool call (the model says nothing) tells the developer, and leaves no empty assistant message that every later request would be refused for", async () => {
+test("intake/empty-reply: a reply with no text and no tool call (the model says nothing) tells the developer, and leaves no empty assistant message that every later request would be refused for #BUG-613/empty-reply", async () => {
   const sent: Anthropic.MessageParam[][] = [];
   const turns: Anthropic.ContentBlock[][] = [[], [{ type: "text", text: "Here you go.", citations: null }]];
   const client: ModelClient = async (req) => {
@@ -554,7 +554,7 @@ const thinking = { type: "thinking", thinking: "hmm", signature: "sig" } as Anth
 const redacted = { type: "redacted_thinking", data: "x" } as Anthropic.RedactedThinkingBlock;
 const silentNotices = (s: Session) => s.snapshot.items.filter((i) => i.kind === "notice" && /said nothing; send your message again/.test(i.text));
 
-test("BUG-613/whitespace-only: a whitespace-only reply is an empty one: a notice, and no blank text block in the history", async () => {
+test("intake/empty-reply: a whitespace-only reply is an empty one: a notice, and no blank text block in the history #BUG-613/whitespace-only", async () => {
   const { client, sent } = replies([[text("\n")], [text("ok")]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("one");
@@ -564,7 +564,7 @@ test("BUG-613/whitespace-only: a whitespace-only reply is an empty one: a notice
   expect(sent[1]).toEqual([{ role: "user", content: "two" }]);
 });
 
-test("BUG-613/twice: two empty replies in a row leave the history as it was, with a notice each", async () => {
+test("intake/empty-reply: two empty replies in a row leave the history as it was, with a notice each #BUG-613/twice", async () => {
   const { client, sent } = replies([[], [], [text("ok")]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("one");
@@ -576,7 +576,7 @@ test("BUG-613/twice: two empty replies in a row leave the history as it was, wit
   expect(s.busy).toBe(false);
 });
 
-test("BUG-613/thinking only: a reply with only thinking blocks counts as empty; thinking beside a tool call or words stays", async () => {
+test("intake/empty-reply: a reply with only thinking blocks counts as empty; thinking beside a tool call or words stays #BUG-613/thinking-only", async () => {
   const { client, sent } = replies([[thinking], [redacted], [thinking, text("Here.")], [thinking, tool("l1", "list_files", {}), text("\n")], [text("ok")]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("one");
@@ -591,7 +591,7 @@ test("BUG-613/thinking only: a reply with only thinking blocks counts as empty; 
   expect((withCall.content as Anthropic.ContentBlock[]).map((b) => b.type)).toEqual(["thinking", "tool_use"]);
 });
 
-test("BUG-613/mid-turn: an empty reply after tool calls rewinds the whole turn, so no tool_use is left unanswered", async () => {
+test("intake/empty-reply: an empty reply after tool calls rewinds the whole turn, so no tool_use is left unanswered #BUG-613/mid-turn", async () => {
   const { client, sent } = replies([[tool("l1", "list_files", {})], [], [text("ok")]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("one");
@@ -602,7 +602,7 @@ test("BUG-613/mid-turn: an empty reply after tool calls rewinds the whole turn, 
   expect(apiProblem(sent[2]!)).toBeNull();
 });
 
-test("BUG-613/after a proposal: an empty reply to the developer's answer keeps the proposal's tool call answered for the next message", async () => {
+test("intake/empty-reply: an empty reply to the developer's answer keeps the proposal's tool call answered for the next message #BUG-613/after-a-proposal", async () => {
   const { client, sent } = replies([[route("r1"), tool("p1", "propose_launch", intake)], [], [text("ok")]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("fix the bug");
@@ -618,7 +618,7 @@ test("BUG-613/after a proposal: an empty reply to the developer's answer keeps t
   expect(json).not.toContain("They replied: make it cheaper\\\"");
 });
 
-test("BUG-613/routes: the history after an empty reply builds a valid request on every route (Anthropic, Bedrock Claude and Converse, Responses, Chat)", async () => {
+test("intake/empty-reply: the history after an empty reply builds a valid request on every route (Anthropic, Bedrock Claude and Converse, Responses, Chat) #BUG-613/routes", async () => {
   const { client, sent } = replies([[], [text("Here you go.")], [tool("l1", "list_files", {})], [text("ok")]]);
   const s = new Session(client, config, "sys", root);
   await s.submit("fix the bug");
@@ -641,7 +641,7 @@ test("BUG-613/routes: the history after an empty reply builds a valid request on
   }
 });
 
-test("BUG-613/chat builder: Chat Completions gets no assistant message without text and calls, whatever the history holds", () => {
+test("intake/empty-reply: Chat Completions gets no assistant message without text and calls, whatever the history holds #BUG-613/chat-builder", () => {
   const out = toChatMessages("sys", [
     { role: "user", content: "a" },
     { role: "assistant", content: [] },
@@ -651,7 +651,7 @@ test("BUG-613/chat builder: Chat Completions gets no assistant message without t
   expect(out).toEqual([{ role: "system", content: "sys" }, { role: "user", content: "a" }, { role: "user", content: "b" }]);
 });
 
-test("BUG-625/QA-brain-02: a loop brain that ends its turn normally after Gluon stopped it (the call cap) still shows why the turn ended", async () => {
+test("intake/turn-limits: a loop brain that ends its turn normally after Gluon stopped it (the call cap) still shows why the turn ended #BUG-625/QA-brain-02", async () => {
   let begun = 0;
   const brain: LoopBrain = {
     // A brain whose interrupt ends the turn without an error (not every harness raises one).
@@ -670,7 +670,7 @@ test("BUG-625/QA-brain-02: a loop brain that ends its turn normally after Gluon 
   expect(s.snapshot.items.some((i) => i.kind === "notice" && /calls without asking or proposing/.test(i.text))).toBe(true);
 });
 
-test("BUG-625/variants: a loop brain that returns normally after a stop shows the stop once, and the next turn is clean", async () => {
+test("intake/turn-limits: a loop brain that returns normally after a stop shows the stop once, and the next turn is clean #BUG-625/variants", async () => {
   const brain: LoopBrain = {
     async send(_text, _system, hooks, signal) {
       for (let i = 0; i < 100 && !signal.aborted; i++) {
@@ -691,7 +691,7 @@ test("BUG-625/variants: a loop brain that returns normally after a stop shows th
   expect(s2.snapshot.items.filter((i) => i.kind === "notice")).toHaveLength(0);
 });
 
-test("BUG-630/plan brain: a plan brain (a loop brain) that ends its turn with no words and no tool call says so, as the chat path does (BUG-613)", async () => {
+test("intake/empty-reply: a plan brain (a loop brain) that ends its turn with no words and no tool call says so, as the chat path does (BUG-613) #BUG-630/plan-brain", async () => {
   const silent: LoopBrain = { async send(_t, _s, hooks) { hooks.begin(); hooks.end([]); } };
   const s = new Session(silent, config, "sys", root);
   await s.submit("fix the bug");
@@ -699,7 +699,7 @@ test("BUG-630/plan brain: a plan brain (a loop brain) that ends its turn with no
   expect(s.snapshot.items.some((i) => i.kind === "notice" && /said nothing; send your message again/.test(i.text))).toBe(true);
 });
 
-test("BUG-630/variants: words, a tool call, or an open question are not silence; an empty last reply after tool calls, or after the developer's answer, is", async () => {
+test("intake/empty-reply: words, a tool call, or an open question are not silence; an empty last reply after tool calls, or after the developer's answer, is #BUG-630/variants", async () => {
   const run = async (send: LoopBrain["send"], ...replies: string[]) => {
     const s = new Session({ send }, config, "sys", root);
     await s.submit("go");
@@ -716,7 +716,7 @@ test("BUG-630/variants: words, a tool call, or an open question are not silence;
   expect(await run(async (_t, _s, h) => { h.begin(); await h.tool("ask_user", { question: "Which?", options: [{ label: "a" }, { label: "b" }] }); h.begin(); h.end([]); }, "a")).toBe(1);
 });
 
-test("QA: a loop brain that goes on calling tools is stopped with a notice; a brain whose interrupt raises shows it", async () => {
+test("intake/turn-limits: a loop brain that goes on calling tools is stopped with a notice; a brain whose interrupt raises shows it", async () => {
   let begun = 0;
   const brain: LoopBrain = {
     async send(_text, _system, hooks, signal) {
@@ -736,7 +736,7 @@ test("QA: a loop brain that goes on calling tools is stopped with a notice; a br
   expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "notice", tone: "error", text: expect.stringContaining("16 calls") });
 });
 
-test("QA: the same cap on a model client leaves its unanswered tool results to open the developer's next message", async () => {
+test("intake/turn-limits: the same cap on a model client leaves its unanswered tool results to open the developer's next message", async () => {
   let n = 0;
   const client: ModelClient = async () => ({ content: [tool(`c${++n}`, "list_files", {})], stop_reason: "tool_use" });
   const s = new Session(client, config, "sys", root);
@@ -755,7 +755,7 @@ test("QA: the same cap on a model client leaves its unanswered tool results to o
   expect(opening.at(-1)).toEqual({ type: "text", text: "continue" });
 });
 
-test("QA: more repo tool calls than the budget in one turn: the first twelve run, the rest are answered with a budget error and shown as skipped", async () => {
+test("intake/turn-limits: more repo tool calls than the budget in one turn: the first twelve run, the rest are answered with a budget error and shown as skipped", async () => {
   const calls = Array.from({ length: 14 }, (_, i) => tool(`l${i}`, "list_files", {}));
   const { client, requests } = scripted([calls]);
   const s = new Session(client, config, "sys", root);
@@ -768,7 +768,7 @@ test("QA: more repo tool calls than the budget in one turn: the first twelve run
   expect(explored?.kind === "explored" && explored.rows.filter((r) => r.error === "skipped")).toHaveLength(2);
 });
 
-test("QA: a tool call whose input isn't an object (null, text, a number, a list) is answered like any bad call: no throw, no pending, no hang", async () => {
+test("intake/turn-limits: a tool call whose input isn't an object (null, text, a number, a list) is answered like any bad call: no throw, no pending, no hang", async () => {
   const names = ["ask_user", "propose_launch", "route", "read_file", "grep", "list_files", "git_log", "forge"];
   for (const name of names) {
     for (const bad of [null, "garbage", 42, [], ["a"]]) {
@@ -783,7 +783,7 @@ test("QA: a tool call whose input isn't an object (null, text, a number, a list)
   }
 });
 
-test("QA: an error in the middle of a stream keeps the words already shown, masks a key in the message, and the next message goes on from a valid history", async () => {
+test("intake/failed-turn: an error in the middle of a stream keeps the words already shown, masks a key in the message, and the next message goes on from a valid history", async () => {
   const sent: Req["messages"][] = [];
   let n = 0;
   const client: ModelClient = async (req, onText) => {
@@ -808,7 +808,7 @@ test("QA: an error in the middle of a stream keeps the words already shown, mask
   expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "back" });
 });
 
-test("QA: Esc while a repo tool runs ends the turn with the Interrupted notice, drops the unanswered tool_use, and the next message is accepted", async () => {
+test("intake/failed-turn: Esc while a repo tool runs ends the turn with the Interrupted notice, drops the unanswered tool_use, and the next message is accepted", async () => {
   let s!: Session;
   const sent: Req["messages"][] = [];
   const client: ModelClient = async (req) => {
@@ -828,7 +828,7 @@ test("QA: Esc while a repo tool runs ends the turn with the Interrupted notice, 
   expect(JSON.stringify(sent[1])).not.toContain("g1");
 });
 
-test("QA: the next brain is asked only for a model that is unavailable, never for an interrupt; a fallback that fails or finds nothing leaves the original error and its hint", async () => {
+test("brain/fallback: the next brain is asked only for a model that is unavailable, never for an interrupt; a fallback that fails or finds nothing leaves the original error and its hint", async () => {
   let asked = 0;
   const fallback = async () => {
     asked++;
@@ -863,7 +863,7 @@ test("QA: the next brain is asked only for a model that is unavailable, never fo
   expect(asked).toBe(before + 1);
 });
 
-test("QA: moving on from a loop brain closes it, and the next loop brain gets the message again from a fresh history", async () => {
+test("brain/fallback: moving on from a loop brain closes it, and the next loop brain gets the message again from a fresh history", async () => {
   let closed = 0;
   const first: LoopBrain = { send: async () => Promise.reject(new Error("There's an issue with the selected model (x). It may not exist or you may not have access to it.")), close: () => void closed++ };
   const heard: string[] = [];
@@ -885,7 +885,7 @@ test("QA: moving on from a loop brain closes it, and the next loop brain gets th
   expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "hello from the second" });
 });
 
-test("QA: ask_user shows at most four questions (the first and three next_questions; any more are dropped), at most eight options each, trimmed; the answers come back in order; a bad next question refuses the whole batch with its reason", async () => {
+test("intake/questions: ask_user shows at most four questions (the first and three next_questions; any more are dropped), at most eight options each, trimmed; the answers come back in order; a bad next question refuses the whole batch with its reason", async () => {
   const many = Array.from({ length: 10 }, (_, i) => ({ label: ` Option ${i} `, description: i === 0 ? " why " : 5 }));
   const q = (question: string) => ({ question, options: many });
   const { client, requests } = scripted([[tool("q1", "ask_user", { ...q("First?"), next_questions: [q("Second?"), q("Third?"), q("Fourth?"), q("Fifth?")] })]]);
@@ -911,7 +911,7 @@ test("QA: ask_user shows at most four questions (the first and three next_questi
   expect(t.snapshot.pending).toMatchObject({ kind: "question", question: { question: "First?" } });
 });
 
-test("QA: an answer typed while a series of questions is open is the answer to the one shown, and an answer to the proposal's 'keep talking' is a reply, not an answer", async () => {
+test("intake/questions: an answer typed while a series of questions is open is the answer to the one shown, and an answer to the proposal's 'keep talking' is a reply, not an answer", async () => {
   const opts = [{ label: "A" }, { label: "B" }];
   const { client, requests } = scripted([
     [tool("q1", "ask_user", { question: "One?", options: opts, next_questions: [{ question: "Two?", options: opts }] })],
@@ -930,7 +930,7 @@ test("QA: an answer typed while a series of questions is open is the answer to t
 });
 
 // A Windows file name can't hold `<`, `>` or `"`: no directory there can open a block, and the one this test makes can't be created.
-test.skipIf(process.platform === "win32")("BUG-596/QA-brain-14: the nested AGENTS.md block a repo tool's result carries can't have a directory name open one of the prompt's trusted blocks (`fenced`, as the root's file names and text do: BUG-459)", async () => {
+test.skipIf(process.platform === "win32")("repo-tools/untrusted-text: the nested AGENTS.md block a repo tool's result carries can't have a directory name open one of the prompt's trusted blocks (`fenced`, as the root's file names and text do: BUG-459) #BUG-596/QA-brain-14", async () => {
   const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
   const { join } = await import("node:path");
   const { tmpdir } = await import("node:os");

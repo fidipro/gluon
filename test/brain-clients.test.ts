@@ -106,7 +106,7 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     return anthropicBrain("sk-ant-api03-test0123456789abcdefghijklmnop", model, effort);
   };
 
-  test("the request: POST /v1/messages, the key in x-api-key, a streamed body with the model, 8192 tokens, the cached system prompt, the tools and the effort", async () => {
+  test("brain/requests: the request: POST /v1/messages, the key in x-api-key, a streamed body with the model, 8192 tokens, the cached system prompt, the tools and the effort", async () => {
     const { url, requests } = serve(() => sseResponse([START, ...text(0, "Hello"), ...END("end_turn")]));
     const deltas: string[] = [];
     const res = await brain(url, "claude-sonnet-5-5", "high")(ask(), (d) => deltas.push(d));
@@ -130,13 +130,13 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     expect(res.content).toMatchObject([{ type: "text", text: "Hello" }]);
   });
 
-  test("no effort is sent for a model that takes none, and no other field of the request is invented", async () => {
+  test("brain/requests: no effort is sent for a model that takes none, and no other field of the request is invented", async () => {
     const { url, requests } = serve(() => sseResponse([START, ...text(0, "ok"), ...END("end_turn")]));
     await brain(url, "claude-haiku-4-5", null)(ask(), () => {});
     expect(Object.keys(requests[0]!.body).sort()).toEqual(["max_tokens", "messages", "model", "stream", "system", "tools"]);
   });
 
-  test("text and a tool call in one reply: the words stream, the tool's input is the JSON its pieces make, the stop reason is tool_use", async () => {
+  test("brain/streams: text and a tool call in one reply: the words stream, the tool's input is the JSON its pieces make, the stop reason is tool_use", async () => {
     const { url } = serve(() => sseResponse([START, ...text(0, "Let me ", "look."), ...toolUse(1, "toolu_1", "grep", '{"patt', 'ern":"ex', 'port","path":"src"}'), ...END("tool_use")]));
     const deltas: string[] = [];
     const res = await brain(url)(ask(), (d) => deltas.push(d));
@@ -145,19 +145,19 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     expect(res.content).toMatchObject([{ type: "text", text: "Let me look." }, { type: "tool_use", id: "toolu_1", name: "grep", input: { pattern: "export", path: "src" } }]);
   });
 
-  test("a tool call with no input pieces at all has an empty input; a reply with no content is returned empty (the session decides)", async () => {
+  test("brain/streams: a tool call with no input pieces at all has an empty input; a reply with no content is returned empty (the session decides)", async () => {
     const { url } = serve((_, n) => sseResponse(n === 1 ? [START, ...toolUse(0, "toolu_1", "list_files"), ...END("tool_use")] : [START, ...END("end_turn")]));
     const b = brain(url);
     expect((await b(ask(), () => {})).content).toMatchObject([{ type: "tool_use", name: "list_files", input: {} }]);
     expect(await b(ask(), () => {})).toEqual({ content: [], stop_reason: "end_turn" });
   });
 
-  test("max_tokens comes back as the stop reason (the session turns it into 'cut off')", async () => {
+  test("brain/streams: max_tokens comes back as the stop reason (the session turns it into 'cut off')", async () => {
     const { url } = serve(() => sseResponse([START, ...text(0, "long"), ...END("max_tokens")]));
     expect((await brain(url)(ask(), () => {})).stop_reason).toBe("max_tokens");
   });
 
-  test("errors keep their HTTP status and the provider's own message; only a missing model is 'model unavailable'", async () => {
+  test("brain/fallback: errors keep their HTTP status and the provider's own message; only a missing model is 'model unavailable'", async () => {
     const cases: [string, number, string, string, boolean][] = [
       ["401", 401, "authentication_error", "invalid x-api-key", false],
       ["403 permission", 403, "permission_error", "Your API key does not have permission to use the specified resource.", false],
@@ -174,7 +174,7 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     }
   });
 
-  test("an error event in the middle of a stream (overloaded) rejects with its message, not as a model problem", async () => {
+  test("brain/fallback: an error event in the middle of a stream (overloaded) rejects with its message, not as a model problem", async () => {
     const { url } = serve(() => sseResponse([START, ...text(0, "partial"), ["error", { type: "error", error: { type: "overloaded_error", message: "Overloaded" } }]]));
     const deltas: string[] = [];
     const error = await brain(url)(ask(), (d) => deltas.push(d)).then(() => null, (e: Error) => e);
@@ -183,19 +183,19 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     expect(modelUnavailable(error)).toBe(false);
   });
 
-  test("a stream that ends without message_stop rejects instead of returning half a reply", async () => {
+  test("brain/streams: a stream that ends without message_stop rejects instead of returning half a reply", async () => {
     const { url } = serve(() => sseResponse([START, ...text(0, "half a repl")].slice(0, 3)));
     const error = await brain(url)(ask(), () => {}).then(() => null, (e: Error) => e);
     expect(error).toBeInstanceOf(Error);
   });
 
-  test("garbage instead of an event stream (a proxy's HTML page) rejects", async () => {
+  test("brain/streams: garbage instead of an event stream (a proxy's HTML page) rejects", async () => {
     const { url } = serve(() => new Response("<html>502 Bad Gateway</html>", { status: 200, headers: { "content-type": "text/html", "x-should-retry": "false" } }));
     const error = await brain(url)(ask(), () => {}).then(() => null, (e: Error) => e);
     expect(error).toBeInstanceOf(Error);
   });
 
-  test("an abort during the stream rejects at once and the server sees the connection close", async () => {
+  test("brain/streams: an abort during the stream rejects at once and the server sees the connection close", async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     const { url } = serve(() => {
@@ -217,7 +217,7 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     release();
   });
 
-  test("nothing listening: a connection error, after the SDK's own two retries, and not a model problem", async () => {
+  test("brain/fallback: nothing listening: a connection error, after the SDK's own two retries, and not a model problem", async () => {
     const dead = Bun.serve({ port: 0, fetch: () => new Response("x") });
     const url = `http://127.0.0.1:${dead.port}`;
     dead.stop(true);
@@ -226,7 +226,7 @@ describe("anthropicBrain (the real SDK on a local server)", () => {
     expect(modelUnavailable(error)).toBe(false);
   });
 
-  test("a Session on it: the key echoed in an error is masked, and the next message still goes", async () => {
+  test("keys/masked-when-printed: a Session on it: the key echoed in an error is masked, and the next message still goes", async () => {
     const key = "sk-ant-api03-test0123456789abcdefghijklmnop";
     const { url, requests } = serve((_, n) => (n === 1 ? apiError(401, "authentication_error", `invalid x-api-key ${key}`) : sseResponse([START, ...text(0, "back"), ...END("end_turn")])));
     const s = new Session(brain(url), defaults(), "sys", root);
@@ -279,7 +279,7 @@ describe("bedrockClaudeBrain (the Anthropic Bedrock SDK on a local server)", () 
     return bedrockClaudeBrain({ ...defaults(), bedrock: { region: "eu-west-1", ...(profile ? { profile } : {}) } }, MODEL, effort);
   };
 
-  test("the request: signed with the environment's AWS keys for the configured region, the model in the path, the Bedrock body (no model, no stream), the effort and the cached system prompt", async () => {
+  test("brain/requests: the request: signed with the environment's AWS keys for the configured region, the model in the path, the Bedrock body (no model, no stream), the effort and the cached system prompt", async () => {
     const { url, requests } = serve(() => eventStreamResponse([START, ...text(0, "Hello", " there"), ...END("end_turn")]));
     const deltas: string[] = [];
     const res = await brain(url, "medium")(ask(), (d) => deltas.push(d));
@@ -293,13 +293,13 @@ describe("bedrockClaudeBrain (the Anthropic Bedrock SDK on a local server)", () 
     expect(res).toMatchObject({ stop_reason: "end_turn", content: [{ type: "text", text: "Hello there" }] });
   });
 
-  test("a tool call streams through the AWS framing like through SSE", async () => {
+  test("brain/streams: a tool call streams through the AWS framing like through SSE", async () => {
     const { url } = serve(() => eventStreamResponse([START, ...toolUse(0, "toolu_9", "read_file", '{"path":', '"package.json"}'), ...END("tool_use")]));
     const res = await brain(url)(ask(), () => {});
     expect(res).toMatchObject({ stop_reason: "tool_use", content: [{ type: "tool_use", id: "toolu_9", name: "read_file", input: { path: "package.json" } }] });
   });
 
-  test("AWS's errors: access denied and a missing model move the order on; throttling, expired credentials and outages don't", async () => {
+  test("brain/fallback: AWS's errors: access denied and a missing model move the order on; throttling, expired credentials and outages don't", async () => {
     const cases: [string, number, string, string, boolean][] = [
       ["access denied", 403, "AccessDeniedException", "You don't have access to the model with the specified model ID.", true],
       ["model not found", 404, "ResourceNotFoundException", "Could not resolve the foundation model from the provided model identifier.", true],
@@ -316,7 +316,7 @@ describe("bedrockClaudeBrain (the Anthropic Bedrock SDK on a local server)", () 
     }
   });
 
-  test("a stream cut off before its last frame rejects", async () => {
+  test("brain/streams: a stream cut off before its last frame rejects", async () => {
     const whole = eventStream([START, ...text(0, "partial"), ...END("end_turn")]);
     const { url } = serve(() => new Response(whole.subarray(0, Math.floor(whole.length * 0.6)), { headers: { "content-type": "application/vnd.amazon.eventstream" } }));
     const error = await brain(url)(ask(), () => {}).then(() => null, (e: Error) => e);
@@ -330,7 +330,7 @@ describe("bedrockClaudeBrain (the Anthropic Bedrock SDK on a local server)", () 
     expect(process.env.AWS_PROFILE).toBeUndefined();
   });
 
-  test("nothing to sign with (no keys, no profile, no metadata service): the error names the credentials, and isn't a model problem", async () => {
+  test("brain/fallback: nothing to sign with (no keys, no profile, no metadata service): the error names the credentials, and isn't a model problem", async () => {
     const { url, requests } = serve(() => eventStreamResponse([START, ...END("end_turn")]));
     const b = brain(url, null, "a-profile-that-does-not-exist");
     for (const k of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]) delete process.env[k];
@@ -400,7 +400,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     return { ...f, session: new Session(subscriptionBrain("claude-sonnet-5-5", root, f.run), defaults(), "sys", root) };
   };
 
-  test("two text blocks and a tool call in one model call, the tool's name without Gluon's MCP prefix; words stream as they come", async () => {
+  test("brain/claude-plan: two text blocks and a tool call in one model call, the tool's name without Gluon's MCP prefix; words stream as they come", async () => {
     const { session, log } = sessionOn([[
       start(), block(0, { type: "text", text: "" }), delta(0, { type: "text_delta", text: "Looking " }), delta(0, { type: "text_delta", text: "now." }),
       block(1, { type: "tool_use", id: "t1", name: "mcp__gluon__list_files", input: {} }), stop,
@@ -414,7 +414,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     session.close();
   });
 
-  test("events of a sub-agent (parent_tool_use_id set) are not the brain's words", async () => {
+  test("brain/claude-plan: events of a sub-agent (parent_tool_use_id set) are not the brain's words", async () => {
     const { session } = sessionOn([[start(), block(0, { type: "text", text: "" }), delta(0, { type: "text_delta", text: "mine" }), delta(0, { type: "text_delta", text: "THEIRS" }, "toolu_x"), stop, done]]);
     await session.submit("go");
     expect(JSON.stringify(session.snapshot.items)).toContain("mine");
@@ -422,7 +422,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     session.close();
   });
 
-  test("a failed result says why in its own words, else from its errors, else plainly; a success flagged is_error is a failure too", async () => {
+  test("brain/claude-plan: a failed result says why in its own words, else from its errors, else plainly; a success flagged is_error is a failure too", async () => {
     const fails: [Record<string, unknown>, string][] = [
       [{ subtype: "success", is_error: true, result: "Credit balance is too low" }, "Credit balance is too low"],
       [{ subtype: "error_during_execution", is_error: true, errors: ["first", "second"] }, "first; second"],
@@ -438,7 +438,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     }
   });
 
-  test("after a failed turn the same `claude` takes the next message (no restart notice)", async () => {
+  test("brain/claude-plan: after a failed turn the same `claude` takes the next message (no restart notice)", async () => {
     const { session, log } = sessionOn([[{ kind: "result", result: { subtype: "error_during_execution", is_error: true, result: "overloaded" } }], [start(), block(0, { type: "text", text: "" }), delta(0, { type: "text_delta", text: "back" }), stop, done]]);
     await session.submit("one");
     await session.submit("two");
@@ -448,7 +448,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     session.close();
   });
 
-  test("`claude` that ends its output mid-turn is an error naming it, and the next message starts a new one with the 'forgot' notice", async () => {
+  test("brain/claude-plan: `claude` that ends its output mid-turn is an error naming it, and the next message starts a new one with the 'forgot' notice", async () => {
     const { session } = sessionOn([[start(), { kind: "end" }], [done]]);
     await session.submit("one");
     expect(session.snapshot.items.at(-1)).toMatchObject({ kind: "notice", tone: "error", text: expect.stringContaining("the intake agent stopped") });
@@ -457,7 +457,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     session.close();
   });
 
-  test("Esc interrupts the query, the turn ends with the Interrupted notice, and a tool call that comes in afterwards is answered 'Stopped'", async () => {
+  test("brain/claude-plan: Esc interrupts the query, the turn ends with the Interrupted notice, and a tool call that comes in afterwards is answered 'Stopped'", async () => {
     const { session, log, tools } = sessionOn([[start(), { kind: "hold" }, { kind: "result", result: { subtype: "error_during_execution", is_error: true, result: "interrupted" } }]]);
     const p = session.submit("go");
     await Bun.sleep(50);
@@ -472,7 +472,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     session.close();
   });
 
-  test("a model that is gone (Claude Code's own wording) moves the order on to the next brain; the plan's query is closed", async () => {
+  test("brain/claude-plan: a model that is gone (Claude Code's own wording) moves the order on to the next brain; the plan's query is closed", async () => {
     const f = fake([[{ kind: "result", result: { subtype: "success", is_error: true, result: "There's an issue with the selected model (claude-nonesuch). It may not exist or you may not have access to it." } }]]);
     const { client: next, requests } = (() => {
       const requests: unknown[] = [];
@@ -488,7 +488,7 @@ describe("subscriptionBrain on a fake `query`", () => {
     session.close();
   });
 
-  test("`claude` not installed: the first message says so (and how to go on), without starting anything", async () => {
+  test("brain/claude-plan: `claude` not installed: the first message says so (and how to go on), without starting anything", async () => {
     const was = process.env.PATH;
     process.env.PATH = mkdtempSync(join(tmpdir(), "gluon-nopath-"));
     try {
@@ -518,7 +518,7 @@ describe("openaiClient (the real SDK on a local server)", () => {
   const jsonError = (status: number, message: string, extra: Record<string, unknown> = {}) => new Response(JSON.stringify({ error: { message, ...extra } }), { status, headers: { "content-type": "application/json", "x-should-retry": "false" } });
   const chat = (url: string, over: Partial<Parameters<typeof openaiClient>[0]> = {}) => openaiClient({ apiKey: "sk-or-v1-0123456789abcdef0123456789abcdef", model: "anthropic/claude-sonnet-5.5", mode: "chat", baseURL: `${url}/api/v1`, headers: OPENROUTER_HEADERS, effort: "high", ...over });
 
-  test("Chat Completions: the request carries OpenRouter's attribution headers, the tools as functions, max_tokens and reasoning.effort; text streams, parallel tool calls are assembled by index", async () => {
+  test("brain/requests: Chat Completions: the request carries OpenRouter's attribution headers, the tools as functions, max_tokens and reasoning.effort; text streams, parallel tool calls are assembled by index", async () => {
     const { url, requests } = serve(() => chatStream([
       chunk({ role: "assistant", content: "Look" }), chunk({ content: "ing." }),
       chunk({ tool_calls: [{ index: 0, id: "call_a", type: "function", function: { name: "grep", arguments: '{"pattern":' } }] }),
@@ -539,7 +539,7 @@ describe("openaiClient (the real SDK on a local server)", () => {
     expect(res.content).toMatchObject([{ type: "text", text: "Looking." }, { type: "tool_use", id: "call_a", name: "grep", input: { pattern: "x" } }, { type: "tool_use", id: "call_b", name: "list_files", input: {} }]);
   });
 
-  test("a tool call whose arguments aren't JSON reaches the session as an input the tool refuses, not as a crash", async () => {
+  test("brain/streams: a tool call whose arguments aren't JSON reaches the session as an input the tool refuses, not as a crash", async () => {
     const { url } = serve((_, n) => chatStream(n === 1
       ? [chunk({ tool_calls: [{ index: 0, id: "call_a", type: "function", function: { name: "read_file", arguments: '{"path": "pack' } }] }), chunk({}, "tool_calls")]
       : [chunk({ content: "ok" }), chunk({}, "stop")]));
@@ -549,14 +549,14 @@ describe("openaiClient (the real SDK on a local server)", () => {
     expect(s.snapshot.items.at(-1)).toMatchObject({ kind: "assistant", text: "ok" });
   });
 
-  test("finish_reason length is max_tokens; a stream with no chunks at all is an empty reply", async () => {
+  test("brain/streams: finish_reason length is max_tokens; a stream with no chunks at all is an empty reply", async () => {
     const { url } = serve((_, n) => chatStream(n === 1 ? [chunk({ content: "cut" }, "length")] : []));
     const b = chat(url);
     expect((await b(ask(), () => {})).stop_reason).toBe("max_tokens");
     expect(await b(ask(), () => {})).toEqual({ content: [], stop_reason: "end_turn" });
   });
 
-  test("errors: the provider's wording decides what is 'model unavailable', and the probe's reading says the same", async () => {
+  test("brain/fallback: errors: the provider's wording decides what is 'model unavailable', and the probe's reading says the same", async () => {
     const cases: [string, number, string, boolean][] = [
       ["401", 401, "No auth credentials found", false],
       ["402", 402, "Insufficient credits", false],
@@ -572,7 +572,7 @@ describe("openaiClient (the real SDK on a local server)", () => {
     }
   });
 
-  test("Responses (the SDK's own endpoint, a local server behind it): input items, instructions, store false, reasoning.effort, streamed text; a failed response and an error event are errors with their messages", async () => {
+  test("brain/requests: Responses (the SDK's own endpoint, a local server behind it): input items, instructions, store false, reasoning.effort, streamed text; a failed response and an error event are errors with their messages", async () => {
     const event = (type: string, data: Record<string, unknown>) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
     const completed = { id: "r1", status: "completed", incomplete_details: null, output: [{ type: "message", id: "m1", role: "assistant", content: [{ type: "output_text", text: "Hello", annotations: [] }] }, { type: "function_call", id: "f1", call_id: "call_1", name: "list_files", arguments: "{}" }] };
     const { url, requests } = serve((_, n) => new Response(n === 1 ? event("response.output_text.delta", { delta: "Hel" }) + event("response.output_text.delta", { delta: "lo" }) + event("response.completed", { response: completed }) : n === 2 ? event("response.failed", { response: { status: "failed", error: { message: "The server had an error" } } }) : event("error", { message: "stream broke" }), { headers: { "content-type": "text/event-stream" } }));
