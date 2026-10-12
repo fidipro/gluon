@@ -66,7 +66,7 @@ Into an agent Gluon writes only:
 
 ## Saved sessions
 
-Saved sessions (`workspaces/` next to the config, one file each, readable only by you like the keys) hold each session's name, agent, model, effort, directory, the spec it started with (keys masked) and the agent's session id. They never hold the chat with the intake agent, a key, or what an agent's screen showed. `gluon uninstall` removes them.
+Saved sessions (`workspaces/` next to the config, one file each, readable only by you like the keys) hold each session's name, agent, model, effort, mode, permissions, directory, the spec it started with (keys masked) and the agent's session id. They never hold the chat with the intake agent, a key, or what an agent's screen showed. `gluon uninstall` removes them.
 
 ## Session analytics
 
