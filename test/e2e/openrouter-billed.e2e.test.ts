@@ -50,7 +50,7 @@ const end = async (app: Awaited<ReturnType<typeof gluon>>) => {
   await app.press(KEYS.enter);
 };
 
-test.skipIf(WIN)("BUG-481/e2e: an OpenRouter session on a key nothing else used: the chat says what OpenRouter billed (the key's usage over the session), the ledger audits it against Gluon's own, the key is only in the header @full", async () => {
+test.skipIf(WIN)("openrouter/billed: an OpenRouter session on a key nothing else used: the chat says what OpenRouter billed (the key's usage over the session), the ledger audits it against Gluon's own, the key is only in the header @full", async () => {
   const s = await session([10, 10.37]);
   try {
     await launch(s.app, "fix the thing");

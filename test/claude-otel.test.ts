@@ -13,7 +13,7 @@ import { startTelemetry, TELEMETRY_HEADER, telemetryLaunch, type UsageEvent } fr
 const SESSION = { token: "ab".repeat(24), endpoint: "http://127.0.0.1:4318" };
 
 describe("BUG-675/claude-otel", () => {
-  test("BUG-675/claude-otel: the env Gluon passes Claude Code (2.1.139 to 2.1.293) turns telemetry on, exports logs and metrics as OTLP http/json to the loopback listener every 2 s and 5 s, and exports no content", () => {
+  test("cost/telemetry-setup: the env Gluon passes Claude Code (2.1.139 to 2.1.293) turns telemetry on, exports logs and metrics as OTLP http/json to the loopback listener every 2 s and 5 s, and exports no content #BUG-675/claude-otel", () => {
     const l = telemetryLaunch("claude-code", SESSION, { PATH: "/bin" })!;
     expect(l.argv).toEqual([]);
     expect(l.env).toEqual({
@@ -42,7 +42,7 @@ describe("BUG-675/claude-otel", () => {
   const sse = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
   test.skipIf(!CLAUDE)(
-    "BUG-675/claude-otel: the installed claude sends a request's usage to Gluon's listener within seconds, while it is still running (offline: a fake Messages API) @full",
+    "cost/telemetry-setup: the installed claude sends a request's usage to Gluon's listener within seconds, while it is still running (offline: a fake Messages API) @full #BUG-675/claude-otel",
     async () => {
       const usage = { input_tokens: 1000, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
       const api = Bun.serve({

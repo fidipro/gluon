@@ -20,7 +20,7 @@ async function waitUntil(ok: () => boolean, ms = 10_000 * SLOW) {
 }
 
 describe("Antigravity: the row is Gluon's own, agy's figures only audit", () => {
-  test("ADV-EDFB/agy-row: no cost on the row (agy has none: its totals are the conversation's size), the context is total_input_tokens over Gluon's window, agy's own figures reach the ledger only; after /clear the new conversation's size shows at once (BUG-387, BUG-389) @full", async () => {
+  test("cost/antigravity-none: no cost on the row (agy has none: its totals are the conversation's size), the context is total_input_tokens over Gluon's window, agy's own figures reach the ledger only; after /clear the new conversation's size shows at once (BUG-387, BUG-389) @full #ADV-EDFB/agy-row", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-ledger-"));
     try {
       const app = await launchAs("agy", { env: { XDG_STATE_HOME: state } });
@@ -52,7 +52,7 @@ describe("Antigravity: the row is Gluon's own, agy's figures only audit", () => 
 });
 
 describe("Codex: the hook names the main conversation; turn costs are audited", () => {
-  test("ADV-EDFB/codex-main-session: the context follows the conversation the hook's session event names (a /fork), not the first one seen; a turn_cost lands in the ledger as a turn observation, never on the row @full", async () => {
+  test("context/main-thread-only: the context follows the conversation the hook's session event names (a /fork), not the first one seen; a turn_cost lands in the ledger as a turn observation, never on the row @full #ADV-EDFB/codex-main-session", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-ledger-"));
     try {
       const app = await launchAs("codex", { env: { XDG_STATE_HOME: state } });

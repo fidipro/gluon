@@ -76,7 +76,7 @@ const CASES: { name: string; opts: TrackerOptions; feed: (t: CostTracker) => voi
 
 describe("a session launched before its price table exists (issue #89)", () => {
   for (const c of CASES) {
-    test(`BUG-512/pending-priced-on-arrival: ${c.name}: requests that arrive before the table are priced when it lands, to the last digit as if it had been there`, () => {
+    test(`pricing/pending: ${c.name}: requests that arrive before the table are priced when it lands, to the last digit as if it had been there #BUG-512/pending-priced-on-arrival`, () => {
       const fresh = new Ledger();
       const ref = new CostTracker({ ...c.opts, ledger: fresh, now: () => 1000 });
       c.feed(ref);
@@ -112,7 +112,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     });
   }
 
-  test("BUG-512/pending-in-order: a request still waiting for a second table stays waiting, in order, while the first one's are priced", () => {
+  test("pricing/pending: a request still waiting for a second table stays waiting, in order, while the first one's are priced #BUG-512/pending-in-order", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     const ledger = new Ledger();
@@ -131,7 +131,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     t.ended();
   });
 
-  test("BUG-513/pinned-session: a refresh mid-session changes no figure of a session that was priced with a table; a session that waited pins the FIRST table that arrived", () => {
+  test("pricing/pending: a refresh mid-session changes no figure of a session that was priced with a table; a session that waited pins the FIRST table that arrived #BUG-513/pinned-session", () => {
     const double = (m: ModelsDevTable): ModelsDevTable => ({ ...m, catalogDigest: "d".repeat(64), entries: Object.fromEntries(Object.entries(m.entries).map(([k, e]) => [k, { ...e, cost: { ...e.cost, input: (e.cost.input ?? 0) * 2, output: (e.cost.output ?? 0) * 2 } }])) });
     const step = { model: "openrouter/deepseek/deepseek-v4-flash", tokens: TOKENS };
     const ledger = new Ledger();
@@ -163,7 +163,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     expect(waited.ownUsdNow()).toBe(first * 2);
   });
 
-  test("BUG-514/pending-at-end: a session that ends with requests still waiting leaves a `dropped` marker with a reason, never silence; the harness's own total then stands in, marked; nothing is priced after the end", () => {
+  test("pricing/pending: a session that ends with requests still waiting leaves a `dropped` marker with a reason, never silence; the harness's own total then stands in, marked; nothing is priced after the end #BUG-514/pending-at-end", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     const ledger = new Ledger();
@@ -183,7 +183,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     expect(droppedOf(ledger).map((d) => [d.reason, d.count])).toEqual([["no-price-table", 2], ["no-price-table", 1]]);
   });
 
-  test("BUG-514/no-subscription-left: a tracker that waited and ended holds no listener of the registry (a later table changes nothing and nothing throws)", () => {
+  test("pricing/pending: a tracker that waited and ended holds no listener of the registry (a later table changes nothing and nothing throws) #BUG-514/no-subscription-left", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     const ledger = new Ledger();
@@ -195,7 +195,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     expect(t.tables().modelsdev).toBeUndefined();
   });
 
-  test("BUG-515/buffer-overflow: past the cap the oldest request is dropped with a marker (counted as unpriced), the rest are priced on arrival", () => {
+  test("pricing/pending: past the cap the oldest request is dropped with a marker (counted as unpriced), the rest are priced on arrival #BUG-515/buffer-overflow", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     const ledger = new Ledger();
@@ -213,7 +213,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     t.ended();
   });
 
-  test("BUG-516/window-appears-late: the context window is unknown until the table it comes from is pinned; then the session is told, and later tables don't move it", () => {
+  test("pricing/pending: the context window is unknown until the table it comes from is pinned; then the session is told, and later tables don't move it #BUG-516/window-appears-late", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     let told = 0;
@@ -232,7 +232,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     t.ended();
   });
 
-  test("BUG-704/table-landed-before-first-use: a table that lands after the tracker is built and before its first request or window check still prices the session (issue #112)", () => {
+  test("pricing/pending: a table that lands after the tracker is built and before its first request or window check still prices the session (issue #112) #BUG-704/table-landed-before-first-use", () => {
     const fixture = { ...currentTables() };
     const feedClaude = (t: CostTracker) => t.claudeRequest({ model: "claude-opus-4-6", input: 1000, output: 600, cacheRead: 5000, cacheWrite: 20_000 });
     const ref = new CostTracker({ harness: "claude-code", conn: "anthropic", ledger: new Ledger(), now: () => 1000 });
@@ -265,7 +265,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     w.ended();
   });
 
-  test("BUG-516/window-per-harness:Claude's window waits for its catalog (no name rule stands in), models.dev's for OpenCode, Antigravity and Kimi; Grok's for its own table", () => {
+  test("pricing/pending: Claude's window waits for its catalog (no name rule stands in), models.dev's for OpenCode, Antigravity and Kimi; Grok's for its own table #BUG-516/window-per-harness", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     const need = (h: Parameters<typeof ownWindow>[0], conn = "plan") => new CostTracker({ harness: h, conn: conn as never });
@@ -281,7 +281,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     for (const t of [claude, opencode, agy, kimi, grok]) t.ended();
   });
 
-  test("BUG-517/no-calibration-while-pending: the live OpenRouter ratio isn't taken while a request waits for its price (the estimate it calibrates is only valid priced); the figure appears priced, uncalibrated", () => {
+  test("openrouter/estimate: the live OpenRouter ratio isn't taken while a request waits for its price (the estimate it calibrates is only valid priced); the figure appears priced, uncalibrated #BUG-517/no-calibration-while-pending", () => {
     const fixture = { ...currentTables() };
     emptyRegistry();
     const t = new CostTracker({ harness: "opencode", conn: "openrouter", launchedKey: "openrouter/deepseek/deepseek-v4-flash" });
@@ -299,7 +299,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
     t.ended();
   });
 
-  test("BUG-517/restate-drops-the-old-estimate: a meter restated after the late pricing calibrates only against an estimate that holds the requests (nothing before one lag), and keeps the time of the last request", async () => {
+  test("openrouter/estimate: a meter restated after the late pricing calibrates only against an estimate that holds the requests (nothing before one lag), and keeps the time of the last request #BUG-517/restate-drops-the-old-estimate", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-restate-"));
     try {
       let now = 1_000_000;
@@ -335,7 +335,7 @@ describe("a session launched before its price table exists (issue #89)", () => {
 describe("the ledger and the report of the tables (issue #89)", () => {
   const tablesEntry = (over: Partial<TablesEntry> = {}): TablesEntry => ({ kind: "tables", t: 1_791_000_000_000, table: "modelsdev", via: "network", digest: "abcdef12", fetchedAt: "2026-10-06T11:00:00.000Z", moved: 2, gone: 0, big: false, prices: [], ...over });
 
-  test("BUG-518/dropped-marker-of-a-table-refresh: the marker for a capped `tables` entry (it has no harness) names none, never `claude-code`; the entry survives a file and the report says so", () => {
+  test("ledger/caps: the marker for a capped `tables` entry (it has no harness) names none, never `claude-code`; the entry survives a file and the report says so #BUG-518/dropped-marker-of-a-table-refresh", () => {
     const dir = mkdtempSync(join(tmpdir(), "gluon-tables-ledger-"));
     try {
       const now = 1_791_000_000_000;
@@ -356,7 +356,7 @@ describe("the ledger and the report of the tables (issue #89)", () => {
     }
   });
 
-  test("BUG-519/report-tables: each local table is listed with its source, date, when it was fetched and how many requests it priced; the table refreshes are summed", () => {
+  test("ledger/report: each local table is listed with its source, date, when it was fetched and how many requests it priced; the table refreshes are summed #BUG-519/report-tables", () => {
     const info = tableInfos().find((t) => t.source === "models.dev")!;
     expect(info.fetchedAt === undefined || typeof info.fetchedAt === "string").toBe(true);
     const t = { source: "models.dev", updatedAt: "2026-10-04T08:57:09.103Z", version: null, fetchedAt: "2026-10-06T11:00:00.000Z", digest: "3a1d9fce060e" };

@@ -233,7 +233,7 @@ describe("the telemetry listener", () => {
     return { s, costs, contexts, auth: { [TELEMETRY_HEADER]: s.token } };
   }
 
-  test("loopback only, on a free port; each launch its own token", () => {
+  test("cost/telemetry-setup: loopback only, on a free port; each launch its own token", () => {
     expect(server.endpoint).toBe(`http://127.0.0.1:${server.port}`);
     expect(server.port).toBeGreaterThan(0);
     const [a, b] = [session(), session()];
@@ -243,7 +243,7 @@ describe("the telemetry listener", () => {
     b.s.close();
   });
 
-  test("Claude Code's cost metric: cumulative series (per model) summed at their latest, deltas added; other metrics ignored", async () => {
+  test("cost/sources: Claude Code's cost metric: cumulative series (per model) summed at their latest, deltas added; other metrics ignored", async () => {
     const a = session();
     expect((await post("/v1/metrics", costMetric([{ model: "claude-opus-5-5", usd: 0.0123 }]), a.auth)).status).toBe(200);
     expect((await post("/v1/metrics", costMetric([{ model: "claude-opus-5-5", usd: 0.05 }, { model: "claude-haiku-4-5", usd: 0.01 }]), a.auth)).status).toBe(200);
@@ -260,7 +260,7 @@ describe("the telemetry listener", () => {
     d.s.close();
   });
 
-  test("Claude Code's api_request events: the main thread's context (input + cache read + cache creation) and model; every request's cost until the metric comes", async () => {
+  test("cost/sources: Claude Code's api_request events: the main thread's context (input + cache read + cache creation) and model; every request's cost until the metric comes", async () => {
     const a = session();
     const main = (s: number, input: number, read: number, created: number, usd: number) =>
       apiRequest(s, [str("model", "claude-opus-5-5"), int("input_tokens", input), int("output_tokens", 300), int("cache_read_tokens", read), int("cache_creation_tokens", created), dbl("cost_usd", usd), str("query_source", "repl_main_thread")]);
@@ -279,7 +279,7 @@ describe("the telemetry listener", () => {
     a.s.close();
   });
 
-  test("BUG-329/subagent-source: a request's query_source says whether it takes the subagent cache TTL: only the main thread and the helpers inline with it do not", async () => {
+  test("cost/claude-code: a request's query_source says whether it takes the subagent cache TTL: only the main thread and the helpers inline with it do not #BUG-329/subagent-source", async () => {
     const usages: UsageEvent[] = [];
     const s = server.session({ onUsage: (u) => usages.push(u) });
     const sources = ["repl_main_thread", "repl_main_thread:outputStyle:custom", "sdk", "auto_mode", "memdir_relevance", "agent:custom", "agent:builtin:Explore", "compact", "generate_session_title"];
@@ -291,7 +291,7 @@ describe("the telemetry listener", () => {
     s.close();
   });
 
-  test("BUG-334/usage-dedup-bounded: 5001 distinct requests then a replay of the first count it once; a request with no model is a usage record without one", async () => {
+  test("cost/counted-once: 5001 distinct requests then a replay of the first count it once; a request with no model is a usage record without one #BUG-334/usage-dedup-bounded", async () => {
     const big = startTelemetry();
     const usages: UsageEvent[] = [];
     const s = big.session({ onUsage: (u) => usages.push(u) });
@@ -313,7 +313,7 @@ describe("the telemetry listener", () => {
     big.stop();
   });
 
-  test("Codex's response.completed events: the context (input, cached included, plus output: its total) and model; no cost", async () => {
+  test("cost/sources: Codex's response.completed events: the context (input, cached included, plus output: its total) and model; no cost", async () => {
     const a = session();
     const completed = (s: number, input: string) => ({
       timeUnixNano: t(s),
@@ -326,7 +326,7 @@ describe("the telemetry listener", () => {
     a.s.close();
   });
 
-  test("refused: no token, a wrong or closed one, another path or method, not JSON, too large (a gzip bomb too); traces are taken and dropped", async () => {
+  test("cost/listener-strict: refused: no token, a wrong or closed one, another path or method, not JSON, too large (a gzip bomb too); traces are taken and dropped", async () => {
     const a = session();
     const body = costMetric([{ model: "m", usd: 1 }]);
     expect((await post("/v1/metrics", body, {})).status).toBe(401);
@@ -351,7 +351,7 @@ describe("the telemetry listener", () => {
     expect(MAX_TELEMETRY_BYTES).toBe(2 * 1024 * 1024);
   });
 
-  test("a callback that throws doesn't break the listener", async () => {
+  test("cost/listener-strict: a callback that throws doesn't break the listener", async () => {
     const s = server.session({
       onCost: () => {
         throw new Error("x");
@@ -365,7 +365,7 @@ describe("the telemetry listener", () => {
 describe("a launch's telemetry", () => {
   const session = { token: "ab".repeat(24), endpoint: "http://127.0.0.1:4318" };
 
-  test("Claude Code: OTLP http/json to the loopback listener with the token; prompts, responses and tool content never exported", () => {
+  test("cost/telemetry-setup: Claude Code: OTLP http/json to the loopback listener with the token; prompts, responses and tool content never exported", () => {
     const l = telemetryLaunch("claude-code", session, { PATH: "/bin", HOME: "/h" })!;
     expect(l).toEqual({
       env: {
@@ -389,12 +389,12 @@ describe("a launch's telemetry", () => {
     for (const conn of [undefined, "plan", "anthropic", "openrouter", "bedrock"] as const) expect(() => assertSafeEnv(l.env, conn)).not.toThrow();
   });
 
-  test("Claude Code: nothing when the user has telemetry settings of their own (theirs stay)", () => {
+  test("cost/telemetry-setup: Claude Code: nothing when the user has telemetry settings of their own (theirs stay)", () => {
     for (const own of ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_METRICS_EXPORTER", "OTEL_RESOURCE_ATTRIBUTES", "CLAUDE_CODE_ENABLE_TELEMETRY"]) expect(telemetryLaunch("claude-code", session, { [own]: "x" })).toBeNull();
     expect(telemetryLaunch("claude-code", session, { OTEL_EXPORTER_OTLP_ENDPOINT: undefined })).not.toBeNull();
   });
 
-  test("Codex: its log exporter, by -c, to /v1/logs, JSON, with the token; prompts never logged; no telemetry for the others", () => {
+  test("cost/telemetry-setup: Codex: its log exporter, by -c, to /v1/logs, JSON, with the token; prompts never logged; no telemetry for the others", () => {
     expect(telemetryLaunch("codex", session, {})).toEqual({
       env: {},
       argv: ["-c", `otel.exporter={otlp-http={endpoint="http://127.0.0.1:4318/v1/logs",protocol="json",headers={x-gluon-telemetry="${session.token}"}}}`, "-c", "otel.log_user_prompt=false"],
@@ -402,7 +402,7 @@ describe("a launch's telemetry", () => {
     for (const h of ["antigravity", "opencode"] as const) expect(telemetryLaunch(h, session, {})).toBeNull();
   });
 
-  test("withTelemetry: options before the spec (after the last --), variables added; never after or into the spec", () => {
+  test("cost/telemetry-setup: withTelemetry: options before the spec (after the last --), variables added; never after or into the spec", () => {
     const codex: Command = { argv: ["codex", "-m", "gpt-6-sol", "-c", "hooks.Stop=[]", "--", "- fix it"], env: { OPENAI_API_KEY: "k" }, spec: "- fix it", harness: "codex", conn: "openai" };
     const r = withTelemetry(codex, telemetryLaunch("codex", session, {}));
     expect(r.argv.slice(0, 5)).toEqual(codex.argv.slice(0, 5));
@@ -420,7 +420,7 @@ describe("a launch's telemetry", () => {
 });
 
 describe("context windows", () => {
-  test("Claude, as Claude Code sizes them: 1M natively for Opus 4.7+, Sonnet 5+, Haiku 5.5+, Fable; 200k for Haiku 4.5, Opus/Sonnet 4.6 (1M with [1m]); every id form", () => {
+  test("context/window: Claude, as Claude Code sizes them: 1M natively for Opus 4.7+, Sonnet 5+, Haiku 5.5+, Fable; 200k for Haiku 4.5, Opus/Sonnet 4.6 (1M with [1m]); every id form", () => {
     const cases: Record<string, number> = {
       opus: 1e6,
       sonnet: 1e6,
@@ -453,7 +453,7 @@ describe("context windows", () => {
     expect(claudeContextWindow("opus", { CLAUDE_CODE_DISABLE_1M_CONTEXT: "0" })).toBe(1e6);
   });
 
-  test("Codex from its catalog: the window Codex lets a conversation use", () => {
+  test("context/window: Codex from its catalog: the window Codex lets a conversation use", () => {
     const catalog = JSON.stringify({ models: [{ slug: "gpt-6-sol", context_window: 400_000, effective_context_window_percent: 95 }, { slug: "gpt-6-luna", context_window: 200_000 }, { slug: "bad", context_window: "x" }] });
     // No effective percent in the catalog: Codex's own default, 95.
     expect(codexContextWindows(catalog)).toEqual({ "gpt-6-sol": 380_000, "gpt-6-luna": 190_000 });
@@ -461,7 +461,7 @@ describe("context windows", () => {
     expect(codexContextWindows('{"models":3}')).toEqual({});
   });
 
-  test("contextPercent: by a window or a model; undefined when unknown; at most 100", () => {
+  test("context/percentage: contextPercent: by a window or a model; undefined when unknown; at most 100", () => {
     expect(contextPercent(50_000, "claude-haiku-4-5", { env: {} })).toBe(25);
     expect(contextPercent(41_920, "claude-opus-5-5", { env: {} })).toBeCloseTo(4.192, 6);
     // Codex's footer: 12k off the prompt and the window.
@@ -485,22 +485,22 @@ test("frame/events-read: status events stay out of the events directory's remain
 
 describe("OpenCode's per-step usage in a status event (issue #39)", () => {
   const step = { n: 3, model: "openrouter/deepseek/deepseek-v4-flash", input: 95, output: 3, reasoning: 13, cacheRead: 5120, cacheWrite: 0, cost: 0.000137296 };
-  test("strictly: known fields, bounded counts and count of steps; anything else refuses the whole event", () => {
+  test("events/strict: strictly: known fields, bounded counts and count of steps; anything else refuses the whole event", () => {
     expect(parseStatus(JSON.stringify({ steps: [step, { ...step, n: 4, cost: undefined }], extra: 1 }))).toEqual({ steps: [step, { n: 4, model: step.model, input: 95, output: 3, reasoning: 13, cacheRead: 5120, cacheWrite: 0 }] });
     for (const bad of [[], "x", [null], [{ ...step, model: "no spaces allowed" }], [{ ...step, input: -1 }], [{ ...step, cacheRead: 1e13 }], [{ ...step, n: "1" }], [{ ...step, cost: 1e7 }], Array(26).fill(step)]) expect(parseStatus(JSON.stringify({ steps: bad }))).toBeNull();
   });
-  test("a step's counts are rounded; its text fields can't carry anything (only the model name)", () => {
+  test("events/strict: a step's counts are rounded; its text fields can't carry anything (only the model name)", () => {
     expect(parseStatus(JSON.stringify({ steps: [{ ...step, input: 95.6, prompt: "secret" }] }))!.steps![0]).toEqual({ ...step, input: 96 });
   });
 });
 
 describe("Codex's compaction (issue #39): the PreCompact hook says one starts", () => {
-  test("status {compacting: true} parses; anything else refuses the event", () => {
+  test("events/strict: status {compacting: true} parses; anything else refuses the event", () => {
     expect(parseStatus('{"compacting":true,"extra":1}')).toEqual({ compacting: true });
     for (const bad of ["false", '"yes"', "1", "null"]) expect(parseStatus(`{"compacting":${bad}}`)).toBeNull();
   });
 
-  test("the compaction's own response (old history as its prompt) is no context: unknown until the next response; its cost still counts", async () => {
+  test("context/after-compact: the compaction's own response (old history as its prompt) is no context: unknown until the next response; its cost still counts", async () => {
     const server = startTelemetry();
     try {
       const contexts: (ContextFigure | null)[] = [];
@@ -527,7 +527,7 @@ describe("Codex's compaction (issue #39): the PreCompact hook says one starts", 
     }
   });
 
-  test("the main conversation can be named: a conversation seen first is then a side one, and only the named one is the context", async () => {
+  test("context/main-thread-only: the main conversation can be named: a conversation seen first is then a side one, and only the named one is the context", async () => {
     const server = startTelemetry();
     try {
       const contexts: (ContextFigure | null)[] = [];
@@ -555,7 +555,7 @@ describe("Codex's main conversation and turn cost (issue #39)", () => {
     fetch(`${server.endpoint}/v1/logs`, { method: "POST", headers: { "content-type": "application/json", [TELEMETRY_HEADER]: token }, body: JSON.stringify(logs(records)) });
   const response = (time: number, conversation: string, input: number, output = 10) => ({ observedTimeUnixNano: t(time), attributes: [str("event.name", "codex.sse_event"), str("event.kind", "response.completed"), str("conversation.id", conversation), str("model", "gpt-6-sol"), str("input_token_count", String(input)), str("output_token_count", String(output))] });
 
-  test("BUG-337/fork: after a /fork (a new conversation id), the hook's session_id is the main conversation: context follows it, cost still sums both", async () => {
+  test("context/main-thread-only: after a /fork (a new conversation id), the hook's session_id is the main conversation: context follows it, cost still sums both #BUG-337/fork", async () => {
     const server = startTelemetry();
     try {
       const contexts: (ContextFigure | null)[] = [];
@@ -579,7 +579,7 @@ describe("Codex's main conversation and turn cost (issue #39)", () => {
     }
   });
 
-  test("BUG-337/override: the new main conversation's own context_window override (announced at its start, before the hook named it) applies", async () => {
+  test("context/window: the new main conversation's own context_window override (announced at its start, before the hook named it) applies #BUG-337/override", async () => {
     const server = startTelemetry();
     try {
       const contexts: (ContextFigure | null)[] = [];
@@ -596,7 +596,7 @@ describe("Codex's main conversation and turn cost (issue #39)", () => {
     }
   });
 
-  test("BUG-336/parse: codex.turn_cost goes to onTurnCost once (a re-sent batch is dropped), from either attribute spelling; it is no context and no usage; an incomplete one is ignored", async () => {
+  test("cost/sources: codex.turn_cost goes to onTurnCost once (a re-sent batch is dropped), from either attribute spelling; it is no context and no usage; an incomplete one is ignored #BUG-336/parse", async () => {
     const server = startTelemetry();
     try {
       const turnsSeen: TurnCostEvent[] = [];

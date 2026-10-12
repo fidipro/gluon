@@ -249,7 +249,7 @@ describe("BUG-352: Gluon writes through no symbolic link", () => {
 describe("what the status line's command sends (real stdin of agy 1.2.16 against a mock gateway)", () => {
   const stdin = JSON.parse(readFileSync(join(import.meta.dir, "fixtures", "telemetry", "agy-1.2.16-statusline-stdin.json"), "utf8")) as { statusline: Record<string, unknown> }[];
 
-  test("a gateway model has no cost and an unknown window: no figure of agy's own is sent (never a 0%); its token totals (the conversation's size) are, for Gluon to size", () => {
+  test("cost/sources: a gateway model has no cost and an unknown window: no figure of agy's own is sent (never a 0%); its token totals (the conversation's size) are, for Gluon to size", () => {
     for (const { statusline } of stdin) {
       const st = agyStatus(statusline);
       expect(st.costUsd).toBeUndefined();
@@ -263,7 +263,7 @@ describe("what the status line's command sends (real stdin of agy 1.2.16 against
     expect(agyStatus(stdin.at(-1)!.statusline).totals).toEqual({ input: 13_740, output: 460 });
   });
 
-  test("BUG-350/reported-figures-ledger-only: agy's own cost, percentage and window leave only as the reported fields (the ledger's), beside the totals; a bad or absent one is dropped", () => {
+  test("cost/sources: agy's own cost, percentage and window leave only as the reported fields (the ledger's), beside the totals; a bad or absent one is dropped #BUG-350/reported-figures-ledger-only", () => {
     const real = { model: { id: "gemini-3.8-flash" }, cost: { total_usd: 0.4321 }, context_window: { context_window_size: 1_000_000, used_percentage: 12.5, total_input_tokens: 99, total_output_tokens: 9, current_usage: { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 7 } } };
     expect(agyStatus(real)).toEqual({ model: "gemini-3.8-flash", costUsd: 0.4321, contextWindow: 1_000_000, contextTokens: 125_000, totals: { input: 99, output: 9 } });
     for (const bad of [{ model: { id: "x y" } }, { model: "x" }, { context_window: { total_input_tokens: 5 } }, { context_window: { total_input_tokens: -5, total_output_tokens: 1 } }]) {
@@ -272,13 +272,13 @@ describe("what the status line's command sends (real stdin of agy 1.2.16 against
     }
   });
 
-  test("with a window and a cost (agy's own fields): reported as its percentage of its window, and its own cost", () => {
+  test("cost/sources: with a window and a cost (agy's own fields): reported as its percentage of its window, and its own cost", () => {
     const real = { cost: { total_usd: 0.4321, subagent_usd: 0.1, estimated: true }, context_window: { context_window_size: 1_000_000, used_percentage: 12.5, total_input_tokens: 99, current_usage: null } };
     expect(agyStatus(real)).toEqual({ costUsd: 0.4321, contextWindow: 1_000_000, contextTokens: 125_000 });
     for (const bad of [{ cost: { total_usd: -1 } }, { cost: null }, { context_window: { context_window_size: 0, used_percentage: 50 } }, { context_window: { context_window_size: 10, used_percentage: 500 } }, { context_window: "x" }, "x"]) expect(agyStatus(bad as never)).toEqual({});
   });
 
-  test("the hook answers `statusline` with one status event, nothing for anything else, and never prints", async () => {
+  test("cost/sources: the hook answers `statusline` with one status event, nothing for anything else, and never prints", async () => {
     const r = await antigravity.hook!("statusline", JSON.stringify({ cost: { total_usd: 2 }, context_window: { context_window_size: 200, used_percentage: 50 } }), { eventsDir: "/x", pieces: [] });
     expect(r.stdout).toBeUndefined();
     expect(r.events!.map((e) => parseEvent(`status ${JSON.stringify(e.status)}`)!.status)).toEqual([{ costUsd: 2, contextTokens: 100, contextWindow: 200 }]);

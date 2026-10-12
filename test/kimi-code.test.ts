@@ -131,7 +131,7 @@ describe("the harness", () => {
     expect(subscriptionOf("kimi-code", "plan")).toMatchObject({ vendor: "moonshot", plan: "Kimi Code plan", loginArgv: ["kimi", "login"] });
   });
 
-  test("every offered model has a price key, a price and a window; the plan is priced as Moonshot's API price of the same model (an API-equivalent), OpenRouter's at its listing", () => {
+  test("cost/every-model-priced: every offered model has a price key, a price and a window; the plan is priced as Moonshot's API price of the same model (an API-equivalent), OpenRouter's at its listing", () => {
     for (const m of DEFAULT_MODELS["kimi-code"]) {
       for (const conn of Object.keys(m.ids) as ("plan" | "openrouter" | "moonshot")[]) {
         const key = priceKey("kimi-code", m.ids, conn);

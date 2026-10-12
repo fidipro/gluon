@@ -252,7 +252,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     }
   });
 
-  test("BUG-359/ledger-and-report: a session with figures shows Gluon's own cost, unmarked (the harness's own total is only audited); the ledger file is in the state dir, and `gluon cost-report` names the harness and a cause @full", async () => {
+  test("ledger/report: a session with figures shows Gluon's own cost, unmarked (the harness's own total is only audited); the ledger file is in the state dir, and `gluon cost-report` names the harness and a cause @full #BUG-359/ledger-and-report", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-ledger-"));
     try {
       const app = await gluon({ XDG_STATE_HOME: state, LOCALAPPDATA: state });
@@ -277,7 +277,7 @@ describe("Gluon: cost, context and the agent's own questions", () => {
     }
   });
 
-  test("BUG-356/audit-off-removes: `cost.audit: off` removes the ledger an earlier launch wrote; with it on, a launch keeps it", async () => {
+  test("ledger/off: `cost.audit: off` removes the ledger an earlier launch wrote; with it on, a launch keeps it #BUG-356/audit-off-removes", async () => {
     const state = mkdtempSync(join(tmpdir(), "gluon-ledger-"));
     try {
       const dir = join(state, "gluon", "cost-audit");

@@ -1,67 +1,28 @@
 {
  "untagged": {
-  "test/adapters-claude-codex.test.ts": 3,
-  "test/adapters-opencode.test.ts": 1,
-  "test/adversarial-pkg-edfb.test.ts": 68,
-  "test/adversarial-pkg0.test.ts": 18,
-  "test/agy-settings.test.ts": 4,
   "test/brain-clients.test.ts": 30,
   "test/brain.test.ts": 39,
   "test/choices.test.ts": 31,
-  "test/claude-otel.test.ts": 2,
   "test/codex.test.ts": 39,
   "test/converse.test.ts": 8,
-  "test/cost-ledger.test.ts": 28,
-  "test/cost.test.ts": 87,
   "test/doctor.test.ts": 1,
-  "test/e2e/adversarial-pkg-edfb.e2e.test.ts": 2,
-  "test/e2e/adversarial-pkg0.e2e.test.ts": 4,
-  "test/e2e/cli.e2e.test.ts": 1,
-  "test/e2e/gluon.e2e.test.ts": 6,
-  "test/e2e/kimi-cost.e2e.test.ts": 2,
-  "test/e2e/openrouter-billed.e2e.test.ts": 1,
+  "test/e2e/gluon.e2e.test.ts": 4,
   "test/e2e/perf-smoke.e2e.test.ts": 1,
-  "test/e2e/tables-refresh.e2e.test.ts": 5,
   "test/effort.test.ts": 18,
-  "test/figures.test.ts": 54,
   "test/gluon-qa-frame.test.ts": 1,
   "test/gluon.test.ts": 3,
-  "test/grok.test.ts": 32,
-  "test/harness-config.test.ts": 4,
-  "test/kimi-code.test.ts": 1,
-  "test/kimi-usage.test.ts": 33,
   "test/openai.test.ts": 25,
-  "test/openrouter-billed.test.ts": 64,
-  "test/otlp-protobuf-fuzz.test.ts": 3,
-  "test/pending-tables.test.ts": 13,
   "test/perf/typing.perf.test.ts": 1,
   "test/pty-session.test.ts": 3,
-  "test/refresh.test.ts": 57,
   "test/route-schema.test.ts": 4,
   "test/rules.test.ts": 4,
   "test/session.test.ts": 54,
-  "test/status.test.ts": 23,
-  "test/tables-hardening.test.ts": 29,
   "test/tools.test.ts": 4,
-  "test/usage.test.ts": 1,
   "test/windows.test.ts": 1
  },
  "pastSeams": {
   "test/adapters-claude-codex.test.ts": [
    "src/pty/types.ts"
-  ],
-  "test/adversarial-pkg-edfb.test.ts": [
-   "src/cost/context.ts",
-   "src/cost/grok-catalog.ts",
-   "src/cost/ledger.ts",
-   "src/cost/pricing-update.ts",
-   "src/cost/report.ts",
-   "src/cost/table-schema.ts",
-   "src/cost/tables-store.ts"
-  ],
-  "test/adversarial-pkg0.test.ts": [
-   "src/cost/context.ts",
-   "src/cost/ledger.ts"
   ],
   "test/brain-clients.test.ts": [
    "src/agent/subscription.ts",
@@ -77,22 +38,7 @@
    "src/agent/prompt.ts"
   ],
   "test/codex.test.ts": [
-   "src/brain.ts",
-   "src/cost/context.ts"
-  ],
-  "test/cost-ledger.test.ts": [
-   "src/cost/ledger.ts",
-   "src/cost/report.ts"
-  ],
-  "test/cost.test.ts": [
-   "src/cost/claude-catalog.ts",
-   "src/cost/context.ts",
-   "src/cost/harness-config.ts",
-   "src/cost/keys.ts",
-   "src/cost/ledger.ts",
-   "src/cost/report.ts",
-   "src/cost/table-schema.ts",
-   "src/cost/tracker.ts"
+   "src/brain.ts"
   ],
   "test/doctor.test.ts": [
    "src/brain.ts"
@@ -102,24 +48,8 @@
    "src/agent/subscription.ts",
    "src/brain.ts"
   ],
-  "test/figures.test.ts": [
-   "src/cost/context.ts",
-   "src/cost/grok-usage.ts",
-   "src/cost/ledger.ts",
-   "src/cost/report.ts",
-   "src/cost/table-schema.ts"
-  ],
   "test/gluon.test.ts": [
    "src/gluon.ts"
-  ],
-  "test/grok.test.ts": [
-   "src/cost/context.ts",
-   "src/cost/grok-usage.ts",
-   "src/cost/ledger.ts",
-   "src/otlp-protobuf.ts"
-  ],
-  "test/harness-config.test.ts": [
-   "src/cost/harness-config.ts"
   ],
   "test/intake.test.ts": [
    "src/agent/choices.ts",
@@ -127,15 +57,7 @@
   ],
   "test/kimi-code.test.ts": [
    "src/agent/choices.ts",
-   "src/agent/prompt.ts",
-   "src/cost/context.ts",
-   "src/cost/keys.ts"
-  ],
-  "test/kimi-usage.test.ts": [
-   "src/cost/keys.ts",
-   "src/cost/ledger.ts",
-   "src/cost/tracker.ts",
-   "src/kimi-usage.ts"
+   "src/agent/prompt.ts"
   ],
   "test/modes.test.ts": [
    "src/agent/prompt.ts"
@@ -147,38 +69,10 @@
    "src/gluon.ts"
   ],
   "test/openrouter-billed.test.ts": [
-   "src/brain.ts",
-   "src/cost/billed.ts",
-   "src/cost/ledger.ts",
-   "src/cost/report.ts",
-   "src/cost/tracker.ts",
-   "src/openrouter-billed.ts"
-  ],
-  "test/otlp-protobuf-fuzz.test.ts": [
-   "src/otlp-protobuf.ts"
-  ],
-  "test/pending-tables.test.ts": [
-   "src/cost/context.ts",
-   "src/cost/ledger.ts",
-   "src/cost/report.ts",
-   "src/cost/tracker.ts",
-   "src/openrouter-billed.ts"
+   "src/brain.ts"
   ],
   "test/platform.test.ts": [
-   "src/auth.ts",
-   "src/cost/tables-store.ts"
-  ],
-  "test/pty-session.test.ts": [
-   "src/cost/ledger.ts",
-   "src/cost/tracker.ts"
-  ],
-  "test/refresh.test.ts": [
-   "src/cost/claude-catalog.ts",
-   "src/cost/ledger.ts",
-   "src/cost/modelsdev-catalog.ts",
-   "src/cost/pricing-update.ts",
-   "src/cost/refresh.ts",
-   "src/cost/tables-store.ts"
+   "src/auth.ts"
   ],
   "test/route.test.ts": [
    "src/agent/prompt.ts"
@@ -191,20 +85,8 @@
   "test/session.test.ts": [
    "src/ui/editor.ts"
   ],
-  "test/tables-hardening.test.ts": [
-   "src/cost/grok-catalog.ts",
-   "src/cost/ledger.ts",
-   "src/cost/pricing-update.ts",
-   "src/cost/refresh.ts",
-   "src/cost/tables-store.ts",
-   "src/cost/tracker.ts",
-   "src/openrouter-billed.ts"
-  ],
   "test/tools.test.ts": [
    "src/agent/prompt.ts"
-  ],
-  "test/usage.test.ts": [
-   "src/usage.ts"
   ],
   "test/windows.test.ts": [
    "src/agent/subscription.ts"

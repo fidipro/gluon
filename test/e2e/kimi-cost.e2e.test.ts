@@ -45,7 +45,7 @@ async function session(yaml: string, key: string, model: string) {
   return { app, dir, state, log, ours };
 }
 
-test.skipIf(WIN)("Kimi Code on OpenRouter: the figure is Gluon's, `~` (an estimate while it runs), tokens of its export (a subagent's too) at OpenRouter's price; the zip and its directory are gone, the ledger keeps counts only @full", async () => {
+test.skipIf(WIN)("cost/kimi: Kimi Code on OpenRouter: the figure is Gluon's, `~` (an estimate while it runs), tokens of its export (a subagent's too) at OpenRouter's price; the zip and its directory are gone, the ledger keeps counts only @full", async () => {
   const k = await session(`${ASK_YAML}connections:\n  kimi-code: { auth: api, provider: openrouter }\n`, "openrouter/moonshotai/kimi-k3", "__kimi_env_model__");
   try {
     // From the status timer, not from the screen: a few seconds after the launch. An OpenRouter session's running figure is an estimate (`~`: the provider that served each request sets the price).
@@ -66,7 +66,7 @@ test.skipIf(WIN)("Kimi Code on OpenRouter: the figure is Gluon's, `~` (an estima
   }
 });
 
-test.skipIf(WIN)("Kimi Code on its plan: Moonshot's API price of the model, marked as a plan's API-equivalent (`~`) @full", async () => {
+test.skipIf(WIN)("cost/by-connection: Kimi Code on its plan: Moonshot's API price of the model, marked as a plan's API-equivalent (`~`) @full", async () => {
   const k = await session(`${ASK_YAML}connections:\n  kimi-code: { auth: subscription }\n`, "moonshotai/kimi-k3", "kimi-code/k3");
   try {
     await k.app.waitFor((s) => s.split("\n")[1]!.includes(`· ~$${k.ours}`), 30_000);

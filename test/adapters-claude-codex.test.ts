@@ -265,7 +265,7 @@ describe("Claude Code's measure module (issue #39)", () => {
   }
   const dollar = (dir: string | undefined, writes: Record<string, string>) => ({ env: { get: async () => dir }, fs: { write: async (path: string, text: string) => void (writes[path] = text) } });
 
-  test("session.measure becomes one status event with Claude Code's own window, tokens and cumulative cost; next(e) is always called unchanged", async () => {
+  test("cost/sources: session.measure becomes one status event with Claude Code's own window, tokens and cumulative cost; next(e) is always called unchanged", async () => {
     const { dir, handlers } = await load();
     expect(Object.keys(handlers)).toEqual(["session.measure"]);
     const writes: Record<string, string> = {};
@@ -279,7 +279,7 @@ describe("Claude Code's measure module (issue #39)", () => {
     expect(parseEvent(text!)).toEqual({ name: "status", status: { contextTokens: 100_000, contextWindow: 1_000_000, costUsd: 0.4025 } });
   });
 
-  test("outside a Gluon launch (no GLUON_EVENTS), with bad numbers, or when a write fails: nothing, no error, next still called", async () => {
+  test("cost/sources: outside a Gluon launch (no GLUON_EVENTS), with bad numbers, or when a write fails: nothing, no error, next still called", async () => {
     const { dir, handlers } = await load();
     const writes: Record<string, string> = {};
     let calls = 0;
@@ -294,7 +294,7 @@ describe("Claude Code's measure module (issue #39)", () => {
 });
 
 describe("Codex's PreCompact hook tells Gluon a compaction starts (issue #39)", () => {
-  test("a compacting status event first, whatever the answer; the ask logic is unchanged", async () => {
+  test("context/after-compact: a compacting status event first, whatever the answer; the ask logic is unchanged", async () => {
     for (const pieces of [[], ["compact" as HandoffPiece]]) {
       const dir = mkdtempSync(join(tmpdir(), "gluon-precompact-"));
       const r = await codex.hook!("pre-compact", "{}", { eventsDir: dir, pieces, answerTimeoutMs: 50 });

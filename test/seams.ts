@@ -58,8 +58,24 @@ export const SEAMS: Record<string, Seam> = {
     modules: ["src/agent/tools.ts", "src/agent/scan.ts", "src/agent/git.ts", "src/agent/forge.ts"],
   },
   cost: {
-    says: "captured real telemetry and the price tables → the cost figures",
-    modules: ["src/cost/claude.ts", "src/cost/codex.ts", "src/cost/opencode.ts", "src/cost/grok.ts", "src/cost/kimi.ts", "src/cost/antigravity.ts", "src/cost/tables.ts", "src/telemetry.ts"],
+    says: "a harness's usage reports (telemetry, plugin and hook events, exports) and the price tables → the cost and context figures, and what a launch's telemetry is",
+    modules: [
+      "src/cost/claude.ts",
+      "src/cost/codex.ts",
+      "src/cost/opencode.ts",
+      "src/cost/grok.ts",
+      "src/cost/kimi.ts",
+      "src/cost/antigravity.ts",
+      "src/cost/tables.ts",
+      "src/cost/tracker.ts",
+      "src/cost/context.ts",
+      "src/cost/keys.ts",
+      "src/cost/harness-config.ts",
+      "src/cost/grok-usage.ts",
+      "src/telemetry.ts",
+      "src/otlp-protobuf.ts",
+      "src/kimi-usage.ts",
+    ],
   },
   secrets: {
     says: "text and environments → masked, or refused when a key or token would leak",
@@ -96,6 +112,18 @@ export const SEAMS: Record<string, Seam> = {
   install: {
     says: "an agent and the OS (PATH, WSL, Windows) → its official install commands, which of them can run here and what is missing, the argv that runs one, and where its installer puts the binary",
     modules: ["src/install.ts"],
+  },
+  pricing: {
+    says: "the sources' formats (models.dev, OpenRouter's /models and /endpoints, the Claude and Grok binaries, `codex debug models`) → validated tables in the store, and the refresh's report",
+    modules: ["src/cost/refresh.ts", "src/cost/pricing-update.ts", "src/cost/tables-store.ts", "src/cost/table-schema.ts", "src/cost/modelsdev-catalog.ts", "src/cost/claude-catalog.ts", "src/cost/codex-catalog.ts", "src/cost/grok-catalog.ts"],
+  },
+  ledger: {
+    says: "a ledger entry (`LedgerEntry`, whitelisted) → its explained observations, its line in the file, and `gluon cost-report`'s lines",
+    modules: ["src/cost/ledger.ts", "src/cost/report.ts"],
+  },
+  openrouter: {
+    says: "OpenRouter's /key usage answers over time, with the registry and brain files → the billed figure (settled or not, and why) and the live k",
+    modules: ["src/openrouter-billed.ts", "src/cost/billed.ts"],
   },
   launch: {
     says: "a spec, a harness and the OS → the command line and the spec's hand-off; a Windows shim's safe arguments, the neutral directory, the stale sweep and the command a harness runs to reach Gluon (`GLUON_SELF`)",

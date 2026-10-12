@@ -65,7 +65,7 @@ describe("Claude Code 2.1.289: Gluon's figures against its own status line", () 
     context_window: { used_percentage: number | null; context_window_size: number; current_usage: { input_tokens: number; cache_creation_input_tokens: number; cache_read_input_tokens: number } | null };
   }[];
 
-  test("cost: the sum of the delta cost metric is its own total after every step (subagent and side requests included)", async () => {
+  test("cost/sources: Claude Code's cost metric: the sum of its deltas is its own total after every step (subagent and side requests included)", async () => {
     const { costs } = await replay("claude-code-2.1.289.jsonl");
     // Every total it displayed was reached by the stream, and the last is the same to the cent.
     for (const step of own) expect(costs.some((c) => Math.abs(c - step.cost.total_cost_usd) < 1e-9)).toBe(true);
@@ -74,7 +74,7 @@ describe("Claude Code 2.1.289: Gluon's figures against its own status line", () 
     expect(costs).toEqual([...costs].sort((a, b) => a - b));
   });
 
-  test("BUG-314/compaction: the context is the main thread's prompt (subagent and title requests left out), and unknown after /compact until the next request: its own figure's sequence", async () => {
+  test("context/after-compact: the context is the main thread's prompt (subagent and title requests left out), and unknown after /compact until the next request: its own figure's sequence #BUG-314/compaction", async () => {
     const { contexts } = await replay("claude-code-2.1.289.jsonl");
     // Collapse repeats (several requests of one turn).
     const seq = contexts.filter((c, i) => i === 0 || JSON.stringify(c) !== JSON.stringify(contexts[i - 1]));
@@ -97,7 +97,7 @@ describe("Claude Code 2.1.289: Gluon's figures against its own status line", () 
 describe("Claude Code 2.1.289, a real run on an API key (issue #39, paid, ~$0.05)", () => {
   const own = JSON.parse(readFileSync(join(DIR, "claude-code-2.1.289-live-haiku-statusline.json"), "utf8")).steps as { cost: { total_cost_usd: number }; context_window: { used_percentage: number } }[];
 
-  test("the real stream's cost is its own total to the last digit, and its context is its status line's percentage (the compaction step aside: it shows 0 there, Gluon `—`)", async () => {
+  test("cost/claude-code: the real stream's cost is its own total to the last digit, and its context is its status line's percentage (the compaction step aside: it shows 0 there, Gluon `—`)", async () => {
     const { costs, contexts } = await replay("claude-code-2.1.289-live-haiku.jsonl");
     expect(costs.at(-1)).toBeCloseTo(own.at(-1)!.cost.total_cost_usd, 9);
     const seq = contexts.filter((c, i) => i === 0 || JSON.stringify(c) !== JSON.stringify(contexts[i - 1]));
@@ -109,7 +109,7 @@ describe("Claude Code 2.1.289, a real run on an API key (issue #39, paid, ~$0.05
 });
 
 describe("the usage Gluon's own cost is computed from (onUsage)", () => {
-  test("Claude Code: every request once (main thread, title, /compact), with the reported cost beside it", async () => {
+  test("cost/counted-once: Claude Code: every request once (main thread, title, /compact), with the reported cost beside it", async () => {
     const { usages, costs } = await replay("claude-code-2.1.289-live-haiku.jsonl", { resend: true });
     expect(usages.length).toBe(5);
     expect(usages.every((u) => u.harness === "claude-code" && u.model === "claude-haiku-4-5-20251001" && u.reportedUsd !== undefined)).toBe(true);
@@ -119,7 +119,7 @@ describe("the usage Gluon's own cost is computed from (onUsage)", () => {
     expect(costs.at(-1)).toBeCloseTo(0.04530665, 9);
   });
 
-  test("Codex: every conversation's response, the title thread's too, with the requested tier; a batch sent twice counts once", async () => {
+  test("cost/counted-once: Codex: every conversation's response, the title thread's too, with the requested tier; a batch sent twice counts once", async () => {
     const { usages } = await replay("codex-0.159.3-live-luna.jsonl", { resend: true });
     expect(usages).toEqual([
       { harness: "codex", model: "gpt-6-luna", input: 10_611, cached: 0, cacheWrite: 10_608, output: 228, serviceTier: "priority" },
@@ -132,7 +132,7 @@ describe("the usage Gluon's own cost is computed from (onUsage)", () => {
 describe("Codex 0.159.3: Gluon's context against its own /status", () => {
   const windows = codexContextWindows(JSON.stringify({ models: [{ slug: "gpt-6-sol", context_window: 272_000, effective_context_window_percent: 95 }] }));
 
-  test("BUG-317/codex-footer: counted as its footer counts: last response's input + output, 12k off both sides (what /status showed for the same numbers)", () => {
+  test("context/percentage: counted as its footer counts: last response's input + output, 12k off both sides (what /status showed for the same numbers) #BUG-317/codex-footer", () => {
     expect(windows["gpt-6-sol"]).toBe(258_400);
     // /status in the TUI: "97% left (20.5K used / 258K)" and "22% left (204K used / 258K)".
     // A real run on an API key (paid, gpt-6-luna) added: "100% left (10.8K used / 258K)" for 10,611 + 228, and "88% left (40.4K used / 258K)" for 40,421 + 22.
@@ -141,18 +141,18 @@ describe("Codex 0.159.3: Gluon's context against its own /status", () => {
     }
   });
 
-  test("a real run on an API key (paid): the title thread (read-only, `approval_policy` never; its prompt 7,195 tokens, finished BEFORE the main response) is no context; the session's is input + output", async () => {
+  test("context/main-thread-only: a real run on an API key (paid): the title thread (read-only, `approval_policy` never; its prompt 7,195 tokens, finished BEFORE the main response) is no context; the session's is input + output", async () => {
     const { contexts } = await replay("codex-0.159.3-live-luna.jsonl");
     expect(contexts.map((c) => c?.tokens)).toEqual([10_839, 40_443]);
   });
 
-  test("the session's conversation only: the title thread each prompt starts is a conversation of its own, with a small prompt of its own", async () => {
+  test("context/main-thread-only: the session's conversation only: the title thread each prompt starts is a conversation of its own, with a small prompt of its own", async () => {
     const { contexts } = await replay("codex-0.159.3.jsonl");
     expect(contexts.every((c) => c?.model === "gpt-6-sol")).toBe(true);
     expect(contexts.map((c) => c?.tokens)).toEqual([20_500, 204_000, 9_300, 30_700]);
   });
 
-  test("BUG-316/codex-title-thread: a side conversation's response, newer than the session's, doesn't replace its figure", async () => {
+  test("context/main-thread-only: a side conversation's response, newer than the session's, doesn't replace its figure #BUG-316/codex-title-thread", async () => {
     // The capture's side threads have the main one's usage (its fake API sent one answer for all): give them a title request's size.
     const lines = jsonl("codex-0.159.3.jsonl");
     const main = (lines[0]!.body as { resourceLogs: { scopeLogs: { logRecords: { attributes: { key: string; value: { stringValue: string } }[] }[] }[] }[] }).resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.find((a) => a.key === "conversation.id")!.value.stringValue;
@@ -174,12 +174,12 @@ describe("Codex 0.159.3: Gluon's context against its own /status", () => {
 describe("Codex's window, resolved as Codex resolves it (issue #39)", () => {
   const catalog = codexCatalogWindows(JSON.stringify({ models: [{ slug: "gpt-6-sol", context_window: 272_000, max_context_window: 872_000, effective_context_window_percent: 95 }, { slug: "gpt-6", context_window: 100_000 }, { slug: "only-max", max_context_window: 50_000 }, { slug: "bad", context_window: "x" }] }));
 
-  test("the catalog keeps the window, its maximum and the effective percent (95 when absent); max_context_window stands in for a missing window", () => {
+  test("context/window: the catalog keeps the window, its maximum and the effective percent (95 when absent); max_context_window stands in for a missing window", () => {
     expect(catalog).toEqual({ "gpt-6-sol": { context: 272_000, max: 872_000, percent: 95 }, "gpt-6": { context: 100_000, max: 100_000, percent: 95 }, "only-max": { context: 50_000, max: 50_000, percent: 95 } });
     expect(codexContextWindows(JSON.stringify({ models: [{ slug: "m", context_window: 1000 }] }))).toEqual({ m: 950 });
   });
 
-  test("the model resolves by the longest catalog prefix, then once without a `provider/` namespace, then Codex's 272k x 95% fallback", () => {
+  test("context/window: the model resolves by the longest catalog prefix, then once without a `provider/` namespace, then Codex's 272k x 95% fallback", () => {
     expect(codexUsableWindow("gpt-6-sol", catalog)).toBe(258_400);
     expect(codexUsableWindow("gpt-6-sol-2026-10", catalog)).toBe(258_400);
     expect(codexUsableWindow("gpt-6-luna", catalog)).toBe(95_000);
@@ -190,13 +190,13 @@ describe("Codex's window, resolved as Codex resolves it (issue #39)", () => {
     expect(codexUsableWindow("unknown-model", {})).toBe(258_400);
   });
 
-  test("the config's model_context_window replaces the window, capped by the model's maximum, then the percent applies", () => {
+  test("context/window: the config's model_context_window replaces the window, capped by the model's maximum, then the percent applies", () => {
     expect(codexUsableWindow("gpt-6-sol", catalog, 100_000)).toBe(95_000);
     expect(codexUsableWindow("gpt-6-sol", catalog, 2_000_000)).toBe(Math.floor((872_000 * 95) / 100));
     expect(codexUsableWindow("gpt-6-sol", catalog, 0)).toBe(258_400);
   });
 
-  test("a real run with `-c model_context_window=100000`: the override travels with the context, and the figure is /status's own (90% left of 95K at 20.5K)", async () => {
+  test("context/window: a real run with `-c model_context_window=100000`: the override travels with the context, and the figure is /status's own (90% left of 95K at 20.5K)", async () => {
     const { contexts } = await replay("codex-0.159.3-window-override-100000.jsonl");
     expect(contexts[0]).toMatchObject({ tokens: 20_500, model: "gpt-6-sol", windowOverride: 100_000 });
     // 20,500 tokens: Codex's /status said "90% left (20.5K used / 95K)": 10% used.
@@ -206,14 +206,14 @@ describe("Codex's window, resolved as Codex resolves it (issue #39)", () => {
     expect(Math.round(contextPercent(20_500, "gpt-6-sol", { codexCatalog: catalog })!)).toBe(3);
   });
 
-  test("a model Codex doesn't know (Bedrock's id) still gets a window, as in Codex (its fallback), where a bare lookup gave none", () => {
+  test("context/window: a model Codex doesn't know (Bedrock's id) still gets a window, as in Codex (its fallback), where a bare lookup gave none", () => {
     expect(contextPercent(100_000, "us.openai.gpt-6-sol", { codexCatalog: catalog })).toBeCloseTo(((100_000 - 12_000) / (258_400 - 12_000)) * 100, 6);
     expect(contextPercent(100_000, "us.openai.gpt-6-sol", { codex: {} })).toBeUndefined();
   });
 });
 
 describe("the context window: a model named without its [1m] suffix", () => {
-  test("BUG-315/window: Claude Code's telemetry drops `[1m]` from the model, so a prompt over 200k proves a 1M window (and stays so after a compaction)", () => {
+  test("context/window: Claude Code's telemetry drops `[1m]` from the model, so a prompt over 200k proves a 1M window (and stays so after a compaction) #BUG-315/window", () => {
     // Real: `--model claude-opus-4-6[1m]` is exported as model `claude-opus-4-6`; its own status line says 1,000,000.
     expect(contextPercent(150_000, "claude-opus-4-6", { env: {} })).toBe(75);
     expect(contextPercent(300_000, "claude-opus-4-6", { env: {} })).toBe(30);
@@ -226,7 +226,7 @@ describe("the context window: a model named without its [1m] suffix", () => {
 });
 
 describe("when Gluon can't see a harness's figures", () => {
-  test("Claude Code with telemetry settings of the user's own: Gluon adds none (the figures show as —) and says so; no other harness is affected", () => {
+  test("cost/telemetry-setup: Claude Code with telemetry settings of the user's own: Gluon adds none (the figures show as —) and says so; no other harness is affected", () => {
     for (const own of ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_SERVICE_NAME", "CLAUDE_CODE_ENABLE_TELEMETRY"]) {
       expect(ownTelemetry({ [own]: "x", PATH: "/bin" })).toBe(true);
       expect(telemetryLaunch("claude-code", { token: "t", endpoint: "http://127.0.0.1:1" }, { [own]: "x" })).toBeNull();
@@ -234,7 +234,7 @@ describe("when Gluon can't see a harness's figures", () => {
     expect(ownTelemetry({ PATH: "/bin", OTEL_X: undefined })).toBe(false);
   });
 
-  test("Antigravity exports nothing Gluon can read (no OpenTelemetry, no hook with figures: its status line is the only source): no telemetry is added, and its row reads —; Grok Build exports protobuf (test/grok.test.ts)", () => {
+  test("cost/telemetry-setup: Antigravity exports nothing Gluon can read (no OpenTelemetry, no hook with figures: its status line is the only source): no telemetry is added, and its row reads —; Grok Build exports protobuf (test/grok.test.ts)", () => {
     expect(telemetryLaunch("antigravity", { token: "t", endpoint: "http://127.0.0.1:1" }, {})).toBeNull();
     expect(telemetryLaunch("grok-build", { token: "t", endpoint: "http://127.0.0.1:1" }, {})).not.toBeNull();
   });
@@ -286,7 +286,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
   /** What Gluon's row would read for these figures. */
   const shown = (f: StatusInfo) => ({ context: f.contextTokens == null ? "—" : contextLabel(contextPercent(f.contextTokens, f.contextWindow ?? f.model)), cost: costLabel(f.costUsd === undefined ? undefined : { usd: f.costUsd, approx: false }) });
 
-  test("BUG-318/opencode-footer: the context counts the last step's input + cache + output + reasoning, as the footer does (32,000 / 32% for a prompt of 10k + 20k cached, 1.6k out, 0.4k reasoning); its cost summed over the sessions (subagent's too) @full", async () => {
+  test("context/percentage: the context counts the last step's input + cache + output + reasoning, as the footer does (32,000 / 32% for a prompt of 10k + 20k cached, 1.6k out, 0.4k reasoning); its cost summed over the sessions (subagent's too) @full #BUG-318/opencode-footer", async () => {
     const events = capture("opencode-2.0.21-prompts.jsonl");
     // The footer after the first prompt, read from the TUI: 32,000 tokens, 32%, $0.10.
     const first = await figures(events.slice(0, events.findIndex((e) => e.type === "session.usage.updated") + 3));
@@ -299,7 +299,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(shown(last)).toEqual({ context: "51%", cost: "$0.38" });
   });
 
-  test("each step and each compaction goes out as its own record, in order, never merged (a context tier is chosen by one step's prompt) @full", async () => {
+  test("cost/opencode: each step and each compaction goes out as its own record, in order, never merged (a context tier is chosen by one step's prompt) @full", async () => {
     const events = capture("opencode-2.0.21-prompts.jsonl");
     const f = await figures(events);
     const ended = events.filter((e) => e.type === "session.step.ended") as unknown as { data: { sessionID: string; cost: number; tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } } } }[];
@@ -316,7 +316,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(c.length).toBe(capture("opencode-2.0.21-compaction.jsonl").filter((e) => ["session.step.ended", "session.compaction.ended", "session.compaction.failed"].includes(e.type)).length);
   });
 
-  test("BUG-319/opencode-compaction: after a compaction that worked OpenCode shows no context until its next step; a failed one changes nothing @full", async () => {
+  test("context/after-compact: after a compaction that worked OpenCode shows no context until its next step; a failed one changes nothing @full #BUG-319/opencode-compaction", async () => {
     const events = capture("opencode-2.0.21-compaction.jsonl");
     const ended = events.findIndex((e) => e.type === "session.compaction.ended");
     // The step after the first compaction (window 20,000): the footer read 16,000 tokens, 80%.
@@ -333,7 +333,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect((await figures(events.slice(0, failed + 1))).contextTokens).toBe(21_000);
   });
 
-  test("a real run (paid, deepseek-v4-flash via OpenRouter): the last step's input 95 + cache read 5,120 + output 3 + reasoning 13 is OpenCode's own \"5,231 tokens\"", async () => {
+  test("context/percentage: a real run (paid, deepseek-v4-flash via OpenRouter): the last step's input 95 + cache read 5,120 + output 3 + reasoning 13 is OpenCode's own \"5,231 tokens\"", async () => {
     const tokens = { input: 95, output: 3, reasoning: 13, cache: { read: 5120, write: 0 } };
     const f = await figures([
       { type: "session.created", data: { sessionID: "ses_01", model: { id: "deepseek/deepseek-v4-flash", providerID: "openrouter" } } },
@@ -345,7 +345,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(f.costUsd).toBeCloseTo(0.000329, 6);
   });
 
-  test("a model without a price (cost 0) sends no cost, as OpenCode shows none; a null context is a valid status", async () => {
+  test("cost/unpriced-model: a model without a price (cost 0) sends no cost, as OpenCode shows none; a null context is a valid status", async () => {
     const events = capture("opencode-2.0.21-prompts.jsonl").map((e) => ((e.data as { cost?: number }).cost !== undefined ? { ...e, data: { ...e.data, cost: 0 } } : e));
     expect((await figures(events)).costUsd).toBeUndefined();
     expect(parseStatus('{"contextTokens":null}')).toEqual({ contextTokens: null });
@@ -361,7 +361,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     return { t, ledger };
   };
 
-  test("BUG-345/opencode-title-in-cost: the request OpenCode bills with no step event (the session title: usage moves by its tokens and cost before the first step) is its own `side` record, so the cost total is OpenCode's cumulative one; it is no context", async () => {
+  test("cost/opencode: the request OpenCode bills with no step event (the session title: usage moves by its tokens and cost before the first step) is its own `side` record, so the cost total is OpenCode's cumulative one; it is no context #BUG-345/opencode-title-in-cost", async () => {
     const f = await figures(capture("opencode-2.0.21-prompts.jsonl"));
     const side = f.steps!.filter((s) => s.side);
     // Exactly the title: the first usage update (10,000 in, 1,600 out, 400 reasoning, 20,000 cached; $0.05), on the session's model, once.
@@ -378,12 +378,12 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(ledger.divergences()).toEqual([]);
   });
 
-  test("BUG-345/opencode-title-no-false-title: a compaction's usage update (its event comes later), a failed compaction and a subagent never read as a title; the only side record of the compaction capture is its title", async () => {
+  test("cost/opencode: a compaction's usage update (its event comes later), a failed compaction and a subagent never read as a title; the only side record of the compaction capture is its title #BUG-345/opencode-title-no-false-title", async () => {
     const f = await figures(capture("opencode-2.0.21-compaction.jsonl"));
     expect(f.steps!.filter((s) => s.side).map((s) => [s.input, s.output, s.cost])).toEqual([[20_000, 1_000, expect.closeTo(0.05, 9)]]);
   });
 
-  test("BUG-346/opencode-own-context: the conversation on screen's steps say `context` (a subagent's, a title's and a failed compaction's don't), the compaction says `compacted`; the % is the step's tokens over models.dev's limit, never the window OpenCode reports @full", async () => {
+  test("context/main-thread-only: the conversation on screen's steps say `context` (a subagent's, a title's and a failed compaction's don't), the compaction says `compacted`; the % is the step's tokens over models.dev's limit, never the window OpenCode reports @full #BUG-346/opencode-own-context", async () => {
     const f = await figures(capture("opencode-2.0.21-prompts.jsonl"));
     // The steps of ses_01 (on screen) move the context; the subagent ses_02 (parentID) and the title (sent a second after the update, behind the steps) do not.
     expect(f.steps!.map((s) => [s.model, s.side ? "side" : (s.context ?? "-")])).toEqual([
@@ -408,7 +408,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(ownWindow("opencode", "fake/fake-1").window).toBeUndefined();
   });
 
-  test("BUG-347/opencode-resume-baseline: in a resumed launch a session that was already there holds history: its first usage update beyond its records is a baseline, off its cost and off the title detection; a session created in this launch has none @full", async () => {
+  test("cost/this-launch-only: in a resumed launch a session that was already there holds history: its first usage update beyond its records is a baseline, off its cost and off the title detection; a session created in this launch has none @full #BUG-347/opencode-resume-baseline", async () => {
     const tokens = (input: number) => ({ input, output: 100, reasoning: 0, cache: { read: 0, write: 0 } });
     const stream = (created: boolean) => [
       ...(created ? [{ type: "session.created", data: { sessionID: "ses_01", model: { id: "fake-1", providerID: "fake" } } }] : [{ type: "session.step.started", data: { sessionID: "ses_01", model: { id: "fake-1", providerID: "fake" } } }]),
@@ -449,7 +449,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
   const liveRun = () => (liveOnce ??= figures(capture(LIVE), { models: live, session: "ses_REDACTED0001" }));
   const liveTracker = (ledger = new Ledger()) => frozenTracker({ harness: "opencode", conn: "openrouter", launchedKey: "openrouter/deepseek/deepseek-v4-flash", ledger });
 
-  test("live run 2: the % after each step is the footer's (1%: 7,450, 7,586 and 7,831 tokens), — after the compaction, then 7,243 tokens; Gluon's own window is models.dev's 1,048,576", async () => {
+  test("context/percentage: live run 2: the % after each step is the footer's (1%: 7,450, 7,586 and 7,831 tokens), — after the compaction, then 7,243 tokens; Gluon's own window is models.dev's 1,048,576", async () => {
     const f = await liveRun();
     const window = frozenWindow("openrouter/deepseek/deepseek-v4-flash");
     expect(window).toBe(1_048_576);
@@ -463,7 +463,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(f).toMatchObject({ contextTokens: 7_243, contextWindow: 1_048_576 });
   });
 
-  test("BUG-380/opencode-title-model: the title request (3 in, 7 out, 1,099 written; no step event, billed $0.000141175) is priced at the provider's small model as OpenCode picks it (the first family of gpt-luna, gemini-flash-lite, gemini-flash, claude-haiku the provider has), not the session's: 141 micro-USD like OpenCode's, not 9", async () => {
+  test("cost/opencode: the title request (3 in, 7 out, 1,099 written; no step event, billed $0.000141175) is priced at the provider's small model as OpenCode picks it (the first family of gpt-luna, gemini-flash-lite, gemini-flash, claude-haiku the provider has), not the session's: 141 micro-USD like OpenCode's, not 9 #BUG-380/opencode-title-model", async () => {
     const f = await liveRun();
     const side = f.steps!.filter((s) => s.side);
     expect(side).toEqual([{ n: expect.any(Number), model: "openrouter/openai/gpt-6-luna", input: 3, output: 7, reasoning: 0, cacheRead: 0, cacheWrite: 1_099, cost: expect.closeTo(0.000141175, 12), side: true }]);
@@ -500,7 +500,7 @@ describe("OpenCode 2.0.21: its plugin's figures against OpenCode's own footer", 
     expect(reportLines(wrong.entries).join("\n")).toContain("opencode side-model-assumed");
   });
 
-  test("a resumed session (live run 2): its history is a baseline, so only this launch's step is cost (the footer's $0.00 and 7,463 tokens), and no title is read out of the history", async () => {
+  test("cost/this-launch-only: a resumed session (live run 2): its history is a baseline, so only this launch's step is cost (the footer's $0.00 and 7,463 tokens), and no title is read out of the history", async () => {
     const saved = process.env.GLUON_RESUMED;
     process.env.GLUON_RESUMED = "1";
     try {
@@ -543,7 +543,7 @@ describe("issue #39, live run 2 (paid, API keys): what each harness displayed, s
     return { tracker, ledger, usages, pct: pct.filter((v, i) => i === 0 || v !== pct[i - 1]) };
   };
 
-  test("Claude Code Haiku 4.5 (200k): Gluon's own total is the micro-dollar sum of its requests (107,616) = what the status line and /cost showed ($0.1076), no request differs, the % follows each step, and — after /compact", async () => {
+  test("cost/claude-code: Claude Code Haiku 4.5 (200k): Gluon's own total is the micro-dollar sum of its requests (107,616) = what the status line and /cost showed ($0.1076), no request differs, the % follows each step, and — after /compact", async () => {
     const { tracker, ledger, usages, pct } = await claudeRun("claude-code-2.1.289-live-api-haiku-telemetry.jsonl", "claude-haiku-4-5", "anthropic/claude-haiku-4-5");
     const shown = statusLines("claude-code-2.1.289-live-api-haiku-statusline.jsonl");
     expect(usages.length).toBe(17);
@@ -558,7 +558,7 @@ describe("issue #39, live run 2 (paid, API keys): what each harness displayed, s
     expect(pct).toEqual(shownPct("claude-code-2.1.289-live-api-haiku-statusline.jsonl"));
   });
 
-  test("Claude Code Opus 4.6 [1m]: 394,424 (Claude's own OTEL total and status line: 0.39442375), every request equal, the % of a 1M window at each step (2, 3, —, 2), a Haiku title request and a subagent included", async () => {
+  test("cost/claude-code: Claude Code Opus 4.6 [1m]: 394,424 (Claude's own OTEL total and status line: 0.39442375), every request equal, the % of a 1M window at each step (2, 3, —, 2), a Haiku title request and a subagent included", async () => {
     const { tracker, ledger, pct } = await claudeRun("claude-code-2.1.289-live-api-opus-4-6-1m-telemetry.jsonl", "claude-opus-4-6[1m]", "anthropic/claude-opus-4-6");
     expect(Math.round(tracker.figure()!.usd * 1e6)).toBe(394_424);
     const shown = statusLines("claude-code-2.1.289-live-api-opus-4-6-1m-statusline.jsonl");
@@ -574,7 +574,7 @@ describe("issue #39, live run 2 (paid, API keys): what each harness displayed, s
     expect(costs.at(-1)).toBeCloseTo(0.39442375, 9);
   });
 
-  test("BUG-381/report-running-total: the running total is compared at its last sample per launch: the samples that were in flight (the plugin's ahead of the telemetry's) are not 64 differences, and the final totals agree", async () => {
+  test("ledger/audit: the running total is compared at its last sample per launch: the samples that were in flight (the plugin's ahead of the telemetry's) are not 64 differences, and the final totals agree #BUG-381/report-running-total", async () => {
     const shown = statusLines("claude-code-2.1.289-live-api-haiku-statusline.jsonl");
     const ledger = new Ledger();
     const tracker = frozenTracker({ harness: "claude-code", conn: "anthropic", launchedKey: "anthropic/claude-haiku-4-5", ledger });
@@ -631,7 +631,7 @@ describe("issue #39, live run 2 (paid): Codex 0.159.3 on an OpenAI API key, /sta
     return { contexts, usages, mains };
   }
 
-  test("the context is the main thread's last response (input + output), 0% of the 258K window as /status said (100% left); a spawned agent's and the title thread's requests are no context; the compaction's own request is —", async () => {
+  test("context/percentage: the context is the main thread's last response (input + output), 0% of the 258K window as /status said (100% left); a spawned agent's and the title thread's requests are no context; the compaction's own request is —", async () => {
     const { contexts } = await run();
     const seq = contexts.map((c) => c?.tokens ?? null);
     // /status: 11.1K, 11.5K, 11.8K, 12K, then compacted (Codex showed 5.42K: Gluon says unknown), then 11.5K (11,541), the fork's 11.8K.
@@ -643,7 +643,7 @@ describe("issue #39, live run 2 (paid): Codex 0.159.3 on an OpenAI API key, /sta
     for (const c of contexts.filter((c) => c)) expect(Math.round(ownPercent("codex", c!.tokens, window.window)!)).toBe(0);
   });
 
-  test("BUG-382/codex-fork-follows: after /fork the hooks run in the new thread (a new session_id); the context follows it from its first response, and not before (the old thread's figure stays until then)", async () => {
+  test("context/main-thread-only: after /fork the hooks run in the new thread (a new session_id); the context follows it from its first response, and not before (the old thread's figure stays until then) #BUG-382/codex-fork-follows", async () => {
     const { contexts, mains } = await run();
     // The thread the hooks named: the first, then the fork's (conversation ids of the telemetry are the same ids).
     expect(mains.length).toBe(2);
@@ -655,7 +655,7 @@ describe("issue #39, live run 2 (paid): Codex 0.159.3 on an OpenAI API key, /sta
     expect(first.slice(-1)).toEqual([11_541]);
   });
 
-  test("BUG-383/codex-api-key-no-turn-noise: an API-key launch gets no codex.turn_cost (the ChatGPT login only): nothing is pending, nothing dropped, no turn observation, however long it runs", async () => {
+  test("ledger/audit: an API-key launch gets no codex.turn_cost (the ChatGPT login only): nothing is pending, nothing dropped, no turn observation, however long it runs #BUG-383/codex-api-key-no-turn-noise", async () => {
     const { usages } = await run();
     const ledger = new Ledger();
     let now = 0;
@@ -670,7 +670,7 @@ describe("issue #39, live run 2 (paid): Codex 0.159.3 on an OpenAI API key, /sta
     expect(tracker.figure()).toMatchObject({ own: true });
   });
 
-  test("BUG-384/codex-usage-semantics: input_token_count includes the cached and the written tokens, output the reasoning, and service_tier is the requested tier — the real response (11,162 in, 11,129 cached, 30 written, 308 out of which 219 reasoning, priority) is priced so", async () => {
+  test("cost/codex: input_token_count includes the cached and the written tokens, output the reasoning, and service_tier is the requested tier — the real response (11,162 in, 11,129 cached, 30 written, 308 out of which 219 reasoning, priority) is priced so #BUG-384/codex-usage-semantics", async () => {
     const { usages } = await run();
     const real = usages.find((u) => u.harness === "codex" && u.input === 11_162);
     expect(real).toEqual({ harness: "codex", model: "gpt-6-luna", input: 11_162, cached: 11_129, cacheWrite: 30, output: 308, serviceTier: "priority" });
@@ -701,7 +701,7 @@ describe("issue #39, live run 2 (paid, Google account): Antigravity 1.2.16 on ge
   }
   const label = (tokens: number) => contextLabel(ownPercent("antigravity", tokens, frozenWindow("google/gemini-3.8-flash")));
 
-  test("BUG-388/agy-context-is-total-input: the % is total_input_tokens over Gluon's window (models.dev, 1,048,576), as agy counts its own: 1.67, 1.70, 1.80, 1.82 and 1.60 after each step, not current_usage's 1.2% (the last request's prompt)", async () => {
+  test("context/percentage: the % is total_input_tokens over Gluon's window (models.dev, 1,048,576), as agy counts its own: 1.67, 1.70, 1.80, 1.82 and 1.60 after each step, not current_usage's 1.2% (the last request's prompt) #BUG-388/agy-context-is-total-input", async () => {
     const window = frozenWindow("google/gemini-3.8-flash")!;
     expect(window).toBe(1_048_576);
     expect(ownWindow("antigravity", "gemini-3.8-flash").source).toBe("agy-table");
@@ -718,7 +718,7 @@ describe("issue #39, live run 2 (paid, Google account): Antigravity 1.2.16 on ge
     expect(ownWindow("antigravity", undefined, { launchedModel: "gemini-3.8-flash" })).toEqual(ownWindow("antigravity", "gemini-3.8-flash"));
   });
 
-  test("BUG-389/agy-clear-shows-the-new-conversation: after /clear (a new conversation id, the totals back to zero, no current_usage) the next reading is the row's figure at once; the old 19,098 tokens are never kept", async () => {
+  test("context/after-compact: after /clear (a new conversation id, the totals back to zero, no current_usage) the next reading is the row's figure at once; the old 19,098 tokens are never kept #BUG-389/agy-clear-shows-the-new-conversation", async () => {
     let shown: number | undefined;
     const seen: { id: string; tokens: number; label: string }[] = [];
     for (const r of readings) {
@@ -740,7 +740,7 @@ describe("issue #39, live run 2 (paid, Google account): Antigravity 1.2.16 on ge
     expect((await row(16_781, at(STEPS.clear))).tokens).toBeUndefined();
   });
 
-  test("BUG-387/agy-no-cost: nothing in the run is priced: the status line holds the conversation's size, which grew by 18,884 - 17,487 tokens over the run while the requests (a subagent's among them, absent from it) billed more; the row's cost is — and agy reports none", async () => {
+  test("cost/antigravity-none: nothing in the run is priced: the status line holds the conversation's size, which grew by 18,884 - 17,487 tokens over the run while the requests (a subagent's among them, absent from it) billed more; the row's cost is — and agy reports none #BUG-387/agy-no-cost", async () => {
     for (const r of readings) {
       expect(r.stdin).not.toHaveProperty("cost");
       expect((await row(undefined, r)).st.costUsd).toBeUndefined();
@@ -795,7 +795,7 @@ describe("issue #39, live run 2 (paid, SuperGrok subscription): Grok Build 1.0.4
   const requestObs = (ledger: Ledger) => ledger.entries.filter((e) => e.kind === "observation" && e.scope === "request") as { ownMicros: number; reportedMicros: number; cause: string }[];
   const cumulativeObs = (ledger: Ledger) => ledger.entries.filter((e) => e.kind === "observation" && e.scope === "cumulative") as { ownMicros: number; reportedMicros: number; cause: string }[];
 
-  test("every one of the 8 requests (a subagent's two among them) is Grok's own cost_usd_micros to the micro, at the table's rates; the 200k tier never applies", async () => {
+  test("cost/grok: every one of the 8 requests (a subagent's two among them) is Grok's own cost_usd_micros to the micro, at the table's rates; the 200k tier never applies", async () => {
     const f = await live();
     await f.to(Infinity);
     f.close();
@@ -806,7 +806,7 @@ describe("issue #39, live run 2 (paid, SuperGrok subscription): Grok Build 1.0.4
     expect(f.tracker.figure()).toMatchObject({ approx: true, own: true });
   });
 
-  test("the row after each step is the sum of the requests so far, and grok usage's own total to the micro: ~$0.03, ~$0.05, ~$0.09, ~$0.09 (the compaction adds nothing), ~$0.13", async () => {
+  test("cost/grok: the row after each step is the sum of the requests so far, and grok usage's own total to the micro: ~$0.03, ~$0.05, ~$0.09, ~$0.09 (the compaction adds nothing), ~$0.13", async () => {
     const f = await live();
     const rows: string[] = [];
     for (const step of STEPS) {
@@ -819,7 +819,7 @@ describe("issue #39, live run 2 (paid, SuperGrok subscription): Grok Build 1.0.4
     expect(STEPS.map((s) => report(s.usage).micros)).toEqual([25_722, 49_628, 93_026, 93_026, 127_144]);
   });
 
-  test("BUG-396/grok-4.7-footer-percent: the context % after each step is the last main request's input + output over Grok's own 256K window for grok-4.7 (its footer read 13K / 256K, then 17K / 256K): 5, 7, 7, — after /compact, 7 (it was 3-4 over models.dev's 500K)", async () => {
+  test("context/percentage: the context % after each step is the last main request's input + output over Grok's own 256K window for grok-4.7 (its footer read 13K / 256K, then 17K / 256K): 5, 7, 7, — after /compact, 7 (it was 3-4 over models.dev's 500K) #BUG-396/grok-4.7-footer-percent", async () => {
     const f = await live();
     const labels: string[] = [];
     for (const step of STEPS) {
@@ -831,7 +831,7 @@ describe("issue #39, live run 2 (paid, SuperGrok subscription): Grok Build 1.0.4
     expect(labels).toEqual(["5%", "7%", "7%", "—", "7%"]);
   });
 
-  test("BUG-390/grok-usage-race: grok usage is read 0.4 to 1.5 s before the turn's last OTLP batch reaches Gluon, so each report waits for the requests it counts and is then equal to ours: no 'unexplained' difference, no dropped entry", async () => {
+  test("ledger/audit: grok usage is read 0.4 to 1.5 s before the turn's last OTLP batch reaches Gluon, so each report waits for the requests it counts and is then equal to ours: no 'unexplained' difference, no dropped entry #BUG-390/grok-usage-race", async () => {
     const f = await live();
     // The best case for the old code: the report is looked at the instant Grok persisted it.
     const naive: number[] = [];
@@ -854,7 +854,7 @@ describe("issue #39, live run 2 (paid, SuperGrok subscription): Grok Build 1.0.4
     expect(reportLines(f.ledger.entries).join("\n")).not.toMatch(/unexplained|dropped/);
   });
 
-  test("BUG-391/grok-usage-includes-subagents: turn 3 is 4 model calls and $0.043398 in grok usage: the main thread's first and last request and the subagent's two; ours matches with no named 'subagent' cause", async () => {
+  test("ledger/audit: turn 3 is 4 model calls and $0.043398 in grok usage: the main thread's first and last request and the subagent's two; ours matches with no named 'subagent' cause #BUG-391/grok-usage-includes-subagents", async () => {
     const f = await live();
     await f.to(Infinity);
     f.close();
@@ -874,7 +874,7 @@ describe("issue #39, live run 2 (paid, SuperGrok subscription): Grok Build 1.0.4
     expect(cumulativeObs((g as unknown as { o: { ledger: Ledger } }).o.ledger).map((o) => o.cause)).toEqual(["none"]);
   });
 
-  test("BUG-392/grok-compaction-unpriced: /compact emits grok_code.compaction and no api_request: nothing is priced for it, the context is unknown, grok usage right after it counts no new call and no new cost, and the audit finds no difference", async () => {
+  test("cost/grok: /compact emits grok_code.compaction and no api_request: nothing is priced for it, the context is unknown, grok usage right after it counts no new call and no new cost, and the audit finds no difference #BUG-392/grok-compaction-unpriced", async () => {
     const f = await live();
     await f.to(STEPS[2]!.mark);
     const before = { usages: f.usages.length, own: micros(f.tracker), contexts: f.contexts.length };
@@ -918,7 +918,7 @@ describe("openrouter/* prices come from OpenRouter's own listing (BUG-469)", () 
     missing: [] as string[],
   };
 
-  test("BUG-469/openrouter-listing: the listing's per-token price (prompt, completion, cache read and write) replaces models.dev's, per million, and says so; models.dev's is kept where they differ", () => {
+  test("pricing/sources: the listing's per-token price (prompt, completion, cache read and write) replaces models.dev's, per million, and says so; models.dev's is kept where they differ #BUG-469/openrouter-listing", () => {
     const { entries, missing } = applyOpenRouter(picked.entries, picked.missing, listing, new Set([dsKey]));
     expect(missing).toEqual([]);
     expect(entries[dsKey]).toEqual({ cost: { input: 0.003, output: 2.4, cache_read: 0.003 }, context: 1_048_576, priceSource: "openrouter", modelsdevCost: { input: 0.3, output: 1.2, cache_read: 0.006 } });
@@ -934,13 +934,13 @@ describe("openrouter/* prices come from OpenRouter's own listing (BUG-469)", () 
     expect(Object.keys(entries)).not.toContain("openrouter/acme/new");
   });
 
-  test("BUG-469/openrouter-listing: a wanted openrouter key models.dev has no price for is taken from the listing, not left missing", () => {
+  test("pricing/sources: a wanted openrouter key models.dev has no price for is taken from the listing, not left missing #BUG-469/openrouter-listing", () => {
     const { entries, missing } = applyOpenRouter({}, ["openrouter/acme/new", "openrouter/acme/gone", "xai/grok-9"], listing, new Set(["openrouter/acme/new", "openrouter/acme/gone", "xai/grok-9"]));
     expect(entries["openrouter/acme/new"]).toEqual({ cost: { input: 2, output: 4 }, context: 64_000, priceSource: "openrouter" });
     expect(missing).toEqual(["openrouter/acme/gone", "xai/grok-9"]);
   });
 
-  test("BUG-474/openrouter-tiers: models.dev's long-context tier stays where OpenRouter lists one and goes where it lists none (a flat price)", () => {
+  test("pricing/sources: models.dev's long-context tier stays where OpenRouter lists one and goes where it lists none (a flat price) #BUG-474/openrouter-tiers", () => {
     const tier = { input: 10, output: 37.5, tier: { type: "context", size: 200_000 } };
     const flat = "openrouter/anthropic/claude-opus-4.7";
     const tiered = "openrouter/openai/gpt-5.4";
@@ -959,7 +959,7 @@ describe("openrouter/* prices come from OpenRouter's own listing (BUG-469)", () 
     for (const k of ["anthropic/claude-opus-4.6", "anthropic/claude-opus-4.7", "anthropic/claude-sonnet-4.6"]) expect(bundled[`openrouter/${k}`].cost.tiers).toBeUndefined();
   });
 
-  test("BUG-493/openrouter-endpoints: the generator records each wanted openrouter model's endpoint count and price range; the schema holds the shape", () => {
+  test("pricing/sources: the generator records each wanted openrouter model's endpoint count and price range; the schema holds the shape #BUG-493/openrouter-endpoints", () => {
     const ep = (prompt: string, completion: string) => ({ pricing: { prompt, completion } });
     const reply = { data: { endpoints: [ep("0.000000365", "0.000013"), ep("0.0000045", "0.0000225"), ep("0.000001", "0.00002"), { pricing: { prompt: "x" } }] } };
     expect(endpointRange(reply)).toEqual({ count: 3, input: { min: 0.365, max: 4.5 }, output: { min: 13, max: 22.5 } });
@@ -981,12 +981,12 @@ describe("openrouter/* prices come from OpenRouter's own listing (BUG-469)", () 
     expect(parseTable("modelsdev", table({ count: 2, input: { min: 1, max: 2 }, output: { min: 1, max: 2 }, url: "https://x.test" }))).toHaveProperty("problem");
   });
 
-  test("BUG-477/openrouter-listing-empty: an error body or an empty listing fails the generator instead of leaving models.dev's prices in", () => {
+  test("pricing/validated: an error body or an empty listing fails the generator instead of leaving models.dev's prices in #BUG-477/openrouter-listing-empty", () => {
     expect(() => applyOpenRouter(picked.entries, [], { data: [] }, new Set())).toThrow("no models");
     expect(() => applyOpenRouter(picked.entries, [], { error: { code: 429 } } as never, new Set())).toThrow("no models");
   });
 
-  test("BUG-469/openrouter-listing: the committed table prices the audited model at OpenRouter's rate", () => {
+  test("pricing/sources: the committed table prices the audited model at OpenRouter's rate #BUG-469/openrouter-listing", () => {
     const row = (BUNDLED_TABLES.modelsdev.entries as Record<string, any>)[dsKey];
     expect(row.priceSource).toBe("openrouter");
     expect(row.cost).toMatchObject({ input: 0.003, output: 2.4 });
@@ -1000,7 +1000,7 @@ describe("the price table reaches every model OpenCode can use on Gluon's connec
     "github-copilot": { models: { "gpt-6": { cost: { input: 1, output: 1 } } } },
   };
 
-  test("issue-39/modelsdev-wide: the wanted models first (with their priced modes, `missing` when the catalog has none), then every other priced model of the providers OpenCode reaches; a provider Gluon has no connection to is left out", () => {
+  test("pricing/sources: the wanted models first (with their priced modes, `missing` when the catalog has none), then every other priced model of the providers OpenCode reaches; a provider Gluon has no connection to is left out #issue-39/modelsdev-wide", () => {
     const { entries, missing } = select(catalog as never, new Set(["xai/grok-4.6", "xai/grok-9"]), ["openrouter", "xai"]);
     expect(missing).toEqual(["xai/grok-9"]);
     expect(Object.keys(entries)).toEqual(["openrouter/acme/big", "openrouter/acme/free-text", "xai/grok-4.6", "xai/grok-x"]);
@@ -1028,7 +1028,7 @@ describe("the price table reaches every model OpenCode can use on Gluon's connec
     ]);
   });
 
-  test("issue-39/modelsdev-format: one entry per line under a JSON header; it parses, and the same catalog gives the same bytes", () => {
+  test("pricing/sources: one entry per line under a JSON header; it parses, and the same catalog gives the same bytes #issue-39/modelsdev-format", () => {
     const { entries, missing } = select(catalog as never, new Set(["xai/grok-4.6"]), ["openrouter", "xai"]);
     const table = { schema: 1 as const, source: "models.dev", catalogUpdatedAt: "2026-10-01T00:00:00.000Z", generatedAt: "2026-10-04", catalogDigest: "ab".repeat(32), missing, entries };
     const text = format(table);
@@ -1040,7 +1040,7 @@ describe("the price table reaches every model OpenCode can use on Gluon's connec
 
 describe("BUG-476/report-last-sample: the report compares the running total at its last sample per launch, whatever the earlier ones showed", () => {
   // BUG-381's guard, kept apart from replay data: BUG-472 settles in-flight samples, so a replay no longer produces earlier samples that differ.
-  test("five earlier samples that differ are left out and counted; the last sample agrees: 0 differ", () => {
+  test("ledger/audit: five earlier samples that differ are left out and counted; the last sample agrees: 0 differ", () => {
     const ledger = new Ledger();
     const sample = (t: number, reportedMicros: number, ownMicros: number, cause: string) => ledger.add({ kind: "observation", what: "cost", t, harness: "claude-code", scope: "cumulative", reportedMicros, ownMicros, cause });
     for (let i = 1; i <= 5; i++) sample(i, i * 100_000, 0, "unexplained");

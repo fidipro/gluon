@@ -512,3 +512,34 @@ describe("BUG-707/tarball: the documented tarball install works from any directo
     expect(hits, `use bun add -g "$PWD/gluon-<version>.tgz" (absolute):\n${hits.join("\n")}`).toEqual([]);
   });
 });
+
+// Moved from adversarial-pkg-edfb.test.ts (issue #39, package F): every test marked "(mutation: …)" fails when
+// that mutation is applied to the workflows.
+describe("the workflows, beyond what the release workflow's pins above check", () => {
+  type Step = { uses?: string; run?: string; if?: string; with?: Record<string, unknown>; env?: Record<string, unknown> };
+  type Job = { permissions?: Record<string, string>; steps: Step[]; if?: string; needs?: unknown };
+  const dir = join(ROOT, ".github", "workflows");
+  const wfs = readdirSync(dir).filter((f) => f.endsWith(".yml")).map((f) => [f, (Bun as unknown as { YAML: { parse(t: string): { jobs: Record<string, Job> } } }).YAML.parse(readFileSync(join(dir, f), "utf8"))] as const);
+
+  test("there are workflows to check", () => {
+    expect(wfs.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test("every checkout, in every job, leaves no token in the git config (mutation: persist-credentials true)", () => {
+    for (const [f, wf] of wfs)
+      for (const [name, job] of Object.entries(wf.jobs)) for (const s of job.steps.filter((x) => x.uses?.startsWith("actions/checkout@"))) expect([f, name, s.with?.["persist-credentials"]]).toEqual([f, name, false]);
+  });
+
+  test("every action is pinned to a full commit hash, not a tag or a branch", () => {
+    for (const [f, wf] of wfs)
+      for (const [name, job] of Object.entries(wf.jobs)) for (const s of job.steps.filter((x) => x.uses)) expect([f, name, s.uses]).toEqual([f, name, expect.stringMatching(/^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/)]);
+  });
+
+  test("no step names the repository token in a `with`", () => {
+    for (const [f, wf] of wfs) for (const job of Object.values(wf.jobs)) for (const s of job.steps) expect([f, JSON.stringify(s.with ?? {})]).not.toEqual([f, expect.stringContaining("token")]);
+  });
+
+  test("no step interpolates attacker-influenced event text into a script (github.event.*, head_ref)", () => {
+    for (const [f, wf] of wfs) for (const job of Object.values(wf.jobs)) for (const s of job.steps) expect([f, s.run ?? ""]).not.toEqual([f, expect.stringMatching(/\$\{\{\s*github\.(event|head_ref)/)]);
+  });
+});

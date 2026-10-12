@@ -17,23 +17,23 @@ const dir = () => join(TMP, `d${++n}`, "gluon", "cost-audit");
 const usage = (over: object = {}) => ({ kind: "usage", t: 1_791_000_000_000, harness: "claude-code", model: "claude-opus-4-6", connection: "anthropic", channel: "otel", counts: { input: 3, output: 4, cacheWrite: 21_929 }, ownMicros: 137_171, assumptions: ["cache-ttl-assumed-5m"], table: "3a1d9fce", ...over });
 
 describe("what a ledger entry may hold", () => {
-  test("only whitelisted fields: no prompt, user id, host, path or free text ever passes through", () => {
+  test("ledger/entries: only whitelisted fields: no prompt, user id, host, path or free text ever passes through", () => {
     const e = sanitize({ ...usage(), "user.id": "abc", prompt: "secret text", host: "me-laptop", cwd: "/home/me/repo", session: "s1", counts: { input: 3, "user.email": 1, prompt_length: 9, output: 4 }, harnessVersion: "2.1.289" });
     expect(e).toEqual({ kind: "usage", t: 1_791_000_000_000, harness: "claude-code", harnessVersion: "2.1.289", model: "claude-opus-4-6", connection: "anthropic", channel: "otel", counts: { input: 3, output: 4 }, ownMicros: 137_171, assumptions: ["cache-ttl-assumed-5m"], table: "3a1d9fce" });
     expect(JSON.stringify(e)).not.toMatch(/secret|abc|laptop|repo|s1|email/);
   });
 
-  test("names that aren't names become '?', unknown assumptions and bad versions drop, counts are bounded integers", () => {
+  test("ledger/entries: names that aren't names become '?', unknown assumptions and bad versions drop, counts are bounded integers", () => {
     const e = sanitize(usage({ model: "has spaces and /etc/passwd\\n", connection: "x".repeat(500), assumptions: ["list-price", "launched-model-price", "rm -rf /"], harnessVersion: "1.0; DROP", counts: { input: -5, output: 1.7, cacheRead: Number.NaN, cached: 1e30 } }))!;
     expect(e).toMatchObject({ model: "?", connection: "?", assumptions: ["list-price", "launched-model-price"], counts: { output: 2 } });
     expect(e as object).not.toHaveProperty("harnessVersion");
   });
 
-  test("not entries: wrong kind, harness, channel, missing or negative money", () => {
+  test("ledger/entries: not entries: wrong kind, harness, channel, missing or negative money", () => {
     for (const bad of [null, "x", 3, {}, usage({ harness: "emacs" }), usage({ channel: "screen" }), usage({ ownMicros: -1 }), usage({ ownMicros: "1" }), usage({ t: Number.NaN }), { kind: "observation", t: 1, harness: "codex", scope: "weekly", reportedMicros: 1 }]) expect(sanitize(bad)).toBeNull();
   });
 
-  test("a context entry keeps both sides' tokens, window and percentage (bounded) and a cause from the list; a mismatch beyond a point is a divergence", () => {
+  test("ledger/entries: a context entry keeps both sides' tokens, window and percentage (bounded) and a cause from the list; a mismatch beyond a point is a divergence", () => {
     expect(sanitize({ kind: "context", t: 5, harness: "claude-code", ownTokens: 380_000, reportedTokens: 380_000, ownWindow: 1_000_000, reportedWindow: 2_000_000, ownPct: 38, reportedPct: 19, cause: "window", prompt: "x" })).toEqual({ kind: "context", t: 5, harness: "claude-code", ownTokens: 380_000, reportedTokens: 380_000, ownWindow: 1_000_000, reportedWindow: 2_000_000, ownPct: 38, reportedPct: 19, cause: "window" });
     expect(sanitize({ kind: "context", t: 5, harness: "claude-code", ownPct: 11.4, reportedPct: 2, cause: "window" })).toEqual({ kind: "context", t: 5, harness: "claude-code", ownPct: 11, reportedPct: 2, cause: "window" });
     // One side may be missing (Gluon has no figure of its own yet); a figure that is not valid is absent, the valid ones stay (BUG-368); a cause outside the list is dropped.
@@ -48,7 +48,7 @@ describe("what a ledger entry may hold", () => {
     expect(reportLines(l.entries.concat(sanitize(usage())!)).join("\n")).toContain("context % audited against the harness's own: 2 readings, 1 differ by more than a point\n  claude-code none: 1 reading (own 20%, reported 20%, on average)\n  claude-code window: 1 reading (own 11%, reported 2%, on average)");
   });
 
-  test("a dropped entry keeps what it was for, a reason slug and a count; nothing else", () => {
+  test("ledger/entries: a dropped entry keeps what it was for, a reason slug and a count; nothing else", () => {
     expect(sanitize({ kind: "dropped", t: 5, harness: "codex", what: "usage", reason: "side-conversation", count: 3, prompt: "x" })).toEqual({ kind: "dropped", t: 5, harness: "codex", what: "usage", reason: "side-conversation", count: 3 });
     for (const bad of [{ what: "prompt" }, { reason: "Not A Slug" }, { count: -1 }, { count: undefined }]) expect(sanitize({ kind: "dropped", t: 5, harness: "codex", what: "usage", reason: "x", count: 1, ...bad })).toBeNull();
     const l = new Ledger();
@@ -57,7 +57,7 @@ describe("what a ledger entry may hold", () => {
     expect(reportLines(l.entries.concat(sanitize(usage())!)).join("\n")).toContain("records Gluon did not count:\n  codex usage: side-conversation: 3");
   });
 
-  test("an observation keeps what it is of (cost unless it says context), its scope, reported and own figure and a cause slug", () => {
+  test("ledger/entries: an observation keeps what it is of (cost unless it says context), its scope, reported and own figure and a cause slug", () => {
     expect(sanitize({ kind: "observation", t: 5, harness: "opencode", what: "cost", scope: "request", reportedMicros: 134, ownMicros: 134, cause: "none", prompt: "x" })).toEqual({ kind: "observation", t: 5, harness: "opencode", what: "cost", scope: "request", reportedMicros: 134, ownMicros: 134, cause: "none" });
     expect(sanitize({ kind: "observation", t: 5, harness: "opencode", what: "context", scope: "turn", reportedMicros: 1, cause: "Not A Slug!" })).toEqual({ kind: "observation", t: 5, harness: "opencode", what: "context", scope: "turn", reportedMicros: 1 });
     // An entry from before `what` existed (or one with junk) is a cost.
@@ -72,7 +72,7 @@ describe("what a ledger entry may hold", () => {
 
 describe("explaining a difference", () => {
   const hyps = [{ name: "cache-ttl-1h", deltaMicros: 82_250 }, { name: "us-geo", deltaMicros: 14_500 }];
-  test("the hypothesis whose delta equals the residual; rounding is no divergence; nothing fits is 'unexplained'", () => {
+  test("ledger/audit: the hypothesis whose delta equals the residual; rounding is no divergence; nothing fits is 'unexplained'", () => {
     expect(explain(82_250, hyps)).toBe("cache-ttl-1h");
     expect(explain(82_251, hyps, 2)).toBe("cache-ttl-1h");
     expect(explain(14_500, hyps)).toBe("us-geo");
@@ -84,7 +84,7 @@ describe("explaining a difference", () => {
     expect(toleranceMicros(10)).toBe(1);
   });
 
-  test("a Ledger sums our own figure and lists observations that differ beyond rounding", () => {
+  test("ledger/audit: a Ledger sums our own figure and lists observations that differ beyond rounding", () => {
     const l = new Ledger();
     l.add(usage({ ownMicros: 100 }));
     l.add(usage({ ownMicros: 250 }));
@@ -95,7 +95,7 @@ describe("explaining a difference", () => {
     expect(l.divergences().map((d) => d.cause)).toEqual(["cache-ttl-1h"]);
   });
 
-  test("a sink that throws never breaks the launch", () => {
+  test("ledger/audit: a sink that throws never breaks the launch", () => {
     const l = new Ledger(() => {
       throw new Error("disk full");
     });
@@ -108,13 +108,13 @@ describe("the ledger on disk", () => {
     for (let i = 0; i < count; i++) open!(sanitize(usage({ t: 1_791_000_000_000 + i }))!);
   };
 
-  test("the state directory by platform", () => {
+  test("ledger/file: the state directory by platform", () => {
     expect(ledgerDir({ XDG_STATE_HOME: "/s" }, "linux", "/h")).toBe("/s/gluon/cost-audit");
     expect(ledgerDir({}, "linux", "/h")).toBe("/h/.local/state/gluon/cost-audit");
     expect(ledgerDir({ LOCALAPPDATA: "C:\\L" }, "win32", "C:\\h")).toBe("C:\\L\\gluon\\cost-audit");
   });
 
-  test.skipIf(process.platform === "win32")("private from the start: directory 0700, file 0600, one line per entry, readable back", () => {
+  test.skipIf(process.platform === "win32")("ledger/file: private from the start: directory 0700, file 0600, one line per entry, readable back", () => {
     const d = dir();
     const open = openLedgerFile(d, { now: () => 1_791_000_000_000, pid: 42 });
     write(open, 3);
@@ -126,7 +126,7 @@ describe("the ledger on disk", () => {
     expect(readLedger(d)).toHaveLength(3);
   });
 
-  test("a partial last line and junk lines are skipped; another entry's fields never come back", () => {
+  test("ledger/file: a partial last line and junk lines are skipped; another entry's fields never come back", () => {
     const d = dir();
     const open = openLedgerFile(d, { now: () => 1_791_000_000_000, pid: 1 });
     write(open, 2);
@@ -138,7 +138,7 @@ describe("the ledger on disk", () => {
     expect(readLedger(join(TMP, "nothing-here"))).toEqual([]);
   });
 
-  test("capped: a launch writes at most MAX_PER_MINUTE entries a minute, and starts again the next minute", () => {
+  test("ledger/caps: capped: a launch writes at most MAX_PER_MINUTE entries a minute, and starts again the next minute", () => {
     const d = dir();
     let t = 1_791_000_000_000;
     const open = openLedgerFile(d, { now: () => t, pid: 2 });
@@ -151,7 +151,7 @@ describe("the ledger on disk", () => {
 
   const droppedIn = (d: string) => readLedger(d).filter((e): e is DroppedEntry => e.kind === "dropped");
 
-  test("BUG-353/cap-marker: the first entry a cap refuses leaves one dropped marker; the rest is silent, and the next minute's first write adds the count", () => {
+  test("ledger/caps: the first entry a cap refuses leaves one dropped marker; the rest is silent, and the next minute's first write adds the count #BUG-353/cap-marker", () => {
     const d = dir();
     let t = 1_791_000_000_000;
     const open = openLedgerFile(d, { now: () => t, pid: 20 });
@@ -166,7 +166,7 @@ describe("the ledger on disk", () => {
     expect(reportLines(readLedger(d)).join("\n")).toContain("claude-code usage: rate-cap: 50");
   });
 
-  test("BUG-403/cap-marker-at-quit: what the rate cap refused after its marker is added when the writer is closed (quit), not lost; nothing is written after the close; a second close adds nothing", () => {
+  test("ledger/caps: what the rate cap refused after its marker is added when the writer is closed (quit), not lost; nothing is written after the close; a second close adds nothing #BUG-403/cap-marker-at-quit", () => {
     const d = dir();
     const t = 1_791_000_000_000;
     const open = openLedgerFile(d, { now: () => t, pid: 21 });
@@ -181,7 +181,7 @@ describe("the ledger on disk", () => {
     expect(reportLines(readLedger(d)).join("\n")).toContain("claude-code usage: rate-cap: 50");
   });
 
-  test("BUG-353/cap-marker: the size cap leaves one marker inside the file's budget, never beyond MAX_FILE_BYTES", () => {
+  test("ledger/caps: the size cap leaves one marker inside the file's budget, never beyond MAX_FILE_BYTES #BUG-353/cap-marker", () => {
     const d = dir();
     let t = 1_791_000_000_000;
     const open = openLedgerFile(d, { now: () => t, pid: 21 })!;
@@ -202,7 +202,7 @@ describe("the ledger on disk", () => {
     expect(statSync(file).size).toBe(size);
   });
 
-  test("BUG-353/cap-marker: files pruned past MAX_FILES are said at the launch's first write", () => {
+  test("ledger/caps: files pruned past MAX_FILES are said at the launch's first write #BUG-353/cap-marker", () => {
     const d = dir();
     mkdirSync(d, { recursive: true });
     for (let i = 0; i < MAX_FILES + 2; i++) writeFileSync(join(d, `20260101T0000${String(10 + i).padStart(2, "0")}-${i}.jsonl`), "");
@@ -212,7 +212,7 @@ describe("the ledger on disk", () => {
     expect(readLedger(d).filter((e) => e.kind === "usage")).toHaveLength(2);
   });
 
-  test("at most MAX_FILES files are kept: the oldest go when a new one starts", () => {
+  test("ledger/caps: at most MAX_FILES files are kept: the oldest go when a new one starts", () => {
     const d = dir();
     mkdirSync(d, { recursive: true });
     for (let i = 0; i < MAX_FILES + 5; i++) writeFileSync(join(d, `20260101T0000${String(10 + i).padStart(2, "0")}-${i}.jsonl`), "");
@@ -223,7 +223,7 @@ describe("the ledger on disk", () => {
     expect(files[0]).not.toMatch(/T000010-0/);
   });
 
-  test.skipIf(process.platform === "win32")("never writes through a symlink planted at its path; failures return null, never throw", () => {
+  test.skipIf(process.platform === "win32")("ledger/file: never writes through a symlink planted at its path; failures return null, never throw", () => {
     const d = dir();
     mkdirSync(d, { recursive: true });
     const target = join(TMP, "victim.txt");
@@ -234,7 +234,7 @@ describe("the ledger on disk", () => {
     expect(openLedgerFile(join(target, "inside-a-file"), {})).toBeNull();
   });
 
-  test.skipIf(process.platform === "win32")("BUG-357/ledger-dir: an existing directory with a loose mode is set back to 0700; a symlink in its place is refused, and what it points to is untouched", () => {
+  test.skipIf(process.platform === "win32")("ledger/file: an existing directory with a loose mode is set back to 0700; a symlink in its place is refused, and what it points to is untouched #BUG-357/ledger-dir", () => {
     const d = dir();
     mkdirSync(d, { recursive: true, mode: 0o755 });
     chmodSync(d, 0o755);
@@ -258,7 +258,7 @@ describe("the ledger on disk", () => {
     expect(openLedgerFile(file, { pid: 32 })).toBeNull();
   });
 
-  test.skipIf(process.platform === "win32" || process.getuid === undefined)("BUG-357/ledger-dir: a directory owned by someone else is refused (checked against the process's uid)", () => {
+  test.skipIf(process.platform === "win32" || process.getuid === undefined)("ledger/file: a directory owned by someone else is refused (checked against the process's uid) #BUG-357/ledger-dir", () => {
     const d = dir();
     mkdirSync(d, { recursive: true });
     const uid = process.getuid!;
@@ -272,7 +272,7 @@ describe("the ledger on disk", () => {
     expect(readdirSync(d)).toEqual([]);
   });
 
-  test.skipIf(process.platform === "win32")("removeLedger unlinks a symlink at the path and leaves what it points to", () => {
+  test.skipIf(process.platform === "win32")("ledger/file: removeLedger unlinks a symlink at the path and leaves what it points to", () => {
     const real = join(TMP, "linked-target");
     mkdirSync(real);
     writeFileSync(join(real, "keep.jsonl"), "x");
@@ -285,7 +285,7 @@ describe("the ledger on disk", () => {
     removeLedger(link); // nothing there: no throw
   });
 
-  test("removeLedger deletes every file and the directory", () => {
+  test("ledger/file: removeLedger deletes every file and the directory", () => {
     const d = dir();
     write(openLedgerFile(d, { now: () => 1_791_000_000_000, pid: 5 }));
     removeLedger(d);
@@ -294,7 +294,7 @@ describe("the ledger on disk", () => {
 });
 
 describe("gluon cost-report (src/cost/report.ts)", () => {
-  test("per harness and model, the audit and its causes, unknown models, the table's age", () => {
+  test("ledger/report: per harness and model, the audit and its causes, unknown models, the table's age", () => {
     const l = new Ledger();
     l.add(usage({ ownMicros: 137_171, harnessVersion: "2.1.289" }));
     l.add(usage({ ownMicros: 28_000, assumptions: [] }));
@@ -311,11 +311,11 @@ describe("gluon cost-report (src/cost/report.ts)", () => {
     expect(text).toContain("claude-code cache-ttl-1h: 1 observation, +$0.07 (the harness's figure minus ours)");
     expect(text).toContain("no price in the table for: grok-build grok-9");
   });
-  test("an empty ledger says so, and where it would be", () => {
+  test("ledger/report: an empty ledger says so, and where it would be", () => {
     expect(reportLines([], { dir: "/x" }).join("\\n")).toContain("no cost audit entries in /x yet");
   });
 
-  test("BUG-354/report-scopes: turn and cumulative observations are aggregated beside the request ones, a causes table for each scope", () => {
+  test("ledger/report: turn and cumulative observations are aggregated beside the request ones, a causes table for each scope #BUG-354/report-scopes", () => {
     const l = new Ledger();
     l.add(usage());
     l.add({ kind: "observation", t: 2, harness: "codex", scope: "turn", reportedMicros: 500_000, ownMicros: 400_000, cause: "cached-input" });
@@ -330,7 +330,7 @@ describe("gluon cost-report (src/cost/report.ts)", () => {
     expect(text).toContain("reported by a harness with no figure of ours to compare: 1 observation");
   });
 
-  test("BUG-355/report-without-usage: context-only and dropped-only ledgers (Antigravity has no usage entries) still report; a one-sided reading is counted", () => {
+  test("ledger/report: context-only and dropped-only ledgers (Antigravity has no usage entries) still report; a one-sided reading is counted #BUG-355/report-without-usage", () => {
     const l = new Ledger();
     l.add({ kind: "context", t: 1, harness: "antigravity", reportedPct: 40, reportedTokens: 400_000, reportedWindow: 1_000_000 });
     l.add({ kind: "context", t: 2, harness: "antigravity", ownPct: 30, ownTokens: 300_000, ownWindow: 1_000_000, reportedPct: 35, reportedTokens: 350_000, reportedWindow: 1_000_000, cause: "tokens" });
@@ -345,7 +345,7 @@ describe("gluon cost-report (src/cost/report.ts)", () => {
     expect(text).toContain("price table: models.dev of undated");
   });
 
-  test("BUG-360/table-age: the tables listed are the ones tables.ts exports metadata for (models.dev, Claude Code's catalog, Codex's windows and Grok's models today; a digest in `catalogDigest` or `digest`, a date in `catalogUpdatedAt` or `generatedAt`)", () => {
+  test("ledger/report: the tables listed are the ones tables.ts exports metadata for (models.dev, Claude Code's catalog, Codex's windows and Grok's models today; a digest in `catalogDigest` or `digest`, a date in `catalogUpdatedAt` or `generatedAt`) #BUG-360/table-age", () => {
     const infos = tableInfos();
     expect(infos.map((t) => t.source)).toEqual(["claude-code binary", "codex debug models", "grok binary default_models.json", "models.dev"]);
     expect(infos.find((t) => t.source === "grok binary default_models.json")).toMatchObject({ version: GROK_MODELS.grokVersion, updatedAt: GROK_MODELS.generatedAt, digest: GROK_MODELS.digest });
