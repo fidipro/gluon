@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: mkdir -p .harness-watch && cp test/harnesses.json .harness-watch/
       - if: steps.bump.outputs.changed == 'true' && steps.seen.outputs.cache-hit != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harness-pin
           path: test/harnesses.json
@@ -123,7 +123,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: harness-pin
           path: pin
@@ -136,7 +136,7 @@ jobs:
           set -euo pipefail
           cp pin/harnesses.json test/harnesses.json
           for h in claude-code codex opencode kimi-code; do bun scripts/capture-screens.ts --harness "$h" --pinned --update; done
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harness-screens
           path: test/fixtures/screens/
@@ -154,13 +154,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: harness-pin
           path: pin
       # The captured screens replace the fixtures whole (a version's file goes with it): a person reviews their diff.
       - run: rm -rf test/fixtures/screens
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: harness-screens
           path: test/fixtures/screens
