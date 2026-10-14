@@ -32,11 +32,11 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@anthropic-ai/bedrock-sdk": "^0.33.8",
-    "@anthropic-ai/claude-agent-sdk": "^0.3.289",
-    "@anthropic-ai/sdk": "^0.131.0",
-    "@aws-sdk/client-bedrock-runtime": "^3.1142.0",
-    "@aws-sdk/credential-providers": "^3.1146.0",
+    "@anthropic-ai/bedrock-sdk": "^0.34.4",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.296",
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1149.0",
+    "@aws-sdk/credential-providers": "^3.1149.0",
     "@sigstore/bundle": "5.0.0",
     "@sigstore/protobuf-specs": "0.5.2",
     "@sigstore/tuf": "5.0.0",
@@ -46,11 +46,11 @@
     "chalk": "^6.0.1",
     "ink": "^7.1.1",
     "ink-text-input": "^6.0.0",
-    "openai": "^7.28.0",
+    "openai": "^7.32.0",
     "react": "^19.3.0",
     "wrap-ansi": "^10.0.2",
     "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "version": "1.2.0",
   "bin": {
